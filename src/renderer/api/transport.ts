@@ -5,7 +5,7 @@
 
 // Detect if running in Electron (has window.skillsfan via preload)
 export function isElectron(): boolean {
-  return typeof window !== 'undefined' && 'halo' in window
+  return typeof window !== 'undefined' && 'skillsfan' in window
 }
 
 // Detect if running as remote web client

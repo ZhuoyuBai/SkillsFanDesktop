@@ -9,7 +9,6 @@ import { SPACE_ICONS, DEFAULT_SPACE_ICON } from '../types'
 import type { Space, CreateSpaceInput, SpaceIconId } from '../types'
 import {
   SpaceIcon,
-  Sparkles,
   Settings,
   Plus,
   Trash2,
@@ -44,7 +43,7 @@ export function HomePage() {
   // Path selection state
   const [useCustomPath, setUseCustomPath] = useState(false)
   const [customPath, setCustomPath] = useState<string | null>(null)
-  const [defaultPath, setDefaultPath] = useState<string>('~/.halo/spaces')
+  const [defaultPath, setDefaultPath] = useState<string>('~/.skillsfan/spaces')
 
   // Load spaces on mount
   useEffect(() => {
@@ -137,7 +136,7 @@ export function HomePage() {
     if (!space) return
 
     // Check if it's a custom path (not under default spaces directory)
-    const isCustomPath = !space.path.includes('/.halo/spaces/')
+    const isCustomPath = !space.path.includes('/.skillsfan/spaces/')
 
     const message = isCustomPath
       ? t('Are you sure you want to delete this space?\n\nOnly Halo data (conversation history) will be deleted, your project files will be kept.')
@@ -221,7 +220,7 @@ export function HomePage() {
             className="skillsfan-space-card p-6 rounded-xl cursor-pointer mb-8 animate-fade-in"
           >
             <div className="flex items-center gap-3">
-              <Sparkles className="w-6 h-6 text-primary" />
+              <HaloLogo size={24} animated={false} />
               <div>
                 <h2 className="text-lg font-medium">{t('Enter Halo')}</h2>
                 <p className="text-sm text-muted-foreground mt-1">
@@ -306,7 +305,7 @@ export function HomePage() {
 
       {/* Create Space Dialog */}
       {showCreateDialog && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 no-drag">
           <div className="bg-card border border-border rounded-xl p-6 w-full max-w-md animate-fade-in">
             <h2 className="text-lg font-medium mb-4">{t('Create Dedicated Space')}</h2>
 
@@ -449,7 +448,7 @@ export function HomePage() {
 
       {/* Edit Space Dialog */}
       {editingSpace && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 no-drag">
           <div className="bg-card border border-border rounded-xl p-6 w-full max-w-md animate-fade-in">
             <h2 className="text-lg font-medium mb-4">{t('Edit Space')}</h2>
 

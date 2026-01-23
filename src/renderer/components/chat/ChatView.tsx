@@ -18,7 +18,7 @@ import { useSmartScroll } from '../../hooks/useSmartScroll'
 import { MessageList } from './MessageList'
 import { InputArea } from './InputArea'
 import { ScrollToBottomButton } from './ScrollToBottomButton'
-import { Sparkles } from '../icons/ToolIcons'
+import { HaloLogo } from '../brand/HaloLogo'
 import {
   ONBOARDING_ARTIFACT_NAME,
   getOnboardingAiResponse,
@@ -349,7 +349,7 @@ function EmptyState({ isTemp, isCompact = false }: { isTemp: boolean; isCompact?
   if (isCompact) {
     return (
       <div className="h-full flex flex-col items-center justify-center text-center px-4">
-        <Sparkles className="w-8 h-8 text-primary/70" />
+        <HaloLogo size={32} animated={false} />
         <p className="mt-4 text-sm text-muted-foreground">
           {t('Continue the conversation here')}
         </p>
@@ -360,7 +360,7 @@ function EmptyState({ isTemp, isCompact = false }: { isTemp: boolean; isCompact?
   return (
     <div className="h-full flex flex-col items-center justify-center text-center px-8">
       {/* Icon */}
-      <Sparkles className="w-12 h-12 text-primary" />
+      <HaloLogo size={48} animated={false} />
 
       {/* Title */}
       <h2 className="mt-6 text-xl font-medium">
