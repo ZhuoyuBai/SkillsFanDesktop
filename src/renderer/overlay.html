@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <!-- CSP is relaxed for development (Vite HMR needs ws: connections) -->
     <!-- Production build will have stricter CSP -->
-    <title>Halo Overlay</title>
+    <title>技能范 Overlay</title>
     <style>
       /* Transparent background for overlay */
       html, body, #root {
@@ -21,7 +21,7 @@
       // Apply theme from main window
       (function() {
         try {
-          var theme = localStorage.getItem('halo-theme');
+          var theme = localStorage.getItem('skillsfan-theme');
           if (theme === 'light') {
             document.documentElement.classList.add('light');
           } else if (theme === 'system') {

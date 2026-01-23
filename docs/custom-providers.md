@@ -1,6 +1,6 @@
 # AI Source Provider Development Guide
 
-This guide explains how to create a custom AI source provider for Halo.
+This guide explains how to create a custom AI source provider for SkillsFan.
 
 ## Quick Start
 

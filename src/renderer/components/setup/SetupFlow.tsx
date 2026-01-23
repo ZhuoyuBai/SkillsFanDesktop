@@ -11,6 +11,7 @@ import { LoginSelector } from './LoginSelector'
 import { ApiSetup } from './ApiSetup'
 import { useTranslation } from '../../i18n'
 import { Loader2 } from 'lucide-react'
+import { HaloLogo } from '../brand/HaloLogo'
 
 type SetupStep = 'select' | 'oauth-waiting' | 'custom'
 
@@ -121,10 +122,8 @@ export function SetupFlow() {
       <div className="h-full w-full flex flex-col items-center justify-center bg-background p-8">
         {/* Header with Logo */}
         <div className="flex flex-col items-center mb-10">
-          <div className="w-20 h-20 rounded-full border-2 border-primary/60 flex items-center justify-center halo-glow">
-            <div className="w-14 h-14 rounded-full bg-gradient-to-br from-primary/30 to-transparent" />
-          </div>
-          <h1 className="mt-4 text-3xl font-light tracking-wide">Halo</h1>
+          <HaloLogo size={80} />
+          <h1 className="mt-4 text-3xl font-light tracking-wide">技能范</h1>
         </div>
 
         {/* Loading state */}

@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="../resources/icon.png" alt="Halo Logo" width="120" height="120">
+<img src="../resources/icon.png" alt="SkillsFan Logo" width="120" height="120">
 
-# Halo
+# SkillsFan
 
 ### Claude Code 的图形界面
 
@@ -31,7 +31,7 @@
 
 ---
 
-## 为什么选择 Halo？
+## 为什么选择 SkillsFan？
 
 **Claude Code 是目前最强大的 AI 编程助手。** 但有一个问题：
 
@@ -39,11 +39,11 @@
 
 对于熟悉命令行的开发者来说，这没什么。但对于设计师、产品经理、学生，以及所有希望 AI *帮忙做事* 的人来说，终端是一道门槛。
 
-**Halo 打破了这道门槛。**
+**SkillsFan 打破了这道门槛。**
 
 我们把 Claude Code 100% 的 Agent 能力，包装进一个人人都能用的可视化界面。同样的能力，零摩擦。
 
-| | Claude Code CLI | Halo |
+| | Claude Code CLI | SkillsFan |
 |---|:---:|:---:|
 | 完整 Agent 能力 | ✅ | ✅ |
 | 可视化界面 | ❌ | ✅ |
@@ -54,7 +54,7 @@
 
 > 可以这样理解：
 > **Windows** 把 DOS 变成了可视化桌面。
-> **Halo** 把 Claude Code CLI 变成了可视化 AI 伙伴。
+> **SkillsFan** 把 Claude Code CLI 变成了可视化 AI 伙伴。
 
 ---
 
@@ -65,7 +65,7 @@
 <td width="50%">
 
 ### 真正的 Agent 循环
-不只是聊天。Halo 能**真正做事** — 写代码、创建文件、执行命令，持续迭代直到任务完成。
+不只是聊天。SkillsFan 能**真正做事** — 写代码、创建文件、执行命令，持续迭代直到任务完成。
 
 ### 空间系统
 隔离的工作空间让你的项目井井有条。每个空间都有独立的文件、对话和上下文。
@@ -77,7 +77,7 @@
 <td width="50%">
 
 ### 远程访问
-从手机或任何浏览器控制你的桌面 Halo。随时随地工作 — 甚至在医院病床上（真实故事）。
+从手机或任何浏览器控制你的桌面 SkillsFan。随时随地工作 — 甚至在医院病床上（真实故事）。
 
 ### AI 浏览器
 让 AI 控制真实的内嵌浏览器。网页抓取、表单填写、测试 — 全部自动化。
@@ -107,7 +107,7 @@
 ![Chat Todo](./assets/chat_todo.jpg)
 
 
-*远程访问：从任何地方控制 Halo*
+*远程访问：从任何地方控制 SkillsFan*
 
 ![Remote Settings](./assets/remote_setting.jpg)
 <p align="center">
@@ -147,7 +147,7 @@ npm run dev
 
 ## 快速开始
 
-1. **启动 Halo** 并输入你的 API 密钥（推荐 Anthropic）
+1. **启动 SkillsFan** 并输入你的 API 密钥（推荐 Anthropic）
 2. **开始聊天** — 试试 "用 React 创建一个简单的待办事项应用"
 3. **见证魔法** — 看着文件在产物栏中出现
 4. **预览和迭代** — 点击任何文件预览，要求修改
@@ -160,7 +160,7 @@ npm run dev
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                          Halo 桌面端                             │
+│                          SkillsFan 桌面端                             │
 │  ┌─────────────┐    ┌─────────────┐    ┌───────────────────┐   │
 │  │   React UI  │◄──►│    主进程    │◄──►│  Claude Code SDK  │   │
 │  │  (渲染进程)  │IPC │   (Main)    │    │   (Agent 循环)    │   │
@@ -180,16 +180,16 @@ npm run dev
 
 ---
 
-## 用户在用 Halo 做什么
+## 用户在用 SkillsFan 做什么
 
-Halo 不只是给开发者用的。我们看到：
+SkillsFan 不只是给开发者用的。我们看到：
 
 - **金融团队** 从零开始构建全栈应用 — 完全没有编程经验
 - **设计师** 制作交互原型
 - **学生** 以 AI 作为编程伙伴学习编程
 - **开发者** 以前所未有的速度交付功能
 
-障碍不再是 AI 的能力，**而是可及性**。Halo 消除了这个障碍。
+障碍不再是 AI 的能力，**而是可及性**。SkillsFan 消除了这个障碍。
 
 ---
 
@@ -221,13 +221,13 @@ Halo 不只是给开发者用的。我们看到：
 
 ## 参与贡献
 
-Halo 开源是因为 AI 应该人人可及。
+SkillsFan 开源是因为 AI 应该人人可及。
 
 我们欢迎各种贡献：
 
 - **翻译** — 帮助我们触达更多用户（见 `src/renderer/i18n/`）
 - **Bug 报告** — 发现问题？告诉我们
-- **功能建议** — 什么能让 Halo 更好用？
+- **功能建议** — 什么能让 SkillsFan 更好用？
 - **代码贡献** — 欢迎 PR！
 
 ```bash
@@ -252,7 +252,7 @@ npm run dev
 </p>
 
 <p align="center">
-  <em>如二维码过期，可加微信：helloddbb<strong>_</strong>（注意末尾有下划线，昵称"混沌数字"），备注"Halo"，将邀请入群</em>
+  <em>如二维码过期，可加微信：helloddbb<strong>_</strong>（注意末尾有下划线，昵称"混沌数字"），备注"SkillsFan"，将邀请入群</em>
 </p>
 
 <p align="center">
@@ -267,7 +267,7 @@ MIT 许可证 — 详见 [LICENSE](../LICENSE)。
 
 ---
 
-## Halo 背后的故事
+## SkillsFan 背后的故事
 
 几个月前，一切始于一个简单的困扰：**我想用 Claude Code，但整天都在开会。**
 
@@ -275,12 +275,12 @@ MIT 许可证 — 详见 [LICENSE](../LICENSE)。
 
 然后又遇到另一个问题 — 我的非技术同事看到 Claude Code 能做什么后也想试试。但他们卡在了安装环节。*"什么是 npm？怎么安装 Node.js？"* 有些人花了好几天也没搞定。
 
-所以我为自己做了 Halo：
+所以我为自己做了 SkillsFan：
 - **可视化界面** — 不用再盯着终端输出
 - **一键安装** — 不需要 Node.js，不需要 npm，下载即用
 - **远程访问** — 从手机、平板或任何浏览器控制
 
-第一版只用了几个小时。之后的所有功能？**100% 由 Halo 自己构建。** 我们已经日常使用好几个月了。
+第一版只用了几个小时。之后的所有功能？**100% 由 SkillsFan 自己构建。** 我们已经日常使用好几个月了。
 
 AI 构建 AI。现在人人可用。
 
@@ -290,9 +290,9 @@ AI 构建 AI。现在人人可用。
 
 ### 由 AI 构建，为人类服务。
 
-如果 Halo 帮你创造了精彩的东西，我们很想听听。
+如果 SkillsFan 帮你创造了精彩的东西，我们很想听听。
 
-**Star 这个仓库** 帮助更多人发现 Halo。
+**Star 这个仓库** 帮助更多人发现 SkillsFan。
 
 [![Star History Chart](https://api.star-history.com/svg?repos=openkursar/hello-halo&type=Date)](https://star-history.com/#openkursar/hello-halo&Date)
 

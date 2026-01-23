@@ -51,7 +51,7 @@ function applyTheme(theme: 'light' | 'dark' | 'system') {
 
   // Save to localStorage for anti-flash script
   try {
-    localStorage.setItem('halo-theme', theme)
+    localStorage.setItem('skillsfan-theme', theme)
   } catch (e) { /* ignore */ }
 
   let isDark: boolean

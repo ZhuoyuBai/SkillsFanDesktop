@@ -3,7 +3,7 @@
  * Automatically selects the appropriate transport based on environment
  */
 
-// Detect if running in Electron (has window.halo via preload)
+// Detect if running in Electron (has window.skillsfan via preload)
 export function isElectron(): boolean {
   return typeof window !== 'undefined' && 'halo' in window
 }
@@ -198,7 +198,7 @@ export function unsubscribeFromConversation(conversationId: string): void {
 export function onEvent(channel: string, callback: (data: unknown) => void): () => void {
   if (isElectron()) {
     // Use IPC in Electron
-    const methodMap: Record<string, keyof typeof window.halo> = {
+    const methodMap: Record<string, keyof typeof window.skillsfan> = {
       'agent:message': 'onAgentMessage',
       'agent:tool-call': 'onAgentToolCall',
       'agent:tool-result': 'onAgentToolResult',
@@ -217,8 +217,8 @@ export function onEvent(channel: string, callback: (data: unknown) => void): () 
     }
 
     const method = methodMap[channel]
-    if (method && typeof window.halo[method] === 'function') {
-      return (window.halo[method] as (cb: (data: unknown) => void) => () => void)(callback)
+    if (method && typeof window.skillsfan[method] === 'function') {
+      return (window.skillsfan[method] as (cb: (data: unknown) => void) => () => void)(callback)
     }
 
     return () => {}

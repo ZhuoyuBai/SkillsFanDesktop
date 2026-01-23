@@ -5,7 +5,7 @@ out
 
 # TypeScript build cache
 *.tsbuildinfo
-.halo
+.skillsfan
 
 # Release notes temp file
 .release-notes-current.md
@@ -21,7 +21,7 @@ tests/e2e/results/
 local_docs/
 
 # Local plugins
-halo-local/
+skillsfan-local/
 product.json
 
 # Local deploy scripts

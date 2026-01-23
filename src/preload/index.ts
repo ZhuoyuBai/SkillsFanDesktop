@@ -457,7 +457,7 @@ const api: HaloAPI = {
   onBootstrapExtendedReady: (callback) => createEventListener('bootstrap:extended-ready', callback as (data: unknown) => void),
 }
 
-contextBridge.exposeInMainWorld('halo', api)
+contextBridge.exposeInMainWorld('skillsfan', api)
 
 // Analytics: Listen for tracking events from main process
 // Baidu Tongji SDK is loaded in index.html, we just need to call _hmt.push()
@@ -519,7 +519,7 @@ const electronAPI = {
 
 contextBridge.exposeInMainWorld('electron', electronAPI)
 
-// TypeScript declaration for window.halo and window.platform
+// TypeScript declaration for window.skillsfan and window.platform
 declare global {
   interface Window {
     halo: HaloAPI

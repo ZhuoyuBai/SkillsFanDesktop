@@ -1,6 +1,6 @@
-# Contributing to Halo
+# Contributing to SkillsFan
 
-Thanks for your interest in contributing to Halo! This guide will help you get started.
+Thanks for your interest in contributing to SkillsFan! This guide will help you get started.
 
 ## About This Project
 
@@ -114,7 +114,7 @@ git checkout -b feat/new-feature-name
 
 ### 3. Development
 
-💡 **Recommended**: Use **Halo + Claude Opus 4.5** for development!
+💡 **Recommended**: Use **SkillsFan + Claude Opus 4.5** for development!
 
 - Follow the [Code Guidelines](#code-guidelines)
 - Write code and comments in English
@@ -157,11 +157,11 @@ Then create a PR on GitHub:
 - Address any feedback if requested
 - Once approved, maintainers will merge and handle final testing/building
 
-## Extending Halo
+## Extending SkillsFan
 
 ### Custom AI Providers
 
-Halo supports custom AI source providers through a plugin architecture. You can create your own OAuth or API key-based providers.
+SkillsFan supports custom AI source providers through a plugin architecture. You can create your own OAuth or API key-based providers.
 
 See **[docs/custom-providers.md](docs/custom-providers.md)** for the complete guide, including:
 - Provider interface definitions

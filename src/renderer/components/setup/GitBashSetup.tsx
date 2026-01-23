@@ -44,7 +44,7 @@ export function GitBashSetup({ onComplete }: GitBashSetupProps) {
     setPhase('downloading')
 
     try {
-      const result = await window.halo.installGitBash((progressData: DownloadProgress) => {
+      const result = await window.skillsfan.installGitBash((progressData: DownloadProgress) => {
         setPhase(progressData.phase as Phase)
         setProgress(progressData.progress)
         setMessage(progressData.message)
@@ -73,7 +73,7 @@ export function GitBashSetup({ onComplete }: GitBashSetupProps) {
   }
 
   const handleManualInstall = () => {
-    window.halo.openExternal?.('https://git-scm.com/downloads/win')
+    window.skillsfan.openExternal?.('https://git-scm.com/downloads/win')
   }
 
   // Choice screen

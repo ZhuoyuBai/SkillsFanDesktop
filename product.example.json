@@ -1,6 +1,6 @@
 {
   "$schema": "./product.schema.json",
-  "name": "Halo",
+  "name": "SkillsFan",
   "version": "1.0.0",
   "authProviders": [
     {

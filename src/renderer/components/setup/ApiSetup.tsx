@@ -12,6 +12,7 @@ import { Lightbulb } from '../icons/ToolIcons'
 import { Globe, ChevronDown, ArrowLeft, Eye, EyeOff } from 'lucide-react'
 import { AVAILABLE_MODELS, DEFAULT_MODEL } from '../../types'
 import { useTranslation, setLanguage, getCurrentLanguage, SUPPORTED_LOCALES, type LocaleCode } from '../../i18n'
+import { HaloLogo } from '../brand/HaloLogo'
 
 interface ApiSetupProps {
   /** Called when user clicks back button */
@@ -165,10 +166,8 @@ export function ApiSetup({ onBack, showBack = false }: ApiSetupProps) {
       {/* Header */}
       <div className="flex flex-col items-center mb-8">
         {/* Logo */}
-        <div className="w-16 h-16 rounded-full border-2 border-primary/60 flex items-center justify-center halo-glow">
-          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary/30 to-transparent" />
-        </div>
-        <h1 className="mt-4 text-2xl font-light">Halo</h1>
+        <HaloLogo size={64} />
+        <h1 className="mt-4 text-2xl font-light">技能范</h1>
       </div>
 
       {/* Main content */}

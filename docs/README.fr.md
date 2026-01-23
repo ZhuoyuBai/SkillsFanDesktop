@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="../resources/icon.png" alt="Halo Logo" width="120" height="120">
+<img src="../resources/icon.png" alt="SkillsFan Logo" width="120" height="120">
 
-# Halo
+# SkillsFan
 
 ### L'Interface Manquante pour Claude Code
 
@@ -31,7 +31,7 @@ Mettez Claude Code dans votre poche — le client de bureau open-source qui rend
 
 ---
 
-## Pourquoi Halo ?
+## Pourquoi SkillsFan ?
 
 **Claude Code est l'agent IA de programmation le plus performant disponible.** Mais il y a un problème :
 
@@ -39,11 +39,11 @@ Mettez Claude Code dans votre poche — le client de bureau open-source qui rend
 
 Pour les développeurs à l'aise avec le CLI, c'est bien. Mais pour les designers, les chefs de produit, les étudiants, et tous ceux qui veulent simplement que l'IA *fasse des choses* — le terminal est un obstacle.
 
-**Halo brise cet obstacle.**
+**SkillsFan brise cet obstacle.**
 
 Nous avons pris 100% des capacités d'Agent de Claude Code et les avons enveloppées dans une interface visuelle que tout le monde peut utiliser. Même puissance, zéro friction.
 
-| | Claude Code CLI | Halo |
+| | Claude Code CLI | SkillsFan |
 |---|:---:|:---:|
 | Capacités Agent complètes | ✅ | ✅ |
 | Interface visuelle | ❌ | ✅ |
@@ -54,7 +54,7 @@ Nous avons pris 100% des capacités d'Agent de Claude Code et les avons envelopp
 
 > Pensez-y ainsi :
 > **Windows** a transformé DOS en bureaux visuels.
-> **Halo** transforme Claude Code CLI en compagnon IA visuel.
+> **SkillsFan** transforme Claude Code CLI en compagnon IA visuel.
 
 ---
 
@@ -65,7 +65,7 @@ Nous avons pris 100% des capacités d'Agent de Claude Code et les avons envelopp
 <td width="50%">
 
 ### Vraie Boucle d'Agent
-Pas seulement du chat. Halo peut **vraiment faire des choses** — écrire du code, créer des fichiers, exécuter des commandes, et itérer jusqu'à ce que la tâche soit terminée.
+Pas seulement du chat. SkillsFan peut **vraiment faire des choses** — écrire du code, créer des fichiers, exécuter des commandes, et itérer jusqu'à ce que la tâche soit terminée.
 
 ### Système d'Espaces
 Des espaces de travail isolés gardent vos projets organisés. Chaque Espace a ses propres fichiers, conversations et contexte.
@@ -77,7 +77,7 @@ Voyez chaque fichier créé par l'IA en temps réel. Prévisualisez le code, HTM
 <td width="50%">
 
 ### Accès Distant
-Contrôlez votre Halo de bureau depuis votre téléphone ou n'importe quel navigateur. Travaillez de n'importe où — même depuis un lit d'hôpital (histoire vraie).
+Contrôlez votre SkillsFan de bureau depuis votre téléphone ou n'importe quel navigateur. Travaillez de n'importe où — même depuis un lit d'hôpital (histoire vraie).
 
 ### Navigateur IA
 Laissez l'IA contrôler un vrai navigateur intégré. Web scraping, remplissage de formulaires, tests — tout automatisé.
@@ -107,7 +107,7 @@ Laissez l'IA contrôler un vrai navigateur intégré. Web scraping, remplissage 
 ![Chat Todo](./assets/chat_todo.jpg)
 
 
-*Accès Distant : Contrôlez Halo de n'importe où*
+*Accès Distant : Contrôlez SkillsFan de n'importe où*
 
 ![Remote Settings](./assets/remote_setting.jpg)
 <p align="center">
@@ -147,7 +147,7 @@ npm run dev
 
 ## Démarrage Rapide
 
-1. **Lancez Halo** et entrez votre clé API (Anthropic recommandé)
+1. **Lancez SkillsFan** et entrez votre clé API (Anthropic recommandé)
 2. **Commencez à discuter** — essayez "Crée une simple app de tâches avec React"
 3. **Observez la magie** — voyez les fichiers apparaître dans la Barre d'Artefacts
 4. **Prévisualisez et itérez** — cliquez sur n'importe quel fichier pour prévisualiser, demandez des modifications
@@ -160,7 +160,7 @@ npm run dev
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                         Halo Bureau                              │
+│                         SkillsFan Bureau                              │
 │  ┌─────────────┐    ┌─────────────┐    ┌───────────────────┐   │
 │  │   React UI  │◄──►│  Processus  │◄──►│  Claude Code SDK  │   │
 │  │  (Renderer) │IPC │  Principal  │    │  (Boucle Agent)   │   │
@@ -182,14 +182,14 @@ npm run dev
 
 ## Ce Que les Gens Construisent
 
-Halo n'est pas que pour les développeurs. Nous avons vu :
+SkillsFan n'est pas que pour les développeurs. Nous avons vu :
 
 - **Des équipes finance** construire des apps full-stack de zéro — sans expérience en programmation
 - **Des designers** prototyper des maquettes interactives
 - **Des étudiants** apprendre à coder avec l'IA comme partenaire de pair programming
 - **Des développeurs** livrer des fonctionnalités plus vite que jamais
 
-L'obstacle n'est plus la capacité de l'IA. **C'est l'accessibilité.** Halo supprime cet obstacle.
+L'obstacle n'est plus la capacité de l'IA. **C'est l'accessibilité.** SkillsFan supprime cet obstacle.
 
 ---
 
@@ -221,13 +221,13 @@ L'obstacle n'est plus la capacité de l'IA. **C'est l'accessibilité.** Halo sup
 
 ## Contribuer
 
-Halo est open source parce que l'IA devrait être accessible à tous.
+SkillsFan est open source parce que l'IA devrait être accessible à tous.
 
 Nous accueillons les contributions de toute nature :
 
 - **Traductions** — Aidez-nous à atteindre plus d'utilisateurs (voir `src/renderer/i18n/`)
 - **Rapports de bugs** — Trouvé quelque chose de cassé ? Faites-le nous savoir
-- **Idées de fonctionnalités** — Qu'est-ce qui rendrait Halo meilleur pour vous ?
+- **Idées de fonctionnalités** — Qu'est-ce qui rendrait SkillsFan meilleur pour vous ?
 - **Contributions de code** — PRs bienvenues !
 
 ```bash
@@ -255,7 +255,7 @@ Licence MIT — voir [LICENSE](../LICENSE) pour les détails.
 
 ---
 
-## L'Histoire Derrière Halo
+## L'Histoire Derrière SkillsFan
 
 Il y a quelques mois, tout a commencé avec une simple frustration : **Je voulais utiliser Claude Code, mais j'étais coincé en réunions toute la journée.**
 
@@ -263,12 +263,12 @@ Pendant des réunions ennuyeuses (on y est tous passés), j'ai pensé : *Et si j
 
 Puis est venu un autre problème — mes collègues non-techniques voulaient essayer Claude Code après avoir vu ce qu'il pouvait faire. Mais ils étaient bloqués à l'installation. *"C'est quoi npm ? Comment j'installe Node.js ?"* Certains ont passé des jours à essayer de comprendre.
 
-Alors j'ai construit Halo pour moi :
+Alors j'ai construit SkillsFan pour moi :
 - **Interface visuelle** — plus besoin de fixer la sortie terminal
 - **Installation en un clic** — pas de Node.js, pas de npm, juste télécharger et lancer
 - **Accès distant** — contrôle depuis téléphone, tablette, ou n'importe quel navigateur
 
-La première version a pris quelques heures. Tout après ça ? **100% construit par Halo lui-même.** On l'utilise quotidiennement depuis des mois.
+La première version a pris quelques heures. Tout après ça ? **100% construit par SkillsFan lui-même.** On l'utilise quotidiennement depuis des mois.
 
 L'IA qui construit l'IA. Maintenant entre les mains de tous.
 
@@ -278,9 +278,9 @@ L'IA qui construit l'IA. Maintenant entre les mains de tous.
 
 ### Construit par l'IA, pour les humains.
 
-Si Halo vous aide à construire quelque chose d'incroyable, on aimerait en entendre parler.
+Si SkillsFan vous aide à construire quelque chose d'incroyable, on aimerait en entendre parler.
 
-**Donnez une Star à ce repo** pour aider les autres à découvrir Halo.
+**Donnez une Star à ce repo** pour aider les autres à découvrir SkillsFan.
 
 [![Star History Chart](https://api.star-history.com/svg?repos=openkursar/hello-halo&type=Date)](https://star-history.com/#openkursar/hello-halo&Date)
 

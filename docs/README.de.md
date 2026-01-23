@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="../resources/icon.png" alt="Halo Logo" width="120" height="120">
+<img src="../resources/icon.png" alt="SkillsFan Logo" width="120" height="120">
 
-# Halo
+# SkillsFan
 
 ### Die Fehlende Benutzeroberfläche für Claude Code
 
@@ -31,7 +31,7 @@ Claude Code in deiner Tasche — der Open-Source Desktop-Client, der die Leistun
 
 ---
 
-## Warum Halo?
+## Warum SkillsFan?
 
 **Claude Code ist der leistungsfähigste verfügbare KI-Programmieragent.** Aber es gibt ein Problem:
 
@@ -39,11 +39,11 @@ Claude Code in deiner Tasche — der Open-Source Desktop-Client, der die Leistun
 
 Für Entwickler, die sich mit CLI wohlfühlen, ist das in Ordnung. Aber für Designer, PMs, Studenten und alle, die einfach wollen, dass KI *Dinge erledigt* — das Terminal ist eine Hürde.
 
-**Halo überwindet diese Hürde.**
+**SkillsFan überwindet diese Hürde.**
 
 Wir haben 100% der Agent-Fähigkeiten von Claude Code genommen und sie in eine visuelle Oberfläche verpackt, die jeder nutzen kann. Gleiche Leistung, null Reibung.
 
-| | Claude Code CLI | Halo |
+| | Claude Code CLI | SkillsFan |
 |---|:---:|:---:|
 | Volle Agent-Fähigkeiten | ✅ | ✅ |
 | Visuelle Oberfläche | ❌ | ✅ |
@@ -54,7 +54,7 @@ Wir haben 100% der Agent-Fähigkeiten von Claude Code genommen und sie in eine v
 
 > Stell es dir so vor:
 > **Windows** verwandelte DOS in visuelle Desktops.
-> **Halo** verwandelt Claude Code CLI in einen visuellen KI-Begleiter.
+> **SkillsFan** verwandelt Claude Code CLI in einen visuellen KI-Begleiter.
 
 ---
 
@@ -65,7 +65,7 @@ Wir haben 100% der Agent-Fähigkeiten von Claude Code genommen und sie in eine v
 <td width="50%">
 
 ### Echter Agent-Loop
-Nicht nur Chat. Halo kann **wirklich Dinge tun** — Code schreiben, Dateien erstellen, Befehle ausführen und iterieren, bis die Aufgabe erledigt ist.
+Nicht nur Chat. SkillsFan kann **wirklich Dinge tun** — Code schreiben, Dateien erstellen, Befehle ausführen und iterieren, bis die Aufgabe erledigt ist.
 
 ### Space-System
 Isolierte Arbeitsbereiche halten deine Projekte organisiert. Jeder Space hat seine eigenen Dateien, Konversationen und Kontext.
@@ -77,7 +77,7 @@ Sieh jede Datei, die die KI erstellt, in Echtzeit. Vorschau von Code, HTML, Bild
 <td width="50%">
 
 ### Fernzugriff
-Steuere dein Desktop-Halo von deinem Handy oder jedem Browser. Arbeite von überall — sogar von einem Krankenhausbett (wahre Geschichte).
+Steuere dein Desktop-SkillsFan von deinem Handy oder jedem Browser. Arbeite von überall — sogar von einem Krankenhausbett (wahre Geschichte).
 
 ### KI-Browser
 Lass die KI einen echten eingebetteten Browser steuern. Web-Scraping, Formularausfüllung, Tests — alles automatisiert.
@@ -107,7 +107,7 @@ Erweitere Fähigkeiten mit Model Context Protocol. Kompatibel mit Claude Desktop
 ![Chat Todo](./assets/chat_todo.jpg)
 
 
-*Fernzugriff: Steuere Halo von überall*
+*Fernzugriff: Steuere SkillsFan von überall*
 
 ![Remote Settings](./assets/remote_setting.jpg)
 <p align="center">
@@ -147,7 +147,7 @@ npm run dev
 
 ## Schnellstart
 
-1. **Starte Halo** und gib deinen API-Schlüssel ein (Anthropic empfohlen)
+1. **Starte SkillsFan** und gib deinen API-Schlüssel ein (Anthropic empfohlen)
 2. **Beginne zu chatten** — probiere "Erstelle eine einfache Todo-App mit React"
 3. **Beobachte die Magie** — sieh Dateien in der Artefakt-Leiste erscheinen
 4. **Vorschau & Iteration** — klicke auf jede Datei zur Vorschau, bitte um Änderungen
@@ -160,7 +160,7 @@ npm run dev
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                         Halo Desktop                             │
+│                         SkillsFan Desktop                             │
 │  ┌─────────────┐    ┌─────────────┐    ┌───────────────────┐   │
 │  │   React UI  │◄──►│    Haupt-   │◄──►│  Claude Code SDK  │   │
 │  │  (Renderer) │IPC │   prozess   │    │   (Agent-Loop)    │   │
@@ -182,14 +182,14 @@ npm run dev
 
 ## Was Leute Bauen
 
-Halo ist nicht nur für Entwickler. Wir haben gesehen:
+SkillsFan ist nicht nur für Entwickler. Wir haben gesehen:
 
 - **Finanzteams** bauen Full-Stack-Apps von Grund auf — ohne Programmiererfahrung
 - **Designer** prototypen interaktive Mockups
 - **Studenten** lernen Programmieren mit KI als Pair-Programming-Partner
 - **Entwickler** liefern Features schneller als je zuvor
 
-Die Hürde ist nicht mehr die KI-Fähigkeit. **Es ist die Zugänglichkeit.** Halo beseitigt diese Hürde.
+Die Hürde ist nicht mehr die KI-Fähigkeit. **Es ist die Zugänglichkeit.** SkillsFan beseitigt diese Hürde.
 
 ---
 
@@ -221,13 +221,13 @@ Die Hürde ist nicht mehr die KI-Fähigkeit. **Es ist die Zugänglichkeit.** Hal
 
 ## Mitwirken
 
-Halo ist Open Source, weil KI für alle zugänglich sein sollte.
+SkillsFan ist Open Source, weil KI für alle zugänglich sein sollte.
 
 Wir begrüßen Beiträge aller Art:
 
 - **Übersetzungen** — Hilf uns, mehr Nutzer zu erreichen (siehe `src/renderer/i18n/`)
 - **Bug-Reports** — Etwas Kaputtes gefunden? Lass es uns wissen
-- **Feature-Ideen** — Was würde Halo für dich besser machen?
+- **Feature-Ideen** — Was würde SkillsFan für dich besser machen?
 - **Code-Beiträge** — PRs willkommen!
 
 ```bash
@@ -255,7 +255,7 @@ MIT-Lizenz — siehe [LICENSE](../LICENSE) für Details.
 
 ---
 
-## Die Geschichte Hinter Halo
+## Die Geschichte Hinter SkillsFan
 
 Vor ein paar Monaten begann es mit einer einfachen Frustration: **Ich wollte Claude Code nutzen, aber ich steckte den ganzen Tag in Meetings.**
 
@@ -263,12 +263,12 @@ Während langweiliger Meetings (wir kennen das alle) dachte ich: *Was wenn ich C
 
 Dann kam ein anderes Problem — meine nicht-technischen Kollegen wollten Claude Code ausprobieren, nachdem sie gesehen hatten, was es kann. Aber sie blieben bei der Installation hängen. *"Was ist npm? Wie installiere ich Node.js?"* Manche verbrachten Tage damit, es herauszufinden.
 
-Also baute ich Halo für mich:
+Also baute ich SkillsFan für mich:
 - **Visuelle Oberfläche** — kein Starren auf Terminal-Ausgaben mehr
 - **Ein-Klick-Installation** — kein Node.js, kein npm, einfach herunterladen und ausführen
 - **Fernzugriff** — steuern vom Handy, Tablet oder jedem Browser
 
-Die erste Version dauerte ein paar Stunden. Alles danach? **100% von Halo selbst gebaut.** Wir nutzen es seit Monaten täglich.
+Die erste Version dauerte ein paar Stunden. Alles danach? **100% von SkillsFan selbst gebaut.** Wir nutzen es seit Monaten täglich.
 
 KI baut KI. Jetzt in jedermanns Händen.
 
@@ -278,9 +278,9 @@ KI baut KI. Jetzt in jedermanns Händen.
 
 ### Von KI gebaut, für Menschen.
 
-Wenn Halo dir hilft, etwas Großartiges zu bauen, würden wir gerne davon hören.
+Wenn SkillsFan dir hilft, etwas Großartiges zu bauen, würden wir gerne davon hören.
 
-**Gib diesem Repo einen Star** um anderen zu helfen, Halo zu entdecken.
+**Gib diesem Repo einen Star** um anderen zu helfen, SkillsFan zu entdecken.
 
 [![Star History Chart](https://api.star-history.com/svg?repos=openkursar/hello-halo&type=Date)](https://star-history.com/#openkursar/hello-halo&Date)
 

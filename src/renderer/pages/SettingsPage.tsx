@@ -294,7 +294,7 @@ export function SettingsPage() {
     setTheme(value)
     // Sync to localStorage immediately (for anti-flash on reload)
     try {
-      localStorage.setItem('halo-theme', value)
+      localStorage.setItem('skillsfan-theme', value)
     } catch (e) { /* ignore */ }
     await autoSave({
       appearance: { theme: value }

@@ -163,9 +163,9 @@ class RendererPerfCollector {
     import('../api')
       .then(({ api }) => api.perfReportRendererMetrics(metrics))
       .catch(() => {
-        // Fallback to direct window.halo if api not available
-        if (typeof window !== 'undefined' && window.halo?.perfReportRendererMetrics) {
-          window.halo.perfReportRendererMetrics(metrics)
+        // Fallback to direct window.skillsfan if api not available
+        if (typeof window !== 'undefined' && window.skillsfan?.perfReportRendererMetrics) {
+          window.skillsfan.perfReportRendererMetrics(metrics)
         }
       })
 

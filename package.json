@@ -1,13 +1,13 @@
 {
-  "name": "halo",
-  "version": "1.2.10",
-  "description": "AI that gets things done",
+  "name": "skillsfan",
+  "version": "1.0.0",
+  "description": "技能范 - AI 技能助手",
   "type": "module",
   "main": "./out/main/index.mjs",
-  "author": "Halo Team",
+  "author": "技能范团队",
   "license": "MIT",
   "scripts": {
-    "dev": "cross-env HALO_DATA_DIR=~/.halo-dev electron-vite dev",
+    "dev": "cross-env SKILLSFAN_DATA_DIR=~/.skillsfan-dev electron-vite dev",
     "build": "electron-vite build",
     "start": "electron-vite preview",
     "postinstall": "patch-package && electron-builder install-app-deps",
@@ -96,8 +96,8 @@
     "vitest": "^1.6.1"
   },
   "build": {
-    "appId": "com.halo.app",
-    "productName": "Halo",
+    "appId": "com.skillsfan.app",
+    "productName": "技能范",
     "releaseInfo": {
       "releaseNotesFile": ".release-notes-current.md"
     },
@@ -109,15 +109,15 @@
       "out/**/*",
       "resources/**/*",
       "product.json",
-      "halo-local/dist/**/*"
+      "skillsfan-local/dist/**/*"
     ],
     "asarUnpack": [
       "node_modules/cloudflared/**/*"
     ],
     "publish": {
       "provider": "github",
-      "owner": "openkursar",
-      "repo": "hello-halo",
+      "owner": "skillsfan",
+      "repo": "skillsfan-app",
       "releaseType": "release"
     },
     "mac": {

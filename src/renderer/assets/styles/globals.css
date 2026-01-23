@@ -49,11 +49,16 @@
   --ring: 217 91% 60%;
   --radius: 0.75rem;
 
-  /* Halo brand colors */
-  --halo-glow: 217 91% 60%;
-  --halo-success: 142 71% 45%;
-  --halo-warning: 38 92% 50%;
-  --halo-error: 0 62% 50%;
+  /* SkillsFan brand colors */
+  --skillsfan-glow: 217 91% 60%;
+  --skillsfan-success: 142 71% 45%;
+  --skillsfan-warning: 38 92% 50%;
+  --skillsfan-error: 0 62% 50%;
+  /* Legacy aliases */
+  --halo-glow: var(--skillsfan-glow);
+  --halo-success: var(--skillsfan-success);
+  --halo-warning: var(--skillsfan-warning);
+  --halo-error: var(--skillsfan-error);
 }
 
 /* Light theme */
@@ -78,11 +83,16 @@
   --input: 0 0% 94%;
   --ring: 217 91% 55%;
 
-  /* Halo brand colors (adjusted for light) */
-  --halo-glow: 217 91% 55%;
-  --halo-success: 142 71% 40%;
-  --halo-warning: 38 92% 45%;
-  --halo-error: 0 72% 51%;
+  /* SkillsFan brand colors (adjusted for light) */
+  --skillsfan-glow: 217 91% 55%;
+  --skillsfan-success: 142 71% 40%;
+  --skillsfan-warning: 38 92% 45%;
+  --skillsfan-error: 0 72% 51%;
+  /* Legacy aliases */
+  --halo-glow: var(--skillsfan-glow);
+  --halo-success: var(--skillsfan-success);
+  --halo-warning: var(--skillsfan-warning);
+  --halo-error: var(--skillsfan-error);
 }
 
 * {
@@ -194,6 +204,22 @@ body {
 
 .halo-spin {
   animation: halo-spin 2s linear infinite;
+}
+
+/* SkillsFan logo pulse animation */
+@keyframes skillsfan-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.9;
+  }
+}
+
+.skillsfan-pulse {
+  animation: skillsfan-pulse 2s ease-in-out infinite;
 }
 
 /* Fade in animation */
@@ -736,13 +762,13 @@ body {
   transform: translateY(-2px);
 }
 
-/* Halo space special style */
-.halo-space-card {
+/* SkillsFan space special style */
+.skillsfan-space-card {
   background: linear-gradient(135deg, hsl(var(--primary) / 0.15), hsl(var(--primary) / 0.05));
   border: 1px solid hsl(var(--primary) / 0.3);
 }
 
-.halo-space-card:hover {
+.skillsfan-space-card:hover {
   border-color: hsl(var(--primary));
   box-shadow: 0 0 20px hsl(var(--primary) / 0.2);
 }

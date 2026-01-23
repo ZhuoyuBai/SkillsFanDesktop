@@ -18,6 +18,7 @@ import {
 } from '../components/icons/ToolIcons'
 import { Header } from '../components/layout/Header'
 import { SpaceGuide } from '../components/space/SpaceGuide'
+import { HaloLogo } from '../components/brand/HaloLogo'
 import { Monitor } from 'lucide-react'
 import { api } from '../api'
 import { useTranslation } from '../i18n'
@@ -196,10 +197,8 @@ export function HomePage() {
       <Header
         left={
           <>
-            <div className="w-[22px] h-[22px] rounded-full border-2 border-primary/60 flex items-center justify-center">
-              <div className="w-3 h-3 rounded-full bg-gradient-to-br from-primary/30 to-transparent" />
-            </div>
-            <span className="text-sm font-medium">Halo</span>
+            <HaloLogo size={22} animated={false} />
+            <span className="text-sm font-medium">技能范</span>
           </>
         }
         right={
@@ -214,12 +213,12 @@ export function HomePage() {
 
       {/* Content */}
       <main className="flex-1 overflow-auto p-6">
-        {/* Halo Space Card */}
+        {/* SkillsFan Space Card */}
         {haloSpace && (
           <div
             data-onboarding="halo-space"
             onClick={() => handleSpaceClick(haloSpace)}
-            className="halo-space-card p-6 rounded-xl cursor-pointer mb-8 animate-fade-in"
+            className="skillsfan-space-card p-6 rounded-xl cursor-pointer mb-8 animate-fade-in"
           >
             <div className="flex items-center gap-3">
               <Sparkles className="w-6 h-6 text-primary" />

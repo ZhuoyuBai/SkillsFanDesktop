@@ -273,7 +273,7 @@ export function getOnboardingHtmlArtifact(translator?: TFunction, lang: string =
       <div class="logo">
         <div class="logo-inner"></div>
       </div>
-      <h1>Halo</h1>
+      <h1>技能范</h1>
       <p class="tagline">${tagline}</p>
     </section>
 

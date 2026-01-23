@@ -112,8 +112,8 @@ interface McpSseServerConfig {
 export function getHaloDir(): string {
   // 1. Support custom data directory via environment variable
   //    Useful for development to avoid conflicts with production data
-  if (process.env.HALO_DATA_DIR) {
-    let dir = process.env.HALO_DATA_DIR
+  if (process.env.SKILLSFAN_DATA_DIR) {
+    let dir = process.env.SKILLSFAN_DATA_DIR
     // Expand ~ to home directory (shell doesn't expand in env vars)
     if (dir.startsWith('~')) {
       dir = join(homedir(), dir.slice(1))
@@ -124,11 +124,11 @@ export function getHaloDir(): string {
   // 2. Auto-detect development mode: use separate directory
   //    app.isPackaged is false when running via electron-vite dev
   if (!app.isPackaged) {
-    return join(homedir(), '.halo-dev')
+    return join(homedir(), '.skillsfan-dev')
   }
 
   // 3. Production: use default directory
-  return join(homedir(), '.halo')
+  return join(homedir(), '.skillsfan')
 }
 
 export function getConfigPath(): string {

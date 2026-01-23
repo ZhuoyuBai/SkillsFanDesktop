@@ -24,7 +24,7 @@ interface ApiResponse<T = unknown> {
 }
 
 /**
- * API object - drop-in replacement for window.halo
+ * API object - drop-in replacement for window.skillsfan
  * Works in both Electron and remote web mode
  */
 export const api = {
@@ -53,42 +53,42 @@ export const api = {
   // ===== Generic Auth (provider-agnostic) =====
   authGetProviders: async (): Promise<ApiResponse> => {
     if (isElectron()) {
-      return window.halo.authGetProviders()
+      return window.skillsfan.authGetProviders()
     }
     return httpRequest('GET', '/api/auth/providers')
   },
 
   authStartLogin: async (providerType: string): Promise<ApiResponse> => {
     if (isElectron()) {
-      return window.halo.authStartLogin(providerType)
+      return window.skillsfan.authStartLogin(providerType)
     }
     return httpRequest('POST', '/api/auth/start-login', { providerType })
   },
 
   authCompleteLogin: async (providerType: string, state: string): Promise<ApiResponse> => {
     if (isElectron()) {
-      return window.halo.authCompleteLogin(providerType, state)
+      return window.skillsfan.authCompleteLogin(providerType, state)
     }
     return httpRequest('POST', '/api/auth/complete-login', { providerType, state })
   },
 
   authRefreshToken: async (providerType: string): Promise<ApiResponse> => {
     if (isElectron()) {
-      return window.halo.authRefreshToken(providerType)
+      return window.skillsfan.authRefreshToken(providerType)
     }
     return httpRequest('POST', '/api/auth/refresh-token', { providerType })
   },
 
   authCheckToken: async (providerType: string): Promise<ApiResponse> => {
     if (isElectron()) {
-      return window.halo.authCheckToken(providerType)
+      return window.skillsfan.authCheckToken(providerType)
     }
     return httpRequest('GET', `/api/auth/check-token?providerType=${providerType}`)
   },
 
   authLogout: async (providerType: string): Promise<ApiResponse> => {
     if (isElectron()) {
-      return window.halo.authLogout(providerType)
+      return window.skillsfan.authLogout(providerType)
     }
     return httpRequest('POST', '/api/auth/logout', { providerType })
   },
@@ -99,14 +99,14 @@ export const api = {
   // ===== Config =====
   getConfig: async (): Promise<ApiResponse> => {
     if (isElectron()) {
-      return window.halo.getConfig()
+      return window.skillsfan.getConfig()
     }
     return httpRequest('GET', '/api/config')
   },
 
   setConfig: async (updates: Record<string, unknown>): Promise<ApiResponse> => {
     if (isElectron()) {
-      return window.halo.setConfig(updates)
+      return window.skillsfan.setConfig(updates)
     }
     return httpRequest('POST', '/api/config', updates)
   },
@@ -117,14 +117,14 @@ export const api = {
     provider: string
   ): Promise<ApiResponse> => {
     if (isElectron()) {
-      return window.halo.validateApi(apiKey, apiUrl, provider)
+      return window.skillsfan.validateApi(apiKey, apiUrl, provider)
     }
     return httpRequest('POST', '/api/config/validate', { apiKey, apiUrl, provider })
   },
 
   refreshAISourcesConfig: async (): Promise<ApiResponse> => {
     if (isElectron()) {
-      return window.halo.refreshAISourcesConfig()
+      return window.skillsfan.refreshAISourcesConfig()
     }
     return httpRequest('POST', '/api/config/refresh-ai-sources')
   },
@@ -132,14 +132,14 @@ export const api = {
   // ===== Space =====
   getHaloSpace: async (): Promise<ApiResponse> => {
     if (isElectron()) {
-      return window.halo.getHaloSpace()
+      return window.skillsfan.getHaloSpace()
     }
     return httpRequest('GET', '/api/spaces/halo')
   },
 
   listSpaces: async (): Promise<ApiResponse> => {
     if (isElectron()) {
-      return window.halo.listSpaces()
+      return window.skillsfan.listSpaces()
     }
     return httpRequest('GET', '/api/spaces')
   },
@@ -150,28 +150,28 @@ export const api = {
     customPath?: string
   }): Promise<ApiResponse> => {
     if (isElectron()) {
-      return window.halo.createSpace(input)
+      return window.skillsfan.createSpace(input)
     }
     return httpRequest('POST', '/api/spaces', input)
   },
 
   deleteSpace: async (spaceId: string): Promise<ApiResponse> => {
     if (isElectron()) {
-      return window.halo.deleteSpace(spaceId)
+      return window.skillsfan.deleteSpace(spaceId)
     }
     return httpRequest('DELETE', `/api/spaces/${spaceId}`)
   },
 
   getSpace: async (spaceId: string): Promise<ApiResponse> => {
     if (isElectron()) {
-      return window.halo.getSpace(spaceId)
+      return window.skillsfan.getSpace(spaceId)
     }
     return httpRequest('GET', `/api/spaces/${spaceId}`)
   },
 
   openSpaceFolder: async (spaceId: string): Promise<ApiResponse> => {
     if (isElectron()) {
-      return window.halo.openSpaceFolder(spaceId)
+      return window.skillsfan.openSpaceFolder(spaceId)
     }
     // In remote mode, just return the path (can't open folder remotely)
     return httpRequest('POST', `/api/spaces/${spaceId}/open`)
@@ -179,7 +179,7 @@ export const api = {
 
   getDefaultSpacePath: async (): Promise<ApiResponse> => {
     if (isElectron()) {
-      return window.halo.getDefaultSpacePath()
+      return window.skillsfan.getDefaultSpacePath()
     }
     // In remote mode, get default path from server
     return httpRequest('GET', '/api/spaces/default-path')
@@ -187,7 +187,7 @@ export const api = {
 
   selectFolder: async (): Promise<ApiResponse> => {
     if (isElectron()) {
-      return window.halo.selectFolder()
+      return window.skillsfan.selectFolder()
     }
     // Cannot select folder in remote mode
     return { success: false, error: 'Cannot select folder in remote mode' }
@@ -198,7 +198,7 @@ export const api = {
     updates: { name?: string; icon?: string }
   ): Promise<ApiResponse> => {
     if (isElectron()) {
-      return window.halo.updateSpace(spaceId, updates)
+      return window.skillsfan.updateSpace(spaceId, updates)
     }
     return httpRequest('PUT', `/api/spaces/${spaceId}`, updates)
   },
@@ -214,7 +214,7 @@ export const api = {
     }
   ): Promise<ApiResponse> => {
     if (isElectron()) {
-      return window.halo.updateSpacePreferences(spaceId, preferences)
+      return window.skillsfan.updateSpacePreferences(spaceId, preferences)
     }
     return httpRequest('PUT', `/api/spaces/${spaceId}/preferences`, preferences)
   },
@@ -222,7 +222,7 @@ export const api = {
   // Get space preferences
   getSpacePreferences: async (spaceId: string): Promise<ApiResponse> => {
     if (isElectron()) {
-      return window.halo.getSpacePreferences(spaceId)
+      return window.skillsfan.getSpacePreferences(spaceId)
     }
     return httpRequest('GET', `/api/spaces/${spaceId}/preferences`)
   },
@@ -230,14 +230,14 @@ export const api = {
   // ===== Conversation =====
   listConversations: async (spaceId: string): Promise<ApiResponse> => {
     if (isElectron()) {
-      return window.halo.listConversations(spaceId)
+      return window.skillsfan.listConversations(spaceId)
     }
     return httpRequest('GET', `/api/spaces/${spaceId}/conversations`)
   },
 
   createConversation: async (spaceId: string, title?: string): Promise<ApiResponse> => {
     if (isElectron()) {
-      return window.halo.createConversation(spaceId, title)
+      return window.skillsfan.createConversation(spaceId, title)
     }
     return httpRequest('POST', `/api/spaces/${spaceId}/conversations`, { title })
   },
@@ -247,7 +247,7 @@ export const api = {
     conversationId: string
   ): Promise<ApiResponse> => {
     if (isElectron()) {
-      return window.halo.getConversation(spaceId, conversationId)
+      return window.skillsfan.getConversation(spaceId, conversationId)
     }
     return httpRequest('GET', `/api/spaces/${spaceId}/conversations/${conversationId}`)
   },
@@ -258,7 +258,7 @@ export const api = {
     updates: Record<string, unknown>
   ): Promise<ApiResponse> => {
     if (isElectron()) {
-      return window.halo.updateConversation(spaceId, conversationId, updates)
+      return window.skillsfan.updateConversation(spaceId, conversationId, updates)
     }
     return httpRequest(
       'PUT',
@@ -272,7 +272,7 @@ export const api = {
     conversationId: string
   ): Promise<ApiResponse> => {
     if (isElectron()) {
-      return window.halo.deleteConversation(spaceId, conversationId)
+      return window.skillsfan.deleteConversation(spaceId, conversationId)
     }
     return httpRequest(
       'DELETE',
@@ -286,7 +286,7 @@ export const api = {
     message: { role: string; content: string }
   ): Promise<ApiResponse> => {
     if (isElectron()) {
-      return window.halo.addMessage(spaceId, conversationId, message)
+      return window.skillsfan.addMessage(spaceId, conversationId, message)
     }
     return httpRequest(
       'POST',
@@ -301,7 +301,7 @@ export const api = {
     updates: Record<string, unknown>
   ): Promise<ApiResponse> => {
     if (isElectron()) {
-      return window.halo.updateLastMessage(spaceId, conversationId, updates)
+      return window.skillsfan.updateLastMessage(spaceId, conversationId, updates)
     }
     return httpRequest(
       'PUT',
@@ -350,28 +350,28 @@ export const api = {
     }
 
     if (isElectron()) {
-      return window.halo.sendMessage(request)
+      return window.skillsfan.sendMessage(request)
     }
     return httpRequest('POST', '/api/agent/message', request)
   },
 
   stopGeneration: async (conversationId?: string): Promise<ApiResponse> => {
     if (isElectron()) {
-      return window.halo.stopGeneration(conversationId)
+      return window.skillsfan.stopGeneration(conversationId)
     }
     return httpRequest('POST', '/api/agent/stop', { conversationId })
   },
 
   approveTool: async (conversationId: string): Promise<ApiResponse> => {
     if (isElectron()) {
-      return window.halo.approveTool(conversationId)
+      return window.skillsfan.approveTool(conversationId)
     }
     return httpRequest('POST', '/api/agent/approve', { conversationId })
   },
 
   rejectTool: async (conversationId: string): Promise<ApiResponse> => {
     if (isElectron()) {
-      return window.halo.rejectTool(conversationId)
+      return window.skillsfan.rejectTool(conversationId)
     }
     return httpRequest('POST', '/api/agent/reject', { conversationId })
   },
@@ -379,7 +379,7 @@ export const api = {
   // Get current session state for recovery after refresh
   getSessionState: async (conversationId: string): Promise<ApiResponse> => {
     if (isElectron()) {
-      return window.halo.getSessionState(conversationId)
+      return window.skillsfan.getSessionState(conversationId)
     }
     return httpRequest('GET', `/api/agent/session/${conversationId}`)
   },
@@ -388,7 +388,7 @@ export const api = {
   ensureSessionWarm: async (spaceId: string, conversationId: string): Promise<ApiResponse> => {
     if (isElectron()) {
       // No need to wait, initialize in background
-      window.halo.ensureSessionWarm(spaceId, conversationId).catch((error: unknown) => {
+      window.skillsfan.ensureSessionWarm(spaceId, conversationId).catch((error: unknown) => {
         console.error('[API] ensureSessionWarm error:', error)
       })
       return { success: true }
@@ -402,7 +402,7 @@ export const api = {
   // Test MCP server connections
   testMcpConnections: async (): Promise<{ success: boolean; servers: unknown[]; error?: string }> => {
     if (isElectron()) {
-      return window.halo.testMcpConnections()
+      return window.skillsfan.testMcpConnections()
     }
     // HTTP mode: call backend endpoint
     const result = await httpRequest('POST', '/api/agent/test-mcp')
@@ -412,21 +412,21 @@ export const api = {
   // ===== Artifact =====
   listArtifacts: async (spaceId: string): Promise<ApiResponse> => {
     if (isElectron()) {
-      return window.halo.listArtifacts(spaceId)
+      return window.skillsfan.listArtifacts(spaceId)
     }
     return httpRequest('GET', `/api/spaces/${spaceId}/artifacts`)
   },
 
   listArtifactsTree: async (spaceId: string): Promise<ApiResponse> => {
     if (isElectron()) {
-      return window.halo.listArtifactsTree(spaceId)
+      return window.skillsfan.listArtifactsTree(spaceId)
     }
     return httpRequest('GET', `/api/spaces/${spaceId}/artifacts/tree`)
   },
 
   openArtifact: async (filePath: string): Promise<ApiResponse> => {
     if (isElectron()) {
-      return window.halo.openArtifact(filePath)
+      return window.skillsfan.openArtifact(filePath)
     }
     // Can't open files remotely
     return { success: false, error: 'Cannot open files in remote mode' }
@@ -434,7 +434,7 @@ export const api = {
 
   showArtifactInFolder: async (filePath: string): Promise<ApiResponse> => {
     if (isElectron()) {
-      return window.halo.showArtifactInFolder(filePath)
+      return window.skillsfan.showArtifactInFolder(filePath)
     }
     // Can't open folder remotely
     return { success: false, error: 'Cannot open folder in remote mode' }
@@ -444,7 +444,7 @@ export const api = {
   downloadArtifact: (filePath: string): void => {
     if (isElectron()) {
       // In Electron, just open the file
-      window.halo.openArtifact(filePath)
+      window.skillsfan.openArtifact(filePath)
       return
     }
     // In remote mode, trigger download via browser with token in URL
@@ -467,7 +467,7 @@ export const api = {
   // Read artifact content for Content Canvas
   readArtifactContent: async (filePath: string): Promise<ApiResponse> => {
     if (isElectron()) {
-      return window.halo.readArtifactContent(filePath)
+      return window.skillsfan.readArtifactContent(filePath)
     }
     // In remote mode, fetch content via API
     return httpRequest('GET', `/api/artifacts/content?path=${encodeURIComponent(filePath)}`)
@@ -480,7 +480,7 @@ export const api = {
     content: string
   ): Promise<ApiResponse> => {
     if (isElectron()) {
-      return window.halo.writeOnboardingArtifact(spaceId, fileName, content)
+      return window.skillsfan.writeOnboardingArtifact(spaceId, fileName, content)
     }
     return httpRequest('POST', `/api/spaces/${spaceId}/onboarding/artifact`, { fileName, content })
   },
@@ -491,7 +491,7 @@ export const api = {
     aiResponse: string
   ): Promise<ApiResponse> => {
     if (isElectron()) {
-      return window.halo.saveOnboardingConversation(spaceId, userMessage, aiResponse)
+      return window.skillsfan.saveOnboardingConversation(spaceId, userMessage, aiResponse)
     }
     return httpRequest('POST', `/api/spaces/${spaceId}/onboarding/conversation`, { userMessage, aiResponse })
   },
@@ -501,56 +501,56 @@ export const api = {
     if (!isElectron()) {
       return { success: false, error: 'Only available in desktop app' }
     }
-    return window.halo.enableRemoteAccess(port)
+    return window.skillsfan.enableRemoteAccess(port)
   },
 
   disableRemoteAccess: async (): Promise<ApiResponse> => {
     if (!isElectron()) {
       return { success: false, error: 'Only available in desktop app' }
     }
-    return window.halo.disableRemoteAccess()
+    return window.skillsfan.disableRemoteAccess()
   },
 
   enableTunnel: async (): Promise<ApiResponse> => {
     if (!isElectron()) {
       return { success: false, error: 'Only available in desktop app' }
     }
-    return window.halo.enableTunnel()
+    return window.skillsfan.enableTunnel()
   },
 
   disableTunnel: async (): Promise<ApiResponse> => {
     if (!isElectron()) {
       return { success: false, error: 'Only available in desktop app' }
     }
-    return window.halo.disableTunnel()
+    return window.skillsfan.disableTunnel()
   },
 
   getRemoteStatus: async (): Promise<ApiResponse> => {
     if (!isElectron()) {
       return { success: false, error: 'Only available in desktop app' }
     }
-    return window.halo.getRemoteStatus()
+    return window.skillsfan.getRemoteStatus()
   },
 
   getRemoteQRCode: async (includeToken?: boolean): Promise<ApiResponse> => {
     if (!isElectron()) {
       return { success: false, error: 'Only available in desktop app' }
     }
-    return window.halo.getRemoteQRCode(includeToken)
+    return window.skillsfan.getRemoteQRCode(includeToken)
   },
 
   setRemotePassword: async (password: string): Promise<ApiResponse> => {
     if (!isElectron()) {
       return { success: false, error: 'Only available in desktop app' }
     }
-    return window.halo.setRemotePassword(password)
+    return window.skillsfan.setRemotePassword(password)
   },
 
   regenerateRemotePassword: async (): Promise<ApiResponse> => {
     if (!isElectron()) {
       return { success: false, error: 'Only available in desktop app' }
     }
-    return window.halo.regenerateRemotePassword()
+    return window.skillsfan.regenerateRemotePassword()
   },
 
   // ===== System Settings (Electron only) =====
@@ -558,28 +558,28 @@ export const api = {
     if (!isElectron()) {
       return { success: false, error: 'Only available in desktop app' }
     }
-    return window.halo.getAutoLaunch()
+    return window.skillsfan.getAutoLaunch()
   },
 
   setAutoLaunch: async (enabled: boolean): Promise<ApiResponse> => {
     if (!isElectron()) {
       return { success: false, error: 'Only available in desktop app' }
     }
-    return window.halo.setAutoLaunch(enabled)
+    return window.skillsfan.setAutoLaunch(enabled)
   },
 
   getMinimizeToTray: async (): Promise<ApiResponse> => {
     if (!isElectron()) {
       return { success: false, error: 'Only available in desktop app' }
     }
-    return window.halo.getMinimizeToTray()
+    return window.skillsfan.getMinimizeToTray()
   },
 
   setMinimizeToTray: async (enabled: boolean): Promise<ApiResponse> => {
     if (!isElectron()) {
       return { success: false, error: 'Only available in desktop app' }
     }
-    return window.halo.setMinimizeToTray(enabled)
+    return window.skillsfan.setMinimizeToTray(enabled)
   },
 
   // ===== Window (Electron only) =====
@@ -590,42 +590,42 @@ export const api = {
     if (!isElectron()) {
       return { success: true } // No-op in remote mode
     }
-    return window.halo.setTitleBarOverlay(options)
+    return window.skillsfan.setTitleBarOverlay(options)
   },
 
   maximizeWindow: async (): Promise<ApiResponse> => {
     if (!isElectron()) {
       return { success: false, error: 'Only available in desktop app' }
     }
-    return window.halo.maximizeWindow()
+    return window.skillsfan.maximizeWindow()
   },
 
   unmaximizeWindow: async (): Promise<ApiResponse> => {
     if (!isElectron()) {
       return { success: false, error: 'Only available in desktop app' }
     }
-    return window.halo.unmaximizeWindow()
+    return window.skillsfan.unmaximizeWindow()
   },
 
   isWindowMaximized: async (): Promise<ApiResponse<boolean>> => {
     if (!isElectron()) {
       return { success: false, error: 'Only available in desktop app' }
     }
-    return window.halo.isWindowMaximized()
+    return window.skillsfan.isWindowMaximized()
   },
 
   toggleMaximizeWindow: async (): Promise<ApiResponse<boolean>> => {
     if (!isElectron()) {
       return { success: false, error: 'Only available in desktop app' }
     }
-    return window.halo.toggleMaximizeWindow()
+    return window.skillsfan.toggleMaximizeWindow()
   },
 
   onWindowMaximizeChange: (callback: (isMaximized: boolean) => void) => {
     if (!isElectron()) {
       return () => { } // No-op in remote mode
     }
-    return window.halo.onWindowMaximizeChange(callback)
+    return window.skillsfan.onWindowMaximizeChange(callback)
   },
 
   // ===== Event Listeners =====
@@ -659,14 +659,14 @@ export const api = {
 
   createBrowserView: async (viewId: string, url?: string): Promise<ApiResponse> => {
     if (isElectron()) {
-      return window.halo.createBrowserView(viewId, url)
+      return window.skillsfan.createBrowserView(viewId, url)
     }
     return { success: false, error: 'Browser views only available in desktop app' }
   },
 
   destroyBrowserView: async (viewId: string): Promise<ApiResponse> => {
     if (isElectron()) {
-      return window.halo.destroyBrowserView(viewId)
+      return window.skillsfan.destroyBrowserView(viewId)
     }
     return { success: false, error: 'Browser views only available in desktop app' }
   },
@@ -676,14 +676,14 @@ export const api = {
     bounds: { x: number; y: number; width: number; height: number }
   ): Promise<ApiResponse> => {
     if (isElectron()) {
-      return window.halo.showBrowserView(viewId, bounds)
+      return window.skillsfan.showBrowserView(viewId, bounds)
     }
     return { success: false, error: 'Browser views only available in desktop app' }
   },
 
   hideBrowserView: async (viewId: string): Promise<ApiResponse> => {
     if (isElectron()) {
-      return window.halo.hideBrowserView(viewId)
+      return window.skillsfan.hideBrowserView(viewId)
     }
     return { success: false, error: 'Browser views only available in desktop app' }
   },
@@ -693,84 +693,84 @@ export const api = {
     bounds: { x: number; y: number; width: number; height: number }
   ): Promise<ApiResponse> => {
     if (isElectron()) {
-      return window.halo.resizeBrowserView(viewId, bounds)
+      return window.skillsfan.resizeBrowserView(viewId, bounds)
     }
     return { success: false, error: 'Browser views only available in desktop app' }
   },
 
   navigateBrowserView: async (viewId: string, url: string): Promise<ApiResponse> => {
     if (isElectron()) {
-      return window.halo.navigateBrowserView(viewId, url)
+      return window.skillsfan.navigateBrowserView(viewId, url)
     }
     return { success: false, error: 'Browser views only available in desktop app' }
   },
 
   browserGoBack: async (viewId: string): Promise<ApiResponse> => {
     if (isElectron()) {
-      return window.halo.browserGoBack(viewId)
+      return window.skillsfan.browserGoBack(viewId)
     }
     return { success: false, error: 'Browser views only available in desktop app' }
   },
 
   browserGoForward: async (viewId: string): Promise<ApiResponse> => {
     if (isElectron()) {
-      return window.halo.browserGoForward(viewId)
+      return window.skillsfan.browserGoForward(viewId)
     }
     return { success: false, error: 'Browser views only available in desktop app' }
   },
 
   browserReload: async (viewId: string): Promise<ApiResponse> => {
     if (isElectron()) {
-      return window.halo.browserReload(viewId)
+      return window.skillsfan.browserReload(viewId)
     }
     return { success: false, error: 'Browser views only available in desktop app' }
   },
 
   browserStop: async (viewId: string): Promise<ApiResponse> => {
     if (isElectron()) {
-      return window.halo.browserStop(viewId)
+      return window.skillsfan.browserStop(viewId)
     }
     return { success: false, error: 'Browser views only available in desktop app' }
   },
 
   getBrowserState: async (viewId: string): Promise<ApiResponse> => {
     if (isElectron()) {
-      return window.halo.getBrowserState(viewId)
+      return window.skillsfan.getBrowserState(viewId)
     }
     return { success: false, error: 'Browser views only available in desktop app' }
   },
 
   captureBrowserView: async (viewId: string): Promise<ApiResponse> => {
     if (isElectron()) {
-      return window.halo.captureBrowserView(viewId)
+      return window.skillsfan.captureBrowserView(viewId)
     }
     return { success: false, error: 'Browser views only available in desktop app' }
   },
 
   executeBrowserJS: async (viewId: string, code: string): Promise<ApiResponse> => {
     if (isElectron()) {
-      return window.halo.executeBrowserJS(viewId, code)
+      return window.skillsfan.executeBrowserJS(viewId, code)
     }
     return { success: false, error: 'Browser views only available in desktop app' }
   },
 
   setBrowserZoom: async (viewId: string, level: number): Promise<ApiResponse> => {
     if (isElectron()) {
-      return window.halo.setBrowserZoom(viewId, level)
+      return window.skillsfan.setBrowserZoom(viewId, level)
     }
     return { success: false, error: 'Browser views only available in desktop app' }
   },
 
   toggleBrowserDevTools: async (viewId: string): Promise<ApiResponse> => {
     if (isElectron()) {
-      return window.halo.toggleBrowserDevTools(viewId)
+      return window.skillsfan.toggleBrowserDevTools(viewId)
     }
     return { success: false, error: 'Browser views only available in desktop app' }
   },
 
   showBrowserContextMenu: async (options: { viewId: string; url?: string; zoomLevel: number }): Promise<ApiResponse> => {
     if (isElectron()) {
-      return window.halo.showBrowserContextMenu(options)
+      return window.skillsfan.showBrowserContextMenu(options)
     }
     return { success: false, error: 'Browser views only available in desktop app' }
   },
@@ -791,7 +791,7 @@ export const api = {
     hasTabsToRight: boolean
   }): Promise<ApiResponse> => {
     if (isElectron()) {
-      return window.halo.showCanvasTabContextMenu(options)
+      return window.skillsfan.showCanvasTabContextMenu(options)
     }
     return { success: false, error: 'Native menu only available in desktop app' }
   },
@@ -817,7 +817,7 @@ export const api = {
     spaceId?: string
   ): Promise<ApiResponse> => {
     if (isElectron()) {
-      return window.halo.search(query, scope, conversationId, spaceId)
+      return window.skillsfan.search(query, scope, conversationId, spaceId)
     }
     return httpRequest('POST', '/api/search', {
       query,
@@ -829,7 +829,7 @@ export const api = {
 
   cancelSearch: async (): Promise<ApiResponse> => {
     if (isElectron()) {
-      return window.halo.cancelSearch()
+      return window.skillsfan.cancelSearch()
     }
     return httpRequest('POST', '/api/search/cancel')
   },
@@ -845,21 +845,21 @@ export const api = {
     if (!isElectron()) {
       return { success: false, error: 'Only available in desktop app' }
     }
-    return window.halo.checkForUpdates()
+    return window.skillsfan.checkForUpdates()
   },
 
   installUpdate: async (): Promise<ApiResponse> => {
     if (!isElectron()) {
       return { success: false, error: 'Only available in desktop app' }
     }
-    return window.halo.installUpdate()
+    return window.skillsfan.installUpdate()
   },
 
   getVersion: async (): Promise<ApiResponse<string>> => {
     if (!isElectron()) {
       return { success: false, error: 'Only available in desktop app' }
     }
-    return window.halo.getVersion()
+    return window.skillsfan.getVersion()
   },
 
   onUpdaterStatus: (callback: (data: {
@@ -872,7 +872,7 @@ export const api = {
     if (!isElectron()) {
       return () => { } // No-op in remote mode
     }
-    return window.halo.onUpdaterStatus(callback)
+    return window.skillsfan.onUpdaterStatus(callback)
   },
 
   // ===== Overlay (Electron only) =====
@@ -881,21 +881,21 @@ export const api = {
     if (!isElectron()) {
       return { success: false, error: 'Only available in desktop app' }
     }
-    return window.halo.showChatCapsuleOverlay()
+    return window.skillsfan.showChatCapsuleOverlay()
   },
 
   hideChatCapsuleOverlay: async (): Promise<ApiResponse> => {
     if (!isElectron()) {
       return { success: false, error: 'Only available in desktop app' }
     }
-    return window.halo.hideChatCapsuleOverlay()
+    return window.skillsfan.hideChatCapsuleOverlay()
   },
 
   onCanvasExitMaximized: (callback: () => void) => {
     if (!isElectron()) {
       return () => { } // No-op in remote mode
     }
-    return window.halo.onCanvasExitMaximized(callback)
+    return window.skillsfan.onCanvasExitMaximized(callback)
   },
 
   // ===== Performance Monitoring (Electron only, Developer Tools) =====
@@ -903,49 +903,49 @@ export const api = {
     if (!isElectron()) {
       return { success: false, error: 'Only available in desktop app' }
     }
-    return window.halo.perfStart(config)
+    return window.skillsfan.perfStart(config)
   },
 
   perfStop: async (): Promise<ApiResponse> => {
     if (!isElectron()) {
       return { success: false, error: 'Only available in desktop app' }
     }
-    return window.halo.perfStop()
+    return window.skillsfan.perfStop()
   },
 
   perfGetState: async (): Promise<ApiResponse> => {
     if (!isElectron()) {
       return { success: false, error: 'Only available in desktop app' }
     }
-    return window.halo.perfGetState()
+    return window.skillsfan.perfGetState()
   },
 
   perfGetHistory: async (): Promise<ApiResponse> => {
     if (!isElectron()) {
       return { success: false, error: 'Only available in desktop app' }
     }
-    return window.halo.perfGetHistory()
+    return window.skillsfan.perfGetHistory()
   },
 
   perfClearHistory: async (): Promise<ApiResponse> => {
     if (!isElectron()) {
       return { success: false, error: 'Only available in desktop app' }
     }
-    return window.halo.perfClearHistory()
+    return window.skillsfan.perfClearHistory()
   },
 
   perfSetConfig: async (config: { enabled?: boolean; sampleInterval?: number; warnOnThreshold?: boolean }): Promise<ApiResponse> => {
     if (!isElectron()) {
       return { success: false, error: 'Only available in desktop app' }
     }
-    return window.halo.perfSetConfig(config)
+    return window.skillsfan.perfSetConfig(config)
   },
 
   perfExport: async (): Promise<ApiResponse<string>> => {
     if (!isElectron()) {
       return { success: false, error: 'Only available in desktop app' }
     }
-    return window.halo.perfExport()
+    return window.skillsfan.perfExport()
   },
 
   onPerfSnapshot: (callback: (data: unknown) => void) =>
@@ -966,7 +966,7 @@ export const api = {
     longTasks: number
   }): void => {
     if (isElectron()) {
-      window.halo.perfReportRendererMetrics(metrics)
+      window.skillsfan.perfReportRendererMetrics(metrics)
     }
   },
 
@@ -980,7 +980,7 @@ export const api = {
       // In remote mode, assume Git Bash is available (server handles it)
       return { success: true, data: { found: true, path: null, source: null } }
     }
-    return window.halo.getGitBashStatus()
+    return window.skillsfan.getGitBashStatus()
   },
 
   installGitBash: async (onProgress: (progress: {
@@ -992,7 +992,7 @@ export const api = {
     if (!isElectron()) {
       return { success: false, error: 'Only available in desktop app' }
     }
-    return window.halo.installGitBash(onProgress)
+    return window.skillsfan.installGitBash(onProgress)
   },
 
   openExternal: async (url: string): Promise<void> => {
@@ -1001,7 +1001,7 @@ export const api = {
       window.open(url, '_blank')
       return
     }
-    return window.halo.openExternal(url)
+    return window.skillsfan.openExternal(url)
   },
 
   // ===== Bootstrap Lifecycle Events (Electron only) =====
@@ -1013,7 +1013,7 @@ export const api = {
       setTimeout(() => callback({ timestamp: Date.now(), duration: 0 }), 0)
       return () => {}
     }
-    return window.halo.onBootstrapExtendedReady(callback)
+    return window.skillsfan.onBootstrapExtendedReady(callback)
   },
 }
 
