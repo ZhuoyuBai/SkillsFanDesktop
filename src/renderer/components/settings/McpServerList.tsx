@@ -71,7 +71,7 @@ function StatusIndicator({ status, t }: { status: McpServerStatus['status'] | nu
       )
     case 'pending':
       return (
-        <span className="flex items-center gap-1 text-xs text-blue-500" title={t('Connecting...')}>
+        <span className="flex items-center gap-1 text-xs text-orange-500" title={t('Connecting...')}>
           <Clock className="w-3 h-3" />
         </span>
       )

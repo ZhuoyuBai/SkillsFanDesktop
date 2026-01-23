@@ -90,7 +90,7 @@ function ThoughtItem({ thought }: { thought: Thought }) {
   const getTypeInfo = () => {
     switch (thought.type) {
       case 'thinking':
-        return { label: t('Thinking'), color: 'text-blue-400', Icon: Lightbulb }
+        return { label: t('Thinking'), color: 'text-orange-400', Icon: Lightbulb }
       case 'tool_use':
         return {
           label: `${t('Calling')} ${thought.toolName}`,

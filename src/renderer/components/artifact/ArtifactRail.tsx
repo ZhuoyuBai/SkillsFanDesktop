@@ -325,7 +325,7 @@ export function ArtifactRail({
             className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 text-xs text-muted-foreground hover:bg-secondary hover:text-foreground rounded-lg transition-colors"
             title={t('Open browser (⌘⇧B)')}
           >
-            <Globe className="w-4 h-4 text-blue-500" />
+            <Globe className="w-4 h-4 text-orange-500" />
             <span>{t('Browser')}</span>
           </button>
         </div>
@@ -506,7 +506,7 @@ export function ArtifactRail({
                 className="p-2 hover:bg-secondary rounded-lg transition-colors"
                 title={t('Open browser')}
               >
-                <Globe className="w-5 h-5 text-blue-500" />
+                <Globe className="w-5 h-5 text-orange-500" />
               </button>
             </>
           )}

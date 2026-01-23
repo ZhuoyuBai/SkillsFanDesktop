@@ -208,7 +208,7 @@ export const spaceIconMap: Record<string, LucideIcon> = {
 // Professional color palette for space icons
 export const spaceIconColors: Record<string, string> = {
   folder: 'text-amber-500',        // Classic folder yellow
-  code: 'text-blue-500',           // Tech/programming blue
+  code: 'text-orange-500',          // Claude Code orange
   globe: 'text-cyan-500',          // Internet/global cyan
   chart: 'text-violet-500',        // Data/analytics purple
   'file-text': 'text-slate-500',   // Document neutral
