@@ -44,6 +44,16 @@ export function SplashScreen() {
       >
         {t('AI that gets things done')}
       </p>
+
+      {/* Loading indicator */}
+      <div
+        className={`mt-8 flex items-center gap-2 text-muted-foreground/60 text-xs transition-all duration-1000 delay-700 ${
+          animate ? 'opacity-100' : 'opacity-0'
+        }`}
+      >
+        <div className="w-3 h-3 border border-muted-foreground/40 border-t-transparent rounded-full animate-spin" />
+        <span>{t('Loading, please wait...')}</span>
+      </div>
     </div>
   )
 }
