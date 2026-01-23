@@ -26,6 +26,7 @@ import { ConversationList } from '../components/chat/ConversationList'
 import { ChatHistoryPanel } from '../components/chat/ChatHistoryPanel'
 import { SpaceIcon } from '../components/icons/ToolIcons'
 import { Header } from '../components/layout/Header'
+import { HaloLogo } from '../components/brand/HaloLogo'
 import { ModelSelector } from '../components/layout/ModelSelector'
 import { ContentCanvas, CanvasToggleButton } from '../components/canvas'
 import { GitBashWarningBanner } from '../components/setup/GitBashWarningBanner'
@@ -339,8 +340,12 @@ export function SpacePage() {
               </svg>
             </button>
 
-            <SpaceIcon iconId={currentSpace.icon} size={22} />
-            <span className="font-medium text-sm">{currentSpace.isTemp ? 'Halo' : currentSpace.name}</span>
+            {currentSpace.isTemp ? (
+              <HaloLogo size={22} animated={false} />
+            ) : (
+              <SpaceIcon iconId={currentSpace.icon} size={22} />
+            )}
+            <span className="font-medium text-sm">{currentSpace.isTemp ? '技能范' : currentSpace.name}</span>
 
             {/* Chat History Panel - integrated in header */}
             {conversations.length > 0 && (

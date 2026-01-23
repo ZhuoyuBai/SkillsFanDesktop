@@ -85,8 +85,8 @@ function removeFromSpaceIndex(path: string): void {
 
 const HALO_SPACE: Space = {
   id: 'halo-temp',
-  name: 'Halo',
-  icon: 'sparkles',  // Maps to Lucide Sparkles icon
+  name: '技能范',
+  icon: 'skillsfan',  // Uses SkillsFan brand logo
   path: '',
   isTemp: true,
   createdAt: new Date().toISOString(),

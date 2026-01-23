@@ -78,7 +78,7 @@
   "Appearance": "外观",
   "Approaching context limit": "接近上下文限制",
   "Are you sure you want to delete this space?\n\nAll conversations and files in the space will be deleted.": "确定要删除此空间吗?\n\n空间中的所有对话和文件都将被删除。",
-  "Are you sure you want to delete this space?\n\nOnly Halo data (conversation history) will be deleted, your project files will be kept.": "确定要删除此空间吗?\n\n仅会删除 Halo 数据(对话历史),您的项目文件将被保留。",
+  "Are you sure you want to delete this space?\n\nOnly Halo data (conversation history) will be deleted, your project files will be kept.": "确定要删除此空间吗?\n\n仅会删除技能范数据(对话历史),您的项目文件将被保留。",
   "Argument value": "参数值",
   "Arguments": "参数",
   "artifacts": "产物",
