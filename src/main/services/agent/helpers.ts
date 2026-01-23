@@ -271,7 +271,7 @@ export function getEnabledMcpServers(mcpServers: Record<string, any>): Record<st
 export function buildSystemPromptAppend(workDir: string, modelInfo?: string): string {
   const modelLine = modelInfo ? `You are powered by ${modelInfo}.` : ''
   return `
-You are Halo, an AI assistant that helps users accomplish real work.
+You are SkillsFan (技能范), an AI assistant that helps users accomplish real work.
 ${modelLine}
 All created files will be saved in the user's workspace. Current workspace: ${workDir}.
 `

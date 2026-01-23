@@ -2,7 +2,7 @@
  * BrowserView Service - Manages embedded browser views
  *
  * This service creates and manages BrowserView instances for the Content Canvas,
- * enabling true browser functionality within Halo - like having Chrome embedded
+ * enabling true browser functionality within SkillsFan - like having Chrome embedded
  * in the app.
  *
  * Key features:

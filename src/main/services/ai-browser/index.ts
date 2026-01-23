@@ -1,7 +1,7 @@
 /**
  * AI Browser Module - Main Entry Point
  *
- * This module provides AI-controlled browser capabilities for Halo.
+ * This module provides AI-controlled browser capabilities for SkillsFan.
  * It enables the AI to navigate web pages, interact with elements,
  * and extract information - all without requiring external tools.
  *
@@ -158,7 +158,7 @@ export async function executeAIBrowserTool(
 export const AI_BROWSER_SYSTEM_PROMPT = `
 ## AI Browser
 
-You can now control Halo's embedded real browser. All browser tools are provided via MCP server "ai-browser".
+You can now control SkillsFan's embedded real browser. All browser tools are provided via MCP server "ai-browser".
 
 ### Core Workflow
 1. Use \`mcp__ai-browser__browser_new_page\` to open a webpage
