@@ -100,25 +100,27 @@ export function SpaceGuide() {
               </div>
             </div>
 
-            {/* Section 3: When to create one */}
+            {/* Section 3: Default space vs Custom space */}
             <div className="flex items-start gap-2.5 sm:gap-3">
               <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center flex-shrink-0 mt-0.5">
                 <HelpCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500" />
               </div>
               <div className="flex-1 min-w-0">
-                <h4 className="text-sm font-medium mb-1 sm:mb-1.5">{t('When do you need to create one?')}</h4>
-                <div className="text-xs sm:text-sm text-muted-foreground leading-relaxed space-y-0.5 sm:space-y-1">
-                  <p>
-                    <span className="text-foreground/80">{t('Casual chat, asking questions')}</span>
-                    <span className="mx-1 sm:mx-1.5">→</span>
-                    {t('Use Halo space')}
-                  </p>
-                  <p>
-                    <span className="text-foreground/80">{t('Projects, long-term tasks')}</span>
-                    <span className="mx-1 sm:mx-1.5">→</span>
-                    {t('Recommend creating a dedicated space')}
-                  </p>
-                  <p className="mt-1">{t('Keep files from different projects organized')}</p>
+                <h4 className="text-sm font-medium mb-2 sm:mb-2.5">{t('When do you need to create one?')}</h4>
+                <div className="text-xs sm:text-sm text-muted-foreground leading-relaxed space-y-2 sm:space-y-3">
+                  {/* Default space */}
+                  <div className="space-y-0.5">
+                    <p className="text-foreground/90 font-medium">{t('Casual chat, asking questions')}</p>
+                    <p>{t('Use Halo space')}</p>
+                    <p>{t('Suitable for default space')}</p>
+                  </div>
+                  {/* Custom space */}
+                  <div className="space-y-0.5">
+                    <p className="text-foreground/90 font-medium">{t('Projects, long-term tasks')}</p>
+                    <p>{t('Recommend creating a dedicated space')}</p>
+                    <p>{t('Suitable for custom space')}</p>
+                  </div>
+                  <p className="pt-1 text-muted-foreground/80">{t('Keep files from different projects organized')}</p>
                 </div>
               </div>
             </div>

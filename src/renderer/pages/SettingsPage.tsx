@@ -27,7 +27,7 @@ import { CheckCircle2, XCircle, ArrowLeft, Eye, EyeOff } from '../components/ico
 import { Header } from '../components/layout/Header'
 import { McpServerList } from '../components/settings/McpServerList'
 import { useTranslation, setLanguage, getCurrentLanguage, SUPPORTED_LOCALES, type LocaleCode } from '../i18n'
-import { Loader2, LogOut, Plus, Check, Globe, Key, MessageSquare, type LucideIcon } from 'lucide-react'
+import { Loader2, LogOut, Plus, Check, Globe, Key, MessageSquare, Bot, Palette, Server, Settings, Wifi, type LucideIcon } from 'lucide-react'
 
 /**
  * Get localized text based on current language
@@ -70,9 +70,15 @@ interface RemoteAccessStatus {
   clients: number
 }
 
+// Settings section type
+type SettingsSection = 'ai-model' | 'display' | 'mcp' | 'system' | 'remote'
+
 export function SettingsPage() {
   const { t } = useTranslation()
   const { config, setConfig, goBack } = useAppStore()
+
+  // Active section state
+  const [activeSection, setActiveSection] = useState<SettingsSection>('ai-model')
 
   // AI Source state
   const [currentSource, setCurrentSource] = useState<AISourceType>(config?.aiSources?.current || 'custom')
@@ -471,6 +477,15 @@ export function SettingsPage() {
     goBack()
   }
 
+  // Navigation items configuration
+  const navItems: { id: SettingsSection; icon: LucideIcon; label: string; desktopOnly?: boolean }[] = [
+    { id: 'ai-model', icon: Bot, label: t('AI Model') },
+    { id: 'display', icon: Palette, label: t('Display & Language') },
+    { id: 'mcp', icon: Server, label: t('MCP Servers') },
+    { id: 'system', icon: Settings, label: t('System'), desktopOnly: true },
+    { id: 'remote', icon: Wifi, label: t('Remote Access') },
+  ]
+
   return (
     <div className="h-full w-full flex flex-col">
       {/* Header - cross-platform support */}
@@ -488,10 +503,53 @@ export function SettingsPage() {
         }
       />
 
-      {/* Content */}
-      <main className="flex-1 overflow-auto p-6">
-        <div className="max-w-2xl mx-auto space-y-6">
+      {/* Main content with sidebar navigation */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Left sidebar navigation */}
+        <nav className="w-52 border-r border-border flex flex-col bg-card/50">
+          <div className="flex-1 p-3 space-y-1">
+            {navItems
+              .filter(item => !item.desktopOnly || !api.isRemoteMode())
+              .map(item => {
+                const Icon = item.icon
+                const isActive = activeSection === item.id
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => setActiveSection(item.id)}
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
+                      isActive
+                        ? 'bg-primary/10 text-primary font-medium'
+                        : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
+                    }`}
+                  >
+                    <Icon className="w-4 h-4" />
+                    <span>{item.label}</span>
+                  </button>
+                )
+              })}
+          </div>
+
+          {/* About section at bottom */}
+          <div className="p-3 border-t border-border">
+            <div className="text-xs text-muted-foreground space-y-1">
+              <div className="flex justify-between">
+                <span>{t('Version')}</span>
+                <span>1.0.0</span>
+              </div>
+              <div className="text-[10px] opacity-70">
+                Powered by Claude Code
+              </div>
+            </div>
+          </div>
+        </nav>
+
+        {/* Right content area */}
+        <main className="flex-1 overflow-auto p-6">
+          <div className="max-w-2xl">
+
           {/* AI Model Section */}
+          {activeSection === 'ai-model' && (
           <section className="bg-card rounded-xl border border-border p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-medium">{t('AI Model')}</h2>
@@ -931,118 +989,54 @@ export function SettingsPage() {
               )}
             </div>
           </section>
+          )}
 
-          {/* Permissions Section */}
+          {/* Display & Language Section */}
+          {activeSection === 'display' && (
           <section className="bg-card rounded-xl border border-border p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-medium">{t('Permissions')}</h2>
-              <span className="text-xs px-2 py-1 rounded-full bg-green-500/20 text-green-500">
-                {t('Full Permission Mode')}
-              </span>
-            </div>
+            <h2 className="text-lg font-medium mb-4">{t('Display & Language')}</h2>
 
-            {/* Info banner */}
-            <div className="bg-muted/50 rounded-lg p-3 mb-4 text-sm text-muted-foreground">
-              {t('Current version defaults to full permission mode, AI can freely perform all operations. Future versions will support fine-grained permission control.')}
-            </div>
-
-            <div className="space-y-4 opacity-50">
-              {/* File Access */}
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">{t('File Read/Write')}</p>
-                  <p className="text-sm text-muted-foreground">{t('Allow AI to read and create files')}</p>
+            <div className="space-y-6">
+              {/* Theme */}
+              <div>
+                <label className="block text-sm text-muted-foreground mb-2">{t('Theme')}</label>
+                <div className="flex gap-3">
+                  {(['light', 'dark', 'system'] as ThemeMode[]).map((themeMode) => (
+                    <button
+                      key={themeMode}
+                      onClick={() => handleThemeChange(themeMode)}
+                      className={`px-4 py-2 rounded-lg transition-colors ${theme === themeMode
+                        ? 'bg-primary/10 text-primary border border-primary'
+                        : 'bg-secondary hover:bg-secondary/80'
+                        }`}
+                    >
+                      {themeMode === 'light' ? t('Light') : themeMode === 'dark' ? t('Dark') : t('Follow System')}
+                    </button>
+                  ))}
                 </div>
+              </div>
+
+              {/* Language */}
+              <div className="pt-4 border-t border-border">
+                <label className="block text-sm text-muted-foreground mb-2">{t('Language')}</label>
                 <select
-                  value="allow"
-                  disabled
-                  className="px-3 py-1 bg-input rounded-lg border border-border cursor-not-allowed"
+                  value={getCurrentLanguage()}
+                  onChange={(e) => setLanguage(e.target.value as LocaleCode)}
+                  className="w-full px-4 py-2 bg-input rounded-lg border border-border focus:border-primary focus:outline-none transition-colors"
                 >
-                  <option value="allow">{t('Allow')}</option>
+                  {Object.entries(SUPPORTED_LOCALES).map(([code, name]) => (
+                    <option key={code} value={code}>
+                      {name}
+                    </option>
+                  ))}
                 </select>
               </div>
-
-              {/* Command Execution */}
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">{t('Execute Commands')}</p>
-                  <p className="text-sm text-muted-foreground">{t('Allow AI to execute terminal commands')}</p>
-                </div>
-                <select
-                  value="allow"
-                  disabled
-                  className="px-3 py-1 bg-input rounded-lg border border-border cursor-not-allowed"
-                >
-                  <option value="allow">{t('Allow')}</option>
-                </select>
-              </div>
-
-              {/* Trust Mode */}
-              <div className="flex items-center justify-between pt-4 border-t border-border">
-                <div>
-                  <p className="font-medium">{t('Trust Mode')}</p>
-                  <p className="text-sm text-muted-foreground">{t('Automatically execute all operations')}</p>
-                </div>
-                <label className="relative inline-flex items-center cursor-not-allowed">
-                  <input
-                    type="checkbox"
-                    checked={true}
-                    disabled
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-primary rounded-full">
-                    <div className="w-5 h-5 bg-white rounded-full shadow-md transform translate-x-5 mt-0.5" />
-                  </div>
-                </label>
-              </div>
             </div>
           </section>
-
-          {/* Appearance Section */}
-          <section className="bg-card rounded-xl border border-border p-6">
-            <h2 className="text-lg font-medium mb-4">{t('Appearance')}</h2>
-
-            <div>
-              <label className="block text-sm text-muted-foreground mb-2">{t('Theme')}</label>
-              <div className="flex gap-4">
-                {(['light', 'dark', 'system'] as ThemeMode[]).map((themeMode) => (
-                  <button
-                    key={themeMode}
-                    onClick={() => handleThemeChange(themeMode)}
-                    className={`px-4 py-2 rounded-lg transition-colors ${theme === themeMode
-                      ? 'bg-primary/20 text-primary border border-primary'
-                      : 'bg-secondary hover:bg-secondary/80'
-                      }`}
-                  >
-                    {themeMode === 'light' ? t('Light') : themeMode === 'dark' ? t('Dark') : t('Follow System')}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </section>
-
-          {/* Language Section */}
-          <section className="bg-card rounded-xl border border-border p-6">
-            <h2 className="text-lg font-medium mb-4">{t('Language')}</h2>
-
-            <div>
-              <label className="block text-sm text-muted-foreground mb-2">{t('Language')}</label>
-              <select
-                value={getCurrentLanguage()}
-                onChange={(e) => setLanguage(e.target.value as LocaleCode)}
-                className="w-full px-4 py-2 bg-input rounded-lg border border-border focus:border-primary focus:outline-none transition-colors"
-              >
-                {Object.entries(SUPPORTED_LOCALES).map(([code, name]) => (
-                  <option key={code} value={code}>
-                    {name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </section>
+          )}
 
           {/* System Section */}
-          {!api.isRemoteMode() && (
+          {activeSection === 'system' && !api.isRemoteMode() && (
             <section className="bg-card rounded-xl border border-border p-6">
               <h2 className="text-lg font-medium mb-4">{t('System')}</h2>
 
@@ -1122,6 +1116,7 @@ export function SettingsPage() {
           )}
 
           {/* MCP Servers Section */}
+          {activeSection === 'mcp' && (
           <section className="bg-card rounded-xl border border-border p-6">
             <McpServerList
               servers={config?.mcpServers || {}}
@@ -1146,8 +1141,10 @@ export function SettingsPage() {
               </p>
             </div>
           </section>
+          )}
 
           {/* Remote Access Section */}
+          {activeSection === 'remote' && (
           <section className="bg-card rounded-xl border border-border p-6">
             <h2 className="text-lg font-medium mb-4">{t('Remote Access')}</h2>
 
@@ -1403,24 +1400,11 @@ export function SettingsPage() {
               )}
             </div>
           </section>
+          )}
 
-          {/* About Section */}
-          <section className="bg-card rounded-xl border border-border p-6">
-            <h2 className="text-lg font-medium mb-4">{t('About')}</h2>
-
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">{t('Version')}</span>
-                <span>1.0.0</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">{t('Build')}</span>
-                <span> Powered by Claude Code </span>
-              </div>
-            </div>
-          </section>
-        </div>
-      </main>
+          </div>
+        </main>
+      </div>
     </div>
   )
 }
