@@ -35,6 +35,7 @@ interface InputAreaProps {
   isGenerating: boolean
   placeholder?: string
   isCompact?: boolean
+  noBorder?: boolean  // Hide top border (used in empty state centered layout)
 }
 
 // Image constraints
@@ -47,7 +48,7 @@ interface ImageError {
   message: string
 }
 
-export function InputArea({ onSend, onStop, isGenerating, placeholder, isCompact = false }: InputAreaProps) {
+export function InputArea({ onSend, onStop, isGenerating, placeholder, isCompact = false, noBorder = false }: InputAreaProps) {
   const { t } = useTranslation()
   const [content, setContent] = useState('')
   const [isFocused, setIsFocused] = useState(false)
@@ -288,9 +289,9 @@ export function InputArea({ onSend, onStop, isGenerating, placeholder, isCompact
 
   return (
     <div className={`
-      border-t border-border/50 bg-background/80 backdrop-blur-sm
+      ${noBorder ? '' : 'border-t border-border/50'} bg-background/80 backdrop-blur-sm
       transition-[padding] duration-300 ease-out
-      ${isCompact ? 'px-3 py-2' : 'px-4 py-3'}
+      ${isCompact ? 'px-3 py-2' : noBorder ? 'px-4 py-0' : 'px-4 py-3'}
     `}>
       <div className={isCompact ? '' : 'max-w-3xl mx-auto'}>
         {/* Error toast notification */}
@@ -471,28 +472,27 @@ function InputToolbar({
 
             {/* Attachment menu dropdown */}
             {showAttachMenu && (
-              <div className="absolute bottom-full left-0 mb-2 py-1.5 bg-popover border border-border
-                rounded-xl shadow-lg min-w-[160px] z-20 animate-fade-in">
+              <div className="absolute bottom-full left-0 mb-1 p-1 bg-popover border border-border
+                rounded-lg shadow-lg z-20 animate-fade-in">
                 <button
                   onClick={onImageClick}
                   disabled={imageCount >= maxImages}
-                  className={`w-full px-3 py-2 flex items-center gap-3 text-sm
-                    transition-colors duration-150
+                  className={`w-full px-2.5 py-1.5 flex items-center gap-2 text-sm whitespace-nowrap
+                    rounded-md transition-colors duration-150
                     ${imageCount >= maxImages
                       ? 'text-muted-foreground/40 cursor-not-allowed'
-                      : 'text-foreground hover:bg-muted/50'
+                      : 'text-foreground hover:bg-muted'
                     }
                   `}
                 >
-                  <ImagePlus size={16} className="text-muted-foreground" />
+                  <ImagePlus size={14} className="text-muted-foreground" />
                   <span>{t('Add image')}</span>
                   {imageCount > 0 && (
-                    <span className="ml-auto text-xs text-muted-foreground">
+                    <span className="text-xs text-muted-foreground">
                       {imageCount}/{maxImages}
                     </span>
                   )}
                 </button>
-                {/* Future extensibility: add more options here */}
               </div>
             )}
           </div>
@@ -513,10 +513,6 @@ function InputToolbar({
           >
             <Globe size={15} />
             <span className="text-xs">{t('Browser')}</span>
-            {/* Active indicator dot */}
-            {aiBrowserEnabled && (
-              <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-primary rounded-full" />
-            )}
           </button>
         )}
 
@@ -558,7 +554,7 @@ function InputToolbar({
             onClick={onSend}
             disabled={!canSend}
             className={`
-              w-8 h-8 flex items-center justify-center rounded-lg transition-all duration-200
+              w-8 h-8 flex items-center justify-center rounded-full transition-all duration-200
               ${canSend
                 ? 'bg-primary text-primary-foreground hover:bg-primary/90 active:scale-95'
                 : 'bg-muted/50 text-muted-foreground/40 cursor-not-allowed'

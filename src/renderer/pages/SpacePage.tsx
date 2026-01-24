@@ -82,8 +82,8 @@ export function SpacePage() {
   const currentConversation = getCurrentConversation()
   const currentConversationId = getCurrentConversationId()
 
-  // Show conversation list for non-temp spaces
-  const [showConversationList, setShowConversationList] = useState(false)
+  // Conversation list collapse state (default: expanded = not collapsed)
+  const [isConversationListCollapsed, setIsConversationListCollapsed] = useState(false)
 
   // Canvas state - use precise selectors to minimize re-renders
   const isCanvasOpen = useCanvasIsOpen()
@@ -358,8 +358,8 @@ export function SpacePage() {
                   onDelete={handleDeleteConversation}
                   onRename={handleRenameConversation}
                   spaceName={currentSpace.isTemp ? t('Halo Space') : currentSpace.name}
-                  onToggleSidebar={() => setShowConversationList(!showConversationList)}
-                  isSidebarVisible={showConversationList}
+                  onToggleSidebar={() => setIsConversationListCollapsed(!isConversationListCollapsed)}
+                  isSidebarVisible={!isConversationListCollapsed}
                 />
               </div>
             )}
@@ -411,7 +411,7 @@ export function SpacePage() {
       {/* Main content */}
       <div className="flex-1 flex overflow-hidden">
         {/* Conversation list sidebar - hidden when maximized */}
-        {showConversationList && !isCanvasMaximized && (
+        {!isCanvasMaximized && (
           <ConversationList
             conversations={conversations}
             currentConversationId={currentConversationId}
@@ -419,6 +419,8 @@ export function SpacePage() {
             onNew={handleNewConversation}
             onDelete={handleDeleteConversation}
             onRename={handleRenameConversation}
+            isCollapsed={isConversationListCollapsed}
+            onToggleCollapse={() => setIsConversationListCollapsed(!isConversationListCollapsed)}
           />
         )}
 

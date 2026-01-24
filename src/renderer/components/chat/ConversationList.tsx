@@ -1,17 +1,20 @@
 /**
  * Conversation List - Resizable sidebar for multiple conversations
  * Supports drag-to-resize, inline title editing, and conversation management
+ * Can be collapsed to show only icons
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import type { ConversationMeta } from '../../types'
 import { MessageSquare, Plus } from '../icons/ToolIcons'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useTranslation } from '../../i18n'
 
 // Width constraints (in pixels)
 const MIN_WIDTH = 140
 const MAX_WIDTH = 320
 const DEFAULT_WIDTH = 192 // w-48 = 12rem = 192px
+const COLLAPSED_WIDTH = 48 // Width when collapsed (icon only)
 
 interface ConversationListProps {
   conversations: ConversationMeta[]
@@ -20,6 +23,8 @@ interface ConversationListProps {
   onNew: () => void
   onDelete?: (id: string) => void
   onRename?: (id: string, newTitle: string) => void
+  isCollapsed?: boolean
+  onToggleCollapse?: () => void
 }
 
 export function ConversationList({
@@ -28,7 +33,9 @@ export function ConversationList({
   onSelect,
   onNew,
   onDelete,
-  onRename
+  onRename,
+  isCollapsed = false,
+  onToggleCollapse
 }: ConversationListProps) {
   const { t } = useTranslation()
   const [width, setWidth] = useState(DEFAULT_WIDTH)
@@ -122,15 +129,75 @@ export function ConversationList({
     }
   }
 
+  // Collapsed view - show only icons
+  if (isCollapsed) {
+    return (
+      <div
+        className="border-r border-border flex flex-col bg-card/50 relative"
+        style={{ width: COLLAPSED_WIDTH }}
+      >
+        {/* Toggle button */}
+        {onToggleCollapse && (
+          <div className="p-2 border-b border-border flex justify-center">
+            <button
+              onClick={onToggleCollapse}
+              className="p-1.5 hover:bg-muted rounded-md transition-colors text-muted-foreground hover:text-foreground"
+              title={t('Expand')}
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        )}
+
+        {/* Collapsed conversation icons */}
+        <div className="flex-1 overflow-auto py-2">
+          {conversations.map((conversation) => (
+            <div
+              key={conversation.id}
+              onClick={() => onSelect(conversation.id)}
+              className={`w-full p-2 flex justify-center hover:bg-secondary/50 transition-colors cursor-pointer ${
+                conversation.id === currentConversationId ? 'bg-primary/10 border-l-2 border-primary' : ''
+              }`}
+              title={conversation.title}
+            >
+              <MessageSquare className="w-4 h-4 text-orange-500" />
+            </div>
+          ))}
+        </div>
+
+        {/* New conversation button (icon only) */}
+        <div className="p-2 border-t border-border flex justify-center">
+          <button
+            onClick={onNew}
+            className="p-1.5 text-primary hover:bg-primary/10 rounded-md transition-colors"
+            title={t('New conversation')}
+          >
+            <Plus className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // Expanded view
   return (
     <div
       ref={containerRef}
       className="border-r border-border flex flex-col bg-card/50 relative"
       style={{ width, transition: isDragging ? 'none' : 'width 0.2s ease' }}
     >
-      {/* Header */}
-      <div className="p-3 border-b border-border">
+      {/* Header with toggle button */}
+      <div className="p-3 border-b border-border flex items-center justify-between">
         <span className="text-sm font-medium text-muted-foreground">{t('Conversations')}</span>
+        {onToggleCollapse && (
+          <button
+            onClick={onToggleCollapse}
+            className="p-1 hover:bg-muted rounded-md transition-colors text-muted-foreground hover:text-foreground"
+            title={t('Collapse')}
+          >
+            <ChevronLeft size={14} />
+          </button>
+        )}
       </div>
 
       {/* Conversation list */}

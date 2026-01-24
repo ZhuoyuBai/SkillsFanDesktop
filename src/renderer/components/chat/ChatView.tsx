@@ -269,6 +269,29 @@ export function ChatView({ isCompact = false }: ChatViewProps) {
     prevCompactRef.current = isCompact
   }, [isCompact])
 
+  // Input area for empty state (centered, no border)
+  const emptyStateInputArea = (
+    <InputArea
+      onSend={handleSend}
+      onStop={handleStop}
+      isGenerating={isGenerating}
+      placeholder={t('Say what you want to do...')}
+      isCompact={isCompact}
+      noBorder
+    />
+  )
+
+  // Input area for message view (bottom, with border)
+  const bottomInputArea = (
+    <InputArea
+      onSend={handleSend}
+      onStop={handleStop}
+      isGenerating={isGenerating}
+      placeholder={isCompact ? t('Continue conversation...') : t('Continue conversation...')}
+      isCompact={isCompact}
+    />
+  )
+
   return (
     <div
       className={`
@@ -292,7 +315,11 @@ export function ChatView({ isCompact = false }: ChatViewProps) {
           {isLoadingConversation ? (
             <LoadingState />
           ) : !hasMessages ? (
-            <EmptyState isTemp={currentSpace?.isTemp || false} isCompact={isCompact} />
+            <EmptyState
+              isTemp={currentSpace?.isTemp || false}
+              isCompact={isCompact}
+              inputArea={emptyStateInputArea}
+            />
           ) : (
             <>
               <MessageList
@@ -319,14 +346,8 @@ export function ChatView({ isCompact = false }: ChatViewProps) {
         />
       </div>
 
-      {/* Input area */}
-      <InputArea
-        onSend={handleSend}
-        onStop={handleStop}
-        isGenerating={isGenerating}
-        placeholder={isCompact ? t('Continue conversation...') : (currentSpace?.isTemp ? t('Say something to Halo...') : t('Continue conversation...'))}
-        isCompact={isCompact}
-      />
+      {/* Input area - only show at bottom when there are messages */}
+      {hasMessages && bottomInputArea}
     </div>
   )
 }
@@ -343,7 +364,15 @@ function LoadingState() {
 }
 
 // Empty state component - adapts to compact mode
-function EmptyState({ isTemp, isCompact = false }: { isTemp: boolean; isCompact?: boolean }) {
+function EmptyState({
+  isTemp,
+  isCompact = false,
+  inputArea
+}: {
+  isTemp: boolean;
+  isCompact?: boolean;
+  inputArea?: React.ReactNode;
+}) {
   const { t } = useTranslation()
   // Compact mode shows minimal UI
   if (isCompact) {
@@ -353,12 +382,17 @@ function EmptyState({ isTemp, isCompact = false }: { isTemp: boolean; isCompact?
         <p className="mt-4 text-sm text-muted-foreground">
           {t('Continue the conversation here')}
         </p>
+        {inputArea && (
+          <div className="mt-4 w-full max-w-2xl">
+            {inputArea}
+          </div>
+        )}
       </div>
     )
   }
 
   return (
-    <div className="h-full flex flex-col items-center justify-center text-center px-8">
+    <div className="h-full flex flex-col items-center justify-start pt-[15vh] text-center px-8 pb-6">
       {/* Icon */}
       <HaloLogo size={48} animated={false} />
 
@@ -367,7 +401,14 @@ function EmptyState({ isTemp, isCompact = false }: { isTemp: boolean; isCompact?
         {t('Halo, not just chat, can help you get things done')}
       </h2>
 
-      {/* Capabilities */}
+      {/* Input area - shown in center when empty */}
+      {inputArea && (
+        <div className="mt-6 w-full max-w-2xl">
+          {inputArea}
+        </div>
+      )}
+
+      {/* Capabilities - below input area */}
       <div className="mt-4 flex flex-wrap justify-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
         <span>{t('Writing & Documents')}</span>
         <span className="text-muted-foreground/30">·</span>
@@ -382,8 +423,8 @@ function EmptyState({ isTemp, isCompact = false }: { isTemp: boolean; isCompact?
         <span>{t('Efficiency Tools')}</span>
       </div>
 
-      {/* Permission hint */}
-      <p className="mt-6 text-xs text-muted-foreground/50">
+      {/* Permission hint - pushed to bottom */}
+      <p className="mt-auto text-xs text-muted-foreground/50">
         {t('Halo has full access to the current space')}
       </p>
 

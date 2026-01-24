@@ -90,9 +90,9 @@ export function useLayoutPreferences(
       return userRailOverride
     }
 
-    // Priority 2: If canvas is not open, default to expanded
+    // Priority 2: If canvas is not open, default to collapsed
     if (!isCanvasOpen) {
-      return true
+      return false
     }
 
     // Priority 3: Persisted preference
