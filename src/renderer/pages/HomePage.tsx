@@ -13,7 +13,8 @@ import {
   Plus,
   Trash2,
   FolderOpen,
-  Pencil
+  Pencil,
+  ChevronDown
 } from '../components/icons/ToolIcons'
 import { Header } from '../components/layout/Header'
 import { SpaceGuide } from '../components/space/SpaceGuide'
@@ -44,6 +45,7 @@ export function HomePage() {
   const [useCustomPath, setUseCustomPath] = useState(false)
   const [customPath, setCustomPath] = useState<string | null>(null)
   const [defaultPath, setDefaultPath] = useState<string>('~/.skillsfan/spaces')
+  const [showAdvanced, setShowAdvanced] = useState(false)
 
   // Load spaces on mount
   useEffect(() => {
@@ -96,6 +98,7 @@ export function HomePage() {
     setNewSpaceIcon(DEFAULT_SPACE_ICON)
     setUseCustomPath(false)
     setCustomPath(null)
+    setShowAdvanced(false)
   }
 
   // Handle space click - no reset needed, SpacePage handles its own state
@@ -192,14 +195,8 @@ export function HomePage() {
 
   return (
     <div className="h-full w-full flex flex-col">
-      {/* Header - cross-platform support */}
+      {/* Header - simplified, only settings button */}
       <Header
-        left={
-          <>
-            <HaloLogo size={22} animated={false} />
-            <span className="text-sm font-medium">技能范</span>
-          </>
-        }
         right={
           <button
             onClick={() => setView('settings')}
@@ -211,210 +208,115 @@ export function HomePage() {
       />
 
       {/* Content */}
-      <main className="flex-1 overflow-auto p-6">
-        {/* SkillsFan Space Card */}
-        {haloSpace && (
-          <div
-            data-onboarding="halo-space"
-            onClick={() => handleSpaceClick(haloSpace)}
-            className="skillsfan-space-card p-6 rounded-xl cursor-pointer mb-8 animate-fade-in"
-          >
-            <div className="flex items-center gap-3">
-              <HaloLogo size={24} animated={false} />
-              <div>
-                <h2 className="text-lg font-medium">{t('Enter Halo')}</h2>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {t('Aimless time, ideas will crystallize here')}
-                </p>
-                {(haloSpace.stats.artifactCount > 0 || haloSpace.stats.conversationCount > 0) && (
-                  <p className="text-xs text-muted-foreground mt-2">
-                    {t('{{count}} artifacts · {{conversations}} conversations', {
-                      count: haloSpace.stats.artifactCount,
-                      conversations: haloSpace.stats.conversationCount
-                    })}
-                  </p>
-                )}
-              </div>
-            </div>
+      <main className="flex-1 overflow-auto flex flex-col">
+        {/* Hero Section - Visual Focus Area (2:1 ratio with spaces section) */}
+        <section className="flex-[2] flex flex-col items-center justify-center px-6 animate-fade-in">
+          {/* Logo with subtle glow */}
+          <div className="relative mb-6">
+            <div className="absolute inset-0 blur-3xl bg-primary/10 rounded-full scale-150" />
+            <HaloLogo size={56} hoverOnly={true} className="relative" />
           </div>
-        )}
+
+          {/* Brand name */}
+          <h1 className="text-2xl font-semibold mb-3 tracking-tight text-foreground/90">技能范</h1>
+
+          {/* Tagline */}
+          <p className="text-muted-foreground text-center text-sm mb-10">
+            {t('Aimless time, ideas will crystallize here')}
+          </p>
+
+          {/* CTA Button - Claude Code style: subtle, not flashy */}
+          <button
+            data-onboarding="halo-space"
+            onClick={() => haloSpace && handleSpaceClick(haloSpace)}
+            disabled={!haloSpace}
+            className="px-6 py-3 bg-primary/80 hover:bg-primary/90 text-primary-foreground rounded-xl text-sm font-medium transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {t('Enter Halo')}
+          </button>
+        </section>
+
+        {/* Gradient Divider */}
+        <div className="h-px mx-6 bg-gradient-to-r from-transparent via-border to-transparent" />
 
         {/* Spaces Section */}
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-sm font-medium text-muted-foreground">{t('Dedicated Spaces')}</h3>
-          <button
-            onClick={() => setShowCreateDialog(true)}
-            className="flex items-center gap-1 px-3 py-1 text-sm text-primary hover:bg-primary/10 rounded-lg transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            {t('New')}
-          </button>
-        </div>
-
-        {/* Space Guide - always visible */}
-        <SpaceGuide />
-
-        {spaces.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            <p className="text-sm">{t('No dedicated spaces yet')}</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 gap-4">
-            {spaces.map((space) => (
-              <div
-                key={space.id}
-                onClick={() => handleSpaceClick(space)}
-                className="space-card p-4 group animate-fade-in"
+        <section className="flex-[1] overflow-auto p-6">
+          <div className="max-w-4xl mx-auto">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-sm font-medium text-muted-foreground">自定义空间</h3>
+              <button
+                onClick={() => setShowCreateDialog(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground border border-border hover:border-foreground/20 rounded-lg transition-colors"
               >
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-2">
-                    <SpaceIcon iconId={space.icon} size={20} />
-                    <span className="font-medium truncate">{space.name}</span>
-                  </div>
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                    <button
-                      onClick={(e) => handleEditSpace(e, space)}
-                      className="p-1 hover:bg-secondary rounded transition-all"
-                      title={t('Edit Space')}
-                    >
-                      <Pencil className="w-4 h-4 text-muted-foreground" />
-                    </button>
-                    <button
-                      onClick={(e) => handleDeleteSpace(e, space.id)}
-                      className="p-1 hover:bg-destructive/20 rounded transition-all"
-                      title={t('Delete space')}
-                    >
-                      <Trash2 className="w-4 h-4 text-destructive" />
-                    </button>
-                  </div>
-                </div>
-                <p className="text-xs text-muted-foreground mt-2">
-                  {t('{{count}} artifacts · {{conversations}} conversations', {
-                    count: space.stats.artifactCount,
-                    conversations: space.stats.conversationCount
-                  })}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {formatTimeAgo(space.updatedAt)}{t('active')}
-                </p>
+                <Plus className="w-3.5 h-3.5" />
+                新建空间
+              </button>
+            </div>
+
+            {/* Space Guide - always visible */}
+            <SpaceGuide />
+
+            {spaces.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <p className="text-sm">暂无自定义空间</p>
               </div>
-            ))}
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 lg:gap-5">
+                {spaces.map((space, index) => (
+                  <div
+                    key={space.id}
+                    onClick={() => handleSpaceClick(space)}
+                    className={`space-card p-4 group animate-fade-in ${
+                      index === 0 ? 'border-primary/40' : ''
+                    }`}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <SpaceIcon iconId={space.icon} size={20} className="flex-shrink-0" />
+                        <span className="font-medium truncate">{space.name}</span>
+                      </div>
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0">
+                        <button
+                          onClick={(e) => handleEditSpace(e, space)}
+                          className="p-1.5 hover:bg-secondary rounded-lg transition-all"
+                          title={t('Edit Space')}
+                        >
+                          <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
+                        </button>
+                        <button
+                          onClick={(e) => handleDeleteSpace(e, space.id)}
+                          className="p-1.5 hover:bg-destructive/20 rounded-lg transition-all"
+                          title={t('Delete space')}
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                        </button>
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      {t('{{count}} artifacts · {{conversations}} conversations', {
+                        count: space.stats.artifactCount,
+                        conversations: space.stats.conversationCount
+                      })}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {formatTimeAgo(space.updatedAt)}{t('active')}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-        )}
+        </section>
       </main>
 
       {/* Create Space Dialog */}
       {showCreateDialog && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 no-drag">
           <div className="bg-card border border-border rounded-xl p-6 w-full max-w-md animate-fade-in">
-            <h2 className="text-lg font-medium mb-4">{t('Create Dedicated Space')}</h2>
+            <h2 className="text-lg font-medium mb-5">{t('Create Dedicated Space')}</h2>
 
-            {/* Icon select */}
-            <div className="mb-4">
-              <label className="block text-sm text-muted-foreground mb-2">{t('Icon (optional)')}</label>
-              <div className="flex flex-wrap gap-2">
-                {SPACE_ICONS.map((iconId) => (
-                  <button
-                    key={iconId}
-                    onClick={() => setNewSpaceIcon(iconId)}
-                    className={`w-10 h-10 rounded-lg flex items-center justify-center transition-all ${
-                      newSpaceIcon === iconId
-                        ? 'bg-primary/20 border-2 border-primary'
-                        : 'bg-secondary hover:bg-secondary/80'
-                    }`}
-                  >
-                    <SpaceIcon iconId={iconId} size={20} />
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Storage location */}
-            <div className="mb-6">
-              <label className="block text-sm text-muted-foreground mb-2">{t('Storage Location')}</label>
-              <div className="space-y-2">
-                {/* Default location */}
-                <label
-                  className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
-                    !useCustomPath
-                      ? 'border-primary bg-primary/5'
-                      : 'border-border hover:border-muted-foreground/50'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="pathType"
-                    checked={!useCustomPath}
-                    onChange={() => {
-                      setUseCustomPath(false)
-                      setTimeout(() => {
-                        spaceNameInputRef.current?.focus()
-                      }, 100)
-                    }}
-                    className="w-4 h-4 text-primary"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm">{t('Default Location')}</div>
-                    <div className="text-xs text-muted-foreground truncate">
-                      {shortenPath(defaultPath)}/{newSpaceName || '...'}
-                    </div>
-                  </div>
-                </label>
-
-                {/* Custom location */}
-                <label
-                  className={`flex items-center gap-3 p-3 rounded-lg border transition-all ${
-                    isWebMode
-                      ? 'cursor-not-allowed opacity-60 border-border'
-                      : useCustomPath
-                        ? 'cursor-pointer border-primary bg-primary/5'
-                        : 'cursor-pointer border-border hover:border-muted-foreground/50'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="pathType"
-                    checked={useCustomPath}
-                    onChange={() => !isWebMode && setUseCustomPath(true)}
-                    disabled={isWebMode}
-                    className="w-4 h-4 text-primary"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm">{t('Custom Folder')}</div>
-                    {isWebMode ? (
-                      <div className="text-xs text-muted-foreground flex items-center gap-1">
-                        <Monitor className="w-3 h-3" />
-                        {t('Please select folder in desktop app')}
-                      </div>
-                    ) : customPath ? (
-                      <div className="text-xs text-muted-foreground truncate">
-                        {shortenPath(customPath)}
-                      </div>
-                    ) : (
-                      <div className="text-xs text-muted-foreground">
-                        {t('Select an existing project or folder')}
-                      </div>
-                    )}
-                  </div>
-                  {!isWebMode && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault()
-                        handleSelectFolder()
-                      }}
-                      className="px-3 py-1.5 text-xs bg-secondary hover:bg-secondary/80 rounded-md flex items-center gap-1.5 transition-colors"
-                    >
-                      <FolderOpen className="w-3.5 h-3.5" />
-                      {t('Browse')}
-                    </button>
-                  )}
-                </label>
-              </div>
-            </div>
-
-            {/* Space name - moved to bottom, above create button */}
-            <div className="mb-6">
+            {/* 1. Space name - Primary input, most important */}
+            <div className="mb-5">
               <label className="block text-sm text-muted-foreground mb-2">{t('Name this space')}</label>
               <input
                 ref={spaceNameInputRef}
@@ -422,8 +324,131 @@ export function HomePage() {
                 value={newSpaceName}
                 onChange={(e) => setNewSpaceName(e.target.value)}
                 placeholder={t('My Project')}
-                className="w-full px-4 py-2 bg-input rounded-lg border border-border focus:border-primary focus:outline-none transition-colors"
+                className="w-full px-4 py-2.5 bg-input rounded-lg border border-border focus:border-primary focus:outline-none transition-colors"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && newSpaceName.trim() && !(useCustomPath && !customPath)) {
+                    handleCreateSpace()
+                  }
+                }}
               />
+            </div>
+
+            {/* 2. Icon select - Compact, secondary importance */}
+            <div className="mb-5">
+              <label className="block text-sm text-muted-foreground mb-2">{t('Icon (optional)')}</label>
+              <div className="flex flex-wrap gap-1.5">
+                {SPACE_ICONS.map((iconId) => (
+                  <button
+                    key={iconId}
+                    onClick={() => setNewSpaceIcon(iconId)}
+                    className={`w-8 h-8 rounded-md flex items-center justify-center transition-all ${
+                      newSpaceIcon === iconId
+                        ? 'bg-primary/20 ring-2 ring-primary ring-offset-1 ring-offset-card'
+                        : 'bg-secondary/60 hover:bg-secondary'
+                    }`}
+                  >
+                    <SpaceIcon iconId={iconId} size={16} />
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 3. Advanced settings - Collapsible, lowest priority */}
+            <div className="mb-6">
+              <button
+                type="button"
+                onClick={() => setShowAdvanced(!showAdvanced)}
+                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors w-full"
+              >
+                <ChevronDown className={`w-4 h-4 transition-transform ${showAdvanced ? '' : '-rotate-90'}`} />
+                <span>{t('Advanced Settings')}</span>
+                {useCustomPath && customPath && (
+                  <span className="text-xs text-primary ml-auto">{t('Custom path set')}</span>
+                )}
+              </button>
+
+              {showAdvanced && (
+                <div className="mt-3 space-y-2 pl-6">
+                  <label className="block text-xs text-muted-foreground mb-2">{t('Storage Location')}</label>
+                  {/* Default location */}
+                  <label
+                    className={`flex items-center gap-3 p-2.5 rounded-lg border cursor-pointer transition-all ${
+                      !useCustomPath
+                        ? 'border-primary bg-primary/5'
+                        : 'border-border hover:border-muted-foreground/50'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="pathType"
+                      checked={!useCustomPath}
+                      onChange={() => {
+                        setUseCustomPath(false)
+                        setTimeout(() => {
+                          spaceNameInputRef.current?.focus()
+                        }, 100)
+                      }}
+                      className="w-3.5 h-3.5 text-primary"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm">{t('Default Location')}</div>
+                      <div className="text-xs text-muted-foreground truncate">
+                        {shortenPath(defaultPath)}/{newSpaceName || '...'}
+                      </div>
+                    </div>
+                  </label>
+
+                  {/* Custom location */}
+                  <label
+                    className={`flex items-center gap-3 p-2.5 rounded-lg border transition-all ${
+                      isWebMode
+                        ? 'cursor-not-allowed opacity-60 border-border'
+                        : useCustomPath
+                          ? 'cursor-pointer border-primary bg-primary/5'
+                          : 'cursor-pointer border-border hover:border-muted-foreground/50'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="pathType"
+                      checked={useCustomPath}
+                      onChange={() => !isWebMode && setUseCustomPath(true)}
+                      disabled={isWebMode}
+                      className="w-3.5 h-3.5 text-primary"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm">{t('Custom Folder')}</div>
+                      {isWebMode ? (
+                        <div className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Monitor className="w-3 h-3" />
+                          {t('Please select folder in desktop app')}
+                        </div>
+                      ) : customPath ? (
+                        <div className="text-xs text-muted-foreground truncate">
+                          {shortenPath(customPath)}
+                        </div>
+                      ) : (
+                        <div className="text-xs text-muted-foreground">
+                          {t('Select an existing project or folder')}
+                        </div>
+                      )}
+                    </div>
+                    {!isWebMode && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault()
+                          handleSelectFolder()
+                        }}
+                        className="px-2.5 py-1 text-xs bg-secondary hover:bg-secondary/80 rounded-md flex items-center gap-1 transition-colors"
+                      >
+                        <FolderOpen className="w-3 h-3" />
+                        {t('Browse')}
+                      </button>
+                    )}
+                  </label>
+                </div>
+              )}
             </div>
 
             {/* Actions */}

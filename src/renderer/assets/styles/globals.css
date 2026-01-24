@@ -206,20 +206,31 @@ body {
   animation: halo-spin 2s linear infinite;
 }
 
-/* SkillsFan logo pulse animation */
+/* SkillsFan logo pulse animation - stronger breathing effect */
 @keyframes skillsfan-pulse {
   0%, 100% {
     transform: scale(1);
-    opacity: 1;
+    opacity: 0.8;
+    filter: brightness(1);
   }
   50% {
-    transform: scale(1.05);
-    opacity: 0.9;
+    transform: scale(1.15);
+    opacity: 1;
+    filter: brightness(1.2);
   }
 }
 
 .skillsfan-pulse {
   animation: skillsfan-pulse 2s ease-in-out infinite;
+}
+
+/* Hover-only pulse animation */
+.skillsfan-pulse-hover {
+  transition: transform 0.3s ease, opacity 0.3s ease, filter 0.3s ease;
+}
+
+.skillsfan-pulse-hover:hover {
+  animation: skillsfan-pulse 1.8s ease-in-out infinite;
 }
 
 /* Fade in animation */

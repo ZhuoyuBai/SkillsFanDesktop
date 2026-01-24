@@ -55,7 +55,7 @@ export function Header({ left, right, className = '' }: HeaderProps) {
     <header
       className={`
         flex items-center justify-between h-10
-        border-b border-border drag-region
+        drag-region
         ${platformPadding}
         ${className}
       `.trim().replace(/\s+/g, ' ')}

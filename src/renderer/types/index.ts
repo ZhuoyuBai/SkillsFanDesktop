@@ -592,14 +592,14 @@ export function getCurrentModelName(config: HaloConfig): string {
 
 // Icon options for spaces (using icon IDs that map to Lucide icons)
 export const SPACE_ICONS = [
-  'folder', 'code', 'globe', 'chart', 'file-text', 'palette',
-  'gamepad', 'wrench', 'smartphone', 'lightbulb', 'rocket', 'star'
+  'briefcase', 'code-2', 'globe-2', 'bar-chart', 'pen-tool', 'music',
+  'camera', 'book-open', 'heart', 'coffee', 'zap', 'sparkles'
 ] as const;
 
 export type SpaceIconId = typeof SPACE_ICONS[number];
 
 // Default space icon
-export const DEFAULT_SPACE_ICON: SpaceIconId = 'folder';
+export const DEFAULT_SPACE_ICON: SpaceIconId = 'briefcase';
 
 // File type to icon ID mapping (maps to Lucide icon names)
 export const FILE_ICON_IDS: Record<string, string> = {

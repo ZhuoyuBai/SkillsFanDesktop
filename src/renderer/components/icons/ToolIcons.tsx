@@ -58,6 +58,16 @@ import {
   Cpu,
   HardDrive,
   Pencil,
+  // New space icons
+  Briefcase,
+  Code2,
+  Globe2,
+  BarChart2,
+  PenTool,
+  Music,
+  Camera,
+  BookOpen,
+  Heart,
   type LucideIcon
 } from 'lucide-react'
 
@@ -182,14 +192,27 @@ export function StatusIcon({ status, className = '', size = 16 }: StatusIconProp
 
 // Space icon identifiers (used in data storage)
 export const SPACE_ICON_IDS = [
-  'folder', 'code', 'globe', 'chart', 'file-text', 'palette',
-  'gamepad', 'wrench', 'smartphone', 'lightbulb', 'rocket', 'star'
+  'briefcase', 'code-2', 'globe-2', 'bar-chart', 'pen-tool', 'music',
+  'camera', 'book-open', 'heart', 'coffee', 'zap', 'sparkles'
 ] as const
 
 export type SpaceIconId = typeof SPACE_ICON_IDS[number]
 
 // Map icon IDs to Lucide components
 export const spaceIconMap: Record<string, LucideIcon> = {
+  briefcase: Briefcase,
+  'code-2': Code2,
+  'globe-2': Globe2,
+  'bar-chart': BarChart2,
+  'pen-tool': PenTool,
+  music: Music,
+  camera: Camera,
+  'book-open': BookOpen,
+  heart: Heart,
+  coffee: Coffee,
+  zap: Zap,
+  sparkles: Sparkles,
+  // Legacy icons for backward compatibility
   folder: Folder,
   code: FileCode,
   globe: Globe,
@@ -202,24 +225,36 @@ export const spaceIconMap: Record<string, LucideIcon> = {
   lightbulb: Lightbulb,
   rocket: Rocket,
   star: Star,
-  sparkles: Sparkles,
 }
 
 // Professional color palette for space icons
 export const spaceIconColors: Record<string, string> = {
-  folder: 'text-amber-500',        // Classic folder yellow
-  code: 'text-orange-500',          // Claude Code orange
-  globe: 'text-cyan-500',          // Internet/global cyan
-  chart: 'text-violet-500',        // Data/analytics purple
-  'file-text': 'text-slate-500',   // Document neutral
-  palette: 'text-pink-500',        // Design/art pink
-  gamepad: 'text-emerald-500',     // Gaming green
-  wrench: 'text-orange-500',       // Tools orange
-  smartphone: 'text-indigo-500',   // Mobile tech
-  lightbulb: 'text-yellow-500',    // Ideas/creativity
-  rocket: 'text-rose-500',         // Launch/speed
-  star: 'text-amber-400',          // Favorite/important
-  sparkles: 'text-primary',        // Halo brand color
+  // New icons
+  briefcase: 'text-amber-600',     // Work/business
+  'code-2': 'text-orange-500',     // Development
+  'globe-2': 'text-cyan-500',      // Web/international
+  'bar-chart': 'text-violet-500',  // Data/analytics
+  'pen-tool': 'text-pink-500',     // Design/creative
+  music: 'text-emerald-500',       // Music/entertainment
+  camera: 'text-sky-500',          // Photography/media
+  'book-open': 'text-indigo-500',  // Learning/notes
+  heart: 'text-rose-500',          // Personal/hobbies
+  coffee: 'text-amber-700',        // Casual/lifestyle
+  zap: 'text-yellow-500',          // Quick/temp projects
+  sparkles: 'text-primary',        // Special/important
+  // Legacy icons for backward compatibility
+  folder: 'text-amber-500',
+  code: 'text-orange-500',
+  globe: 'text-cyan-500',
+  chart: 'text-violet-500',
+  'file-text': 'text-slate-500',
+  palette: 'text-pink-500',
+  gamepad: 'text-emerald-500',
+  wrench: 'text-orange-500',
+  smartphone: 'text-indigo-500',
+  lightbulb: 'text-yellow-500',
+  rocket: 'text-rose-500',
+  star: 'text-amber-400',
 }
 
 // Space icon component with color
