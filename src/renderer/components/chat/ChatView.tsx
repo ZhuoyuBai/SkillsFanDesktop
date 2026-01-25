@@ -9,7 +9,7 @@
  * - Compact mode (isCompact=true): Sidebar-style when Canvas is open
  */
 
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { useSpaceStore } from '../../stores/space.store'
 import { useChatStore } from '../../stores/chat.store'
 import { useOnboardingStore } from '../../stores/onboarding.store'
@@ -30,12 +30,35 @@ import { api } from '../../api'
 import type { ImageAttachment } from '../../types'
 import { useTranslation } from '../../i18n'
 
+// Mobile breakpoint (matches Tailwind sm: 640px)
+const MOBILE_BREAKPOINT = 640
+
+// Hook to detect mobile viewport
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return window.innerWidth < MOBILE_BREAKPOINT
+  })
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < MOBILE_BREAKPOINT)
+    }
+
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
+  return isMobile
+}
+
 interface ChatViewProps {
   isCompact?: boolean
 }
 
 export function ChatView({ isCompact = false }: ChatViewProps) {
   const { t } = useTranslation()
+  const isMobile = useIsMobile()
   const { currentSpace } = useSpaceStore()
   const {
     getCurrentConversation,
@@ -320,6 +343,7 @@ export function ChatView({ isCompact = false }: ChatViewProps) {
               isTemp={currentSpace?.isTemp || false}
               isCompact={isCompact}
               inputArea={emptyStateInputArea}
+              isMobile={isMobile}
             />
           ) : (
             <>
@@ -374,15 +398,17 @@ const QUICK_CATEGORIES: { key: string; icon: LucideIcon }[] = [
   { key: 'Efficiency Tools', icon: Wrench },
 ]
 
-// Empty state component - adapts to compact mode
+// Empty state component - adapts to compact mode and mobile
 function EmptyState({
   isTemp,
   isCompact = false,
-  inputArea
+  inputArea,
+  isMobile = false
 }: {
   isTemp: boolean;
   isCompact?: boolean;
   inputArea?: React.ReactNode;
+  isMobile?: boolean;
 }) {
   const { t } = useTranslation()
   // Compact mode shows minimal UI
@@ -401,23 +427,28 @@ function EmptyState({
     )
   }
 
+  // Show fewer categories on mobile
+  const categoriesToShow = isMobile ? QUICK_CATEGORIES.slice(0, 4) : QUICK_CATEGORIES
+
   return (
-    <div className="h-full flex flex-col items-center justify-start pt-[15vh] text-center px-8 pb-6">
-      {/* Title */}
-      <h1 className="mt-8 text-4xl font-semibold tracking-tight">
+    <div className={`h-full flex flex-col items-center justify-start text-center pb-6
+      ${isMobile ? 'pt-[8vh] px-4' : 'pt-[15vh] px-8'}`}>
+      {/* Title - smaller on mobile */}
+      <h1 className={`mt-8 font-semibold tracking-tight
+        ${isMobile ? 'text-2xl' : 'text-4xl'}`}>
         {t('Halo, not just chat, can help you get things done')}
       </h1>
 
       {/* Input area - shown in center when empty */}
       {inputArea && (
-        <div className="mt-6 w-full max-w-2xl">
+        <div className={`mt-6 w-full ${isMobile ? 'max-w-full' : 'max-w-2xl'}`}>
           {inputArea}
         </div>
       )}
 
       {/* Capabilities - MiniMax style pill buttons */}
       <div className="mt-6 flex flex-wrap justify-center gap-2">
-        {QUICK_CATEGORIES.map((cat) => {
+        {categoriesToShow.map((cat) => {
           const Icon = cat.icon
           return (
             <div

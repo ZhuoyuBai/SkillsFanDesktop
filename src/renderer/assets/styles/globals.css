@@ -309,6 +309,20 @@ body {
   animation: slide-in-right-full 0.25s ease-out;
 }
 
+/* Left slide animation for mobile sidebar */
+@keyframes slide-in-left-full {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-in-left-full {
+  animation: slide-in-left-full 0.25s ease-out;
+}
+
 @keyframes slide-down {
   from {
     opacity: 0;
@@ -911,4 +925,22 @@ body {
 
 .tab-drop-indicator.visible {
   opacity: 1;
+}
+
+/* Mobile-specific styles */
+@supports (padding-top: env(safe-area-inset-top)) {
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top);
+  }
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* Mobile scrollbar (thinner) */
+@media (max-width: 640px) {
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
 }

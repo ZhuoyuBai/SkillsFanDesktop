@@ -28,6 +28,7 @@ interface ConversationListProps {
   isCollapsed?: boolean
   onToggleCollapse?: () => void
   onSettings?: () => void
+  isMobileOverlay?: boolean  // Mobile overlay mode - full width, no drag resize
 }
 
 export function ConversationList({
@@ -39,7 +40,8 @@ export function ConversationList({
   onRename,
   isCollapsed = false,
   onToggleCollapse,
-  onSettings
+  onSettings,
+  isMobileOverlay = false
 }: ConversationListProps) {
   const { t } = useTranslation()
   const [width, setWidth] = useState(DEFAULT_WIDTH)
@@ -50,11 +52,12 @@ export function ConversationList({
   const containerRef = useRef<HTMLDivElement>(null)
   const editInputRef = useRef<HTMLInputElement>(null)
 
-  // Handle drag resize
+  // Handle drag resize (disabled in mobile overlay mode)
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (isMobileOverlay) return  // Disable drag on mobile overlay
     e.preventDefault()
     setIsDragging(true)
-  }, [])
+  }, [isMobileOverlay])
 
   useEffect(() => {
     if (!isDragging) return
@@ -150,7 +153,10 @@ export function ConversationList({
           {onToggleCollapse && (
             <div className="relative">
               <button
-                onClick={onToggleCollapse}
+                onClick={() => {
+                  setShowCollapseTooltip(false)
+                  onToggleCollapse()
+                }}
                 onMouseEnter={() => setShowCollapseTooltip(true)}
                 onMouseLeave={() => setShowCollapseTooltip(false)}
                 className="p-1.5 hover:bg-muted rounded-md transition-colors text-muted-foreground hover:text-foreground"
@@ -238,14 +244,15 @@ export function ConversationList({
   return (
     <div
       ref={containerRef}
-      className="border-r border-border/40 flex flex-col bg-card/50 relative"
-      style={{
+      className={`flex flex-col relative ${isMobileOverlay ? 'bg-background flex-1' : 'border-r border-border/40 bg-card/50'}`}
+      style={isMobileOverlay ? undefined : {
         width,
         transition: isDragging ? 'none' : 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
         willChange: isDragging ? 'width' : 'auto'
       }}
     >
-      {/* Header with logo and toggle button */}
+      {/* Header with logo and toggle button - hidden in mobile overlay (header is provided by parent) */}
+      {!isMobileOverlay && (
       <div className="px-4 py-3 border-b border-border/50 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <HaloLogo size={22} hoverOnly={true} />
@@ -254,7 +261,10 @@ export function ConversationList({
         {onToggleCollapse && (
           <div className="relative">
             <button
-              onClick={onToggleCollapse}
+              onClick={() => {
+                setShowCollapseTooltip(false)
+                onToggleCollapse()
+              }}
               onMouseEnter={() => setShowCollapseTooltip(true)}
               onMouseLeave={() => setShowCollapseTooltip(false)}
               className="p-1 hover:bg-muted rounded-md transition-colors text-muted-foreground hover:text-foreground"
@@ -273,6 +283,7 @@ export function ConversationList({
           </div>
         )}
       </div>
+      )}
 
       {/* New conversation + Search buttons */}
       <div className="px-4 py-3 border-b border-border/50 space-y-2">
@@ -411,17 +422,19 @@ export function ConversationList({
         </div>
       )}
 
-      {/* Drag handle - on right side */}
-      <div
-        className={`absolute right-0 top-0 bottom-0 w-2 cursor-col-resize z-20 group/handle
-          transition-all duration-200
-          ${isDragging ? 'bg-primary/60' : 'hover:bg-primary/40'}`}
-        onMouseDown={handleMouseDown}
-        title={t('Drag to resize width')}
-      >
-        {/* Visual hint line */}
-        <div className="absolute inset-y-1/3 left-1/2 -translate-x-1/2 w-0.5 bg-border/60 rounded-full opacity-0 group-hover/handle:opacity-100 transition-opacity" />
-      </div>
+      {/* Drag handle - on right side (hidden in mobile overlay mode) */}
+      {!isMobileOverlay && (
+        <div
+          className={`absolute right-0 top-0 bottom-0 w-2 cursor-col-resize z-20 group/handle
+            transition-all duration-200
+            ${isDragging ? 'bg-primary/60' : 'hover:bg-primary/40'}`}
+          onMouseDown={handleMouseDown}
+          title={t('Drag to resize width')}
+        >
+          {/* Visual hint line */}
+          <div className="absolute inset-y-1/3 left-1/2 -translate-x-1/2 w-0.5 bg-border/60 rounded-full opacity-0 group-hover/handle:opacity-100 transition-opacity" />
+        </div>
+      )}
     </div>
   )
 }

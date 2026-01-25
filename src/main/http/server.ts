@@ -307,25 +307,31 @@ export function getMainWindow(): BrowserWindow | null {
 function getRemoteLoginPage(): string {
   return `
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>技能范 Remote Access</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>远程访问技能</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
+    html, body {
+      width: 100%;
       min-height: 100vh;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
       display: flex;
       align-items: center;
       justify-content: center;
       color: #fff;
+      padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
     }
     .container {
       text-align: center;
-      padding: 2rem;
+      width: 100%;
+      max-width: 400px;
+      padding: 2rem 1.5rem;
     }
     .logo {
       width: 80px;
@@ -339,51 +345,54 @@ function getRemoteLoginPage(): string {
       font-size: 2rem;
       box-shadow: 0 0 30px rgba(102, 126, 234, 0.4);
     }
-    h1 { font-size: 1.5rem; margin-bottom: 0.5rem; }
-    p { color: #888; margin-bottom: 2rem; }
+    h1 { font-size: 1.5rem; margin-bottom: 0.5rem; font-weight: 600; }
+    p { color: #888; margin-bottom: 2rem; font-size: 0.9rem; }
     .input-group {
-      display: flex;
-      gap: 0.5rem;
-      max-width: 300px;
-      margin: 0 auto;
+      width: 100%;
     }
     input {
-      flex: 1;
-      padding: 1rem;
+      width: 100%;
+      padding: 1rem 1.5rem;
       border: 1px solid #333;
       border-radius: 12px;
       background: rgba(255,255,255,0.05);
       color: #fff;
-      font-size: 1.5rem;
+      font-size: 1.25rem;
       text-align: center;
       letter-spacing: 0.5em;
+      min-height: 56px;
     }
-    input:focus { outline: none; border-color: #667eea; }
+    input::placeholder { color: #555; letter-spacing: 0.5em; }
+    input:focus { outline: none; border-color: #667eea; background: rgba(255,255,255,0.08); }
     button {
+      width: 100%;
       padding: 1rem 2rem;
       border: none;
       border-radius: 12px;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: #fff;
       font-size: 1rem;
+      font-weight: 500;
       cursor: pointer;
-      transition: transform 0.2s;
+      transition: transform 0.2s, opacity 0.2s;
+      min-height: 48px;
+      margin-top: 1rem;
     }
-    button:hover { transform: scale(1.05); }
-    .error { color: #ff6b6b; margin-top: 1rem; }
+    button:hover { transform: scale(1.02); }
+    button:active { transform: scale(0.98); opacity: 0.9; }
+    .error { color: #ff6b6b; margin-top: 1rem; font-size: 0.9rem; }
     .success { color: #4ade80; }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="logo">◯</div>
-    <h1>技能范 Remote Access</h1>
-
-    <p>Enter access code to connect to your desktop</p>
+    <h1>远程访问技能</h1>
+    <p>输入访问代码以连接到您的桌面</p>
     <div class="input-group">
-      <input type="text" id="token" maxlength="32" placeholder="000000" autocomplete="off">
+      <input type="text" id="token" maxlength="32" placeholder="000000" autocomplete="off" inputmode="numeric">
     </div>
-    <button onclick="login()" style="margin-top: 1rem; width: 100%; max-width: 300px;">Connect</button>
+    <button onclick="login()">连接</button>
     <p id="error" class="error"></p>
   </div>
   <script>
@@ -392,7 +401,7 @@ function getRemoteLoginPage(): string {
       const error = document.getElementById('error');
 
       if (!token || token.length < 4) {
-        error.textContent = 'Please enter access code';
+        error.textContent = '请输入访问代码';
         return;
       }
 
@@ -410,15 +419,15 @@ function getRemoteLoginPage(): string {
           error.textContent = '';
           error.classList.remove('error');
           error.classList.add('success');
-          error.textContent = 'Connected! Loading...';
+          error.textContent = '连接成功！加载中...';
 
           // Reload to get the full app (will be proxied to Vite)
           setTimeout(() => location.reload(), 500);
         } else {
-          error.textContent = 'Invalid code';
+          error.textContent = '访问代码无效';
         }
       } catch (e) {
-        error.textContent = 'Connection failed';
+        error.textContent = '连接失败，请重试';
       }
     }
 

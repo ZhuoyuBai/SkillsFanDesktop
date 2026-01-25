@@ -445,6 +445,10 @@ function InputToolbar({
   onStop
 }: InputToolbarProps) {
   const { t } = useTranslation()
+
+  // Detect mobile viewport for simplified toolbar
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 640
+
   return (
     <div className="flex items-center justify-between px-2 pb-2 pt-1">
       {/* Left section: attachment button + thinking toggle */}
@@ -496,13 +500,13 @@ function InputToolbar({
           </div>
         )}
 
-        {/* Model Selector */}
-        {!isGenerating && !isOnboarding && (
+        {/* Model Selector - hidden on mobile */}
+        {!isGenerating && !isOnboarding && !isMobile && (
           <ModelSelector variant="compact" />
         )}
 
-        {/* AI Browser toggle */}
-        {!isGenerating && !isOnboarding && (
+        {/* AI Browser toggle - hidden on mobile */}
+        {!isGenerating && !isOnboarding && !isMobile && (
           <button
             onClick={onAIBrowserToggle}
             className={`h-8 flex items-center gap-1.5 px-2.5 rounded-lg
@@ -519,12 +523,13 @@ function InputToolbar({
           </button>
         )}
 
-        {/* Thinking mode toggle - always show full label, no expansion */}
+        {/* Thinking mode toggle - icon only on mobile */}
         {!isGenerating && !isOnboarding && (
           <button
             onClick={onThinkingToggle}
-            className={`h-8 flex items-center gap-1.5 px-2.5 rounded-lg
+            className={`h-8 flex items-center gap-1.5 rounded-lg
               transition-all duration-200 border
+              ${isMobile ? 'px-2' : 'px-2.5'}
               ${thinkingEnabled
                 ? 'bg-primary/15 text-primary border-primary/30'
                 : 'text-foreground/80 border-border/60 hover:text-foreground hover:bg-muted hover:border-border'
@@ -533,7 +538,7 @@ function InputToolbar({
             title={thinkingEnabled ? t('Disable Deep Thinking') : t('Enable Deep Thinking')}
           >
             <Atom size={15} />
-            <span className="text-xs">{t('Deep Thinking')}</span>
+            {!isMobile && <span className="text-xs">{t('Deep Thinking')}</span>}
           </button>
         )}
       </div>

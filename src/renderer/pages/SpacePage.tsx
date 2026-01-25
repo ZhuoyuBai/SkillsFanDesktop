@@ -31,7 +31,7 @@ import { GitBashWarningBanner } from '../components/setup/GitBashWarningBanner'
 import { api } from '../api'
 import { useLayoutPreferences, LAYOUT_DEFAULTS } from '../hooks/useLayoutPreferences'
 import { useWindowMaximize } from '../components/canvas/viewers/useWindowMaximize'
-import { PanelLeftClose, PanelLeft, X, MessageSquare } from 'lucide-react'
+import { PanelLeftClose, PanelLeft, X, MessageSquare, Menu, SquarePen } from 'lucide-react'
 import { useSearchShortcuts } from '../hooks/useSearchShortcuts'
 import { useTranslation } from '../i18n'
 // Mobile breakpoint (matches Tailwind sm: 640px)
@@ -82,6 +82,9 @@ export function SpacePage() {
 
   // Conversation list collapse state (default: expanded = not collapsed)
   const [isConversationListCollapsed, setIsConversationListCollapsed] = useState(false)
+
+  // Mobile sidebar overlay state
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
 
   // Canvas state - use precise selectors to minimize re-renders
   const isCanvasOpen = useCanvasIsOpen()
@@ -336,6 +339,17 @@ export function SpacePage() {
       <Header
         left={
           <>
+            {/* Mobile menu button */}
+            {isMobile && (
+              <button
+                onClick={() => setMobileSidebarOpen(true)}
+                className="p-1.5 hover:bg-secondary rounded-lg transition-colors"
+                aria-label={t('Open menu')}
+              >
+                <Menu className="w-5 h-5" />
+              </button>
+            )}
+
             <button
               onClick={handleBack}
               className="p-1.5 hover:bg-secondary rounded-lg transition-colors"
@@ -353,6 +367,17 @@ export function SpacePage() {
             )}
           </>
         }
+        right={
+          isMobile ? (
+            <button
+              onClick={handleNewConversation}
+              className="p-1.5 text-primary hover:bg-primary/10 rounded-lg transition-colors"
+              aria-label={t('New conversation')}
+            >
+              <SquarePen className="w-4 h-4" />
+            </button>
+          ) : undefined
+        }
       />
       )}
 
@@ -366,8 +391,8 @@ export function SpacePage() {
 
       {/* Main content */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Conversation list sidebar - hidden when maximized */}
-        {!isCanvasMaximized && (
+        {/* Conversation list sidebar - hidden when maximized or on mobile */}
+        {!isCanvasMaximized && !isMobile && (
           <ConversationList
             conversations={conversations}
             currentConversationId={currentConversationId}
@@ -489,6 +514,47 @@ export function SpacePage() {
           <div className="flex-1 overflow-hidden">
             <ContentCanvas />
           </div>
+        </div>
+      )}
+
+      {/* Mobile Sidebar Overlay */}
+      {isMobile && mobileSidebarOpen && (
+        <div className="fixed inset-0 z-50 flex flex-col bg-background animate-slide-in-left-full safe-area-top">
+          {/* Mobile Sidebar Header */}
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border/50 bg-card/80 backdrop-blur-sm">
+            <div className="flex items-center gap-2">
+              <HaloLogo size={22} hoverOnly={true} />
+              <span className="text-sm font-medium text-foreground/80">技能范</span>
+            </div>
+            <button
+              onClick={() => setMobileSidebarOpen(false)}
+              className="p-1.5 hover:bg-secondary rounded-lg transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Mobile Sidebar Content - reuse ConversationList in overlay mode */}
+          <ConversationList
+            conversations={conversations}
+            currentConversationId={currentConversationId}
+            onSelect={(id) => {
+              selectConversation(id)
+              setMobileSidebarOpen(false)
+            }}
+            onNew={() => {
+              handleNewConversation()
+              setMobileSidebarOpen(false)
+            }}
+            onDelete={handleDeleteConversation}
+            onRename={handleRenameConversation}
+            isCollapsed={false}
+            onSettings={() => {
+              setView('settings')
+              setMobileSidebarOpen(false)
+            }}
+            isMobileOverlay={true}
+          />
         </div>
       )}
 
