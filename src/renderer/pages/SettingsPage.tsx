@@ -1250,7 +1250,7 @@ export function SettingsPage() {
                                 setCustomPassword('')
                                 setPasswordError(null)
                               }}
-                              className="text-xs text-primary hover:text-primary/80"
+                              className="text-xs text-muted-foreground hover:text-foreground"
                             >
                               {t('Edit')}
                             </button>

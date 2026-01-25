@@ -353,8 +353,8 @@ export function getFileTypeIcon(extension: string): LucideIcon {
 // Professional color palette for file types
 export const fileIconColors: Record<string, string> = {
   // Web - official brand colors
-  html: 'text-orange-500',         // HTML5 orange
-  htm: 'text-orange-500',
+  html: 'text-red-500',            // HTML red
+  htm: 'text-red-500',
   css: 'text-blue-500',            // CSS3 blue
   scss: 'text-pink-500',           // Sass pink
   less: 'text-indigo-500',
@@ -372,7 +372,7 @@ export const fileIconColors: Record<string, string> = {
   // Python
   py: 'text-sky-500',              // Python blue
   // Rust
-  rs: 'text-orange-600',           // Rust orange
+  rs: 'text-red-700',              // Rust red-brown
   // Go
   go: 'text-cyan-500',             // Go cyan
   // Java
@@ -385,7 +385,7 @@ export const fileIconColors: Record<string, string> = {
   // Ruby
   rb: 'text-red-600',              // Ruby red
   // Swift
-  swift: 'text-orange-500',        // Swift orange
+  swift: 'text-red-500',           // Swift red
   // SQL
   sql: 'text-amber-600',           // Database amber
   // Shell
@@ -395,7 +395,7 @@ export const fileIconColors: Record<string, string> = {
   // Config
   yaml: 'text-red-400',
   yml: 'text-red-400',
-  xml: 'text-orange-400',
+  xml: 'text-slate-500',
   // Images
   svg: 'text-amber-500',
   png: 'text-pink-500',

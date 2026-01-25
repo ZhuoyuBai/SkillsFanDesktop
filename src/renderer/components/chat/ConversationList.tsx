@@ -187,7 +187,7 @@ export function ConversationList({
                 }`}
               title={conversation.title}
             >
-              <MessageSquare className="w-4 h-4 text-orange-500" />
+              <MessageSquare className="w-4 h-4 text-muted-foreground" />
             </div>
           ))}
         </div>
@@ -227,9 +227,9 @@ export function ConversationList({
         <button
           onClick={onNew}
           className="w-full flex items-center justify-center gap-2 px-3 py-2.5
-            text-sm font-medium text-primary
-            bg-primary/8 hover:bg-primary/15
-            border border-primary/20 hover:border-primary/30
+            text-sm font-medium text-foreground
+            bg-secondary hover:bg-secondary/80
+            border border-border hover:border-foreground/30
             rounded-lg transition-all duration-200
             shadow-sm hover:shadow-md"
         >
@@ -277,7 +277,7 @@ export function ConversationList({
                 />
                 <button
                   onClick={handleSaveEdit}
-                  className="p-1 hover:bg-primary/20 text-primary rounded transition-colors flex-shrink-0"
+                  className="p-1 hover:bg-secondary text-foreground rounded transition-colors flex-shrink-0"
                   title={t('Save')}
                 >
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -297,7 +297,7 @@ export function ConversationList({
                     {onRename && (
                       <button
                         onClick={(e) => handleStartEdit(e, conversation)}
-                        className="p-1.5 hover:bg-primary/20 text-muted-foreground hover:text-primary rounded transition-colors"
+                        className="p-1.5 hover:bg-secondary text-muted-foreground hover:text-foreground rounded transition-colors"
                         title={t('Edit title')}
                         aria-label={t('Edit title')}
                       >

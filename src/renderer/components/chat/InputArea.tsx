@@ -350,7 +350,7 @@ export function InputArea({ onSend, onStop, isGenerating, placeholder, isCompact
             <div className="absolute inset-0 flex items-center justify-center
               bg-primary/5 rounded-2xl border-2 border-dashed border-primary/30
               pointer-events-none z-10">
-              <div className="flex flex-col items-center gap-2 text-primary/70">
+              <div className="flex flex-col items-center gap-2 text-muted-foreground">
                 <ImagePlus size={24} />
                 <span className="text-sm font-medium">{t('Drop to add images')}</span>
               </div>

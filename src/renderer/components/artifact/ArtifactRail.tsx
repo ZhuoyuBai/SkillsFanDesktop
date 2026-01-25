@@ -327,7 +327,7 @@ export function ArtifactRail({
             title={t('Open browser (⌘⇧B)')}
             aria-label={t('Open browser')}
           >
-            <Globe className="w-4 h-4 text-orange-500" />
+            <Globe className="w-4 h-4 text-muted-foreground" />
             <span>{t('Browser')}</span>
           </button>
         </div>

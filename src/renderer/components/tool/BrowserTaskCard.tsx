@@ -343,7 +343,7 @@ export function BrowserTaskCard({ browserToolCalls, isActive }: BrowserTaskCardP
             {steps.length > 3 && (
               <button
                 onClick={() => setIsExpanded(!isExpanded)}
-                className="text-xs text-primary/70 hover:text-primary transition-colors"
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors"
               >
                 {isExpanded ? t('Collapse') : t('Expand')}
               </button>

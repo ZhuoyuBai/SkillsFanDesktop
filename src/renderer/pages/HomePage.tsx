@@ -213,7 +213,7 @@ export function HomePage() {
         <section className="flex-[2] flex flex-col items-center justify-center px-8 py-12 animate-fade-in">
           {/* Logo with subtle glow */}
           <div className="relative mb-8">
-            <div className="absolute inset-0 blur-3xl bg-primary/8 rounded-full scale-150" />
+            <div className="absolute inset-0 blur-3xl bg-muted/20 rounded-full scale-150" />
             <HaloLogo size={64} hoverOnly={true} className="relative" />
           </div>
 
@@ -363,7 +363,7 @@ export function HomePage() {
                 <ChevronDown className={`w-4 h-4 transition-transform ${showAdvanced ? '' : '-rotate-90'}`} />
                 <span>{t('Advanced Settings')}</span>
                 {useCustomPath && customPath && (
-                  <span className="text-xs text-primary ml-auto">{t('Custom path set')}</span>
+                  <span className="text-xs text-muted-foreground ml-auto">{t('Custom path set')}</span>
                 )}
               </button>
 

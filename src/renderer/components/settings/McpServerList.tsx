@@ -71,7 +71,7 @@ function StatusIndicator({ status, t }: { status: McpServerStatus['status'] | nu
       )
     case 'pending':
       return (
-        <span className="flex items-center gap-1 text-xs text-orange-500" title={t('Connecting...')}>
+        <span className="flex items-center gap-1 text-xs text-muted-foreground" title={t('Connecting...')}>
           <Clock className="w-3 h-3" />
         </span>
       )
@@ -449,7 +449,7 @@ function ServerItem({
                         ))}
                         <button
                           onClick={addArg}
-                          className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-primary hover:bg-primary/10 rounded-lg transition-colors"
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground rounded-lg transition-colors"
                         >
                           <Plus className="w-4 h-4" />
                           {t('Add argument')}
@@ -736,7 +736,7 @@ function AddServerDialog({
                     ))}
                     <button
                       onClick={addArg}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-primary hover:bg-primary/10 rounded-lg transition-colors"
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground rounded-lg transition-colors"
                     >
                       <Plus className="w-4 h-4" />
                       {t('Add argument')}
@@ -963,7 +963,7 @@ export function McpServerList({ servers, onSave }: McpServerListProps) {
               setExpandedServer(null)
               setIsAddingNew(true)
             }}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-primary hover:bg-primary/10 rounded-lg transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground rounded-lg transition-colors"
           >
             <Plus className="w-4 h-4" />
             {t('Add')}

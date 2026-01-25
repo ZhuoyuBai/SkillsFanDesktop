@@ -69,7 +69,7 @@
   --card-foreground: 0 0% 9%;
   --popover: 0 0% 100%;
   --popover-foreground: 0 0% 9%;
-  --primary: 24 90% 50%;
+  --primary: 24 90% 42%;
   --primary-foreground: 0 0% 100%;
   --secondary: 0 0% 94%;
   --secondary-foreground: 0 0% 20%;
@@ -610,8 +610,8 @@ body {
    ============================================ */
 
 .message-user {
-  background: linear-gradient(135deg, hsl(var(--primary) / 0.2), hsl(var(--primary) / 0.1));
-  border: 1px solid hsl(var(--primary) / 0.3);
+  background: linear-gradient(135deg, hsl(var(--foreground) / 0.08), hsl(var(--foreground) / 0.05));
+  border: 1px solid hsl(var(--border));
 }
 
 .message-assistant {
@@ -632,14 +632,14 @@ body {
   left: 0;
   right: 0;
   height: 1px;
-  background: linear-gradient(90deg, transparent, hsl(var(--primary) / 0.3), transparent);
+  background: linear-gradient(90deg, transparent, hsl(var(--muted-foreground) / 0.3), transparent);
   animation: shimmer 2s infinite;
 }
 
 /* Working message style */
 .message-working {
   position: relative;
-  border-color: hsl(var(--primary) / 0.25);
+  border-color: hsl(var(--muted-foreground) / 0.25);
   overflow: hidden;
   transition: border-color 0.5s ease-out, opacity 0.5s ease-out;
 }
@@ -651,9 +651,9 @@ body {
   border-radius: inherit;
   background: linear-gradient(
     135deg,
-    hsl(var(--primary) / 0.08),
-    hsl(var(--primary) / 0.03),
-    hsl(var(--primary) / 0.08)
+    hsl(var(--muted) / 0.5),
+    hsl(var(--muted) / 0.3),
+    hsl(var(--muted) / 0.5)
   );
   opacity: 1;
   animation: breathing-glow 3s ease-in-out infinite;
@@ -861,8 +861,8 @@ body {
 
 /* Drag-over state for input area */
 .input-drag-over {
-  background: hsl(var(--primary) / 0.05);
-  border-color: hsl(var(--primary) / 0.5);
+  background: hsl(210 100% 50% / 0.05);
+  border-color: hsl(210 100% 50% / 0.5);
 }
 
 /* Chat area width transition */
