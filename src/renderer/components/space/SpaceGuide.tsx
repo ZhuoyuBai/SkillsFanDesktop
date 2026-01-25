@@ -18,12 +18,14 @@ import {
   AlertTriangle
 } from 'lucide-react'
 import { useTranslation } from '../../i18n'
+import { usePlatform } from '../layout/Header'
 
 // localStorage key for guide state
 const GUIDE_STATE_KEY = 'halo-space-guide-expanded'
 
 export function SpaceGuide() {
   const { t } = useTranslation()
+  const platform = usePlatform()
 
   // Read initial state from localStorage, default to collapsed
   const [isExpanded, setIsExpanded] = useState(() => {
@@ -113,12 +115,18 @@ export function SpaceGuide() {
                     <p className="text-foreground/90 font-medium">{t('Casual chat, asking questions')}</p>
                     <p>{t('Use Halo space')}</p>
                     <p>{t('Suitable for default space')}</p>
+                    <p className="text-muted-foreground/70 font-mono text-[11px]">
+                      {platform.isMac ? '~/.skillsfan/spaces/{项目名}' : '%USERPROFILE%\\.skillsfan\\spaces\\{项目名}'}
+                    </p>
                   </div>
                   {/* Custom space */}
                   <div className="space-y-0.5">
                     <p className="text-foreground/90 font-medium">{t('Projects, long-term tasks')}</p>
                     <p>{t('Recommend creating a dedicated space')}</p>
                     <p>{t('Suitable for custom space')}</p>
+                    <p className="text-muted-foreground/70 font-mono text-[11px]">
+                      {t('User selected directory')}
+                    </p>
                   </div>
                   <p className="pt-1 text-muted-foreground/80">{t('Keep files from different projects organized')}</p>
                 </div>

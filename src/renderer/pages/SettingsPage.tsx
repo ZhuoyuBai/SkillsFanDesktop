@@ -27,7 +27,103 @@ import { CheckCircle2, XCircle, ArrowLeft, Eye, EyeOff } from '../components/ico
 import { Header } from '../components/layout/Header'
 import { McpServerList } from '../components/settings/McpServerList'
 import { useTranslation, setLanguage, getCurrentLanguage, SUPPORTED_LOCALES, type LocaleCode } from '../i18n'
-import { Loader2, LogOut, Plus, Check, Globe, Key, MessageSquare, Bot, Palette, Server, Settings, Wifi, type LucideIcon } from 'lucide-react'
+import { Loader2, LogOut, Plus, Check, Globe, Key, MessageSquare, Bot, Palette, Server, Settings as SettingsIcon, Wifi, ExternalLink, type LucideIcon } from 'lucide-react'
+
+// Import provider logos
+import zhipuLogo from '../assets/providers/zhipu.jpg'
+import minimaxLogo from '../assets/providers/minimax.jpg'
+import kimiLogo from '../assets/providers/kimi.jpg'
+import deepseekLogo from '../assets/providers/deepseek.jpg'
+import claudeLogo from '../assets/providers/claude.jpg'
+import openaiLogo from '../assets/providers/openai.jpg'
+
+// Provider presets for the grid
+interface ProviderPreset {
+  id: string
+  name: string
+  nameKey: string
+  apiUrl?: string
+  defaultModel?: string
+  logo?: string
+  apiType: 'anthropic' | 'openai' | 'custom'
+  isCustom?: boolean
+  docsUrl?: string
+  apiDocsUrl?: string
+}
+
+const PROVIDER_PRESETS: ProviderPreset[] = [
+  {
+    id: 'zhipu',
+    name: 'Zhipu GLM',
+    nameKey: 'Zhipu GLM',
+    apiUrl: 'https://open.bigmodel.cn/api/anthropic',
+    defaultModel: 'GLM-4.7',
+    logo: zhipuLogo,
+    apiType: 'anthropic',
+    docsUrl: 'https://open.bigmodel.cn/usercenter/apikeys',
+    apiDocsUrl: 'https://docs.bigmodel.cn/cn/guide/develop/claude'
+  },
+  {
+    id: 'minimax',
+    name: 'MiniMax',
+    nameKey: 'MiniMax',
+    apiUrl: 'https://api.minimaxi.com/anthropic',
+    defaultModel: 'MiniMax-M2.1',
+    logo: minimaxLogo,
+    apiType: 'anthropic',
+    docsUrl: 'https://platform.minimaxi.com/user-center/basic-information/interface-key',
+    apiDocsUrl: 'https://platform.minimaxi.com/docs/api-reference/text-anthropic-api'
+  },
+  {
+    id: 'kimi',
+    name: 'Kimi',
+    nameKey: 'Kimi',
+    apiUrl: 'https://api.moonshot.cn/anthropic',
+    defaultModel: 'kimi-k2-thinking',
+    logo: kimiLogo,
+    apiType: 'anthropic',
+    docsUrl: 'https://platform.moonshot.cn/console/api-keys',
+    apiDocsUrl: 'https://platform.moonshot.cn/docs/guide/agent-support#%E4%BD%BF%E7%94%A8%E6%B3%A8%E6%84%8F%E4%BA%8B%E9%A1%B9'
+  },
+  {
+    id: 'deepseek',
+    name: 'DeepSeek',
+    nameKey: 'DeepSeek',
+    apiUrl: 'https://api.deepseek.com/anthropic',
+    defaultModel: 'DeepSeek-V3.2',
+    logo: deepseekLogo,
+    apiType: 'anthropic',
+    docsUrl: 'https://platform.deepseek.com/api_keys',
+    apiDocsUrl: 'https://api-docs.deepseek.com/zh-cn/guides/anthropic_api'
+  },
+  {
+    id: 'claude',
+    name: 'Claude',
+    nameKey: 'Claude',
+    apiUrl: 'https://api.anthropic.com',
+    defaultModel: 'claude-sonnet-4-5-20250929',
+    logo: claudeLogo,
+    apiType: 'anthropic',
+    docsUrl: 'https://console.anthropic.com/settings/keys'
+  },
+  {
+    id: 'openai',
+    name: 'OpenAI',
+    nameKey: 'OpenAI',
+    apiUrl: 'https://api.openai.com',
+    defaultModel: 'gpt-4o-mini',
+    logo: openaiLogo,
+    apiType: 'openai',
+    docsUrl: 'https://platform.openai.com/api-keys'
+  },
+  {
+    id: 'custom',
+    name: '自定义',
+    nameKey: 'Custom',
+    apiType: 'custom',
+    isCustom: true
+  }
+]
 
 /**
  * Get localized text based on current language
@@ -83,6 +179,14 @@ export function SettingsPage() {
   // AI Source state
   const [currentSource, setCurrentSource] = useState<AISourceType>(config?.aiSources?.current || 'custom')
   const [showCustomApiForm, setShowCustomApiForm] = useState(false)
+
+  // Selected provider in the grid - initialize based on current config
+  const [selectedProviderId, setSelectedProviderId] = useState<string>(() => {
+    // Try to match current config to a provider preset
+    const currentApiUrl = config?.aiSources?.custom?.apiUrl || config?.api?.apiUrl || ''
+    const matchedPreset = PROVIDER_PRESETS.find(p => p.apiUrl && currentApiUrl.includes(p.apiUrl.replace('https://', '').split('/')[0]))
+    return matchedPreset?.id || 'claude'
+  })
 
   // OAuth providers state (dynamic from product.json)
   const [authProviders, setAuthProviders] = useState<AuthProviderConfig[]>([])
@@ -482,7 +586,7 @@ export function SettingsPage() {
     { id: 'ai-model', icon: Bot, label: t('AI Model') },
     { id: 'display', icon: Palette, label: t('Display & Language') },
     { id: 'mcp', icon: Server, label: t('MCP Servers') },
-    { id: 'system', icon: Settings, label: t('System'), desktopOnly: true },
+    { id: 'system', icon: SettingsIcon, label: t('System'), desktopOnly: true },
     { id: 'remote', icon: Wifi, label: t('Remote Access') },
   ]
 
@@ -548,446 +652,226 @@ export function SettingsPage() {
         <main className="flex-1 overflow-auto p-6">
           <div className="max-w-2xl">
 
-          {/* AI Model Section */}
+          {/* AI Model Section - Grid Layout */}
           {activeSection === 'ai-model' && (
-          <section className="bg-card rounded-xl border border-border p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-medium">{t('AI Model')}</h2>
-            </div>
-
-            <div className="space-y-4">
-              {/* OAuth Providers - Dynamic rendering */}
-              {authProviders
-                .filter(p => p.type !== 'custom' && p.enabled)
-                .map((provider) => {
-                  const providerConfig = config?.aiSources?.[provider.type] as OAuthSourceConfig | undefined
-                  const isLoggedIn = providerConfig?.loggedIn === true
-                  const isLoggingIn = loginState?.provider === provider.type
-                  const isLoggingOut = loggingOutProvider === provider.type
-                  const IconComponent = getIconComponent(provider.icon)
-
-                  if (isLoggedIn) {
-                    // Logged in card
-                    return (
-                      <div
-                        key={provider.type}
-                        className={`p-4 rounded-lg border-2 transition-all cursor-pointer ${
-                          currentSource === provider.type
-                            ? 'border-primary bg-primary/5'
-                            : 'border-border hover:border-muted-foreground/50'
-                        }`}
-                        onClick={() => handleSwitchSource(provider.type)}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            {/* Provider Icon */}
-                            <div
-                              className="w-10 h-10 rounded-lg flex items-center justify-center"
-                              style={{ backgroundColor: `${provider.iconBgColor}20` }}
-                            >
-                              <IconComponent
-                                className="w-6 h-6"
-                                style={{ color: provider.iconBgColor }}
-                              />
-                            </div>
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <span className="font-medium">{getLocalizedText(provider.displayName)}</span>
-                                {currentSource === provider.type && (
-                                  <span className="text-xs px-1.5 py-0.5 rounded bg-primary/20 text-primary flex items-center gap-1">
-                                    <Check className="w-3 h-3" />
-                                    {t('Active')}
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-xs text-muted-foreground">
-                                {providerConfig?.user?.name || t('Logged in')}
-                              </p>
-                            </div>
-                          </div>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleOAuthLogout(provider.type)
-                            }}
-                            disabled={isLoggingOut}
-                            className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
-                            title={t('Logout')}
-                          >
-                            {isLoggingOut ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <LogOut className="w-4 h-4" />
-                            )}
-                          </button>
-                        </div>
-
-                        {/* Model selector for this provider */}
-                        {currentSource === provider.type && (
-                          <div className="mt-3 pt-3 border-t border-border">
-                            <label className="block text-xs text-muted-foreground mb-1.5">{t('Model')}</label>
-                            <select
-                              value={providerConfig?.model || ''}
-                              onChange={(e) => handleOAuthModelChange(provider.type, e.target.value)}
-                              onClick={(e) => e.stopPropagation()}
-                              className="w-full px-3 py-1.5 text-sm bg-input rounded-lg border border-border focus:border-primary focus:outline-none transition-colors"
-                            >
-                              {(providerConfig?.availableModels || []).map((modelId) => {
-                                const displayName = providerConfig?.modelNames?.[modelId] || modelId
-                                return (
-                                  <option key={modelId} value={modelId}>
-                                    {displayName}
-                                  </option>
-                                )
-                              })}
-                            </select>
-                          </div>
-                        )}
-                      </div>
-                    )
-                  } else if (isLoggingIn) {
-                    // Logging in progress
-                    return (
-                      <div key={provider.type} className="p-4 rounded-lg border border-border bg-muted/30">
-                        <div className="flex items-center gap-3">
-                          <Loader2 className="w-5 h-5 animate-spin text-primary" />
-                          <div>
-                            <span className="font-medium">{t('Logging in...')}</span>
-                            <p className="text-xs text-muted-foreground">{loginState?.status}</p>
-                          </div>
-                        </div>
-
-                        {/* Device code display for OAuth Device Code flow */}
-                        {loginState?.userCode && loginState?.verificationUri && (
-                          <div className="mt-4 p-4 bg-background border border-border rounded-lg">
-                            <p className="text-xs text-muted-foreground mb-1">
-                              {t('Visit this URL to login:')}
-                            </p>
-                            <a
-                              href={loginState.verificationUri}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-primary hover:underline font-mono text-xs"
-                            >
-                              {loginState.verificationUri}
-                            </a>
-                            <p className="text-xs text-muted-foreground mt-3 mb-1">
-                              {t('Enter this code:')}
-                            </p>
-                            <div className="flex items-center gap-2">
-                              <code className="text-lg font-bold font-mono tracking-widest bg-muted px-3 py-1 rounded border border-border select-all">
-                                {loginState.userCode}
-                              </code>
-                              <button
-                                onClick={() => navigator.clipboard.writeText(loginState.userCode!)}
-                                className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
-                                title={t('Copy code')}
-                              >
-                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
-                                  <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
-                                </svg>
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )
-                  } else {
-                    // Not logged in - show add button
-                    return (
-                      <button
-                        key={provider.type}
-                        onClick={() => handleOAuthLogin(provider.type)}
-                        className="w-full p-4 rounded-lg border-2 border-dashed border-border hover:border-primary/50 hover:bg-primary/5 transition-all flex items-center gap-3"
-                      >
-                        <div
-                          className="w-10 h-10 rounded-lg flex items-center justify-center"
-                          style={{ backgroundColor: `${provider.iconBgColor}10` }}
-                        >
-                          <Plus className="w-5 h-5" style={{ color: provider.iconBgColor }} />
-                        </div>
-                        <div className="text-left">
-                          <span className="font-medium">{t('Add')} {getLocalizedText(provider.displayName)}</span>
-                          <p className="text-xs text-muted-foreground">{getLocalizedText(provider.description)}</p>
-                        </div>
-                      </button>
-                    )
-                  }
-                })}
-
-              {/* Custom API Source Card */}
-              {config?.aiSources?.custom?.apiKey ? (
-                <div
-                  className={`p-4 rounded-lg border-2 transition-all cursor-pointer ${
-                    currentSource === 'custom'
-                      ? 'border-primary bg-primary/5'
-                      : 'border-border hover:border-muted-foreground/50'
-                  }`}
-                  onClick={() => handleSwitchSource('custom')}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      {/* Claude/API Logo */}
-                      <div className="w-10 h-10 rounded-lg bg-[#da7756]/20 flex items-center justify-center">
-                        <svg className="w-6 h-6 text-[#da7756]" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M4.709 15.955l4.72-2.647.08-.08 2.726-1.529.08-.08 6.206-3.48a.25.25 0 00.125-.216V6.177a.25.25 0 00-.375-.217l-6.206 3.48-.08.08-2.726 1.53-.08.079-4.72 2.647a.25.25 0 00-.125.217v1.746c0 .18.193.294.354.216h.001zm13.937-3.584l-4.72 2.647-.08.08-2.726 1.529-.08.08-6.206 3.48a.25.25 0 00-.125.216v1.746a.25.25 0 00.375.217l6.206-3.48.08-.08 2.726-1.53.08-.079 4.72-2.647a.25.25 0 00.125-.217v-1.746a.25.25 0 00-.375-.216z" />
-                        </svg>
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium">
-                            {config.aiSources?.custom?.provider === 'anthropic' ? 'Claude API' : t('Custom API')}
-                          </span>
-                          {currentSource === 'custom' && (
-                            <span className="text-xs px-1.5 py-0.5 rounded bg-primary/20 text-primary flex items-center gap-1">
-                              <Check className="w-3 h-3" />
-                              {t('Active')}
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          {AVAILABLE_MODELS.find(m => m.id === config.aiSources?.custom?.model)?.name || config.aiSources?.custom?.model}
-                        </p>
-                      </div>
-                    </div>
+          <section className="space-y-6">
+            {/* Provider Grid */}
+            <div className="bg-card rounded-xl border border-border p-5">
+              <h3 className="text-sm text-muted-foreground mb-4">{t('Select AI Provider')}</h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                {PROVIDER_PRESETS.map((preset) => {
+                  const isSelected = selectedProviderId === preset.id
+                  return (
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setShowCustomApiForm(!showCustomApiForm)
-                      }}
-                      className="px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg transition-colors"
-                    >
-                      {t('Edit')}
-                    </button>
-                  </div>
-
-                  {/* Expanded Custom API Form */}
-                  {showCustomApiForm && currentSource === 'custom' && (
-                    <div className="mt-4 pt-4 border-t border-border space-y-4" onClick={(e) => e.stopPropagation()}>
-                      {/* Provider */}
-                      <div>
-                        <label className="block text-xs text-muted-foreground mb-1.5">Provider</label>
-                        <select
-                          value={provider}
-                          onChange={(e) => {
-                            const next = e.target.value as any
-                            setProvider(next)
-                            setValidationResult(null)
-                            if (next === 'anthropic') {
-                              if (!apiUrl || apiUrl.includes('openai')) setApiUrl('https://api.anthropic.com')
-                              if (!model || !model.startsWith('claude-')) {
-                                setModel(DEFAULT_MODEL)
-                                setUseCustomModel(false)
-                              }
-                            } else if (next === 'openai') {
-                              if (!apiUrl || apiUrl.includes('anthropic')) setApiUrl('https://api.openai.com')
-                              if (!model || model.startsWith('claude-')) setModel('gpt-4o-mini')
-                            }
-                          }}
-                          className="w-full px-3 py-1.5 text-sm bg-input rounded-lg border border-border focus:border-primary focus:outline-none transition-colors"
-                        >
-                          <option value="anthropic">{t('Claude (Recommended)')}</option>
-                          <option value="openai">{t('OpenAI Compatible')}</option>
-                        </select>
-                      </div>
-
-                      {/* API Key */}
-                      <div>
-                        <label className="block text-xs text-muted-foreground mb-1.5">API Key</label>
-                        <div className="relative">
-                          <input
-                            type={showApiKey ? 'text' : 'password'}
-                            value={apiKey}
-                            onChange={(e) => setApiKey(e.target.value)}
-                            placeholder={provider === 'openai' ? 'sk-xxxxxxxxxxxxx' : 'sk-ant-xxxxxxxxxxxxx'}
-                            className="w-full px-3 py-1.5 pr-10 text-sm bg-input rounded-lg border border-border focus:border-primary focus:outline-none transition-colors"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setShowApiKey(!showApiKey)}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground transition-colors"
-                          >
-                            {showApiKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* API URL */}
-                      <div>
-                        <label className="block text-xs text-muted-foreground mb-1.5">API URL</label>
-                        <input
-                          type="text"
-                          value={apiUrl}
-                          onChange={(e) => setApiUrl(e.target.value)}
-                          placeholder="https://api.anthropic.com"
-                          className="w-full px-3 py-1.5 text-sm bg-input rounded-lg border border-border focus:border-primary focus:outline-none transition-colors"
-                        />
-                      </div>
-
-                      {/* Model */}
-                      <div>
-                        <label className="block text-xs text-muted-foreground mb-1.5">{t('Model')}</label>
-                        {provider === 'anthropic' && !useCustomModel ? (
-                          <select
-                            value={model}
-                            onChange={(e) => setModel(e.target.value)}
-                            className="w-full px-3 py-1.5 text-sm bg-input rounded-lg border border-border focus:border-primary focus:outline-none transition-colors"
-                          >
-                            {AVAILABLE_MODELS.map((m) => (
-                              <option key={m.id} value={m.id}>{m.name}</option>
-                            ))}
-                          </select>
-                        ) : (
-                          <input
-                            type="text"
-                            value={model}
-                            onChange={(e) => setModel(e.target.value)}
-                            placeholder="claude-sonnet-4-5-20250929"
-                            className="w-full px-3 py-1.5 text-sm bg-input rounded-lg border border-border focus:border-primary focus:outline-none transition-colors"
-                          />
-                        )}
-                      </div>
-
-                      {/* Save button */}
-                      <div className="flex items-center gap-3">
-                        <button
-                          onClick={handleSaveCustomApi}
-                          disabled={isValidating || !apiKey}
-                          className="px-4 py-1.5 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50"
-                        >
-                          {isValidating ? t('Saving...') : t('Save')}
-                        </button>
-                        {validationResult && (
-                          <span className={`text-xs flex items-center gap-1 ${validationResult.valid ? 'text-green-500' : 'text-red-500'}`}>
-                            {validationResult.valid ? <CheckCircle2 className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
-                            {validationResult.message}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                /* Add Custom API Button */
-                <button
-                  onClick={() => setShowCustomApiForm(true)}
-                  className="w-full p-4 rounded-lg border-2 border-dashed border-border hover:border-primary/50 hover:bg-primary/5 transition-all flex items-center gap-3"
-                >
-                  <div className="w-10 h-10 rounded-lg bg-[#da7756]/10 flex items-center justify-center">
-                    <Plus className="w-5 h-5 text-[#da7756]" />
-                  </div>
-                  <div className="text-left">
-                    <span className="font-medium">{t('Add Custom API')}</span>
-                    <p className="text-xs text-muted-foreground">{t('Claude / OpenAI compatible')}</p>
-                  </div>
-                </button>
-              )}
-
-              {/* Add Custom API Form (when no existing custom config) */}
-              {showCustomApiForm && !config?.aiSources?.custom?.apiKey && (
-                <div className="p-4 rounded-lg border border-border space-y-4">
-                  <h3 className="font-medium">{t('Configure Custom API')}</h3>
-
-                  {/* Provider */}
-                  <div>
-                    <label className="block text-xs text-muted-foreground mb-1.5">Provider</label>
-                    <select
-                      value={provider}
-                      onChange={(e) => {
-                        const next = e.target.value as any
-                        setProvider(next)
-                        if (next === 'anthropic') {
-                          setApiUrl('https://api.anthropic.com')
-                          setModel(DEFAULT_MODEL)
-                        } else {
-                          setApiUrl('https://api.openai.com')
-                          setModel('gpt-4o-mini')
+                      key={preset.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedProviderId(preset.id)
+                        // Update form values when switching providers
+                        if (!preset.isCustom) {
+                          setApiUrl(preset.apiUrl || '')
+                          setModel(preset.defaultModel || '')
+                          setProvider(preset.apiType === 'openai' ? 'openai' : 'anthropic')
                         }
                       }}
-                      className="w-full px-3 py-1.5 text-sm bg-input rounded-lg border border-border focus:border-primary focus:outline-none transition-colors"
+                      className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
+                        isSelected
+                          ? 'border-primary bg-primary/5'
+                          : 'border-border hover:border-primary/50 hover:bg-primary/5'
+                      }`}
                     >
-                      <option value="anthropic">{t('Claude (Recommended)')}</option>
-                      <option value="openai">{t('OpenAI Compatible')}</option>
-                    </select>
+                      {/* Logo or Icon */}
+                      <div className="w-10 h-10 rounded-lg flex items-center justify-center overflow-hidden">
+                        {preset.logo ? (
+                          <img src={preset.logo} alt={preset.name} className="w-full h-full object-cover rounded-lg" />
+                        ) : (
+                          <div className="w-full h-full bg-muted/50 flex items-center justify-center rounded-lg">
+                            <SettingsIcon className="w-5 h-5 text-muted-foreground" />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Name */}
+                      <span className={`text-sm font-medium ${isSelected ? 'text-primary' : 'text-muted-foreground'}`}>
+                        {preset.isCustom ? t(preset.nameKey) : preset.name}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* API Configuration Form */}
+            {(() => {
+              const currentPreset = PROVIDER_PRESETS.find(p => p.id === selectedProviderId)
+              if (!currentPreset) return null
+
+              return (
+                <div className="bg-card rounded-xl border border-border p-5 space-y-5">
+                  {/* Header */}
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg flex items-center justify-center overflow-hidden">
+                      {currentPreset.logo ? (
+                        <img src={currentPreset.logo} alt={currentPreset.name} className="w-full h-full object-cover rounded-lg" />
+                      ) : (
+                        <div className="w-full h-full bg-muted/50 flex items-center justify-center rounded-lg">
+                          <SettingsIcon className="w-5 h-5 text-muted-foreground" />
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <h3 className="font-medium">{currentPreset.isCustom ? t('Custom') : currentPreset.name}</h3>
+                      <p className="text-xs text-muted-foreground">{t('Configure API')}</p>
+                    </div>
                   </div>
 
                   {/* API Key */}
                   <div>
-                    <label className="block text-xs text-muted-foreground mb-1.5">API Key</label>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-sm text-muted-foreground">API Key</label>
+                      {currentPreset.docsUrl && (
+                        <a
+                          href={currentPreset.docsUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-primary hover:underline flex items-center gap-1"
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                          {t('Get API Key')}
+                        </a>
+                      )}
+                    </div>
                     <div className="relative">
                       <input
                         type={showApiKey ? 'text' : 'password'}
                         value={apiKey}
                         onChange={(e) => setApiKey(e.target.value)}
-                        placeholder={provider === 'openai' ? 'sk-xxxxxxxxxxxxx' : 'sk-ant-xxxxxxxxxxxxx'}
-                        className="w-full px-3 py-1.5 pr-10 text-sm bg-input rounded-lg border border-border focus:border-primary focus:outline-none transition-colors"
+                        placeholder={currentPreset.apiType === 'openai' ? 'sk-xxxxxxxxxxxxx' : 'sk-ant-xxxxxxxxxxxxx'}
+                        className="w-full px-3 py-2 pr-10 text-sm bg-input rounded-lg border border-border focus:border-primary focus:outline-none transition-colors"
                       />
                       <button
                         type="button"
                         onClick={() => setShowApiKey(!showApiKey)}
                         className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground transition-colors"
                       >
-                        {showApiKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
                     </div>
                   </div>
 
                   {/* API URL */}
                   <div>
-                    <label className="block text-xs text-muted-foreground mb-1.5">API URL</label>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-sm text-muted-foreground">{t('API URL')}</label>
+                      {currentPreset.apiDocsUrl && (
+                        <a
+                          href={currentPreset.apiDocsUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-primary hover:underline flex items-center gap-1"
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                          {t('API Documentation')}
+                        </a>
+                      )}
+                    </div>
                     <input
                       type="text"
                       value={apiUrl}
                       onChange={(e) => setApiUrl(e.target.value)}
-                      placeholder="https://api.anthropic.com"
-                      className="w-full px-3 py-1.5 text-sm bg-input rounded-lg border border-border focus:border-primary focus:outline-none transition-colors"
+                      placeholder={currentPreset.apiUrl || 'https://...'}
+                      className="w-full px-3 py-2 text-sm bg-input rounded-lg border border-border focus:border-primary focus:outline-none transition-colors"
                     />
+                    {!currentPreset.isCustom && (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {t('Default URL is pre-filled, you can modify it')}
+                      </p>
+                    )}
                   </div>
 
                   {/* Model */}
                   <div>
-                    <label className="block text-xs text-muted-foreground mb-1.5">{t('Model')}</label>
-                    {provider === 'anthropic' ? (
-                      <select
-                        value={model}
-                        onChange={(e) => setModel(e.target.value)}
-                        className="w-full px-3 py-1.5 text-sm bg-input rounded-lg border border-border focus:border-primary focus:outline-none transition-colors"
-                      >
-                        {AVAILABLE_MODELS.map((m) => (
-                          <option key={m.id} value={m.id}>{m.name}</option>
-                        ))}
-                      </select>
+                    <label className="block text-sm text-muted-foreground mb-2">{t('Model')}</label>
+                    {selectedProviderId === 'claude' ? (
+                      <>
+                        {useCustomModel ? (
+                          <input
+                            type="text"
+                            value={model}
+                            onChange={(e) => setModel(e.target.value)}
+                            placeholder="claude-sonnet-4-5-20250929"
+                            className="w-full px-3 py-2 text-sm bg-input rounded-lg border border-border focus:border-primary focus:outline-none transition-colors"
+                          />
+                        ) : (
+                          <select
+                            value={model}
+                            onChange={(e) => setModel(e.target.value)}
+                            className="w-full px-3 py-2 text-sm bg-input rounded-lg border border-border focus:border-primary focus:outline-none transition-colors"
+                          >
+                            {AVAILABLE_MODELS.map((m) => (
+                              <option key={m.id} value={m.id}>{m.name}</option>
+                            ))}
+                          </select>
+                        )}
+                        <div className="mt-1 flex items-center justify-between gap-4">
+                          <span className="text-xs text-muted-foreground">
+                            {useCustomModel
+                              ? t('Enter official Claude model name')
+                              : t(AVAILABLE_MODELS.find((m) => m.id === model)?.description || '')}
+                          </span>
+                          <label className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer whitespace-nowrap shrink-0">
+                            <input
+                              type="checkbox"
+                              checked={useCustomModel}
+                              onChange={(e) => {
+                                setUseCustomModel(e.target.checked)
+                                if (!e.target.checked && !AVAILABLE_MODELS.some(m => m.id === model)) {
+                                  setModel(DEFAULT_MODEL)
+                                }
+                              }}
+                              className="w-3.5 h-3.5 rounded border-border cursor-pointer accent-primary"
+                            />
+                            {t('Custom')}
+                          </label>
+                        </div>
+                      </>
                     ) : (
-                      <input
-                        type="text"
-                        value={model}
-                        onChange={(e) => setModel(e.target.value)}
-                        placeholder="gpt-4o-mini"
-                        className="w-full px-3 py-1.5 text-sm bg-input rounded-lg border border-border focus:border-primary focus:outline-none transition-colors"
-                      />
+                      <>
+                        <input
+                          type="text"
+                          value={model}
+                          onChange={(e) => setModel(e.target.value)}
+                          placeholder={currentPreset.defaultModel || 'model-name'}
+                          className="w-full px-3 py-2 text-sm bg-input rounded-lg border border-border focus:border-primary focus:outline-none transition-colors"
+                        />
+                        {!currentPreset.isCustom && (
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {t('Default model is pre-filled, you can modify it')}
+                          </p>
+                        )}
+                      </>
                     )}
                   </div>
 
-                  {/* Actions */}
-                  <div className="flex items-center gap-3">
+                  {/* Save Button */}
+                  <div className="flex items-center gap-3 pt-2">
                     <button
                       onClick={handleSaveCustomApi}
                       disabled={isValidating || !apiKey}
-                      className="px-4 py-1.5 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50"
+                      className="px-6 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50"
                     >
                       {isValidating ? t('Saving...') : t('Save')}
                     </button>
-                    <button
-                      onClick={() => setShowCustomApiForm(false)}
-                      className="px-4 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      {t('Cancel')}
-                    </button>
+                    {validationResult && (
+                      <span className={`text-xs flex items-center gap-1 ${validationResult.valid ? 'text-green-500' : 'text-red-500'}`}>
+                        {validationResult.valid ? <CheckCircle2 className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
+                        {validationResult.message}
+                      </span>
+                    )}
                   </div>
                 </div>
-              )}
-            </div>
+              )
+            })()}
           </section>
           )}
 

@@ -209,8 +209,8 @@ export function HomePage() {
 
       {/* Content */}
       <main className="flex-1 overflow-auto flex flex-col">
-        {/* Hero Section - Visual Focus Area (2:1 ratio with spaces section) */}
-        <section className="flex-[2] flex flex-col items-center justify-center px-8 py-12 animate-fade-in">
+        {/* Hero Section */}
+        <section className="flex flex-col items-center justify-center px-8 py-8 animate-fade-in">
           {/* Logo with subtle glow */}
           <div className="relative mb-8">
             <div className="absolute inset-0 blur-3xl bg-muted/20 rounded-full scale-150" />
@@ -221,7 +221,7 @@ export function HomePage() {
           <h1 className="text-3xl font-semibold mb-4 tracking-tight text-foreground/95 [letter-spacing:-0.02em]">技能范</h1>
 
           {/* Tagline */}
-          <p className="text-muted-foreground text-center text-sm mb-12 max-w-md leading-relaxed">
+          <p className="text-muted-foreground text-center text-sm mb-8 max-w-md leading-relaxed">
             {t('Aimless time, ideas will crystallize here')}
           </p>
 
@@ -240,7 +240,7 @@ export function HomePage() {
         <div className="h-px mx-6 bg-gradient-to-r from-transparent via-border/60 to-transparent" />
 
         {/* Spaces Section */}
-        <section className="flex-[1] overflow-auto p-8">
+        <section className="p-8">
           <div className="max-w-5xl mx-auto">
             <div className="mb-5 flex items-center justify-between">
               <h3 className="text-sm font-medium text-muted-foreground/80 tracking-wide">自定义空间</h3>

@@ -30,9 +30,17 @@ export function SetupFlow() {
   const [loginStatus, setLoginStatus] = useState<string>('')
   const [error, setError] = useState<string | null>(null)
   const [deviceCodeInfo, setDeviceCodeInfo] = useState<DeviceCodeInfo | null>(null)
+  // Track selected provider for ApiSetup
+  const [selectedProviderId, setSelectedProviderId] = useState<string>('claude')
 
-  // Handle OAuth provider login (generic)
-  const handleSelectProvider = async (providerType: string) => {
+  // Handle provider selection from grid
+  const handleSelectProvider = (providerId: string) => {
+    setSelectedProviderId(providerId)
+    setStep('custom')  // Navigate to ApiSetup
+  }
+
+  // Handle OAuth provider login (generic) - kept for future use
+  const handleOAuthLogin = async (providerType: string) => {
     setError(null)
     setCurrentProvider(providerType)
     setStep('oauth-waiting')
@@ -83,12 +91,7 @@ export function SetupFlow() {
     }
   }
 
-  // Handle Custom API selection
-  const handleSelectCustom = () => {
-    setStep('custom')
-  }
-
-  // Handle back from Custom API
+  // Handle back from ApiSetup
   const handleBackFromCustom = () => {
     setStep('select')
   }
@@ -112,7 +115,6 @@ export function SetupFlow() {
     return (
       <LoginSelector
         onSelectProvider={handleSelectProvider}
-        onSelectCustom={handleSelectCustom}
       />
     )
   }
@@ -195,7 +197,7 @@ export function SetupFlow() {
   }
 
   if (step === 'custom') {
-    return <ApiSetup showBack onBack={handleBackFromCustom} />
+    return <ApiSetup showBack onBack={handleBackFromCustom} initialProviderId={selectedProviderId} />
   }
 
   return null
