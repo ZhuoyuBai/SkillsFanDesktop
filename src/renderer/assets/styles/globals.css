@@ -39,21 +39,21 @@
   --secondary: 0 0% 15%;
   --secondary-foreground: 0 0% 98%;
   --muted: 0 0% 15%;
-  --muted-foreground: 0 0% 64%;
-  --accent: 24 90% 55%;
-  --accent-foreground: 0 0% 100%;
+  --muted-foreground: 0 0% 60%;
+  --accent: 0 0% 15%;
+  --accent-foreground: 0 0% 98%;
   --destructive: 0 62% 50%;
   --destructive-foreground: 0 0% 98%;
-  --border: 0 0% 20%;
+  --border: 0 0% 15%;
   --input: 0 0% 15%;
-  --ring: 24 90% 55%;
+  --ring: 0 0% 30%;
   --radius: 0.75rem;
 
   /* SkillsFan brand colors */
   --skillsfan-glow: 24 90% 55%;
-  --skillsfan-success: 142 71% 45%;
-  --skillsfan-warning: 38 92% 50%;
-  --skillsfan-error: 0 62% 50%;
+  --skillsfan-success: 0 0% 50%;
+  --skillsfan-warning: 0 0% 50%;
+  --skillsfan-error: 0 20% 50%;
   /* Legacy aliases */
   --halo-glow: var(--skillsfan-glow);
   --halo-success: var(--skillsfan-success);
@@ -75,19 +75,19 @@
   --secondary-foreground: 0 0% 20%;
   --muted: 0 0% 94%;
   --muted-foreground: 0 0% 45%;
-  --accent: 24 90% 50%;
-  --accent-foreground: 0 0% 100%;
+  --accent: 0 0% 92%;
+  --accent-foreground: 0 0% 15%;
   --destructive: 0 72% 51%;
   --destructive-foreground: 0 0% 100%;
-  --border: 0 0% 90%;
+  --border: 0 0% 88%;
   --input: 0 0% 94%;
-  --ring: 24 90% 50%;
+  --ring: 0 0% 70%;
 
   /* SkillsFan brand colors (adjusted for light) */
   --skillsfan-glow: 24 90% 50%;
-  --skillsfan-success: 142 71% 40%;
-  --skillsfan-warning: 38 92% 45%;
-  --skillsfan-error: 0 72% 51%;
+  --skillsfan-success: 0 0% 45%;
+  --skillsfan-warning: 0 0% 45%;
+  --skillsfan-error: 0 25% 51%;
   /* Legacy aliases */
   --halo-glow: var(--skillsfan-glow);
   --halo-success: var(--skillsfan-success);
@@ -769,19 +769,20 @@ body {
 }
 
 .space-card:hover {
-  border-color: hsl(var(--primary) / 0.5);
+  border-color: hsl(var(--foreground) / 0.2);
   transform: translateY(-2px);
+  box-shadow: 0 4px 12px hsl(var(--foreground) / 0.06);
 }
 
 /* SkillsFan space special style */
 .skillsfan-space-card {
-  background: linear-gradient(135deg, hsl(var(--primary) / 0.15), hsl(var(--primary) / 0.05));
-  border: 1px solid hsl(var(--primary) / 0.3);
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
 }
 
 .skillsfan-space-card:hover {
-  border-color: hsl(var(--primary));
-  box-shadow: 0 0 20px hsl(var(--primary) / 0.2);
+  border-color: hsl(var(--foreground) / 0.25);
+  box-shadow: 0 4px 16px hsl(var(--foreground) / 0.08);
 }
 
 /* Conversation history panel styles */

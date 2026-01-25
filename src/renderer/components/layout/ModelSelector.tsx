@@ -42,7 +42,11 @@ function getLocalizedText(value: LocalizedText): string {
   return value[lang] || value['en'] || Object.values(value)[0] || ''
 }
 
-export function ModelSelector() {
+interface ModelSelectorProps {
+  variant?: 'header' | 'compact'
+}
+
+export function ModelSelector({ variant = 'header' }: ModelSelectorProps = {}) {
   const { t } = useTranslation()
   const { config, setConfig, setView } = useAppStore()
   const [isOpen, setIsOpen] = useState(false)
@@ -147,20 +151,52 @@ export function ModelSelector() {
     setView('settings')
   }
 
+  // Style configuration for different variants
+  const styleConfig = {
+    header: {
+      button: "flex items-center gap-1.5 px-3 py-1.5 text-sm",
+      dropdown: "absolute right-0 top-full mt-1",
+      showChevron: true,
+    },
+    compact: {
+      button: "h-8 flex items-center gap-1.5 px-2.5 rounded-lg text-xs",
+      dropdown: "absolute left-0 bottom-full mb-1",
+      showChevron: false,
+    }
+  }
+
+  const styles = styleConfig[variant]
+
   return (
     <div className="relative" ref={dropdownRef}>
       {/* Trigger Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary/80 rounded-lg transition-colors"
+        className={`
+          ${styles.button}
+          ${variant === 'header'
+            ? 'text-muted-foreground hover:text-foreground hover:bg-secondary/80 rounded-lg transition-colors'
+            : `transition-colors duration-200 ${isOpen
+                ? 'bg-primary/10 text-primary'
+                : 'text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted/50'
+              }`
+          }
+        `.trim().replace(/\s+/g, ' ')}
       >
-        <span className="max-w-[140px] truncate">{currentModelName}</span>
-        <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <span className={variant === 'header' ? 'max-w-[140px] truncate' : ''}>
+          {currentModelName}
+        </span>
+        {styles.showChevron && (
+          <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        )}
       </button>
 
       {/* Dropdown Menu */}
       {isOpen && (
-        <div className="absolute right-0 top-full mt-1 w-56 bg-card border border-border rounded-xl shadow-lg z-50 py-1 overflow-hidden">
+        <div className={`
+          ${styles.dropdown}
+          w-56 bg-card border border-border rounded-xl shadow-lg z-50 py-1 overflow-hidden
+        `.trim().replace(/\s+/g, ' ')}>
           {/* Custom API Section */}
           {hasCustom && aiSources.custom && (
             <>

@@ -2,12 +2,11 @@
  * Header Component - Cross-platform title bar
  *
  * Handles platform-specific padding for window controls:
- * - macOS Electron: traffic lights on the left (pl-20)
+ * - macOS Electron: standard title bar, normal padding (pl-4)
  * - Windows/Linux Electron: titleBarOverlay buttons on the right (pr-36)
  * - Browser/Mobile: no extra padding needed (pl-4)
  *
  * Height: 40px (compact, modern style)
- * Traffic light vertical center formula: y = height/2 - 7 = 13
  */
 
 import { ReactNode } from 'react'
@@ -41,21 +40,20 @@ export function Header({ left, right, className = '' }: HeaderProps) {
   const isInElectron = isElectron()
 
   // Platform-specific padding classes
-  // macOS: traffic lights overlay on the left
+  // macOS: standard title bar, no overlay
   // Windows/Linux: titleBarOverlay buttons overlay on the right
   // Browser/Mobile: no overlay, use normal padding
   const platformPadding = isInElectron
     ? platform.isMac
-      ? 'pl-20 pr-4'   // Electron macOS: 80px left for traffic lights
+      ? 'pl-4 pr-4'    // Electron macOS: normal padding (title bar is separate)
       : 'pl-4 pr-36'   // Electron Windows/Linux: 140px right for titleBarOverlay buttons
     : 'pl-4 pr-4'      // Browser/Mobile: normal padding
 
-  // Header height: 40px, trafficLightPosition.y should be 40/2 - 7 = 13
   return (
     <header
       className={`
         flex items-center justify-between h-10
-        drag-region
+        ${isInElectron && !platform.isMac ? 'drag-region' : ''}
         ${platformPadding}
         ${className}
       `.trim().replace(/\s+/g, ' ')}

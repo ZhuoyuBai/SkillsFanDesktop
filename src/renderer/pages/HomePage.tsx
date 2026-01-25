@@ -210,18 +210,18 @@ export function HomePage() {
       {/* Content */}
       <main className="flex-1 overflow-auto flex flex-col">
         {/* Hero Section - Visual Focus Area (2:1 ratio with spaces section) */}
-        <section className="flex-[2] flex flex-col items-center justify-center px-6 animate-fade-in">
+        <section className="flex-[2] flex flex-col items-center justify-center px-8 py-12 animate-fade-in">
           {/* Logo with subtle glow */}
-          <div className="relative mb-6">
-            <div className="absolute inset-0 blur-3xl bg-primary/10 rounded-full scale-150" />
-            <HaloLogo size={56} hoverOnly={true} className="relative" />
+          <div className="relative mb-8">
+            <div className="absolute inset-0 blur-3xl bg-primary/8 rounded-full scale-150" />
+            <HaloLogo size={64} hoverOnly={true} className="relative" />
           </div>
 
           {/* Brand name */}
-          <h1 className="text-2xl font-semibold mb-3 tracking-tight text-foreground/90">技能范</h1>
+          <h1 className="text-3xl font-semibold mb-4 tracking-tight text-foreground/95 [letter-spacing:-0.02em]">技能范</h1>
 
           {/* Tagline */}
-          <p className="text-muted-foreground text-center text-sm mb-10">
+          <p className="text-muted-foreground text-center text-sm mb-12 max-w-md leading-relaxed">
             {t('Aimless time, ideas will crystallize here')}
           </p>
 
@@ -230,23 +230,23 @@ export function HomePage() {
             data-onboarding="halo-space"
             onClick={() => haloSpace && handleSpaceClick(haloSpace)}
             disabled={!haloSpace}
-            className="px-6 py-3 bg-primary/80 hover:bg-primary/90 text-primary-foreground rounded-xl text-sm font-medium transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-8 py-3.5 bg-primary/90 hover:bg-primary text-primary-foreground rounded-xl text-sm font-medium transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {t('Enter Halo')}
           </button>
         </section>
 
         {/* Gradient Divider */}
-        <div className="h-px mx-6 bg-gradient-to-r from-transparent via-border to-transparent" />
+        <div className="h-px mx-6 bg-gradient-to-r from-transparent via-border/60 to-transparent" />
 
         {/* Spaces Section */}
-        <section className="flex-[1] overflow-auto p-6">
-          <div className="max-w-4xl mx-auto">
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-sm font-medium text-muted-foreground">自定义空间</h3>
+        <section className="flex-[1] overflow-auto p-8">
+          <div className="max-w-5xl mx-auto">
+            <div className="mb-5 flex items-center justify-between">
+              <h3 className="text-sm font-medium text-muted-foreground/80 tracking-wide">自定义空间</h3>
               <button
                 onClick={() => setShowCreateDialog(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground border border-border hover:border-foreground/20 rounded-lg transition-colors"
+                className="flex items-center gap-1.5 px-3 py-2 text-xs text-muted-foreground hover:text-foreground border border-border/60 hover:border-foreground/30 rounded-lg transition-all hover:bg-secondary/50"
               >
                 <Plus className="w-3.5 h-3.5" />
                 新建空间
@@ -261,44 +261,44 @@ export function HomePage() {
                 <p className="text-sm">暂无自定义空间</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 lg:gap-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 lg:gap-6">
                 {spaces.map((space, index) => (
                   <div
                     key={space.id}
                     onClick={() => handleSpaceClick(space)}
-                    className={`space-card p-4 group animate-fade-in ${
-                      index === 0 ? 'border-primary/40' : ''
+                    className={`space-card p-5 group animate-fade-in ${
+                      index === 0 ? 'border-foreground/20' : ''
                     }`}
                   >
                     <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <SpaceIcon iconId={space.icon} size={20} className="flex-shrink-0" />
-                        <span className="font-medium truncate">{space.name}</span>
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <SpaceIcon iconId={space.icon} size={20} colored={false} className="flex-shrink-0 text-foreground/70" />
+                        <span className="font-medium truncate text-foreground/90">{space.name}</span>
                       </div>
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0">
                         <button
                           onClick={(e) => handleEditSpace(e, space)}
-                          className="p-1.5 hover:bg-secondary rounded-lg transition-all"
+                          className="p-1.5 hover:bg-secondary/80 rounded-lg transition-all"
                           title={t('Edit Space')}
                         >
-                          <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
+                          <Pencil className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground" />
                         </button>
                         <button
                           onClick={(e) => handleDeleteSpace(e, space.id)}
-                          className="p-1.5 hover:bg-destructive/20 rounded-lg transition-all"
+                          className="p-1.5 hover:bg-destructive/15 rounded-lg transition-all"
                           title={t('Delete space')}
                         >
-                          <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                          <Trash2 className="w-3.5 h-3.5 text-destructive/80 hover:text-destructive" />
                         </button>
                       </div>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-2">
+                    <p className="text-xs text-muted-foreground mt-3 leading-relaxed">
                       {t('{{count}} artifacts · {{conversations}} conversations', {
                         count: space.stats.artifactCount,
                         conversations: space.stats.conversationCount
                       })}
                     </p>
-                    <p className="text-xs text-muted-foreground mt-1">
+                    <p className="text-xs text-muted-foreground/70 mt-1.5">
                       {formatTimeAgo(space.updatedAt)}{t('active')}
                     </p>
                   </div>
@@ -311,20 +311,20 @@ export function HomePage() {
 
       {/* Create Space Dialog */}
       {showCreateDialog && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 no-drag">
-          <div className="bg-card border border-border rounded-xl p-6 w-full max-w-md animate-fade-in">
-            <h2 className="text-lg font-medium mb-5">{t('Create Dedicated Space')}</h2>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 no-drag">
+          <div className="bg-card border border-border/80 rounded-2xl p-7 w-full max-w-md animate-fade-in shadow-2xl">
+            <h2 className="text-lg font-semibold mb-6 text-foreground/95 tracking-tight">{t('Create Dedicated Space')}</h2>
 
             {/* 1. Space name - Primary input, most important */}
-            <div className="mb-5">
-              <label className="block text-sm text-muted-foreground mb-2">{t('Name this space')}</label>
+            <div className="mb-6">
+              <label className="block text-sm text-muted-foreground mb-2.5 font-medium">{t('Name this space')}</label>
               <input
                 ref={spaceNameInputRef}
                 type="text"
                 value={newSpaceName}
                 onChange={(e) => setNewSpaceName(e.target.value)}
                 placeholder={t('My Project')}
-                className="w-full px-4 py-2.5 bg-input rounded-lg border border-border focus:border-primary focus:outline-none transition-colors"
+                className="w-full px-4 py-3 bg-input/50 focus:bg-input rounded-xl border border-border/60 focus:border-foreground/30 focus:outline-none transition-all text-foreground placeholder:text-muted-foreground/50"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && newSpaceName.trim() && !(useCustomPath && !customPath)) {
                     handleCreateSpace()
@@ -334,20 +334,20 @@ export function HomePage() {
             </div>
 
             {/* 2. Icon select - Compact, secondary importance */}
-            <div className="mb-5">
-              <label className="block text-sm text-muted-foreground mb-2">{t('Icon (optional)')}</label>
-              <div className="flex flex-wrap gap-1.5">
+            <div className="mb-6">
+              <label className="block text-sm text-muted-foreground mb-2.5 font-medium">{t('Icon (optional)')}</label>
+              <div className="flex flex-wrap gap-2">
                 {SPACE_ICONS.map((iconId) => (
                   <button
                     key={iconId}
                     onClick={() => setNewSpaceIcon(iconId)}
-                    className={`w-8 h-8 rounded-md flex items-center justify-center transition-all ${
+                    className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${
                       newSpaceIcon === iconId
-                        ? 'bg-primary/20 ring-2 ring-primary ring-offset-1 ring-offset-card'
-                        : 'bg-secondary/60 hover:bg-secondary'
+                        ? 'bg-foreground/10 ring-2 ring-foreground/30 ring-offset-2 ring-offset-card'
+                        : 'bg-secondary/40 hover:bg-secondary/60 border border-border/40'
                     }`}
                   >
-                    <SpaceIcon iconId={iconId} size={16} />
+                    <SpaceIcon iconId={iconId} size={18} colored={false} className="text-foreground/70" />
                   </button>
                 ))}
               </div>
@@ -452,17 +452,17 @@ export function HomePage() {
             </div>
 
             {/* Actions */}
-            <div className="flex justify-end gap-3">
+            <div className="flex justify-end gap-3 mt-6">
               <button
                 onClick={resetDialog}
-                className="px-4 py-2 text-muted-foreground hover:bg-secondary rounded-lg transition-colors"
+                className="px-5 py-2.5 text-muted-foreground hover:text-foreground hover:bg-secondary/60 rounded-xl transition-all"
               >
                 {t('Cancel')}
               </button>
               <button
                 onClick={handleCreateSpace}
                 disabled={!newSpaceName.trim() || (useCustomPath && !customPath)}
-                className="px-4 py-2 bg-primary text-primary-foreground rounded-lg btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-5 py-2.5 bg-primary/90 hover:bg-primary text-primary-foreground rounded-xl shadow-sm hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {t('Create')}
               </button>
@@ -473,55 +473,55 @@ export function HomePage() {
 
       {/* Edit Space Dialog */}
       {editingSpace && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 no-drag">
-          <div className="bg-card border border-border rounded-xl p-6 w-full max-w-md animate-fade-in">
-            <h2 className="text-lg font-medium mb-4">{t('Edit Space')}</h2>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 no-drag">
+          <div className="bg-card border border-border/80 rounded-2xl p-7 w-full max-w-md animate-fade-in shadow-2xl">
+            <h2 className="text-lg font-semibold mb-6 text-foreground/95 tracking-tight">{t('Edit Space')}</h2>
 
             {/* Space name */}
-            <div className="mb-4">
-              <label className="block text-sm text-muted-foreground mb-2">{t('Space Name')}</label>
+            <div className="mb-6">
+              <label className="block text-sm text-muted-foreground mb-2.5 font-medium">{t('Space Name')}</label>
               <input
                 type="text"
                 value={editSpaceName}
                 onChange={(e) => setEditSpaceName(e.target.value)}
                 placeholder={t('My Project')}
-                className="w-full px-4 py-2 bg-input rounded-lg border border-border focus:border-primary focus:outline-none transition-colors"
+                className="w-full px-4 py-3 bg-input/50 focus:bg-input rounded-xl border border-border/60 focus:border-foreground/30 focus:outline-none transition-all text-foreground placeholder:text-muted-foreground/50"
                 autoFocus
               />
             </div>
 
             {/* Icon select */}
             <div className="mb-6">
-              <label className="block text-sm text-muted-foreground mb-2">{t('Icon')}</label>
+              <label className="block text-sm text-muted-foreground mb-2.5 font-medium">{t('Icon')}</label>
               <div className="flex flex-wrap gap-2">
                 {SPACE_ICONS.map((iconId) => (
                   <button
                     key={iconId}
                     onClick={() => setEditSpaceIcon(iconId)}
-                    className={`w-10 h-10 rounded-lg flex items-center justify-center transition-all ${
+                    className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${
                       editSpaceIcon === iconId
-                        ? 'bg-primary/20 border-2 border-primary'
-                        : 'bg-secondary hover:bg-secondary/80'
+                        ? 'bg-foreground/10 ring-2 ring-foreground/30 ring-offset-2 ring-offset-card'
+                        : 'bg-secondary/40 hover:bg-secondary/60 border border-border/40'
                     }`}
                   >
-                    <SpaceIcon iconId={iconId} size={20} />
+                    <SpaceIcon iconId={iconId} size={18} colored={false} className="text-foreground/70" />
                   </button>
                 ))}
               </div>
             </div>
 
             {/* Actions */}
-            <div className="flex justify-end gap-3">
+            <div className="flex justify-end gap-3 mt-6">
               <button
                 onClick={handleCancelEdit}
-                className="px-4 py-2 text-muted-foreground hover:bg-secondary rounded-lg transition-colors"
+                className="px-5 py-2.5 text-muted-foreground hover:text-foreground hover:bg-secondary/60 rounded-xl transition-all"
               >
                 {t('Cancel')}
               </button>
               <button
                 onClick={handleSaveEdit}
                 disabled={!editSpaceName.trim()}
-                className="px-4 py-2 bg-primary text-primary-foreground rounded-lg btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-5 py-2.5 bg-primary/90 hover:bg-primary text-primary-foreground rounded-xl shadow-sm hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {t('Save')}
               </button>

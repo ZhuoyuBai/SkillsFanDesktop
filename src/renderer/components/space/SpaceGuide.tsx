@@ -50,11 +50,11 @@ export function SpaceGuide() {
       {/* Collapsed title bar - always visible */}
       <button
         onClick={toggleExpand}
-        className="w-full flex items-center justify-between px-3 py-2.5 sm:p-3 rounded-lg bg-card border border-border hover:border-primary/30 transition-all group"
+        className="w-full flex items-center justify-between px-3 py-2.5 sm:p-3 rounded-lg bg-card border border-border hover:border-foreground/20 transition-all group"
       >
         <div className="flex items-center gap-2">
-          <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-md bg-primary/10 flex items-center justify-center">
-            <HelpCircle className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-primary" />
+          <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-md bg-foreground/8 flex items-center justify-center">
+            <HelpCircle className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-foreground/60" />
           </div>
           <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
             {t('Learn what spaces are')}
@@ -73,8 +73,8 @@ export function SpaceGuide() {
           <div className="p-3 sm:p-4 space-y-4 sm:space-y-5">
             {/* Section 1: What can AI do */}
             <div className="flex items-start gap-2.5 sm:gap-3">
-              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-                <Zap className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-primary" />
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-foreground/8 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <Zap className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-foreground/60" />
               </div>
               <div className="flex-1 min-w-0">
                 <h4 className="text-sm font-medium mb-1 sm:mb-1.5">{t('What can AI do?')}</h4>
@@ -88,8 +88,8 @@ export function SpaceGuide() {
 
             {/* Section 2: What is a space */}
             <div className="flex items-start gap-2.5 sm:gap-3">
-              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-amber-500/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-                <Folder className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-500" />
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-foreground/8 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <Folder className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-foreground/60" />
               </div>
               <div className="flex-1 min-w-0">
                 <h4 className="text-sm font-medium mb-1 sm:mb-1.5">{t('What is a space?')}</h4>
@@ -102,8 +102,8 @@ export function SpaceGuide() {
 
             {/* Section 3: Default space vs Custom space */}
             <div className="flex items-start gap-2.5 sm:gap-3">
-              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-                <HelpCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500" />
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-foreground/8 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <HelpCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-foreground/60" />
               </div>
               <div className="flex-1 min-w-0">
                 <h4 className="text-sm font-medium mb-2 sm:mb-2.5">{t('When do you need to create one?')}</h4>
@@ -127,11 +127,11 @@ export function SpaceGuide() {
           </div>
 
           {/* Warning section - keep separate with subtle top border */}
-          <div className="px-3 py-2.5 sm:p-3 bg-halo-warning/5 border-t border-border/50">
+          <div className="px-3 py-2.5 sm:p-3 bg-foreground/5 border-t border-border/40">
             <div className="flex items-center gap-2">
-              <AlertTriangle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-halo-warning flex-shrink-0" />
-              <p className="text-xs text-muted-foreground">
-                <span className="text-halo-warning font-medium">{t('AI has delete permissions')}</span>
+              <AlertTriangle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground flex-shrink-0" />
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                <span className="text-foreground/80 font-medium">{t('AI has delete permissions')}</span>
                 {t(', be mindful of backing up important files')}
               </p>
             </div>

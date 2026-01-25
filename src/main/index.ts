@@ -214,11 +214,9 @@ function createWindow(): void {
     minHeight: 600,
     show: false,
     autoHideMenuBar: true,
-    // macOS: hiddenInset for traffic lights in content area
+    // macOS: default titleBar with standard traffic lights position
     // Windows/Linux: hidden + titleBarOverlay for native buttons overlay
-    titleBarStyle: isMac ? 'hiddenInset' : 'hidden',
-    // Fine-tuned for visual alignment with 40px header
-    trafficLightPosition: isMac ? { x: 15, y: 11 } : undefined,
+    titleBarStyle: isMac ? 'default' : 'hidden',
     // Windows/Linux: native window controls overlay in content area
     titleBarOverlay: !isMac ? {
       color: '#0a0a0a',

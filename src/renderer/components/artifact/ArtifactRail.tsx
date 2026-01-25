@@ -315,6 +315,7 @@ export function ArtifactRail({
             onClick={onOpenFolder}
             className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 text-xs text-muted-foreground hover:bg-secondary hover:text-foreground rounded-lg transition-colors"
             title={t('Open folder (⌘⇧F)')}
+            aria-label={t('Open folder')}
           >
             <FolderOpen className="w-4 h-4 text-amber-500" />
             <span>{t('Folder')}</span>
@@ -324,6 +325,7 @@ export function ArtifactRail({
             onClick={handleOpenBrowser}
             className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 text-xs text-muted-foreground hover:bg-secondary hover:text-foreground rounded-lg transition-colors"
             title={t('Open browser (⌘⇧B)')}
+            aria-label={t('Open browser')}
           >
             <Globe className="w-4 h-4 text-orange-500" />
             <span>{t('Browser')}</span>
@@ -432,18 +434,22 @@ export function ArtifactRail({
       style={{
         width: displayWidth,
         // Disable transition when: dragging OR browser tab exists (to sync with native BrowserView)
-        transition: (isDragging || hasBrowserTab) ? 'none' : 'width 0.2s ease'
+        transition: (isDragging || hasBrowserTab) ? 'none' : 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+        willChange: isDragging ? 'width' : 'auto'
       }}
     >
       {/* Drag handle - only show when expanded */}
       {isExpanded && (
         <div
-          className={`absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-primary/50 transition-colors z-20 ${
-            isDragging ? 'bg-primary/50' : ''
-          }`}
+          className={`absolute left-0 top-0 bottom-0 w-2 cursor-col-resize z-20 group/handle
+            transition-all duration-200
+            ${isDragging ? 'bg-primary/60' : 'hover:bg-primary/40'}`}
           onMouseDown={handleMouseDown}
           title={t('Drag to resize')}
-        />
+        >
+          {/* Visual hint line */}
+          <div className="absolute inset-y-1/3 left-1/2 -translate-x-1/2 w-0.5 bg-border/60 rounded-full opacity-0 group-hover/handle:opacity-100 transition-opacity" />
+        </div>
       )}
 
       {/* Header - height matches CanvasTabs (py-1.5 + h-7 content = ~40px) */}
@@ -471,6 +477,8 @@ export function ArtifactRail({
         <button
           onClick={handleToggleExpanded}
           className="p-1 hover:bg-secondary rounded transition-colors"
+          aria-label={isExpanded ? t('Collapse sidebar') : t('Expand sidebar')}
+          aria-expanded={isExpanded}
         >
           <ChevronRight className={`w-4 h-4 transition-transform ${isExpanded ? '' : 'rotate-180'}`} />
         </button>

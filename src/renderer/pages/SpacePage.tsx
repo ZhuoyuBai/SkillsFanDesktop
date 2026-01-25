@@ -23,18 +23,15 @@ import { useSearchStore } from '../stores/search.store'
 import { ChatView } from '../components/chat/ChatView'
 import { ArtifactRail } from '../components/artifact/ArtifactRail'
 import { ConversationList } from '../components/chat/ConversationList'
-import { ChatHistoryPanel } from '../components/chat/ChatHistoryPanel'
 import { SpaceIcon } from '../components/icons/ToolIcons'
-import { Header } from '../components/layout/Header'
+import { Header, usePlatform } from '../components/layout/Header'
 import { HaloLogo } from '../components/brand/HaloLogo'
-import { ModelSelector } from '../components/layout/ModelSelector'
 import { ContentCanvas, CanvasToggleButton } from '../components/canvas'
 import { GitBashWarningBanner } from '../components/setup/GitBashWarningBanner'
 import { api } from '../api'
 import { useLayoutPreferences, LAYOUT_DEFAULTS } from '../hooks/useLayoutPreferences'
 import { useWindowMaximize } from '../components/canvas/viewers/useWindowMaximize'
 import { PanelLeftClose, PanelLeft, X, MessageSquare } from 'lucide-react'
-import { SearchIcon } from '../components/search/SearchIcon'
 import { useSearchShortcuts } from '../hooks/useSearchShortcuts'
 import { useTranslation } from '../i18n'
 // Mobile breakpoint (matches Tailwind sm: 640px)
@@ -61,6 +58,7 @@ function useIsMobile() {
 
 export function SpacePage() {
   const { t } = useTranslation()
+  const platform = usePlatform()
   const { setView, mockBashMode, gitBashInstallProgress, startGitBashInstall } = useAppStore()
   const { currentSpace, refreshCurrentSpace, openSpaceFolder } = useSpaceStore()
   const {
@@ -229,9 +227,14 @@ export function SpacePage() {
 
   // Handle new conversation
   const handleNewConversation = async () => {
-    if (currentSpace) {
-      await createConversation(currentSpace.id)
+    if (!currentSpace) return
+
+    // Don't create a new conversation if the current one is already empty
+    if (currentConversation && currentConversation.messages.length === 0) {
+      return
     }
+
+    await createConversation(currentSpace.id)
   }
 
   // Handle open folder
@@ -321,12 +324,14 @@ export function SpacePage() {
         Show/hide is controlled by api.showChatCapsuleOverlay() / api.hideChatCapsuleOverlay()
       */}
 
-      {/* Header - replaced with drag region spacer when maximized (for macOS traffic lights) */}
+      {/* Header - replaced with drag region spacer when maximized (for Windows/Linux) */}
       {isCanvasMaximized ? (
-        <div
-          className="h-11 flex-shrink-0 bg-background"
-          style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
-        />
+        platform.isMac ? null : (
+          <div
+            className="h-11 flex-shrink-0 bg-background"
+            style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+          />
+        )
       ) : (
       <Header
         left={
@@ -346,45 +351,10 @@ export function SpacePage() {
               <SpaceIcon iconId={currentSpace.icon} size={22} />
             )}
             <span className="font-medium text-sm">{currentSpace.isTemp ? '技能范' : currentSpace.name}</span>
-
-            {/* Chat History Panel - integrated in header */}
-            {conversations.length > 0 && (
-              <div className="ml-1">
-                <ChatHistoryPanel
-                  conversations={conversations}
-                  currentConversationId={currentConversationId}
-                  onSelect={(id) => selectConversation(id)}
-                  onNew={handleNewConversation}
-                  onDelete={handleDeleteConversation}
-                  onRename={handleRenameConversation}
-                  spaceName={currentSpace.isTemp ? t('Halo Space') : currentSpace.name}
-                  onToggleSidebar={() => setIsConversationListCollapsed(!isConversationListCollapsed)}
-                  isSidebarVisible={!isConversationListCollapsed}
-                />
-              </div>
-            )}
           </>
         }
         right={
           <>
-            {/* New conversation button for all spaces */}
-            <button
-              onClick={handleNewConversation}
-              className="flex items-center gap-1.5 px-2.5 py-1 text-sm hover:bg-secondary rounded-lg transition-colors"
-              title={t('New conversation')}
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              <span className="hidden sm:inline">{t('New conversation')}</span>
-            </button>
-
-            {/* Search Icon */}
-            <SearchIcon onClick={openSearch} isInSpace={true} />
-
-            {/* Model Selector */}
-            <ModelSelector />
-
             <button
               onClick={() => setView('settings')}
               className="p-1.5 hover:bg-secondary rounded-lg transition-colors"

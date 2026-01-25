@@ -393,8 +393,8 @@ export function addMessage(spaceId: string, conversationId: string, message: Omi
   conversation.updatedAt = new Date().toISOString()
   conversation.messageCount = conversation.messages.length
 
-  // Auto-update title from first user message
-  if (conversation.messages.length === 1 && message.role === 'user') {
+  // Auto-update title from first user message (only if still using default title)
+  if (conversation.messages.length === 1 && message.role === 'user' && conversation.title === '新任务') {
     conversation.title = message.content.slice(0, 50) + (message.content.length > 50 ? '...' : '')
   }
 
@@ -466,11 +466,5 @@ export function saveSessionId(spaceId: string, conversationId: string, sessionId
 
 // Generate a default title
 function generateTitle(): string {
-  const now = new Date()
-  const month = now.getMonth() + 1
-  const day = now.getDate()
-  const hour = now.getHours()
-  const minute = now.getMinutes()
-
-  return `Chat ${month}-${day} ${hour}:${minute.toString().padStart(2, '0')}`
+  return '新任务'
 }

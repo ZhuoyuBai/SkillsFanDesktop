@@ -138,35 +138,21 @@ export function ConversationList({
       >
         {/* Toggle button */}
         {onToggleCollapse && (
-          <div className="p-2 border-b border-border flex justify-center">
+          <div className="px-2 py-3 border-b border-border flex justify-center">
             <button
               onClick={onToggleCollapse}
               className="p-1.5 hover:bg-muted rounded-md transition-colors text-muted-foreground hover:text-foreground"
               title={t('Expand')}
+              aria-label={t('Expand sidebar')}
+              aria-expanded={false}
             >
               <ChevronRight size={16} />
             </button>
           </div>
         )}
 
-        {/* Collapsed conversation icons */}
-        <div className="flex-1 overflow-auto py-2">
-          {conversations.map((conversation) => (
-            <div
-              key={conversation.id}
-              onClick={() => onSelect(conversation.id)}
-              className={`w-full p-2 flex justify-center hover:bg-secondary/50 transition-colors cursor-pointer ${
-                conversation.id === currentConversationId ? 'bg-primary/10 border-l-2 border-primary' : ''
-              }`}
-              title={conversation.title}
-            >
-              <MessageSquare className="w-4 h-4 text-orange-500" />
-            </div>
-          ))}
-        </div>
-
         {/* New conversation button (icon only) */}
-        <div className="p-2 border-t border-border flex justify-center">
+        <div className="px-2 py-3 border-b border-border flex justify-center">
           <button
             onClick={onNew}
             className="p-1.5 text-primary hover:bg-primary/10 rounded-md transition-colors"
@@ -174,6 +160,36 @@ export function ConversationList({
           >
             <Plus className="w-4 h-4" />
           </button>
+        </div>
+
+        {/* Collapsed conversation icons */}
+        <div className="flex-1 overflow-auto py-2">
+          {conversations.map((conversation) => (
+            <div
+              key={conversation.id}
+              role="button"
+              tabIndex={0}
+              aria-label={conversation.title}
+              aria-selected={conversation.id === currentConversationId}
+              onClick={() => onSelect(conversation.id)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  onSelect(conversation.id)
+                }
+              }}
+              className={`w-full p-2 flex justify-center cursor-pointer
+                transition-all duration-200
+                focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-inset
+                ${conversation.id === currentConversationId
+                  ? 'bg-primary/8 border-l-2 border-primary/70'
+                  : 'hover:bg-secondary/40 border-l-2 border-transparent'
+                }`}
+              title={conversation.title}
+            >
+              <MessageSquare className="w-4 h-4 text-orange-500" />
+            </div>
+          ))}
         </div>
       </div>
     )
@@ -184,20 +200,42 @@ export function ConversationList({
     <div
       ref={containerRef}
       className="border-r border-border flex flex-col bg-card/50 relative"
-      style={{ width, transition: isDragging ? 'none' : 'width 0.2s ease' }}
+      style={{
+        width,
+        transition: isDragging ? 'none' : 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+        willChange: isDragging ? 'width' : 'auto'
+      }}
     >
       {/* Header with toggle button */}
-      <div className="p-3 border-b border-border flex items-center justify-between">
+      <div className="px-4 py-3 border-b border-border flex items-center justify-between">
         <span className="text-sm font-medium text-muted-foreground">{t('Conversations')}</span>
         {onToggleCollapse && (
           <button
             onClick={onToggleCollapse}
             className="p-1 hover:bg-muted rounded-md transition-colors text-muted-foreground hover:text-foreground"
             title={t('Collapse')}
+            aria-label={t('Collapse sidebar')}
+            aria-expanded={true}
           >
             <ChevronLeft size={14} />
           </button>
         )}
+      </div>
+
+      {/* New conversation button */}
+      <div className="px-4 py-3 border-b border-border">
+        <button
+          onClick={onNew}
+          className="w-full flex items-center justify-center gap-2 px-3 py-2.5
+            text-sm font-medium text-primary
+            bg-primary/8 hover:bg-primary/15
+            border border-primary/20 hover:border-primary/30
+            rounded-lg transition-all duration-200
+            shadow-sm hover:shadow-md"
+        >
+          <Plus className="w-4 h-4" />
+          {t('New conversation')}
+        </button>
       </div>
 
       {/* Conversation list */}
@@ -205,10 +243,24 @@ export function ConversationList({
         {conversations.map((conversation) => (
           <div
             key={conversation.id}
+            role="button"
+            tabIndex={0}
+            aria-label={`${conversation.title}, ${formatDate(conversation.updatedAt)}`}
+            aria-selected={conversation.id === currentConversationId}
             onClick={() => editingId !== conversation.id && onSelect(conversation.id)}
-            className={`w-full px-3 py-2 text-left hover:bg-secondary/50 transition-colors cursor-pointer group ${
-              conversation.id === currentConversationId ? 'bg-primary/10 border-l-2 border-primary' : ''
-            }`}
+            onKeyDown={(e) => {
+              if ((e.key === 'Enter' || e.key === ' ') && editingId !== conversation.id) {
+                e.preventDefault()
+                onSelect(conversation.id)
+              }
+            }}
+            className={`w-full px-4 py-2.5 text-left cursor-pointer group relative
+              transition-all duration-200
+              focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-inset
+              ${conversation.id === currentConversationId
+                ? 'bg-gradient-to-r from-primary/8 via-primary/5 to-transparent border-l-2 border-primary/70'
+                : 'hover:bg-secondary/40 border-l-2 border-transparent'
+              }`}
           >
             {/* Edit mode */}
             {editingId === conversation.id ? (
@@ -235,19 +287,19 @@ export function ConversationList({
               </div>
             ) : (
               <>
-                <div className="flex items-center gap-2">
-                  <MessageSquare className="w-4 h-4 text-orange-500 flex-shrink-0" />
-                  <span className="text-sm truncate flex-1">
-                    {conversation.title.slice(0, 20)}
-                    {conversation.title.length > 20 && '...'}
+                <div className="flex items-center gap-2 min-w-0">
+                  <MessageSquare className="w-4 h-4 text-orange-500 flex-shrink-0 -mt-px" />
+                  <span className="text-sm truncate flex-1 min-w-0">
+                    {conversation.title}
                   </span>
                   {/* Action buttons (on hover) */}
                   <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0">
                     {onRename && (
                       <button
                         onClick={(e) => handleStartEdit(e, conversation)}
-                        className="p-1 hover:bg-primary/20 text-muted-foreground hover:text-primary rounded transition-colors"
+                        className="p-1.5 hover:bg-primary/20 text-muted-foreground hover:text-primary rounded transition-colors"
                         title={t('Edit title')}
+                        aria-label={t('Edit title')}
                       >
                         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -260,8 +312,9 @@ export function ConversationList({
                           e.stopPropagation()
                           onDelete(conversation.id)
                         }}
-                        className="p-1 hover:bg-destructive/20 text-muted-foreground hover:text-destructive rounded transition-colors"
+                        className="p-1.5 hover:bg-destructive/20 text-muted-foreground hover:text-destructive rounded transition-colors"
                         title={t('Delete conversation')}
+                        aria-label={t('Delete conversation')}
                       >
                         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -279,25 +332,17 @@ export function ConversationList({
         ))}
       </div>
 
-      {/* New conversation button */}
-      <div className="p-2 border-t border-border">
-        <button
-          onClick={onNew}
-          className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-primary hover:bg-primary/10 rounded-lg transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          {t('New conversation')}
-        </button>
-      </div>
-
       {/* Drag handle - on right side */}
       <div
-        className={`absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-primary/50 transition-colors z-20 ${
-          isDragging ? 'bg-primary/50' : ''
-        }`}
+        className={`absolute right-0 top-0 bottom-0 w-2 cursor-col-resize z-20 group/handle
+          transition-all duration-200
+          ${isDragging ? 'bg-primary/60' : 'hover:bg-primary/40'}`}
         onMouseDown={handleMouseDown}
         title={t('Drag to resize width')}
-      />
+      >
+        {/* Visual hint line */}
+        <div className="absolute inset-y-1/3 left-1/2 -translate-x-1/2 w-0.5 bg-border/60 rounded-full opacity-0 group-hover/handle:opacity-100 transition-opacity" />
+      </div>
     </div>
   )
 }

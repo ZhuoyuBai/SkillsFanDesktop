@@ -227,34 +227,34 @@ export const spaceIconMap: Record<string, LucideIcon> = {
   star: Star,
 }
 
-// Professional color palette for space icons
+// Monochrome color palette for space icons
 export const spaceIconColors: Record<string, string> = {
   // New icons
-  briefcase: 'text-amber-600',     // Work/business
-  'code-2': 'text-orange-500',     // Development
-  'globe-2': 'text-cyan-500',      // Web/international
-  'bar-chart': 'text-violet-500',  // Data/analytics
-  'pen-tool': 'text-pink-500',     // Design/creative
-  music: 'text-emerald-500',       // Music/entertainment
-  camera: 'text-sky-500',          // Photography/media
-  'book-open': 'text-indigo-500',  // Learning/notes
-  heart: 'text-rose-500',          // Personal/hobbies
-  coffee: 'text-amber-700',        // Casual/lifestyle
-  zap: 'text-yellow-500',          // Quick/temp projects
-  sparkles: 'text-primary',        // Special/important
+  briefcase: 'text-foreground/70',
+  'code-2': 'text-foreground/70',
+  'globe-2': 'text-foreground/70',
+  'bar-chart': 'text-foreground/70',
+  'pen-tool': 'text-foreground/70',
+  music: 'text-foreground/70',
+  camera: 'text-foreground/70',
+  'book-open': 'text-foreground/70',
+  heart: 'text-foreground/70',
+  coffee: 'text-foreground/70',
+  zap: 'text-foreground/70',
+  sparkles: 'text-foreground/70',
   // Legacy icons for backward compatibility
-  folder: 'text-amber-500',
-  code: 'text-orange-500',
-  globe: 'text-cyan-500',
-  chart: 'text-violet-500',
-  'file-text': 'text-slate-500',
-  palette: 'text-pink-500',
-  gamepad: 'text-emerald-500',
-  wrench: 'text-orange-500',
-  smartphone: 'text-indigo-500',
-  lightbulb: 'text-yellow-500',
-  rocket: 'text-rose-500',
-  star: 'text-amber-400',
+  folder: 'text-foreground/70',
+  code: 'text-foreground/70',
+  globe: 'text-foreground/70',
+  chart: 'text-foreground/70',
+  'file-text': 'text-foreground/70',
+  palette: 'text-foreground/70',
+  gamepad: 'text-foreground/70',
+  wrench: 'text-foreground/70',
+  smartphone: 'text-foreground/70',
+  lightbulb: 'text-foreground/70',
+  rocket: 'text-foreground/70',
+  star: 'text-foreground/70',
 }
 
 // Space icon component with color
@@ -265,7 +265,7 @@ interface SpaceIconProps {
   colored?: boolean  // Whether to apply default color
 }
 
-export function SpaceIcon({ iconId, className = '', size = 20, colored = true }: SpaceIconProps) {
+export function SpaceIcon({ iconId, className = '', size = 20, colored = false }: SpaceIconProps) {
   const Icon = spaceIconMap[iconId as SpaceIconId] || Folder
   const colorClass = colored ? (spaceIconColors[iconId] || 'text-muted-foreground') : ''
   return <Icon className={`${colorClass} ${className}`} size={size} />
