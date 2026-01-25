@@ -479,13 +479,24 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   // Send message (with optional images for multi-modal, optional AI Browser and thinking mode)
   sendMessage: async (content, images, aiBrowserEnabled, thinkingEnabled) => {
-    const conversation = get().getCurrentConversation()
-    const conversationMeta = get().getCurrentConversationMeta()
+    let conversation = get().getCurrentConversation()
+    let conversationMeta = get().getCurrentConversationMeta()
     const { currentSpaceId } = get()
 
-    if ((!conversation && !conversationMeta) || !currentSpaceId) {
-      console.error('[ChatStore] No conversation or space selected')
+    // Check if space is selected
+    if (!currentSpaceId) {
+      console.error('[ChatStore] No space selected')
       return
+    }
+
+    // If no current conversation, auto-create a new one
+    if (!conversation && !conversationMeta) {
+      const newConversation = await get().createConversation(currentSpaceId)
+      if (!newConversation) {
+        console.error('[ChatStore] Failed to create new conversation')
+        return
+      }
+      conversation = newConversation
     }
 
     const conversationId = conversationMeta?.id || conversation?.id

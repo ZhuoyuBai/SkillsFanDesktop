@@ -20,7 +20,7 @@
  */
 
 import { useState, useRef, useEffect, KeyboardEvent, ClipboardEvent, DragEvent } from 'react'
-import { Plus, ImagePlus, Loader2, AlertCircle, Atom, Globe } from 'lucide-react'
+import { Plus, ImagePlus, Loader2, AlertCircle, Globe } from 'lucide-react'
 import { useOnboardingStore } from '../../stores/onboarding.store'
 import { useAIBrowserStore } from '../../stores/ai-browser.store'
 import { getOnboardingPrompt } from '../onboarding/onboardingData'
@@ -523,24 +523,6 @@ function InputToolbar({
           </button>
         )}
 
-        {/* Thinking mode toggle - icon only on mobile */}
-        {!isGenerating && !isOnboarding && (
-          <button
-            onClick={onThinkingToggle}
-            className={`h-8 flex items-center gap-1.5 rounded-lg
-              transition-all duration-200 border
-              ${isMobile ? 'px-2' : 'px-2.5'}
-              ${thinkingEnabled
-                ? 'bg-primary/15 text-primary border-primary/30'
-                : 'text-foreground/80 border-border/60 hover:text-foreground hover:bg-muted hover:border-border'
-              }
-            `}
-            title={thinkingEnabled ? t('Disable Deep Thinking') : t('Enable Deep Thinking')}
-          >
-            <Atom size={15} />
-            {!isMobile && <span className="text-xs">{t('Deep Thinking')}</span>}
-          </button>
-        )}
       </div>
 
       {/* Right section: action button only */}
