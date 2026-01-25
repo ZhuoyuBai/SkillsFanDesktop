@@ -1,6 +1,6 @@
 /**
  * ModelSelector - Dropdown for selecting AI model in header
- * Shows models grouped by source (OAuth providers / Custom API)
+ * Shows configured models with provider logos
  *
  * Design: Dynamic rendering based on config - no hardcoded provider names
  * OAuth providers are loaded from product.json configuration
@@ -11,13 +11,38 @@ import { ChevronDown, Plus } from 'lucide-react'
 import { useAppStore } from '../../stores/app.store'
 import { api } from '../../api'
 import {
-  AVAILABLE_MODELS,
   getCurrentModelName,
   type HaloConfig,
   type AISourceType,
   type OAuthSourceConfig
 } from '../../types'
 import { useTranslation, getCurrentLanguage } from '../../i18n'
+
+// Import provider logos
+import zhipuLogo from '../../assets/providers/zhipu.jpg'
+import minimaxLogo from '../../assets/providers/minimax.jpg'
+import kimiLogo from '../../assets/providers/kimi.jpg'
+import deepseekLogo from '../../assets/providers/deepseek.jpg'
+import claudeLogo from '../../assets/providers/claude.jpg'
+import openaiLogo from '../../assets/providers/openai.jpg'
+
+// Provider logo mapping by API URL
+const PROVIDER_LOGOS: Record<string, string> = {
+  'https://open.bigmodel.cn/api/anthropic': zhipuLogo,
+  'https://api.minimaxi.com/anthropic': minimaxLogo,
+  'https://api.moonshot.cn/anthropic': kimiLogo,
+  'https://api.deepseek.com/anthropic': deepseekLogo,
+  'https://api.anthropic.com': claudeLogo,
+  'https://api.openai.com': openaiLogo,
+}
+
+/**
+ * Get provider logo by API URL
+ */
+function getProviderLogo(apiUrl: string): string | null {
+  const normalizedUrl = apiUrl.replace(/\/$/, '')
+  return PROVIDER_LOGOS[normalizedUrl] || null
+}
 
 /**
  * Localized text - either a simple string or object with language codes
@@ -88,7 +113,6 @@ export function ModelSelector({ variant = 'header' }: ModelSelectorProps = {}) {
   const aiSources = config.aiSources || { current: 'custom' as AISourceType }
   const currentSource = aiSources.current
   const hasCustom = !!(aiSources.custom?.apiKey)
-  const isCustomAnthropic = aiSources.custom?.provider === 'anthropic'
 
   // Get logged-in OAuth providers dynamically
   const loggedInOAuthProviders = authProviders
@@ -145,7 +169,7 @@ export function ModelSelector({ variant = 'header' }: ModelSelectorProps = {}) {
     setIsOpen(false)
   }
 
-  // Handle add source
+  // Handle add source - navigate to settings
   const handleAddSource = () => {
     setIsOpen(false)
     setView('settings')
@@ -155,7 +179,7 @@ export function ModelSelector({ variant = 'header' }: ModelSelectorProps = {}) {
   const styleConfig = {
     header: {
       button: "flex items-center gap-1.5 px-3 py-1.5 text-sm",
-      dropdown: "absolute right-0 top-full mt-1",
+      dropdown: "absolute left-0 bottom-full mb-2",
       showChevron: true,
     },
     compact: {
@@ -167,6 +191,9 @@ export function ModelSelector({ variant = 'header' }: ModelSelectorProps = {}) {
 
   const styles = styleConfig[variant]
 
+  // Get custom API provider logo
+  const customApiLogo = aiSources.custom?.apiUrl ? getProviderLogo(aiSources.custom.apiUrl) : null
+
   return (
     <div className="relative" ref={dropdownRef}>
       {/* Trigger Button */}
@@ -176,13 +203,21 @@ export function ModelSelector({ variant = 'header' }: ModelSelectorProps = {}) {
           ${styles.button}
           ${variant === 'header'
             ? 'text-muted-foreground hover:text-foreground hover:bg-secondary/80 rounded-lg transition-colors'
-            : `transition-colors duration-200 ${isOpen
-                ? 'bg-primary/10 text-primary'
-                : 'text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted/50'
+            : `transition-all duration-200 border ${isOpen
+                ? 'bg-primary/15 text-primary border-primary/30'
+                : 'text-foreground/80 border-border/60 hover:text-foreground hover:bg-muted hover:border-border'
               }`
           }
         `.trim().replace(/\s+/g, ' ')}
       >
+        {/* Provider Logo */}
+        {customApiLogo ? (
+          <img src={customApiLogo} alt="" className="w-4 h-4 rounded object-cover flex-shrink-0" />
+        ) : (
+          <div className="w-4 h-4 rounded bg-muted flex items-center justify-center flex-shrink-0">
+            <span className="text-[10px] text-muted-foreground">AI</span>
+          </div>
+        )}
         <span className={variant === 'header' ? 'max-w-[140px] truncate' : ''}>
           {currentModelName}
         </span>
@@ -191,105 +226,78 @@ export function ModelSelector({ variant = 'header' }: ModelSelectorProps = {}) {
         )}
       </button>
 
-      {/* Dropdown Menu */}
+      {/* Dropdown Menu - appears from bottom with animation */}
       {isOpen && (
-        <div className={`
-          ${styles.dropdown}
-          w-56 bg-card border border-border rounded-xl shadow-lg z-50 py-1 overflow-hidden
-        `.trim().replace(/\s+/g, ' ')}>
-          {/* Custom API Section */}
+        <div
+          className={`
+            ${styles.dropdown}
+            w-56 bg-card border border-border rounded-xl shadow-lg z-50 py-1 overflow-hidden
+            animate-in fade-in-0 slide-in-from-bottom-2 duration-200
+          `.trim().replace(/\s+/g, ' ')}
+        >
+          {/* Custom API - show only the configured model with logo */}
           {hasCustom && aiSources.custom && (
-            <>
-              <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground flex items-center justify-between">
-                <span>{t('Custom API')}</span>
-                <button
-                  onClick={handleAddSource}
-                  className="text-xs text-muted-foreground hover:text-foreground"
-                >
-                  &gt;
-                </button>
-              </div>
-              {isCustomAnthropic ? (
-                // Anthropic provider: show Claude model list
-                AVAILABLE_MODELS.map((model) => (
-                  <button
-                    key={model.id}
-                    onClick={() => handleSelectModel('custom', model.id)}
-                    className={`w-full px-3 py-2 text-left text-sm hover:bg-secondary/80 transition-colors flex items-center gap-2 ${
-                      currentSource === 'custom' && aiSources.custom?.model === model.id
-                        ? 'text-primary'
-                        : 'text-foreground'
-                    }`}
-                  >
-                    <span className={`w-1.5 h-1.5 rounded-full ${
-                      currentSource === 'custom' && aiSources.custom?.model === model.id
-                        ? 'bg-primary'
-                        : 'bg-transparent'
-                    }`} />
-                    {model.name}
-                  </button>
-                ))
+            <button
+              onClick={() => setIsOpen(false)}
+              className={`w-full px-3 py-2 text-left text-sm hover:bg-secondary/80 transition-colors flex items-center gap-2.5 ${
+                currentSource === 'custom' ? 'text-primary' : 'text-foreground'
+              }`}
+            >
+              {customApiLogo ? (
+                <img src={customApiLogo} alt="" className="w-5 h-5 rounded object-cover flex-shrink-0" />
               ) : (
-                // OpenAI compatible: show current model only (user configures in settings)
-                <button
-                  onClick={() => setIsOpen(false)}
-                  className={`w-full px-3 py-2 text-left text-sm hover:bg-secondary/80 transition-colors flex items-center gap-2 ${
-                    currentSource === 'custom' ? 'text-primary' : 'text-foreground'
-                  }`}
-                >
-                  <span className={`w-1.5 h-1.5 rounded-full ${
-                    currentSource === 'custom' ? 'bg-primary' : 'bg-transparent'
-                  }`} />
-                  {aiSources.custom?.model || 'Custom Model'}
-                </button>
+                <div className="w-5 h-5 rounded bg-muted flex items-center justify-center flex-shrink-0">
+                  <span className="text-xs text-muted-foreground">AI</span>
+                </div>
               )}
-            </>
+              <span className="truncate">{aiSources.custom?.model || 'Custom Model'}</span>
+              {currentSource === 'custom' && (
+                <span className="ml-auto w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
+              )}
+            </button>
           )}
 
           {/* OAuth Providers - Dynamic rendering */}
-          {loggedInOAuthProviders.map((provider, index) => (
+          {loggedInOAuthProviders.map((provider) => (
             <div key={provider.type}>
-              {(hasCustom || index > 0) && <div className="my-1 border-t border-border" />}
-              <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground">
-                {provider.displayName}
-              </div>
+              {hasCustom && <div className="my-1 border-t border-border" />}
               {(provider.config?.availableModels || []).map((modelId) => {
                 const displayName = provider.config?.modelNames?.[modelId] || modelId
+                const isSelected = currentSource === provider.type && provider.config?.model === modelId
                 return (
                   <button
                     key={modelId}
                     onClick={() => handleSelectModel(provider.type, modelId)}
-                    className={`w-full px-3 py-2 text-left text-sm hover:bg-secondary/80 transition-colors flex items-center gap-2 ${
-                      currentSource === provider.type && provider.config?.model === modelId
-                        ? 'text-primary'
-                        : 'text-foreground'
+                    className={`w-full px-3 py-2 text-left text-sm hover:bg-secondary/80 transition-colors flex items-center gap-2.5 ${
+                      isSelected ? 'text-primary' : 'text-foreground'
                     }`}
                   >
-                    <span className={`w-1.5 h-1.5 rounded-full ${
-                      currentSource === provider.type && provider.config?.model === modelId
-                        ? 'bg-primary'
-                        : 'bg-transparent'
-                    }`} />
-                    {displayName}
+                    <div className="w-5 h-5 rounded bg-muted flex items-center justify-center flex-shrink-0">
+                      <span className="text-xs text-muted-foreground">O</span>
+                    </div>
+                    <span className="truncate">{displayName}</span>
+                    {isSelected && (
+                      <span className="ml-auto w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
+                    )}
                   </button>
                 )
               })}
             </div>
           ))}
 
-          {/* Add source if none configured */}
-          {!hasCustom && loggedInOAuthProviders.length === 0 && (
-            <>
-              <div className="my-1 border-t border-border" />
-              <button
-                onClick={handleAddSource}
-                className="w-full px-3 py-2 text-left text-sm text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors flex items-center gap-2"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                {t('Add Custom API')}
-              </button>
-            </>
+          {/* Divider */}
+          {(hasCustom || loggedInOAuthProviders.length > 0) && (
+            <div className="my-1 border-t border-border" />
           )}
+
+          {/* Add custom model - navigate to settings */}
+          <button
+            onClick={handleAddSource}
+            className="w-full px-3 py-2 text-left text-sm text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors flex items-center gap-2.5"
+          >
+            <Plus className="w-5 h-5 flex-shrink-0" />
+            <span>{t('Custom Model')}</span>
+          </button>
         </div>
       )}
     </div>

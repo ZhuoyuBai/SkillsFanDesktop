@@ -6,8 +6,10 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import type { ConversationMeta } from '../../types'
-import { MessageSquare, Plus } from '../icons/ToolIcons'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { MessageSquare } from '../icons/ToolIcons'
+import { PanelLeftClose, PanelLeft, Search, SquarePen, Settings } from 'lucide-react'
+import { HaloLogo } from '../brand/HaloLogo'
+import { useSearchStore } from '../../stores/search.store'
 import { useTranslation } from '../../i18n'
 
 // Width constraints (in pixels)
@@ -25,6 +27,7 @@ interface ConversationListProps {
   onRename?: (id: string, newTitle: string) => void
   isCollapsed?: boolean
   onToggleCollapse?: () => void
+  onSettings?: () => void
 }
 
 export function ConversationList({
@@ -35,13 +38,15 @@ export function ConversationList({
   onDelete,
   onRename,
   isCollapsed = false,
-  onToggleCollapse
+  onToggleCollapse,
+  onSettings
 }: ConversationListProps) {
   const { t } = useTranslation()
   const [width, setWidth] = useState(DEFAULT_WIDTH)
   const [isDragging, setIsDragging] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingTitle, setEditingTitle] = useState('')
+  const [showCollapseTooltip, setShowCollapseTooltip] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const editInputRef = useRef<HTMLInputElement>(null)
 
@@ -129,6 +134,9 @@ export function ConversationList({
     }
   }
 
+  // Get search store
+  const { openSearch } = useSearchStore()
+
   // Collapsed view - show only icons
   if (isCollapsed) {
     return (
@@ -136,29 +144,47 @@ export function ConversationList({
         className="border-r border-border/40 flex flex-col bg-card/50 relative"
         style={{ width: COLLAPSED_WIDTH }}
       >
-        {/* Toggle button */}
-        {onToggleCollapse && (
-          <div className="px-2 py-3 border-b border-border/50 flex justify-center">
-            <button
-              onClick={onToggleCollapse}
-              className="p-1.5 hover:bg-muted rounded-md transition-colors text-muted-foreground hover:text-foreground"
-              title={t('Expand')}
-              aria-label={t('Expand sidebar')}
-              aria-expanded={false}
-            >
-              <ChevronRight size={16} />
-            </button>
-          </div>
-        )}
+        {/* Logo + Toggle button */}
+        <div className="px-2 py-3 border-b border-border/50 flex flex-col items-center gap-2">
+          <HaloLogo size={24} hoverOnly={true} />
+          {onToggleCollapse && (
+            <div className="relative">
+              <button
+                onClick={onToggleCollapse}
+                onMouseEnter={() => setShowCollapseTooltip(true)}
+                onMouseLeave={() => setShowCollapseTooltip(false)}
+                className="p-1.5 hover:bg-muted rounded-md transition-colors text-muted-foreground hover:text-foreground"
+                aria-label={t('Expand sidebar')}
+                aria-expanded={false}
+              >
+                <PanelLeft size={16} />
+              </button>
+              {showCollapseTooltip && (
+                <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2 z-50 pointer-events-none">
+                  <div className="bg-popover border border-border rounded-lg shadow-lg px-3 py-2 whitespace-nowrap">
+                    <span className="text-sm font-medium text-foreground">{t('Expand sidebar')}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* New conversation button (icon only) */}
-        <div className="px-2 py-3 border-b border-border/50 flex justify-center">
+        <div className="px-2 py-2 flex flex-col items-center gap-1">
           <button
             onClick={onNew}
             className="p-1.5 text-primary hover:bg-primary/10 rounded-md transition-colors"
             title={t('New conversation')}
           >
-            <Plus className="w-4 h-4" />
+            <SquarePen className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => openSearch('global')}
+            className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-md transition-colors"
+            title={t('Search')}
+          >
+            <Search className="w-4 h-4" />
           </button>
         </div>
 
@@ -191,6 +217,19 @@ export function ConversationList({
             </div>
           ))}
         </div>
+
+        {/* Settings button (collapsed) */}
+        {onSettings && (
+          <div className="px-2 py-3 border-t border-border/50 flex justify-center">
+            <button
+              onClick={onSettings}
+              className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-md transition-colors"
+              title={t('Settings')}
+            >
+              <Settings className="w-4 h-4" />
+            </button>
+          </div>
+        )}
       </div>
     )
   }
@@ -206,40 +245,65 @@ export function ConversationList({
         willChange: isDragging ? 'width' : 'auto'
       }}
     >
-      {/* Header with toggle button */}
+      {/* Header with logo and toggle button */}
       <div className="px-4 py-3 border-b border-border/50 flex items-center justify-between">
-        <span className="text-sm font-medium text-muted-foreground">{t('Conversations')}</span>
+        <div className="flex items-center gap-2">
+          <HaloLogo size={22} hoverOnly={true} />
+          <span className="text-sm font-medium text-foreground/80">技能范</span>
+        </div>
         {onToggleCollapse && (
-          <button
-            onClick={onToggleCollapse}
-            className="p-1 hover:bg-muted rounded-md transition-colors text-muted-foreground hover:text-foreground"
-            title={t('Collapse')}
-            aria-label={t('Collapse sidebar')}
-            aria-expanded={true}
-          >
-            <ChevronLeft size={14} />
-          </button>
+          <div className="relative">
+            <button
+              onClick={onToggleCollapse}
+              onMouseEnter={() => setShowCollapseTooltip(true)}
+              onMouseLeave={() => setShowCollapseTooltip(false)}
+              className="p-1 hover:bg-muted rounded-md transition-colors text-muted-foreground hover:text-foreground"
+              aria-label={t('Collapse sidebar')}
+              aria-expanded={true}
+            >
+              <PanelLeftClose size={16} />
+            </button>
+            {showCollapseTooltip && (
+              <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2 z-50 pointer-events-none">
+                <div className="bg-popover border border-border rounded-lg shadow-lg px-3 py-2 whitespace-nowrap">
+                  <span className="text-sm font-medium text-foreground">{t('Collapse sidebar')}</span>
+                </div>
+              </div>
+            )}
+          </div>
         )}
       </div>
 
-      {/* New conversation button */}
-      <div className="px-4 py-3 border-b border-border/50">
+      {/* New conversation + Search buttons */}
+      <div className="px-4 py-3 border-b border-border/50 space-y-2">
         <button
           onClick={onNew}
-          className="w-full flex items-center justify-center gap-2 px-3 py-2
-            text-sm font-semibold text-foreground
-            bg-primary/10 hover:bg-primary/15
-            border border-primary/30 hover:border-primary/50
-            rounded-md transition-all duration-150
+          className="w-full flex items-center justify-start gap-2 px-2 py-1.5
+            text-sm font-medium text-foreground/80 hover:text-foreground
+            hover:bg-muted/60
+            rounded transition-all duration-150
             active:scale-[0.98]"
         >
-          <Plus className="w-4 h-4 stroke-[2.5]" />
+          <SquarePen className="w-4 h-4" />
           {t('New conversation')}
+        </button>
+        <button
+          onClick={() => openSearch('global')}
+          className="w-full flex items-center justify-start gap-2 px-2 py-1.5
+            text-sm text-foreground/70 hover:text-foreground
+            hover:bg-muted/50
+            rounded transition-all duration-150"
+        >
+          <Search className="w-4 h-4" />
+          {t('Search')}
         </button>
       </div>
 
       {/* Conversation list */}
-      <div className="flex-1 overflow-auto py-2">
+      <div className="flex-1 overflow-auto">
+        <div className="px-4 py-2 text-xs text-muted-foreground font-medium">
+          {t('Task history')}
+        </div>
         {conversations.map((conversation) => (
           <div
             key={conversation.id}
@@ -288,7 +352,6 @@ export function ConversationList({
             ) : (
               <>
                 <div className="flex items-center gap-2 min-w-0">
-                  <MessageSquare className="w-4 h-4 text-orange-500 flex-shrink-0 -mt-px" />
                   <span className="text-sm truncate flex-1 min-w-0">
                     {conversation.title}
                   </span>
@@ -331,6 +394,22 @@ export function ConversationList({
           </div>
         ))}
       </div>
+
+      {/* Settings button (expanded) */}
+      {onSettings && (
+        <div className="px-4 py-3 border-t border-border/50">
+          <button
+            onClick={onSettings}
+            className="w-full flex items-center justify-start gap-2 px-2 py-1.5
+              text-sm text-foreground/70 hover:text-foreground
+              hover:bg-muted/50
+              rounded transition-all duration-150"
+          >
+            <Settings className="w-4 h-4" />
+            {t('Settings')}
+          </button>
+        </div>
+      )}
 
       {/* Drag handle - on right side */}
       <div

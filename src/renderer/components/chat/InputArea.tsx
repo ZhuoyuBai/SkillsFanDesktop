@@ -294,7 +294,7 @@ export function InputArea({ onSend, onStop, isGenerating, placeholder, isCompact
       transition-[padding] duration-300 ease-out
       ${isCompact ? 'px-3 py-2' : noBorder ? 'px-4 py-0' : 'px-4 py-3'}
     `}>
-      <div className={isCompact ? '' : 'max-w-3xl mx-auto'}>
+      <div className={isCompact ? '' : 'max-w-4xl mx-auto'}>
         {/* Error toast notification */}
         {imageError && (
           <div className="mb-2 p-3 rounded-xl bg-destructive/10 border border-destructive/20
@@ -317,11 +317,8 @@ export function InputArea({ onSend, onStop, isGenerating, placeholder, isCompact
         {/* Input container */}
         <div
           className={`
-            relative flex flex-col rounded-2xl transition-all duration-200
-            ${isFocused
-              ? 'ring-1 ring-primary/30 bg-card shadow-sm'
-              : 'bg-secondary/50 hover:bg-secondary/70'
-            }
+            relative flex flex-col rounded-2xl
+            border border-border/60 bg-card shadow-sm
             ${isGenerating ? 'opacity-60' : ''}
             ${isDragOver ? 'ring-2 ring-primary/50 bg-primary/5' : ''}
           `}
@@ -358,7 +355,7 @@ export function InputArea({ onSend, onStop, isGenerating, placeholder, isCompact
           )}
 
           {/* Textarea area */}
-          <div className="px-4 pt-4 pb-2">
+          <div className="px-5 pt-5 pb-4">
             <textarea
               ref={textareaRef}
               value={displayContent}
@@ -370,10 +367,10 @@ export function InputArea({ onSend, onStop, isGenerating, placeholder, isCompact
               placeholder={placeholder || t('Type a message, let Halo help you...')}
               disabled={isGenerating}
               readOnly={isOnboardingSendStep}
-              rows={1}
+              rows={2}
               className={`w-full bg-transparent resize-none
                 focus:outline-none text-foreground placeholder:text-muted-foreground/50
-                disabled:cursor-not-allowed min-h-[32px] text-base leading-relaxed
+                disabled:cursor-not-allowed min-h-[80px] text-base leading-relaxed
                 ${isOnboardingSendStep ? 'cursor-default' : ''}`}
               style={{ maxHeight: '200px' }}
             />
@@ -461,8 +458,8 @@ function InputToolbar({
               className={`w-8 h-8 flex items-center justify-center rounded-lg
                 transition-all duration-150
                 ${showAttachMenu
-                  ? 'bg-primary/10 text-primary'
-                  : 'text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted/50'
+                  ? 'bg-primary/15 text-primary'
+                  : 'text-foreground/80 hover:text-foreground hover:bg-muted'
                 }
                 ${isProcessingImages ? 'opacity-50 cursor-not-allowed' : ''}
               `}
@@ -509,10 +506,10 @@ function InputToolbar({
           <button
             onClick={onAIBrowserToggle}
             className={`h-8 flex items-center gap-1.5 px-2.5 rounded-lg
-              transition-colors duration-200 relative
+              transition-all duration-200 border
               ${aiBrowserEnabled
-                ? 'bg-primary/10 text-primary'
-                : 'text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted/50'
+                ? 'bg-primary/15 text-primary border-primary/30'
+                : 'text-foreground/80 border-border/60 hover:text-foreground hover:bg-muted hover:border-border'
               }
             `}
             title={aiBrowserEnabled ? t('AI Browser enabled (click to disable)') : t('Enable AI Browser')}
@@ -527,10 +524,10 @@ function InputToolbar({
           <button
             onClick={onThinkingToggle}
             className={`h-8 flex items-center gap-1.5 px-2.5 rounded-lg
-              transition-colors duration-200
+              transition-all duration-200 border
               ${thinkingEnabled
-                ? 'bg-primary/10 text-primary'
-                : 'text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted/50'
+                ? 'bg-primary/15 text-primary border-primary/30'
+                : 'text-foreground/80 border-border/60 hover:text-foreground hover:bg-muted hover:border-border'
               }
             `}
             title={thinkingEnabled ? t('Disable Deep Thinking') : t('Enable Deep Thinking')}

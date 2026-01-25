@@ -19,6 +19,7 @@ import { MessageList } from './MessageList'
 import { InputArea } from './InputArea'
 import { ScrollToBottomButton } from './ScrollToBottomButton'
 import { HaloLogo } from '../brand/HaloLogo'
+import { PenLine, BarChart3, Palette, FolderSearch, Zap, Wrench, LucideIcon } from 'lucide-react'
 import {
   ONBOARDING_ARTIFACT_NAME,
   getOnboardingAiResponse,
@@ -363,6 +364,16 @@ function LoadingState() {
   )
 }
 
+// Quick category definitions for MiniMax-style display
+const QUICK_CATEGORIES: { key: string; icon: LucideIcon }[] = [
+  { key: 'Writing & Documents', icon: PenLine },
+  { key: 'Data Analysis', icon: BarChart3 },
+  { key: 'Content Creation', icon: Palette },
+  { key: 'Research & Organization', icon: FolderSearch },
+  { key: 'Automation', icon: Zap },
+  { key: 'Efficiency Tools', icon: Wrench },
+]
+
 // Empty state component - adapts to compact mode
 function EmptyState({
   isTemp,
@@ -393,9 +404,9 @@ function EmptyState({
   return (
     <div className="h-full flex flex-col items-center justify-start pt-[15vh] text-center px-8 pb-6">
       {/* Title */}
-      <h2 className="mt-8 text-3xl font-semibold">
+      <h1 className="mt-8 text-4xl font-semibold tracking-tight">
         {t('Halo, not just chat, can help you get things done')}
-      </h2>
+      </h1>
 
       {/* Input area - shown in center when empty */}
       {inputArea && (
@@ -404,19 +415,21 @@ function EmptyState({
         </div>
       )}
 
-      {/* Capabilities - below input area */}
-      <div className="mt-4 flex flex-wrap justify-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
-        <span>{t('Writing & Documents')}</span>
-        <span className="text-muted-foreground/30">·</span>
-        <span>{t('Data Analysis')}</span>
-        <span className="text-muted-foreground/30">·</span>
-        <span>{t('Content Creation')}</span>
-        <span className="text-muted-foreground/30">·</span>
-        <span>{t('Research & Organization')}</span>
-        <span className="text-muted-foreground/30">·</span>
-        <span>{t('Automation')}</span>
-        <span className="text-muted-foreground/30">·</span>
-        <span>{t('Efficiency Tools')}</span>
+      {/* Capabilities - MiniMax style pill buttons */}
+      <div className="mt-6 flex flex-wrap justify-center gap-2">
+        {QUICK_CATEGORIES.map((cat) => {
+          const Icon = cat.icon
+          return (
+            <div
+              key={cat.key}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full
+                bg-secondary/60 text-sm text-muted-foreground"
+            >
+              <Icon size={14} />
+              <span>{t(cat.key)}</span>
+            </div>
+          )
+        })}
       </div>
 
       {/* Permission hint - pushed to bottom */}

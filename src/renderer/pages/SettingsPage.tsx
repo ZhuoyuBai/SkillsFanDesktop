@@ -23,11 +23,10 @@ interface AuthProviderConfig {
   recommended: boolean
   enabled: boolean
 }
-import { CheckCircle2, XCircle, ArrowLeft, Eye, EyeOff } from '../components/icons/ToolIcons'
-import { Header } from '../components/layout/Header'
+import { CheckCircle2, XCircle, Eye, EyeOff } from '../components/icons/ToolIcons'
 import { McpServerList } from '../components/settings/McpServerList'
 import { useTranslation, setLanguage, getCurrentLanguage, SUPPORTED_LOCALES, type LocaleCode } from '../i18n'
-import { Loader2, LogOut, Plus, Check, Globe, Key, MessageSquare, Bot, Palette, Server, Settings as SettingsIcon, Wifi, ExternalLink, type LucideIcon } from 'lucide-react'
+import { Loader2, LogOut, Plus, Check, Globe, Key, MessageSquare, Bot, Palette, Server, Settings as SettingsIcon, Wifi, ExternalLink, X, type LucideIcon } from 'lucide-react'
 
 // Import provider logos
 import zhipuLogo from '../assets/providers/zhipu.jpg'
@@ -591,27 +590,23 @@ export function SettingsPage() {
   ]
 
   return (
-    <div className="h-full w-full flex flex-col">
-      {/* Header - cross-platform support */}
-      <Header
-        left={
-          <>
-            <button
-              onClick={handleBack}
-              className="p-1.5 hover:bg-secondary rounded-lg transition-colors"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-            <span className="font-medium text-sm">{t('Settings')}</span>
-          </>
-        }
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        onClick={handleBack}
       />
 
-      {/* Main content with sidebar navigation */}
-      <div className="flex-1 flex overflow-hidden">
+      {/* Modal */}
+      <div className="relative w-[800px] max-w-[90vw] h-[600px] max-h-[85vh] bg-background rounded-xl shadow-2xl flex overflow-hidden">
         {/* Left sidebar navigation */}
-        <nav className="w-52 border-r border-border flex flex-col bg-card/50">
-          <div className="flex-1 p-3 space-y-1">
+        <nav className="w-48 border-r border-border flex flex-col bg-card/30">
+          {/* Header */}
+          <div className="px-4 py-4 border-b border-border">
+            <h2 className="text-base font-medium">{t('Settings')}</h2>
+          </div>
+
+          <div className="flex-1 p-2 space-y-0.5">
             {navItems
               .filter(item => !item.desktopOnly || !api.isRemoteMode())
               .map(item => {
@@ -641,16 +636,28 @@ export function SettingsPage() {
                 <span>{t('Version')}</span>
                 <span>1.0.0</span>
               </div>
-              <div className="text-[10px] opacity-70">
-                Powered by Claude Code
-              </div>
             </div>
           </div>
         </nav>
 
         {/* Right content area */}
-        <main className="flex-1 overflow-auto p-6">
-          <div className="max-w-2xl">
+        <main className="flex-1 flex flex-col overflow-hidden">
+          {/* Content header with title and close button */}
+          <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+            <h2 className="text-lg font-medium">
+              {navItems.find(item => item.id === activeSection)?.label}
+            </h2>
+            <button
+              onClick={handleBack}
+              className="p-1.5 hover:bg-secondary rounded-lg transition-colors text-muted-foreground hover:text-foreground"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Scrollable content */}
+          <div className="flex-1 overflow-auto p-6">
+            <div className="max-w-2xl">
 
           {/* AI Model Section - Grid Layout */}
           {activeSection === 'ai-model' && (
@@ -1286,6 +1293,7 @@ export function SettingsPage() {
           </section>
           )}
 
+            </div>
           </div>
         </main>
       </div>
