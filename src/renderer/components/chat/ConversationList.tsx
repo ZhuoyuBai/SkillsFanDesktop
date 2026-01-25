@@ -133,12 +133,12 @@ export function ConversationList({
   if (isCollapsed) {
     return (
       <div
-        className="border-r border-border flex flex-col bg-card/50 relative"
+        className="border-r border-border/40 flex flex-col bg-card/50 relative"
         style={{ width: COLLAPSED_WIDTH }}
       >
         {/* Toggle button */}
         {onToggleCollapse && (
-          <div className="px-2 py-3 border-b border-border flex justify-center">
+          <div className="px-2 py-3 border-b border-border/50 flex justify-center">
             <button
               onClick={onToggleCollapse}
               className="p-1.5 hover:bg-muted rounded-md transition-colors text-muted-foreground hover:text-foreground"
@@ -152,7 +152,7 @@ export function ConversationList({
         )}
 
         {/* New conversation button (icon only) */}
-        <div className="px-2 py-3 border-b border-border flex justify-center">
+        <div className="px-2 py-3 border-b border-border/50 flex justify-center">
           <button
             onClick={onNew}
             className="p-1.5 text-primary hover:bg-primary/10 rounded-md transition-colors"
@@ -199,7 +199,7 @@ export function ConversationList({
   return (
     <div
       ref={containerRef}
-      className="border-r border-border flex flex-col bg-card/50 relative"
+      className="border-r border-border/40 flex flex-col bg-card/50 relative"
       style={{
         width,
         transition: isDragging ? 'none' : 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -207,7 +207,7 @@ export function ConversationList({
       }}
     >
       {/* Header with toggle button */}
-      <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+      <div className="px-4 py-3 border-b border-border/50 flex items-center justify-between">
         <span className="text-sm font-medium text-muted-foreground">{t('Conversations')}</span>
         {onToggleCollapse && (
           <button
@@ -223,17 +223,17 @@ export function ConversationList({
       </div>
 
       {/* New conversation button */}
-      <div className="px-4 py-3 border-b border-border">
+      <div className="px-4 py-3 border-b border-border/50">
         <button
           onClick={onNew}
-          className="w-full flex items-center justify-center gap-2 px-3 py-2.5
-            text-sm font-medium text-foreground
-            bg-secondary hover:bg-secondary/80
-            border border-border hover:border-foreground/30
-            rounded-lg transition-all duration-200
-            shadow-sm hover:shadow-md"
+          className="w-full flex items-center justify-center gap-2 px-3 py-2
+            text-sm font-semibold text-foreground
+            bg-primary/10 hover:bg-primary/15
+            border border-primary/30 hover:border-primary/50
+            rounded-md transition-all duration-150
+            active:scale-[0.98]"
         >
-          <Plus className="w-4 h-4" />
+          <Plus className="w-4 h-4 stroke-[2.5]" />
           {t('New conversation')}
         </button>
       </div>

@@ -54,7 +54,7 @@ function ThoughtHistory({ thoughts }: { thoughts: Thought[] }) {
   const toolCount = thoughts.filter(t => t.type === 'tool_use').length
 
   return (
-    <div className="mt-3 border-t border-border/30 pt-2">
+    <div className="mt-3 border-t border-border/20 pt-2">
       <button
         onClick={() => setIsExpanded(!isExpanded)}
         className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors w-full"
@@ -191,7 +191,7 @@ export function MessageItem({ message, previousCost = 0, hideThoughts = false, i
     >
       {/* Working indicator - shows when AI is working */}
       {isWorking && !isUser && (
-        <div className="flex items-center gap-1.5 mb-2 pb-2 border-b border-border/30 working-indicator-fade">
+        <div className="flex items-center gap-1.5 mb-2 pb-2 border-b border-border/20 working-indicator-fade">
           <Sparkles size={12} className="text-primary/60 animate-pulse-gentle" />
           <span className="text-xs text-muted-foreground/70">{t('Halo is working')}</span>
         </div>

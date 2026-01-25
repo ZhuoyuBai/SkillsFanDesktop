@@ -378,8 +378,7 @@ function EmptyState({
   if (isCompact) {
     return (
       <div className="h-full flex flex-col items-center justify-center text-center px-4">
-        <HaloLogo size={32} hoverOnly={true} />
-        <p className="mt-4 text-sm text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           {t('Continue the conversation here')}
         </p>
         {inputArea && (
@@ -393,11 +392,8 @@ function EmptyState({
 
   return (
     <div className="h-full flex flex-col items-center justify-start pt-[15vh] text-center px-8 pb-6">
-      {/* Icon */}
-      <HaloLogo size={48} hoverOnly={true} />
-
       {/* Title */}
-      <h2 className="mt-6 text-xl font-medium">
+      <h2 className="mt-8 text-3xl font-semibold">
         {t('Halo, not just chat, can help you get things done')}
       </h2>
 

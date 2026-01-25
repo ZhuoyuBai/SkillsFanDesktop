@@ -358,7 +358,7 @@ export function InputArea({ onSend, onStop, isGenerating, placeholder, isCompact
           )}
 
           {/* Textarea area */}
-          <div className="px-3 pt-3 pb-1">
+          <div className="px-4 pt-4 pb-2">
             <textarea
               ref={textareaRef}
               value={displayContent}
@@ -373,7 +373,7 @@ export function InputArea({ onSend, onStop, isGenerating, placeholder, isCompact
               rows={1}
               className={`w-full bg-transparent resize-none
                 focus:outline-none text-foreground placeholder:text-muted-foreground/50
-                disabled:cursor-not-allowed min-h-[24px]
+                disabled:cursor-not-allowed min-h-[32px] text-base leading-relaxed
                 ${isOnboardingSendStep ? 'cursor-default' : ''}`}
               style={{ maxHeight: '200px' }}
             />
