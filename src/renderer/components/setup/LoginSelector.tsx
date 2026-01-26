@@ -134,13 +134,13 @@ export function LoginSelector({ onSelectProvider }: LoginSelectorProps) {
       </div>
 
       {/* Header with Logo */}
-      <div className="flex flex-col items-center mb-4 mt-8">
+      <div className="flex flex-col items-center mb-10 mt-8">
         <HaloLogo size={80} animated={false} />
         <h1 className="mt-4 text-3xl font-bold tracking-wide">技能范</h1>
       </div>
 
       {/* Main content */}
-      <div className="w-full max-w-md">
+      <div className="w-full max-w-xl">
         {/* Provider Grid */}
         <div className="bg-card rounded-xl p-5 border border-border/80">
           <h3 className="text-sm text-muted-foreground mb-4">{t('Select AI Provider')}</h3>

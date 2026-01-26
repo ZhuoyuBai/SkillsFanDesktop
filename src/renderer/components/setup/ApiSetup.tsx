@@ -221,7 +221,7 @@ export function ApiSetup({ onBack, showBack = false, initialProviderId }: ApiSet
               onClick={onBack}
               className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary/80 rounded-lg transition-colors"
             >
-              <ArrowLeft className="w-4 h-4" />
+              <ArrowLeft className="w-5 h-5" />
             </button>
           ) : (
             <div />
@@ -267,9 +267,9 @@ export function ApiSetup({ onBack, showBack = false, initialProviderId }: ApiSet
 
       {/* Main content - Centered with proper spacing */}
       <div className="flex-1 flex flex-col items-center px-4 sm:px-8 pt-[8vh] pb-12">
-        <div className="w-full max-w-md">
+        <div className="w-full max-w-lg">
         {/* Provider Header */}
-        <div className="flex flex-col items-center mb-8">
+        <div className="flex flex-col items-center mb-12">
           {currentPreset && (
             <>
               <div className="w-14 h-14 rounded-xl flex items-center justify-center mb-3 overflow-hidden">
