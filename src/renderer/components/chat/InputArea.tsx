@@ -26,6 +26,7 @@ import { useAIBrowserStore } from '../../stores/ai-browser.store'
 import { getOnboardingPrompt } from '../onboarding/onboardingData'
 import { ImageAttachmentPreview } from './ImageAttachmentPreview'
 import { ModelSelector } from '../layout/ModelSelector'
+import { SpaceSelector } from '../layout/SpaceSelector'
 import { processImage, isValidImageType, formatFileSize } from '../../utils/imageProcessor'
 import type { ImageAttachment } from '../../types'
 import { useTranslation } from '../../i18n'
@@ -503,6 +504,11 @@ function InputToolbar({
         {/* Model Selector - hidden on mobile */}
         {!isGenerating && !isOnboarding && !isMobile && (
           <ModelSelector variant="compact" />
+        )}
+
+        {/* Space Selector - hidden on mobile */}
+        {!isGenerating && !isOnboarding && !isMobile && (
+          <SpaceSelector />
         )}
 
         {/* AI Browser toggle - hidden on mobile */}
