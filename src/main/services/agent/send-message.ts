@@ -18,6 +18,7 @@ import {
   AI_BROWSER_SYSTEM_PROMPT,
   createAIBrowserMcpServer
 } from '../ai-browser'
+import { createSkillMcpServer, hasSkills } from '../skill'
 import type {
   AgentRequest,
   ToolCall,
@@ -214,6 +215,12 @@ export async function sendMessage(
         if (aiBrowserEnabled) {
           mcpServers['ai-browser'] = createAIBrowserMcpServer()
           console.log(`[Agent][${conversationId}] AI Browser MCP server added`)
+        }
+
+        // Add Skill MCP server if skills are available
+        if (hasSkills()) {
+          mcpServers['skill'] = createSkillMcpServer()
+          console.log(`[Agent][${conversationId}] Skill MCP server added`)
         }
 
         return Object.keys(mcpServers).length > 0 ? { mcpServers } : {}
