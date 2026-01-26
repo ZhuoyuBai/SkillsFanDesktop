@@ -12,6 +12,7 @@ interface Space {
   id: string
   name: string
   icon: string
+  iconColor?: string  // Custom icon color (hex value)
   path: string
   isTemp: boolean
   createdAt: string
@@ -38,6 +39,7 @@ interface SpaceMeta {
   id: string
   name: string
   icon: string
+  iconColor?: string  // Custom icon color (hex value)
   createdAt: string
   updatedAt: string
   preferences?: SpacePreferences
@@ -215,6 +217,7 @@ function loadSpaceFromPath(spacePath: string): Space | null {
         id: meta.id,
         name: meta.name,
         icon: meta.icon,
+        iconColor: meta.iconColor,
         path: spacePath,
         isTemp: false,
         createdAt: meta.createdAt,
@@ -268,7 +271,7 @@ export function listSpaces(): Space[] {
 }
 
 // Create a new space
-export function createSpace(input: { name: string; icon: string; customPath?: string }): Space {
+export function createSpace(input: { name: string; icon: string; iconColor?: string; customPath?: string }): Space {
   const id = uuidv4()
   const now = new Date().toISOString()
   const isCustomPath = !!input.customPath
@@ -291,6 +294,7 @@ export function createSpace(input: { name: string; icon: string; customPath?: st
     id,
     name: input.name,
     icon: input.icon,
+    iconColor: input.iconColor,
     createdAt: now,
     updatedAt: now
   }
@@ -306,6 +310,7 @@ export function createSpace(input: { name: string; icon: string; customPath?: st
     id,
     name: input.name,
     icon: input.icon,
+    iconColor: input.iconColor,
     path: spacePath,
     isTemp: false,
     createdAt: now,
@@ -381,7 +386,7 @@ export function openSpaceFolder(spaceId: string): boolean {
 }
 
 // Update space metadata
-export function updateSpace(spaceId: string, updates: { name?: string; icon?: string }): Space | null {
+export function updateSpace(spaceId: string, updates: { name?: string; icon?: string; iconColor?: string }): Space | null {
   const space = getSpace(spaceId)
 
   if (!space || space.isTemp) {
@@ -395,6 +400,10 @@ export function updateSpace(spaceId: string, updates: { name?: string; icon?: st
 
     if (updates.name) meta.name = updates.name
     if (updates.icon) meta.icon = updates.icon
+    // Allow setting iconColor to undefined to remove it
+    if (updates.iconColor !== undefined) {
+      meta.iconColor = updates.iconColor || undefined
+    }
     meta.updatedAt = new Date().toISOString()
 
     writeFileSync(metaPath, JSON.stringify(meta, null, 2))

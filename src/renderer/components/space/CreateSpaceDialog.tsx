@@ -6,8 +6,8 @@
 import { useState, useRef, useEffect } from 'react'
 import { Monitor } from 'lucide-react'
 import { useSpaceStore } from '../../stores/space.store'
-import { SPACE_ICONS, DEFAULT_SPACE_ICON } from '../../types'
-import type { Space, CreateSpaceInput, SpaceIconId } from '../../types'
+import { SPACE_ICONS, DEFAULT_SPACE_ICON, SPACE_ICON_COLORS, DEFAULT_SPACE_ICON_COLOR } from '../../types'
+import type { Space, CreateSpaceInput, SpaceIconId, SpaceIconColorId } from '../../types'
 import { SpaceIcon, FolderOpen, ChevronDown } from '../icons/ToolIcons'
 import { api } from '../../api'
 import { useTranslation } from '../../i18n'
@@ -28,6 +28,7 @@ export function CreateSpaceDialog({ isOpen, onClose, onCreated }: CreateSpaceDia
   // Form state
   const [newSpaceName, setNewSpaceName] = useState('')
   const [newSpaceIcon, setNewSpaceIcon] = useState<SpaceIconId>(DEFAULT_SPACE_ICON)
+  const [newSpaceIconColor, setNewSpaceIconColor] = useState<SpaceIconColorId>(DEFAULT_SPACE_ICON_COLOR)
   const [useCustomPath, setUseCustomPath] = useState(false)
   const [customPath, setCustomPath] = useState<string | null>(null)
   const [defaultPath, setDefaultPath] = useState<string>('~/.skillsfan/spaces')
@@ -55,6 +56,7 @@ export function CreateSpaceDialog({ isOpen, onClose, onCreated }: CreateSpaceDia
   const resetForm = () => {
     setNewSpaceName('')
     setNewSpaceIcon(DEFAULT_SPACE_ICON)
+    setNewSpaceIconColor(DEFAULT_SPACE_ICON_COLOR)
     setUseCustomPath(false)
     setCustomPath(null)
     setShowAdvanced(false)
@@ -91,9 +93,14 @@ export function CreateSpaceDialog({ isOpen, onClose, onCreated }: CreateSpaceDia
   const handleCreateSpace = async () => {
     if (!newSpaceName.trim()) return
 
+    // Get the color value from the color ID
+    const colorConfig = SPACE_ICON_COLORS.find(c => c.id === newSpaceIconColor)
+    const iconColorValue = colorConfig?.value || ''
+
     const input: CreateSpaceInput = {
       name: newSpaceName.trim(),
       icon: newSpaceIcon,
+      iconColor: iconColorValue || undefined,
       customPath: useCustomPath && customPath ? customPath : undefined
     }
 
@@ -116,7 +123,7 @@ export function CreateSpaceDialog({ isOpen, onClose, onCreated }: CreateSpaceDia
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 no-drag">
-      <div className="bg-card border border-border/80 rounded-2xl p-7 w-full max-w-md animate-fade-in shadow-2xl">
+      <div className="bg-card border border-border/80 rounded-2xl p-7 w-full max-w-md max-h-[85vh] overflow-y-auto animate-fade-in shadow-2xl">
         <h2 className="text-lg font-semibold mb-6 text-foreground/95 tracking-tight">{t('Create Dedicated Space')}</h2>
 
         {/* 1. Space name - Primary input, most important */}
@@ -137,22 +144,61 @@ export function CreateSpaceDialog({ isOpen, onClose, onCreated }: CreateSpaceDia
           />
         </div>
 
-        {/* 2. Icon select - Compact, secondary importance */}
+        {/* 2. Icon select */}
+        <div className="mb-5">
+          <label className="block text-sm text-muted-foreground font-medium mb-2.5">{t('Icon (optional)')}</label>
+          <div className="grid grid-cols-7 gap-1.5">
+            {/* None option first */}
+            <button
+              onClick={() => setNewSpaceIcon('' as SpaceIconId)}
+              className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all ${
+                newSpaceIcon === ''
+                  ? 'bg-foreground/10 ring-2 ring-foreground/30'
+                  : 'bg-secondary/40 hover:bg-secondary/60'
+              }`}
+              title="无"
+            >
+              <span className="text-xs text-muted-foreground">无</span>
+            </button>
+            {SPACE_ICONS.map((iconId) => {
+              const colorConfig = SPACE_ICON_COLORS.find(c => c.id === newSpaceIconColor)
+              const iconColorValue = colorConfig?.value || undefined
+              return (
+                <button
+                  key={iconId}
+                  onClick={() => setNewSpaceIcon(iconId)}
+                  className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all ${
+                    newSpaceIcon === iconId
+                      ? 'bg-foreground/10 ring-2 ring-foreground/30'
+                      : 'bg-secondary/40 hover:bg-secondary/60'
+                  }`}
+                >
+                  <SpaceIcon iconId={iconId} size={16} iconColor={iconColorValue} className={iconColorValue ? '' : 'text-foreground/70'} />
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* 3. Color picker */}
         <div className="mb-6">
-          <label className="block text-sm text-muted-foreground mb-2.5 font-medium">{t('Icon (optional)')}</label>
-          <div className="flex flex-wrap gap-2">
-            {SPACE_ICONS.map((iconId) => (
+          <label className="block text-sm text-muted-foreground font-medium mb-2.5">颜色</label>
+          <div className="flex gap-2">
+            {SPACE_ICON_COLORS.map((color) => (
               <button
-                key={iconId}
-                onClick={() => setNewSpaceIcon(iconId)}
-                className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${
-                  newSpaceIcon === iconId
-                    ? 'bg-foreground/10 ring-2 ring-foreground/30 ring-offset-2 ring-offset-card'
-                    : 'bg-secondary/40 hover:bg-secondary/60 border border-border/40'
+                key={color.id}
+                onClick={() => setNewSpaceIconColor(color.id as SpaceIconColorId)}
+                className={`w-7 h-7 rounded-full transition-all ${
+                  newSpaceIconColor === color.id
+                    ? 'ring-2 ring-foreground/40 ring-offset-2 ring-offset-card scale-110'
+                    : 'hover:scale-110'
                 }`}
-              >
-                <SpaceIcon iconId={iconId} size={18} colored={false} className="text-foreground/70" />
-              </button>
+                style={{
+                  backgroundColor: color.value || 'transparent',
+                  border: color.id === 'none' ? '2px dashed var(--border)' : 'none'
+                }}
+                title={color.label}
+              />
             ))}
           </div>
         </div>

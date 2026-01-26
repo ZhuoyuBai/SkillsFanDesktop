@@ -58,7 +58,7 @@ import {
   Cpu,
   HardDrive,
   Pencil,
-  // New space icons
+  // Space icons
   Briefcase,
   Code2,
   Globe2,
@@ -68,6 +68,29 @@ import {
   Camera,
   BookOpen,
   Heart,
+  // Additional space icons
+  Film,
+  Mail,
+  Phone,
+  Users,
+  Video,
+  PieChart,
+  TrendingUp,
+  Target,
+  Clipboard,
+  Calendar,
+  GraduationCap,
+  Brain,
+  Puzzle,
+  FlaskConical,
+  Music2,
+  Plane,
+  Monitor,
+  Wifi,
+  Cloud,
+  Server,
+  Atom,
+  Bolt,
   type LucideIcon
 } from 'lucide-react'
 
@@ -192,70 +215,98 @@ export function StatusIcon({ status, className = '', size = 16 }: StatusIconProp
 
 // Space icon identifiers (used in data storage)
 export const SPACE_ICON_IDS = [
-  'briefcase', 'code-2', 'globe-2', 'bar-chart', 'pen-tool', 'music',
-  'camera', 'book-open', 'heart', 'coffee', 'zap', 'sparkles'
+  // Row 1: Work & Code
+  'briefcase', 'code-2', 'terminal', 'folder', 'file-text', 'database',
+  // Row 2: Creative & Media
+  'pen-tool', 'palette', 'camera', 'music', 'image', 'film',
+  // Row 3: Communication & Social
+  'globe-2', 'message-square', 'mail', 'phone', 'users', 'video',
+  // Row 4: Analytics & Business
+  'bar-chart', 'pie-chart', 'trending-up', 'target', 'clipboard', 'calendar',
+  // Row 5: Learning & Ideas
+  'book-open', 'graduation-cap', 'lightbulb', 'brain', 'puzzle', 'flask',
+  // Row 6: Lifestyle & Fun
+  'heart', 'star', 'coffee', 'gamepad', 'music-2', 'plane',
+  // Row 7: Tech & Tools
+  'cpu', 'smartphone', 'monitor', 'wifi', 'cloud', 'server',
+  // Row 8: Action & Energy
+  'zap', 'rocket', 'sparkles', 'flame', 'bolt', 'atom'
 ] as const
 
 export type SpaceIconId = typeof SPACE_ICON_IDS[number]
 
 // Map icon IDs to Lucide components
 export const spaceIconMap: Record<string, LucideIcon> = {
+  // Row 1: Work & Code
   briefcase: Briefcase,
   'code-2': Code2,
-  'globe-2': Globe2,
-  'bar-chart': BarChart2,
-  'pen-tool': PenTool,
-  music: Music,
-  camera: Camera,
-  'book-open': BookOpen,
-  heart: Heart,
-  coffee: Coffee,
-  zap: Zap,
-  sparkles: Sparkles,
-  // Legacy icons for backward compatibility
+  terminal: Terminal,
   folder: Folder,
+  'file-text': FileText,
+  database: Database,
+  // Row 2: Creative & Media
+  'pen-tool': PenTool,
+  palette: Palette,
+  camera: Camera,
+  music: Music,
+  image: Image,
+  film: Film,
+  // Row 3: Communication & Social
+  'globe-2': Globe2,
+  'message-square': MessageSquare,
+  mail: Mail,
+  phone: Phone,
+  users: Users,
+  video: Video,
+  // Row 4: Analytics & Business
+  'bar-chart': BarChart2,
+  'pie-chart': PieChart,
+  'trending-up': TrendingUp,
+  target: Target,
+  clipboard: Clipboard,
+  calendar: Calendar,
+  // Row 5: Learning & Ideas
+  'book-open': BookOpen,
+  'graduation-cap': GraduationCap,
+  lightbulb: Lightbulb,
+  brain: Brain,
+  puzzle: Puzzle,
+  flask: FlaskConical,
+  // Row 6: Lifestyle & Fun
+  heart: Heart,
+  star: Star,
+  coffee: Coffee,
+  gamepad: Gamepad2,
+  'music-2': Music2,
+  plane: Plane,
+  // Row 7: Tech & Tools
+  cpu: Cpu,
+  smartphone: Smartphone,
+  monitor: Monitor,
+  wifi: Wifi,
+  cloud: Cloud,
+  server: Server,
+  // Row 8: Action & Energy
+  zap: Zap,
+  rocket: Rocket,
+  sparkles: Sparkles,
+  flame: Flame,
+  bolt: Bolt,
+  atom: Atom,
+  // Legacy icons for backward compatibility
   code: FileCode,
   globe: Globe,
   chart: Database,
-  'file-text': FileText,
-  palette: Palette,
-  gamepad: Gamepad2,
   wrench: Wrench,
-  smartphone: Smartphone,
-  lightbulb: Lightbulb,
-  rocket: Rocket,
-  star: Star,
 }
 
-// Monochrome color palette for space icons
-export const spaceIconColors: Record<string, string> = {
-  // New icons
-  briefcase: 'text-foreground/70',
-  'code-2': 'text-foreground/70',
-  'globe-2': 'text-foreground/70',
-  'bar-chart': 'text-foreground/70',
-  'pen-tool': 'text-foreground/70',
-  music: 'text-foreground/70',
-  camera: 'text-foreground/70',
-  'book-open': 'text-foreground/70',
-  heart: 'text-foreground/70',
-  coffee: 'text-foreground/70',
-  zap: 'text-foreground/70',
-  sparkles: 'text-foreground/70',
-  // Legacy icons for backward compatibility
-  folder: 'text-foreground/70',
-  code: 'text-foreground/70',
-  globe: 'text-foreground/70',
-  chart: 'text-foreground/70',
-  'file-text': 'text-foreground/70',
-  palette: 'text-foreground/70',
-  gamepad: 'text-foreground/70',
-  wrench: 'text-foreground/70',
-  smartphone: 'text-foreground/70',
-  lightbulb: 'text-foreground/70',
-  rocket: 'text-foreground/70',
-  star: 'text-foreground/70',
-}
+// Default color class for space icons (used when colored=true and no iconColor)
+const DEFAULT_SPACE_ICON_COLOR_CLASS = 'text-foreground/70'
+
+// Monochrome color palette for space icons (fallback)
+export const spaceIconColors: Record<string, string> = new Proxy({} as Record<string, string>, {
+  get: () => DEFAULT_SPACE_ICON_COLOR_CLASS
+})
 
 // Space icon component with color
 interface SpaceIconProps {
@@ -263,11 +314,18 @@ interface SpaceIconProps {
   className?: string
   size?: number
   colored?: boolean  // Whether to apply default color
+  iconColor?: string  // Custom color (hex value)
 }
 
-export function SpaceIcon({ iconId, className = '', size = 20, colored = false }: SpaceIconProps) {
+export function SpaceIcon({ iconId, className = '', size = 20, colored = false, iconColor }: SpaceIconProps) {
   const Icon = spaceIconMap[iconId as SpaceIconId] || Folder
   const colorClass = colored ? (spaceIconColors[iconId] || 'text-muted-foreground') : ''
+
+  // If custom iconColor is provided, use inline style
+  if (iconColor) {
+    return <Icon className={className} size={size} style={{ color: iconColor }} />
+  }
+
   return <Icon className={`${colorClass} ${className}`} size={size} />
 }
 

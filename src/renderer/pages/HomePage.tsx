@@ -5,8 +5,8 @@
 import React, { useEffect, useState } from 'react'
 import { useAppStore } from '../stores/app.store'
 import { useSpaceStore } from '../stores/space.store'
-import { SPACE_ICONS, DEFAULT_SPACE_ICON } from '../types'
-import type { Space, SpaceIconId } from '../types'
+import { SPACE_ICONS, DEFAULT_SPACE_ICON, SPACE_ICON_COLORS, DEFAULT_SPACE_ICON_COLOR } from '../types'
+import type { Space, SpaceIconId, SpaceIconColorId } from '../types'
 import {
   SpaceIcon,
   Settings,
@@ -32,6 +32,7 @@ export function HomePage() {
   const [editingSpace, setEditingSpace] = useState<Space | null>(null)
   const [editSpaceName, setEditSpaceName] = useState('')
   const [editSpaceIcon, setEditSpaceIcon] = useState<SpaceIconId>(DEFAULT_SPACE_ICON)
+  const [editSpaceIconColor, setEditSpaceIconColor] = useState<SpaceIconColorId>(DEFAULT_SPACE_ICON_COLOR)
 
   // Load spaces on mount
   useEffect(() => {
@@ -70,20 +71,29 @@ export function HomePage() {
     setEditingSpace(space)
     setEditSpaceName(space.name)
     setEditSpaceIcon(space.icon as SpaceIconId)
+    // Find matching color ID from the space's iconColor value
+    const colorConfig = SPACE_ICON_COLORS.find(c => c.value === space.iconColor)
+    setEditSpaceIconColor((colorConfig?.id || DEFAULT_SPACE_ICON_COLOR) as SpaceIconColorId)
   }
 
   // Handle save space edit
   const handleSaveEdit = async () => {
     if (!editingSpace || !editSpaceName.trim()) return
 
+    // Get the color value from the color ID
+    const colorConfig = SPACE_ICON_COLORS.find(c => c.id === editSpaceIconColor)
+    const iconColorValue = colorConfig?.value || ''
+
     await updateSpace(editingSpace.id, {
       name: editSpaceName.trim(),
-      icon: editSpaceIcon
+      icon: editSpaceIcon,
+      iconColor: iconColorValue || undefined
     })
 
     setEditingSpace(null)
     setEditSpaceName('')
     setEditSpaceIcon(DEFAULT_SPACE_ICON)
+    setEditSpaceIconColor(DEFAULT_SPACE_ICON_COLOR)
   }
 
   // Handle cancel edit
@@ -91,6 +101,7 @@ export function HomePage() {
     setEditingSpace(null)
     setEditSpaceName('')
     setEditSpaceIcon(DEFAULT_SPACE_ICON)
+    setEditSpaceIconColor(DEFAULT_SPACE_ICON_COLOR)
   }
 
   // Format time ago
@@ -124,7 +135,7 @@ export function HomePage() {
       {/* Content */}
       <main className="flex-1 overflow-auto flex flex-col">
         {/* Hero Section */}
-        <section className="flex flex-col items-center justify-center px-8 py-8 animate-fade-in">
+        <section className="flex flex-col items-center justify-center px-8 pt-16 pb-8 animate-fade-in">
           {/* Logo with subtle glow */}
           <div className="relative mb-8">
             <div className="absolute inset-0 blur-3xl bg-muted/20 rounded-full scale-150" />
@@ -160,7 +171,7 @@ export function HomePage() {
               <h3 className="text-sm font-medium text-muted-foreground/80 tracking-wide">自定义空间</h3>
               <button
                 onClick={() => setShowCreateDialog(true)}
-                className="flex items-center gap-1.5 px-3 py-2 text-xs text-muted-foreground hover:text-foreground border border-border/60 hover:border-foreground/30 rounded-lg transition-all hover:bg-secondary/50"
+                className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-foreground/80 hover:text-foreground rounded-lg transition-all hover:bg-secondary/50"
               >
                 <Plus className="w-3.5 h-3.5" />
                 新建空间
@@ -186,7 +197,7 @@ export function HomePage() {
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <SpaceIcon iconId={space.icon} size={20} colored={false} className="flex-shrink-0 text-foreground/70" />
+                        <SpaceIcon iconId={space.icon} size={20} iconColor={space.iconColor} className={`flex-shrink-0 ${space.iconColor ? '' : 'text-foreground/70'}`} />
                         <span className="font-medium truncate text-foreground/90">{space.name}</span>
                       </div>
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0">
@@ -206,13 +217,7 @@ export function HomePage() {
                         </button>
                       </div>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-3 leading-relaxed">
-                      {t('{{count}} artifacts · {{conversations}} conversations', {
-                        count: space.stats.artifactCount,
-                        conversations: space.stats.conversationCount
-                      })}
-                    </p>
-                    <p className="text-xs text-muted-foreground/70 mt-1.5">
+                    <p className="text-xs text-muted-foreground/70 mt-3">
                       {formatTimeAgo(space.updatedAt)}{t('active')}
                     </p>
                   </div>
@@ -232,7 +237,7 @@ export function HomePage() {
       {/* Edit Space Dialog */}
       {editingSpace && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 no-drag">
-          <div className="bg-card border border-border/80 rounded-2xl p-7 w-full max-w-md animate-fade-in shadow-2xl">
+          <div className="bg-card border border-border/80 rounded-2xl p-7 w-full max-w-md max-h-[85vh] overflow-y-auto animate-fade-in shadow-2xl">
             <h2 className="text-lg font-semibold mb-6 text-foreground/95 tracking-tight">{t('Edit Space')}</h2>
 
             {/* Space name */}
@@ -249,21 +254,60 @@ export function HomePage() {
             </div>
 
             {/* Icon select */}
+            <div className="mb-5">
+              <label className="block text-sm text-muted-foreground font-medium mb-2.5">{t('Icon (optional)')}</label>
+              <div className="grid grid-cols-7 gap-1.5">
+                {/* None option first */}
+                <button
+                  onClick={() => setEditSpaceIcon('' as SpaceIconId)}
+                  className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all ${
+                    editSpaceIcon === ''
+                      ? 'bg-foreground/10 ring-2 ring-foreground/30'
+                      : 'bg-secondary/40 hover:bg-secondary/60'
+                  }`}
+                  title="无"
+                >
+                  <span className="text-xs text-muted-foreground">无</span>
+                </button>
+                {SPACE_ICONS.map((iconId) => {
+                  const colorConfig = SPACE_ICON_COLORS.find(c => c.id === editSpaceIconColor)
+                  const iconColorValue = colorConfig?.value || undefined
+                  return (
+                    <button
+                      key={iconId}
+                      onClick={() => setEditSpaceIcon(iconId)}
+                      className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all ${
+                        editSpaceIcon === iconId
+                          ? 'bg-foreground/10 ring-2 ring-foreground/30'
+                          : 'bg-secondary/40 hover:bg-secondary/60'
+                      }`}
+                    >
+                      <SpaceIcon iconId={iconId} size={16} iconColor={iconColorValue} className={iconColorValue ? '' : 'text-foreground/70'} />
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Color picker */}
             <div className="mb-6">
-              <label className="block text-sm text-muted-foreground mb-2.5 font-medium">{t('Icon')}</label>
-              <div className="flex flex-wrap gap-2">
-                {SPACE_ICONS.map((iconId) => (
+              <label className="block text-sm text-muted-foreground font-medium mb-2.5">颜色</label>
+              <div className="flex gap-2">
+                {SPACE_ICON_COLORS.map((color) => (
                   <button
-                    key={iconId}
-                    onClick={() => setEditSpaceIcon(iconId)}
-                    className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${
-                      editSpaceIcon === iconId
-                        ? 'bg-foreground/10 ring-2 ring-foreground/30 ring-offset-2 ring-offset-card'
-                        : 'bg-secondary/40 hover:bg-secondary/60 border border-border/40'
+                    key={color.id}
+                    onClick={() => setEditSpaceIconColor(color.id as SpaceIconColorId)}
+                    className={`w-7 h-7 rounded-full transition-all ${
+                      editSpaceIconColor === color.id
+                        ? 'ring-2 ring-foreground/40 ring-offset-2 ring-offset-card scale-110'
+                        : 'hover:scale-110'
                     }`}
-                  >
-                    <SpaceIcon iconId={iconId} size={18} colored={false} className="text-foreground/70" />
-                  </button>
+                    style={{
+                      backgroundColor: color.value || 'transparent',
+                      border: color.id === 'none' ? '2px dashed var(--border)' : 'none'
+                    }}
+                    title={color.label}
+                  />
                 ))}
               </div>
             </div>

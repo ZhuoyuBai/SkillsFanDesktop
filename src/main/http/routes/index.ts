@@ -89,8 +89,8 @@ export function registerApiRoutes(app: Express, mainWindow: BrowserWindow | null
   })
 
   app.post('/api/spaces', async (req: Request, res: Response) => {
-    const { name, icon, customPath } = req.body
-    const result = spaceController.createSpace({ name, icon, customPath })
+    const { name, icon, iconColor, customPath } = req.body
+    const result = spaceController.createSpace({ name, icon, iconColor, customPath })
     res.json(result)
   })
 

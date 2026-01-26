@@ -51,6 +51,7 @@ export function listSpaces(): ControllerResponse {
 export function createSpace(input: {
   name: string
   icon: string
+  iconColor?: string
   customPath?: string
 }): ControllerResponse {
   try {
@@ -109,7 +110,7 @@ export function openSpaceFolder(spaceId: string): ControllerResponse {
  */
 export function updateSpace(
   spaceId: string,
-  updates: { name?: string; icon?: string }
+  updates: { name?: string; icon?: string; iconColor?: string }
 ): ControllerResponse {
   try {
     const space = serviceUpdateSpace(spaceId, updates)

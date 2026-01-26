@@ -370,7 +370,7 @@ export function SpacePage() {
 
             {!currentSpace.isTemp && (
               <>
-                <SpaceIcon iconId={currentSpace.icon} size={22} />
+                <SpaceIcon iconId={currentSpace.icon} size={22} iconColor={currentSpace.iconColor} />
                 <span className="font-medium text-sm">{currentSpace.name}</span>
               </>
             )}

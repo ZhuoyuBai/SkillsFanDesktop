@@ -147,6 +147,7 @@ export const api = {
   createSpace: async (input: {
     name: string
     icon: string
+    iconColor?: string
     customPath?: string
   }): Promise<ApiResponse> => {
     if (isElectron()) {
@@ -195,7 +196,7 @@ export const api = {
 
   updateSpace: async (
     spaceId: string,
-    updates: { name?: string; icon?: string }
+    updates: { name?: string; icon?: string; iconColor?: string }
   ): Promise<ApiResponse> => {
     if (isElectron()) {
       return window.skillsfan.updateSpace(spaceId, updates)

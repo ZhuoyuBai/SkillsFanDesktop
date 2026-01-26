@@ -207,6 +207,7 @@ export interface Space {
   id: string;
   name: string;
   icon: string;
+  iconColor?: string;  // Custom icon color (hex value or empty for default)
   path: string;
   isTemp: boolean;
   createdAt: string;
@@ -218,6 +219,7 @@ export interface Space {
 export interface CreateSpaceInput {
   name: string;
   icon: string;
+  iconColor?: string;  // Custom icon color (hex value or empty for default)
   customPath?: string;
 }
 
@@ -592,14 +594,45 @@ export function getCurrentModelName(config: HaloConfig): string {
 
 // Icon options for spaces (using icon IDs that map to Lucide icons)
 export const SPACE_ICONS = [
-  'briefcase', 'code-2', 'globe-2', 'bar-chart', 'pen-tool', 'music',
-  'camera', 'book-open', 'heart', 'coffee', 'zap', 'sparkles'
+  // Row 1: Work & Code
+  'briefcase', 'code-2', 'terminal', 'folder', 'file-text', 'database',
+  // Row 2: Creative & Media
+  'pen-tool', 'palette', 'camera', 'music', 'image', 'film',
+  // Row 3: Communication & Social
+  'globe-2', 'message-square', 'mail', 'phone', 'users', 'video',
+  // Row 4: Analytics & Business
+  'bar-chart', 'pie-chart', 'trending-up', 'target', 'clipboard', 'calendar',
+  // Row 5: Learning & Ideas
+  'book-open', 'graduation-cap', 'lightbulb', 'brain', 'puzzle', 'flask',
+  // Row 6: Lifestyle & Fun
+  'heart', 'star', 'coffee', 'gamepad', 'music-2', 'plane',
+  // Row 7: Tech & Tools
+  'cpu', 'smartphone', 'monitor', 'wifi', 'cloud', 'server',
+  // Row 8: Action & Energy
+  'zap', 'rocket', 'sparkles', 'flame', 'bolt', 'atom'
 ] as const;
 
 export type SpaceIconId = typeof SPACE_ICONS[number];
 
 // Default space icon
 export const DEFAULT_SPACE_ICON: SpaceIconId = 'briefcase';
+
+// Icon color options for spaces (low saturation, muted colors)
+export const SPACE_ICON_COLORS = [
+  { id: 'none', value: '', label: '无' },
+  { id: 'gray', value: '#9ca3af', label: '灰色' },
+  { id: 'rose', value: '#e8a0a0', label: '玫瑰' },
+  { id: 'amber', value: '#d4a574', label: '琥珀' },
+  { id: 'emerald', value: '#7dba98', label: '翡翠' },
+  { id: 'sky', value: '#7db4d4', label: '天空' },
+  { id: 'violet', value: '#a89bce', label: '紫罗兰' },
+  { id: 'pink', value: '#d4a5c9', label: '粉红' },
+] as const;
+
+export type SpaceIconColorId = typeof SPACE_ICON_COLORS[number]['id'];
+
+// Default space icon color
+export const DEFAULT_SPACE_ICON_COLOR: SpaceIconColorId = 'none';
 
 // File type to icon ID mapping (maps to Lucide icon names)
 export const FILE_ICON_IDS: Record<string, string> = {

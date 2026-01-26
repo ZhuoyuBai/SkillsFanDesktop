@@ -21,7 +21,7 @@ interface SpaceState {
   loadHaloSpace: () => Promise<void>
   setCurrentSpace: (space: Space | null) => void
   createSpace: (input: CreateSpaceInput) => Promise<Space | null>
-  updateSpace: (spaceId: string, updates: { name?: string; icon?: string }) => Promise<Space | null>
+  updateSpace: (spaceId: string, updates: { name?: string; icon?: string; iconColor?: string }) => Promise<Space | null>
   deleteSpace: (spaceId: string) => Promise<boolean>
   openSpaceFolder: (spaceId: string) => Promise<void>
   refreshCurrentSpace: () => Promise<void>
