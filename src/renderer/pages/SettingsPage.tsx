@@ -26,8 +26,9 @@ interface AuthProviderConfig {
 import { CheckCircle2, XCircle, Eye, EyeOff } from '../components/icons/ToolIcons'
 import { McpServerList } from '../components/settings/McpServerList'
 import { SkillList } from '../components/settings/SkillList'
+import { SkillsFanAccountSection } from '../components/settings/SkillsFanAccountSection'
 import { useTranslation, setLanguage, getCurrentLanguage, SUPPORTED_LOCALES, type LocaleCode } from '../i18n'
-import { Loader2, LogOut, Plus, Check, Globe, Key, MessageSquare, Bot, Palette, Server, Settings as SettingsIcon, Wifi, ExternalLink, X, Sparkles, type LucideIcon } from 'lucide-react'
+import { Loader2, LogOut, Plus, Check, Globe, Key, MessageSquare, Bot, Palette, Server, Settings as SettingsIcon, Wifi, ExternalLink, X, Sparkles, User, type LucideIcon } from 'lucide-react'
 
 // Import provider logos
 import zhipuLogo from '../assets/providers/zhipu.jpg'
@@ -167,7 +168,7 @@ interface RemoteAccessStatus {
 }
 
 // Settings section type
-type SettingsSection = 'ai-model' | 'display' | 'mcp' | 'skills' | 'system' | 'remote'
+type SettingsSection = 'ai-model' | 'display' | 'mcp' | 'skills' | 'system' | 'remote' | 'account'
 
 export function SettingsPage() {
   const { t } = useTranslation()
@@ -584,6 +585,7 @@ export function SettingsPage() {
   // Navigation items configuration
   // Note: 'mcp' and 'remote' are temporarily hidden (functionality preserved)
   const navItems: { id: SettingsSection; icon: LucideIcon; label: string; desktopOnly?: boolean; hidden?: boolean }[] = [
+    { id: 'account', icon: User, label: t('Account'), desktopOnly: true },
     { id: 'ai-model', icon: Bot, label: t('AI Model') },
     { id: 'display', icon: Palette, label: t('Display & Language') },
     { id: 'mcp', icon: Server, label: t('MCP Servers'), hidden: true },
@@ -661,6 +663,14 @@ export function SettingsPage() {
           {/* Scrollable content */}
           <div className="flex-1 overflow-auto p-6">
             <div className="max-w-2xl">
+
+          {/* SkillsFan Account Section */}
+          {activeSection === 'account' && !api.isRemoteMode() && (
+          <section className="bg-card rounded-xl border border-border p-6">
+            <h2 className="text-lg font-medium mb-4">{t('SkillsFan Account')}</h2>
+            <SkillsFanAccountSection />
+          </section>
+          )}
 
           {/* AI Model Section - Grid Layout */}
           {activeSection === 'ai-model' && (

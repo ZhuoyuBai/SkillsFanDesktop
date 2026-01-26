@@ -251,6 +251,19 @@ export interface HaloAPI {
 
   // Bootstrap lifecycle events
   onBootstrapExtendedReady: (callback: (data: { timestamp: number; duration: number }) => void) => () => void
+
+  // SkillsFan Account Auth
+  skillsfanStartLogin: () => Promise<IpcResponse>
+  skillsfanLogout: () => Promise<IpcResponse>
+  skillsfanGetUser: () => Promise<IpcResponse>
+  skillsfanGetAuthState: () => Promise<IpcResponse>
+  skillsfanIsLoggedIn: () => Promise<IpcResponse>
+  skillsfanRefreshToken: () => Promise<IpcResponse>
+  skillsfanEnsureValidToken: () => Promise<IpcResponse>
+  skillsfanGetAccessToken: () => Promise<IpcResponse>
+  onSkillsFanLoginSuccess: (callback: (data: { user: unknown }) => void) => () => void
+  onSkillsFanLoginError: (callback: (data: { error: string }) => void) => () => void
+  onSkillsFanLogout: (callback: () => void) => () => void
 }
 
 interface IpcResponse<T = unknown> {
@@ -465,6 +478,19 @@ const api: HaloAPI = {
 
   // Bootstrap lifecycle events
   onBootstrapExtendedReady: (callback) => createEventListener('bootstrap:extended-ready', callback as (data: unknown) => void),
+
+  // SkillsFan Account Auth
+  skillsfanStartLogin: () => ipcRenderer.invoke('skillsfan:start-login'),
+  skillsfanLogout: () => ipcRenderer.invoke('skillsfan:logout'),
+  skillsfanGetUser: () => ipcRenderer.invoke('skillsfan:get-user'),
+  skillsfanGetAuthState: () => ipcRenderer.invoke('skillsfan:get-auth-state'),
+  skillsfanIsLoggedIn: () => ipcRenderer.invoke('skillsfan:is-logged-in'),
+  skillsfanRefreshToken: () => ipcRenderer.invoke('skillsfan:refresh-token'),
+  skillsfanEnsureValidToken: () => ipcRenderer.invoke('skillsfan:ensure-valid-token'),
+  skillsfanGetAccessToken: () => ipcRenderer.invoke('skillsfan:get-access-token'),
+  onSkillsFanLoginSuccess: (callback) => createEventListener('skillsfan:login-success', callback as (data: unknown) => void),
+  onSkillsFanLoginError: (callback) => createEventListener('skillsfan:login-error', callback as (data: unknown) => void),
+  onSkillsFanLogout: (callback) => createEventListener('skillsfan:logout', callback as (data: unknown) => void),
 }
 
 contextBridge.exposeInMainWorld('skillsfan', api)

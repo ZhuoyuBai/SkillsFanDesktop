@@ -29,6 +29,7 @@ import { registerSystemHandlers } from '../ipc/system'
 import { registerUpdaterHandlers, initAutoUpdater } from '../services/updater.service'
 import { registerAuthHandlers } from '../ipc/auth'
 import { registerSkillHandlers } from '../ipc/skill'
+import { registerSkillsFanAuthHandlers } from '../ipc/skillsfan-auth'
 
 /**
  * Initialize essential services required for first screen render
@@ -50,6 +51,9 @@ export function initializeEssentialServices(mainWindow: BrowserWindow): void {
 
   // Auth: OAuth login handlers for multi-platform login (generic + backward compat)
   registerAuthHandlers()
+
+  // SkillsFan Auth: OAuth login handlers for SkillsFan account
+  registerSkillsFanAuthHandlers()
 
   // Space: Workspace list is displayed immediately on the left sidebar
   registerSpaceHandlers()

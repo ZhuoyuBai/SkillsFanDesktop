@@ -1037,6 +1037,70 @@ export const api = {
     }
     return window.skillsfan.onBootstrapExtendedReady(callback)
   },
+
+  // ===== SkillsFan Account Auth (Electron only) =====
+  skillsfanStartLogin: async (): Promise<ApiResponse> => {
+    if (!isElectron()) {
+      return { success: false, error: 'Only available in desktop app' }
+    }
+    return window.skillsfan.skillsfanStartLogin()
+  },
+
+  skillsfanLogout: async (): Promise<ApiResponse> => {
+    if (!isElectron()) {
+      return { success: false, error: 'Only available in desktop app' }
+    }
+    return window.skillsfan.skillsfanLogout()
+  },
+
+  skillsfanGetUser: async (): Promise<ApiResponse> => {
+    if (!isElectron()) {
+      return { success: false, error: 'Only available in desktop app' }
+    }
+    return window.skillsfan.skillsfanGetUser()
+  },
+
+  skillsfanGetAuthState: async (): Promise<ApiResponse> => {
+    if (!isElectron()) {
+      return { success: false, error: 'Only available in desktop app' }
+    }
+    return window.skillsfan.skillsfanGetAuthState()
+  },
+
+  skillsfanIsLoggedIn: async (): Promise<ApiResponse> => {
+    if (!isElectron()) {
+      return { success: false, error: 'Only available in desktop app' }
+    }
+    return window.skillsfan.skillsfanIsLoggedIn()
+  },
+
+  skillsfanRefreshToken: async (): Promise<ApiResponse> => {
+    if (!isElectron()) {
+      return { success: false, error: 'Only available in desktop app' }
+    }
+    return window.skillsfan.skillsfanRefreshToken()
+  },
+
+  onSkillsFanLoginSuccess: (callback: (data: { user: unknown }) => void) => {
+    if (!isElectron()) {
+      return () => {}
+    }
+    return window.skillsfan.onSkillsFanLoginSuccess(callback)
+  },
+
+  onSkillsFanLoginError: (callback: (data: { error: string }) => void) => {
+    if (!isElectron()) {
+      return () => {}
+    }
+    return window.skillsfan.onSkillsFanLoginError(callback)
+  },
+
+  onSkillsFanLogout: (callback: () => void) => {
+    if (!isElectron()) {
+      return () => {}
+    }
+    return window.skillsfan.onSkillsFanLogout(callback)
+  },
 }
 
 // Export type for the API

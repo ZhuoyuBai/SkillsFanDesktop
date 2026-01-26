@@ -50,7 +50,15 @@ if (!gotTheLock) {
 
 // Handle second-instance event (when user tries to launch another instance)
 // Note: This event only fires on the primary instance
-app.on('second-instance', () => {
+// On Windows/Linux, deep link URLs are passed as command line arguments
+app.on('second-instance', (_event, commandLine) => {
+  // Check for skillsfan:// URL in command line (Windows/Linux deep links)
+  const url = commandLine.find((arg) => arg.startsWith('skillsfan://'))
+  if (url) {
+    console.log('[Main] Received skillsfan:// URL from second instance:', url)
+    handleSkillsFanUrl(url)
+  }
+
   // Focus the existing window when a second instance is launched
   if (mainWindow) {
     // Restore from tray/hidden state if needed
@@ -90,9 +98,25 @@ import {
 } from './services/tray.service'
 import { checkForUpdates } from './services/updater.service'
 import { initAnalytics } from './services/analytics'
-import { registerProtocols } from './services/protocol.service'
+import { registerProtocols, handleSkillsFanUrl } from './services/protocol.service'
+import { loadAuthState } from './services/skillsfan/auth.service'
 
 let mainWindow: BrowserWindow | null = null
+
+// ============================================================================
+// Deep Link Handling for OAuth
+// Must be registered before app.whenReady()
+// ============================================================================
+
+// macOS: Handle skillsfan:// URLs via open-url event
+app.on('open-url', (event, url) => {
+  event.preventDefault()
+
+  if (url.startsWith('skillsfan://')) {
+    console.log('[Main] Received skillsfan:// URL:', url)
+    handleSkillsFanUrl(url)
+  }
+})
 
 /**
  * Create application menu with Check for Updates option
@@ -293,8 +317,11 @@ app.whenReady().then(async () => {
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.halo.app')
 
-  // Register custom protocols (halo-file://, etc.)
+  // Register custom protocols (halo-file://, skillsfan://, etc.)
   registerProtocols()
+
+  // Load persisted SkillsFan auth state
+  await loadAuthState()
 
   // Default open or close DevTools by F12 in development
   app.on('browser-window-created', (_, window) => {
@@ -303,6 +330,17 @@ app.whenReady().then(async () => {
 
   // Initialize app data directories
   await initializeApp()
+
+  // Windows: Check for skillsfan:// URL in command line on first launch
+  // (second-instance handles subsequent launches)
+  if (process.platform === 'win32') {
+    const url = process.argv.find((arg) => arg.startsWith('skillsfan://'))
+    if (url) {
+      console.log('[Main] Found skillsfan:// URL in startup args:', url)
+      // Delay to ensure window is ready
+      setTimeout(() => handleSkillsFanUrl(url), 500)
+    }
+  }
 
   // Create application menu
   createAppMenu()

@@ -530,5 +530,14 @@
   "No skills installed": "No skills installed",
   "Add skills to the skills directory to see them here": "Add skills to the skills directory to see them here",
   "Each skill folder should contain a SKILL.md file": "Each skill folder should contain a SKILL.md file",
-  "Skills are automatically loaded when the app starts": "Skills are automatically loaded when the app starts"
+  "Skills are automatically loaded when the app starts": "Skills are automatically loaded when the app starts",
+  "Account": "Account",
+  "SkillsFan Account": "SkillsFan Account",
+  "You can now sync skills and access member features.": "You can now sync skills and access member features.",
+  "Manage Account": "Manage Account",
+  "Login to sync skills across devices and unlock premium features.": "Login to sync skills across devices and unlock premium features.",
+  "Login / Register": "Login / Register",
+  "You will be redirected to SkillsFan website to login.": "You will be redirected to SkillsFan website to login.",
+  "Failed to start login": "Failed to start login",
+  "Failed to logout": "Failed to logout"
 }

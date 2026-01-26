@@ -537,5 +537,14 @@
   "No skills installed": "暂无已安装的技能",
   "Add skills to the skills directory to see them here": "将技能添加到技能目录即可在此显示",
   "Each skill folder should contain a SKILL.md file": "每个技能文件夹应包含一个 SKILL.md 文件",
-  "Skills are automatically loaded when the app starts": "技能在应用启动时自动加载"
+  "Skills are automatically loaded when the app starts": "技能在应用启动时自动加载",
+  "Account": "账号",
+  "SkillsFan Account": "SkillsFan 账号",
+  "You can now sync skills and access member features.": "已登录，可同步技能、使用会员功能。",
+  "Manage Account": "管理账号",
+  "Login to sync skills across devices and unlock premium features.": "登录后可跨设备同步技能，解锁会员功能。",
+  "Login / Register": "登录 / 注册",
+  "You will be redirected to SkillsFan website to login.": "将跳转到 SkillsFan 网站完成登录",
+  "Failed to start login": "启动登录失败",
+  "Failed to logout": "退出登录失败"
 }
