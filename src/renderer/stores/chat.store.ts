@@ -93,6 +93,9 @@ interface ChatState {
   isLoading: boolean
   isLoadingConversation: boolean  // Loading full conversation
 
+  // App startup state - used to auto-create new conversation on first space entry
+  freshStart: boolean
+
   // Computed getters
   getCurrentSpaceState: () => SpaceState
   getSpaceState: (spaceId: string) => SpaceState
@@ -106,6 +109,7 @@ interface ChatState {
 
   // Space actions
   setCurrentSpace: (spaceId: string) => void
+  setFreshStart: (value: boolean) => void
 
   // Conversation actions
   loadConversations: (spaceId: string) => Promise<void>
@@ -149,6 +153,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   artifacts: [],
   isLoading: false,
   isLoadingConversation: false,
+  freshStart: true,  // App just started - will auto-create new conversation on first space entry
 
   // Get current space state
   getCurrentSpaceState: () => {
@@ -207,6 +212,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
   // Set current space (called when entering a space)
   setCurrentSpace: (spaceId: string) => {
     set({ currentSpaceId: spaceId })
+  },
+
+  // Set fresh start flag (called after first space entry to disable auto-create)
+  setFreshStart: (value: boolean) => {
+    set({ freshStart: value })
   },
 
   // Load conversations for a space (returns lightweight metadata)

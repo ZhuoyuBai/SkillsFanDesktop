@@ -15,9 +15,8 @@ import { api } from '../../api'
 import type { Artifact, ArtifactViewMode } from '../../types'
 import { useIsGenerating } from '../../stores/chat.store'
 import { useOnboardingStore } from '../../stores/onboarding.store'
-import { useCanvasLifecycle } from '../../hooks/useCanvasLifecycle'
 import { useCanvasStore } from '../../stores/canvas.store'
-import { ChevronRight, FolderOpen, Monitor, LayoutGrid, FolderTree, X, Globe } from 'lucide-react'
+import { ChevronRight, FolderOpen, Monitor, LayoutGrid, FolderTree, X } from 'lucide-react'
 import { ONBOARDING_ARTIFACT_NAME } from '../onboarding/onboardingData'
 import { useTranslation } from '../../i18n'
 
@@ -71,9 +70,6 @@ function getInitialViewMode(): ArtifactViewMode {
   return (stored === 'tree' || stored === 'card') ? stored : 'card'
 }
 
-// Default browser home URL
-const DEFAULT_BROWSER_URL = 'https://www.bing.com'
-
 export function ArtifactRail({
   spaceId,
   isTemp,
@@ -98,8 +94,6 @@ export function ArtifactRail({
   const { isActive: isOnboarding, currentStep, completeOnboarding } = useOnboardingStore()
   const isMobile = useIsMobile()
 
-  // Canvas lifecycle for opening browser
-  const { openUrl } = useCanvasLifecycle()
 
   // Check if any browser tab is open (native BrowserView)
   // When browser tabs exist, disable CSS transition to sync with native view resize
@@ -232,16 +226,6 @@ export function ArtifactRail({
     }
   }, [isOnboardingViewStep, loadArtifacts])
 
-  // Handle opening browser - also collapse the rail to maximize browser area
-  const handleOpenBrowser = useCallback(() => {
-    openUrl(DEFAULT_BROWSER_URL, 'Bing')
-    // Auto-collapse rail when opening browser to maximize viewing area
-    if (isControlled) {
-      onExpandedChange?.(false)
-    } else {
-      setInternalExpanded(false)
-    }
-  }, [openUrl, isControlled, onExpandedChange])
 
   // Shared content renderer
   const renderContent = () => (
@@ -319,16 +303,6 @@ export function ArtifactRail({
           >
             <FolderOpen className="w-4 h-4 text-amber-500" />
             <span>{t('Folder')}</span>
-          </button>
-          {/* Open browser button */}
-          <button
-            onClick={handleOpenBrowser}
-            className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 text-xs text-muted-foreground hover:bg-secondary hover:text-foreground rounded-lg transition-colors"
-            title={t('Open browser (⌘⇧B)')}
-            aria-label={t('Open browser')}
-          >
-            <Globe className="w-4 h-4 text-muted-foreground" />
-            <span>{t('Browser')}</span>
           </button>
         </div>
       )}
@@ -501,22 +475,13 @@ export function ArtifactRail({
               <Monitor className="w-5 h-5 text-muted-foreground" />
             </div>
           ) : (
-            <>
-              <button
-                onClick={onOpenFolder}
-                className="p-2 hover:bg-secondary rounded-lg transition-colors"
-                title={t('Open folder')}
-              >
-                <FolderOpen className="w-5 h-5 text-amber-500" />
-              </button>
-              <button
-                onClick={handleOpenBrowser}
-                className="p-2 hover:bg-secondary rounded-lg transition-colors"
-                title={t('Open browser')}
-              >
-                <Globe className="w-5 h-5 text-orange-500" />
-              </button>
-            </>
+            <button
+              onClick={onOpenFolder}
+              className="p-2 hover:bg-secondary rounded-lg transition-colors"
+              title={t('Open folder')}
+            >
+              <FolderOpen className="w-5 h-5 text-amber-500" />
+            </button>
           )}
         </div>
       )}

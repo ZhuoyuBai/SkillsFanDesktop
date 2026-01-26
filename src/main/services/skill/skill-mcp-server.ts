@@ -18,8 +18,8 @@ import { getSkillContent } from './skill-loader'
  * 核心逻辑：将所有技能的 name + description 嵌入 Tool description，
  * Claude 根据这个描述自动判断是否需要调用技能
  */
-function generateDescription(): string {
-  const skills = getAllSkills()
+async function generateDescription(): Promise<string> {
+  const skills = await getAllSkills()
 
   if (skills.length === 0) {
     return 'Load a skill for detailed task instructions. No skills are currently available.'
@@ -44,20 +44,20 @@ function generateDescription(): string {
 /**
  * 创建 Skill Tool
  */
-function createSkillTool() {
-  const skills = getAllSkills()
+async function createSkillTool() {
+  const skills = await getAllSkills()
   const examples = skills.slice(0, 3).map(s => `'${s.name}'`).join(', ')
   const hint = examples ? ` (e.g., ${examples})` : ''
 
   return tool(
     'Skill',
-    generateDescription(),
+    await generateDescription(),
     { name: z.string().describe(`技能名称${hint}`) },
     async (args) => {
       const skill = getSkill(args.name)
 
       if (!skill) {
-        const available = getAllSkills().map(s => s.name).join(', ')
+        const available = (await getAllSkills()).map(s => s.name).join(', ')
         return {
           content: [{
             type: 'text' as const,
@@ -88,10 +88,10 @@ function createSkillTool() {
 /**
  * 创建 Skill MCP Server
  */
-export function createSkillMcpServer() {
+export async function createSkillMcpServer() {
   return createSdkMcpServer({
     name: 'skill',
     version: '1.0.0',
-    tools: [createSkillTool()]
+    tools: [await createSkillTool()]
   })
 }

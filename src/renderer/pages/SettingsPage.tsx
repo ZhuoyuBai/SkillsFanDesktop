@@ -582,13 +582,14 @@ export function SettingsPage() {
   }
 
   // Navigation items configuration
-  const navItems: { id: SettingsSection; icon: LucideIcon; label: string; desktopOnly?: boolean }[] = [
+  // Note: 'mcp' and 'remote' are temporarily hidden (functionality preserved)
+  const navItems: { id: SettingsSection; icon: LucideIcon; label: string; desktopOnly?: boolean; hidden?: boolean }[] = [
     { id: 'ai-model', icon: Bot, label: t('AI Model') },
     { id: 'display', icon: Palette, label: t('Display & Language') },
-    { id: 'mcp', icon: Server, label: t('MCP Servers') },
+    { id: 'mcp', icon: Server, label: t('MCP Servers'), hidden: true },
     { id: 'skills', icon: Sparkles, label: t('Skills') },
     { id: 'system', icon: SettingsIcon, label: t('System'), desktopOnly: true },
-    { id: 'remote', icon: Wifi, label: t('Remote Access') },
+    { id: 'remote', icon: Wifi, label: t('Remote Access'), hidden: true },
   ]
 
   return (
@@ -610,7 +611,7 @@ export function SettingsPage() {
 
           <div className="flex-1 p-2 space-y-0.5">
             {navItems
-              .filter(item => !item.desktopOnly || !api.isRemoteMode())
+              .filter(item => !item.hidden && (!item.desktopOnly || !api.isRemoteMode()))
               .map(item => {
                 const Icon = item.icon
                 const isActive = activeSection === item.id

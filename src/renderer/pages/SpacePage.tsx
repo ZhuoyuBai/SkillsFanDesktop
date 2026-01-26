@@ -209,6 +209,14 @@ export function SpacePage() {
       const store = useChatStore.getState()
       const spaceState = store.getSpaceState(currentSpace.id)
 
+      // On app fresh start, always create a new conversation
+      if (store.freshStart) {
+        await createConversation(currentSpace.id)
+        store.setFreshStart(false)
+        return
+      }
+
+      // Normal flow: select existing or create new
       if (spaceState.conversations.length > 0) {
         // If no conversation selected, select the first one
         if (!spaceState.currentConversationId) {

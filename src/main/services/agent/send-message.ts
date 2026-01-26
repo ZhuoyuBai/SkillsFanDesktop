@@ -207,7 +207,7 @@ export async function sendMessage(
       // NOTE: SDK patch adds proper handling of SDK-type MCP servers in SessionImpl,
       // extracting 'instance' before serialization (mirrors query() behavior).
       // See patches/@anthropic-ai+claude-agent-sdk+0.1.76.patch
-      ...((() => {
+      ...(await (async () => {
         const enabledMcp = getEnabledMcpServers(config.mcpServers || {})
         const mcpServers: Record<string, any> = enabledMcp ? { ...enabledMcp } : {}
 
@@ -219,7 +219,7 @@ export async function sendMessage(
 
         // Add Skill MCP server if skills are available
         if (hasSkills()) {
-          mcpServers['skill'] = createSkillMcpServer()
+          mcpServers['skill'] = await createSkillMcpServer()
           console.log(`[Agent][${conversationId}] Skill MCP server added`)
         }
 

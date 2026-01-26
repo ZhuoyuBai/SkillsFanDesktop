@@ -476,8 +476,8 @@ function InputToolbar({
     <div className="flex items-center justify-between px-2 pb-2 pt-1">
       {/* Left section: attachment button + thinking toggle */}
       <div className="flex items-center gap-1">
-        {/* Attachment menu */}
-        {!isGenerating && !isOnboarding && (
+        {/* Attachment menu - temporarily hidden */}
+        {/* {!isGenerating && !isOnboarding && (
           <div className="relative" ref={attachMenuRef}>
             <button
               onClick={onAttachMenuToggle}
@@ -495,7 +495,6 @@ function InputToolbar({
               <Plus size={18} className={`transition-transform duration-200 ${showAttachMenu ? 'rotate-45' : ''}`} />
             </button>
 
-            {/* Attachment menu dropdown */}
             {showAttachMenu && (
               <div className="absolute bottom-full left-0 mb-1 p-1 bg-popover border border-border
                 rounded-lg shadow-lg z-20 animate-fade-in">
@@ -521,7 +520,7 @@ function InputToolbar({
               </div>
             )}
           </div>
-        )}
+        )} */}
 
         {/* Model Selector - icon only on narrow windows */}
         {!isGenerating && !isOnboarding && (
