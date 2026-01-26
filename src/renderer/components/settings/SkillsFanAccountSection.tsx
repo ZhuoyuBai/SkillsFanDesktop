@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react'
 import { api } from '../../api'
 import { useTranslation } from '../../i18n'
 import { Loader2, LogOut, User } from 'lucide-react'
+import { HaloLogo } from '../brand/HaloLogo'
 import type { SkillsFanUser, SkillsFanAuthState } from '../../../shared/types/skillsfan'
 
 export function SkillsFanAccountSection() {
@@ -171,7 +172,7 @@ export function SkillsFanAccountSection() {
           {/* Features Description */}
           <div className="bg-secondary/50 rounded-lg p-3">
             <p className="text-sm text-muted-foreground">
-              {t('You can now sync skills and access member features.')}
+              {t('Logged in to SkillsFan account')}
             </p>
           </div>
 
@@ -194,10 +195,15 @@ export function SkillsFanAccountSection() {
       ) : (
         /* Logged Out State */
         <div className="space-y-4">
+          {/* Logo */}
+          <div className="flex justify-center py-2">
+            <HaloLogo size="md" animated={false} />
+          </div>
+
           {/* Description */}
           <div className="bg-secondary/50 rounded-lg p-4">
-            <p className="text-sm text-muted-foreground">
-              {t('Login to sync skills across devices and unlock premium features.')}
+            <p className="text-sm text-muted-foreground text-center">
+              {t('Login to SkillsFan for a better experience')}
             </p>
           </div>
 

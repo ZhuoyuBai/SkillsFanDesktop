@@ -172,10 +172,19 @@ type SettingsSection = 'ai-model' | 'display' | 'mcp' | 'skills' | 'system' | 'r
 
 export function SettingsPage() {
   const { t } = useTranslation()
-  const { config, setConfig, goBack } = useAppStore()
+  const { config, setConfig, goBack, settingsSection, setSettingsSection } = useAppStore()
 
-  // Active section state
-  const [activeSection, setActiveSection] = useState<SettingsSection>('ai-model')
+  // Active section state - use settingsSection from store if available
+  const [activeSection, setActiveSection] = useState<SettingsSection>(() => {
+    return settingsSection || 'ai-model'
+  })
+
+  // Clear settingsSection from store after reading
+  useEffect(() => {
+    if (settingsSection) {
+      setSettingsSection(null)
+    }
+  }, [])
 
   // AI Source state
   const [currentSource, setCurrentSource] = useState<AISourceType>(config?.aiSources?.current || 'custom')
@@ -587,10 +596,10 @@ export function SettingsPage() {
   const navItems: { id: SettingsSection; icon: LucideIcon; label: string; desktopOnly?: boolean; hidden?: boolean }[] = [
     { id: 'account', icon: User, label: t('Account'), desktopOnly: true },
     { id: 'ai-model', icon: Bot, label: t('AI Model') },
-    { id: 'display', icon: Palette, label: t('Display & Language') },
-    { id: 'mcp', icon: Server, label: t('MCP Servers'), hidden: true },
     { id: 'skills', icon: Sparkles, label: t('Skills') },
+    { id: 'display', icon: Palette, label: t('Display & Language') },
     { id: 'system', icon: SettingsIcon, label: t('System'), desktopOnly: true },
+    { id: 'mcp', icon: Server, label: t('MCP Servers'), hidden: true },
     { id: 'remote', icon: Wifi, label: t('Remote Access'), hidden: true },
   ]
 
@@ -602,8 +611,8 @@ export function SettingsPage() {
         onClick={handleBack}
       />
 
-      {/* Modal */}
-      <div className="relative w-[800px] max-w-[90vw] h-[600px] max-h-[85vh] bg-background rounded-xl shadow-2xl flex overflow-hidden">
+      {/* Modal - responsive sizing based on viewport */}
+      <div className="relative w-[90vw] max-w-[1000px] h-[85vh] max-h-[800px] bg-background rounded-xl shadow-2xl flex overflow-hidden">
         {/* Left sidebar navigation */}
         <nav className="w-48 border-r border-border flex flex-col bg-card/30">
           {/* Header */}

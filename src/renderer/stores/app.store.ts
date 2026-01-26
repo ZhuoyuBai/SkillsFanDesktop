@@ -7,6 +7,9 @@ import { api } from '../api'
 import type { HaloConfig, AppView, McpServerStatus } from '../types'
 import { hasAnyAISource } from '../types'
 
+// Settings section type (must match SettingsPage)
+export type SettingsSection = 'ai-model' | 'display' | 'mcp' | 'skills' | 'system' | 'remote' | 'account'
+
 // Git Bash installation progress
 interface GitBashInstallProgress {
   phase: 'idle' | 'downloading' | 'extracting' | 'configuring' | 'done' | 'error'
@@ -33,6 +36,9 @@ interface AppState {
   mockBashMode: boolean
   gitBashInstallProgress: GitBashInstallProgress
 
+  // Settings page initial section
+  settingsSection: SettingsSection | null
+
   // Actions
   setView: (view: AppView) => void
   goBack: () => void  // Navigate back to previous view
@@ -46,6 +52,10 @@ interface AppState {
   setMockBashMode: (mode: boolean) => void
   startGitBashInstall: () => Promise<void>
   refreshGitBashStatus: () => Promise<void>
+
+  // Settings actions
+  setSettingsSection: (section: SettingsSection | null) => void
+  openSettingsWithSection: (section: SettingsSection) => void
 
   // Initialization
   initialize: () => Promise<void>
@@ -62,6 +72,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   mcpStatusTimestamp: null,
   mockBashMode: false,
   gitBashInstallProgress: { phase: 'idle', progress: 0, message: '' },
+  settingsSection: null,
 
   // Actions
   setView: (view) => {
@@ -93,6 +104,14 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setMcpStatus: (status, timestamp) => {
     set({ mcpStatus: status, mcpStatusTimestamp: timestamp })
+  },
+
+  // Settings actions
+  setSettingsSection: (section) => set({ settingsSection: section }),
+
+  openSettingsWithSection: (section) => {
+    set({ settingsSection: section })
+    get().setView('settings')
   },
 
   // Git Bash actions

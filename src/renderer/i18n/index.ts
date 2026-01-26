@@ -25,14 +25,8 @@ import de from './locales/de.json'
 
 // Supported locales with native language names
 export const SUPPORTED_LOCALES = {
-  'de': 'Deutsch',
   'en': 'English',
-  'es': 'Español',
-  'fr': 'Français',
-  'ja': '日本語',
   'zh-CN': '简体中文',
-  'zh-TW': '繁體中文',
-
 } as const
 
 export type LocaleCode = keyof typeof SUPPORTED_LOCALES
@@ -46,25 +40,12 @@ const LOCALE_STORAGE_KEY = 'halo-locale'
 function detectLanguage(): LocaleCode {
   const lang = navigator.language || 'en'
 
-  // Exact match
-  if (lang in SUPPORTED_LOCALES) {
-    return lang as LocaleCode
-  }
-
-  // Chinese variants
-  if (lang.startsWith('zh-TW') || lang.startsWith('zh-HK') || lang.startsWith('zh-Hant')) {
-    return 'zh-TW'
-  }
+  // Chinese variants -> zh-CN
   if (lang.startsWith('zh')) {
     return 'zh-CN'
   }
 
-  // Other languages - match by prefix
-  if (lang.startsWith('ja')) return 'ja'
-  if (lang.startsWith('es')) return 'es'
-  if (lang.startsWith('fr')) return 'fr'
-  if (lang.startsWith('de')) return 'de'
-
+  // Default to English
   return 'en'
 }
 

@@ -7,10 +7,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import type { ConversationMeta } from '../../types'
 import { MessageSquare } from '../icons/ToolIcons'
-import { PanelLeftClose, PanelLeft, Search, SquarePen, Settings } from 'lucide-react'
+import { PanelLeftClose, PanelLeft, Search, SquarePen } from 'lucide-react'
 import { HaloLogo } from '../brand/HaloLogo'
 import { useSearchStore } from '../../stores/search.store'
 import { useTranslation } from '../../i18n'
+import { UserAvatarMenu } from './UserAvatarMenu'
 
 // Width constraints (in pixels)
 const MIN_WIDTH = 140
@@ -27,7 +28,6 @@ interface ConversationListProps {
   onRename?: (id: string, newTitle: string) => void
   isCollapsed?: boolean
   onToggleCollapse?: () => void
-  onSettings?: () => void
   isMobileOverlay?: boolean  // Mobile overlay mode - full width, no drag resize
 }
 
@@ -40,7 +40,6 @@ export function ConversationList({
   onRename,
   isCollapsed = false,
   onToggleCollapse,
-  onSettings,
   isMobileOverlay = false
 }: ConversationListProps) {
   const { t } = useTranslation()
@@ -223,18 +222,8 @@ export function ConversationList({
           ))}
         </div>
 
-        {/* Settings button (collapsed) */}
-        {onSettings && (
-          <div className="px-2 py-3 border-t border-border/50 flex justify-center">
-            <button
-              onClick={onSettings}
-              className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-md transition-colors"
-              title={t('Settings')}
-            >
-              <Settings className="w-4 h-4" />
-            </button>
-          </div>
-        )}
+        {/* User avatar menu (collapsed) */}
+        <UserAvatarMenu collapsed={true} />
       </div>
     )
   }
@@ -405,21 +394,8 @@ export function ConversationList({
         ))}
       </div>
 
-      {/* Settings button (expanded) */}
-      {onSettings && (
-        <div className="px-4 py-3 border-t border-border/50">
-          <button
-            onClick={onSettings}
-            className="w-full flex items-center justify-start gap-2 px-2 py-1.5
-              text-sm text-foreground/70 hover:text-foreground
-              hover:bg-muted/50
-              rounded transition-all duration-150"
-          >
-            <Settings className="w-4 h-4" />
-            {t('Settings')}
-          </button>
-        </div>
-      )}
+      {/* User avatar menu (expanded) */}
+      <UserAvatarMenu collapsed={false} />
 
       {/* Drag handle - on right side (hidden in mobile overlay mode) */}
       {!isMobileOverlay && (

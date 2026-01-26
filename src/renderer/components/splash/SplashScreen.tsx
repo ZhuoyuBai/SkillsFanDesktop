@@ -17,7 +17,7 @@ export function SplashScreen() {
   }, [])
 
   return (
-    <div className="h-full w-full flex flex-col items-center justify-center bg-background">
+    <div className="h-full w-full flex flex-col items-center justify-start pt-[25%] bg-background">
       {/* SkillsFan Logo */}
       <div
         className={`transition-all duration-1000 ${
@@ -47,12 +47,12 @@ export function SplashScreen() {
 
       {/* Loading indicator */}
       <div
-        className={`mt-8 flex items-center gap-2 text-muted-foreground/60 text-xs transition-all duration-1000 delay-700 ${
+        className={`mt-8 flex items-center gap-3 text-muted-foreground transition-all duration-1000 delay-700 ${
           animate ? 'opacity-100' : 'opacity-0'
         }`}
       >
-        <div className="w-3 h-3 border border-muted-foreground/40 border-t-transparent rounded-full animate-spin" />
-        <span>{t('Loading, please wait...')}</span>
+        <div className="w-4 h-4 border-2 border-muted-foreground/60 border-t-transparent rounded-full animate-spin" />
+        <span className="text-sm">{t('Loading, please wait...')}</span>
       </div>
     </div>
   )

@@ -427,7 +427,6 @@ export function SpacePage() {
             onRename={handleRenameConversation}
             isCollapsed={isConversationListCollapsed}
             onToggleCollapse={() => setIsConversationListCollapsed(!isConversationListCollapsed)}
-            onSettings={() => setView('settings')}
           />
         )}
 
@@ -574,10 +573,6 @@ export function SpacePage() {
             onDelete={handleDeleteConversation}
             onRename={handleRenameConversation}
             isCollapsed={false}
-            onSettings={() => {
-              setView('settings')
-              setMobileSidebarOpen(false)
-            }}
             isMobileOverlay={true}
           />
         </div>
