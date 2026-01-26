@@ -27,6 +27,14 @@ function parseFrontmatter(content: string): { data: Record<string, string>; cont
 }
 
 /**
+ * 从 Markdown 内容中提取 H1 标题
+ */
+function extractH1Title(content: string): string | null {
+  const match = content.match(/^#\s+(.+)$/m)
+  return match ? match[1].trim() : null
+}
+
+/**
  * 从目录加载所有技能
  */
 export function loadSkillsFromDir(skillsDir: string): SkillInfo[] {
@@ -54,8 +62,12 @@ export function loadSkillsFromDir(skillsDir: string): SkillInfo[] {
         continue
       }
 
+      // 从正文提取 H1 标题作为显示名称，如果没有则使用 name
+      const displayName = extractH1Title(parsed.content) || parsed.data.name
+
       skills.push({
         name: parsed.data.name,
+        displayName,
         description: parsed.data.description,
         location: skillFile,
         baseDir: dirname(skillFile)

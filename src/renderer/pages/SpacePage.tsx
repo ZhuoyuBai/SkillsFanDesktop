@@ -31,7 +31,7 @@ import { GitBashWarningBanner } from '../components/setup/GitBashWarningBanner'
 import { api } from '../api'
 import { useLayoutPreferences, LAYOUT_DEFAULTS } from '../hooks/useLayoutPreferences'
 import { useWindowMaximize } from '../components/canvas/viewers/useWindowMaximize'
-import { PanelLeftClose, PanelLeft, X, MessageSquare, Menu, SquarePen } from 'lucide-react'
+import { PanelLeftClose, PanelLeft, X, MessageSquare, Menu, SquarePen, Settings, FolderOpen } from 'lucide-react'
 import { useSearchShortcuts } from '../hooks/useSearchShortcuts'
 import { useTranslation } from '../i18n'
 // Mobile breakpoint (matches Tailwind sm: 640px)
@@ -339,7 +339,17 @@ export function SpacePage() {
       <Header
         left={
           <>
-            {/* Mobile menu button */}
+            {/* Back button - always on the left */}
+            <button
+              onClick={handleBack}
+              className="p-1.5 hover:bg-secondary rounded-lg transition-colors"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+
+            {/* Mobile menu button - after back button */}
             {isMobile && (
               <button
                 onClick={() => setMobileSidebarOpen(true)}
@@ -349,15 +359,6 @@ export function SpacePage() {
                 <Menu className="w-5 h-5" />
               </button>
             )}
-
-            <button
-              onClick={handleBack}
-              className="p-1.5 hover:bg-secondary rounded-lg transition-colors"
-            >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-            </button>
 
             {!currentSpace.isTemp && (
               <>
@@ -369,13 +370,29 @@ export function SpacePage() {
         }
         right={
           isMobile ? (
-            <button
-              onClick={handleNewConversation}
-              className="p-1.5 text-primary hover:bg-primary/10 rounded-lg transition-colors"
-              aria-label={t('New conversation')}
-            >
-              <SquarePen className="w-4 h-4" />
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={handleOpenFolder}
+                className="p-1.5 hover:bg-secondary rounded-lg transition-colors"
+                aria-label={t('Open folder')}
+              >
+                <FolderOpen className="w-4 h-4 text-amber-500" />
+              </button>
+              <button
+                onClick={() => setView('settings')}
+                className="p-1.5 hover:bg-secondary rounded-lg transition-colors"
+                aria-label={t('Settings')}
+              >
+                <Settings className="w-4 h-4" />
+              </button>
+              <button
+                onClick={handleNewConversation}
+                className="p-1.5 text-primary hover:bg-primary/10 rounded-lg transition-colors"
+                aria-label={t('New conversation')}
+              >
+                <SquarePen className="w-4 h-4" />
+              </button>
+            </div>
           ) : undefined
         }
       />

@@ -69,9 +69,10 @@ function getLocalizedText(value: LocalizedText): string {
 
 interface ModelSelectorProps {
   variant?: 'header' | 'compact'
+  iconOnly?: boolean  // Show only icon without text (for narrow windows)
 }
 
-export function ModelSelector({ variant = 'header' }: ModelSelectorProps = {}) {
+export function ModelSelector({ variant = 'header', iconOnly = false }: ModelSelectorProps = {}) {
   const { t } = useTranslation()
   const { config, setConfig, setView } = useAppStore()
   const [isOpen, setIsOpen] = useState(false)
@@ -218,10 +219,12 @@ export function ModelSelector({ variant = 'header' }: ModelSelectorProps = {}) {
             <span className="text-[10px] text-muted-foreground">AI</span>
           </div>
         )}
-        <span className={variant === 'header' ? 'max-w-[140px] truncate' : ''}>
-          {currentModelName}
-        </span>
-        {styles.showChevron && (
+        {!iconOnly && (
+          <span className={variant === 'header' ? 'max-w-[140px] truncate' : ''}>
+            {currentModelName}
+          </span>
+        )}
+        {styles.showChevron && !iconOnly && (
           <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
         )}
       </button>

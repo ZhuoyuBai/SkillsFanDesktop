@@ -119,6 +119,11 @@ export interface HaloAPI {
   showArtifactInFolder: (filePath: string) => Promise<IpcResponse>
   readArtifactContent: (filePath: string) => Promise<IpcResponse>
 
+  // Skill
+  listSkills: () => Promise<IpcResponse>
+  reloadSkills: () => Promise<IpcResponse>
+  getSkillsDir: () => Promise<IpcResponse>
+
   // Onboarding
   writeOnboardingArtifact: (spaceId: string, filename: string, content: string) => Promise<IpcResponse>
   saveOnboardingConversation: (spaceId: string, userPrompt: string, aiResponse: string) => Promise<IpcResponse>
@@ -343,6 +348,11 @@ const api: HaloAPI = {
   openArtifact: (filePath) => ipcRenderer.invoke('artifact:open', filePath),
   showArtifactInFolder: (filePath) => ipcRenderer.invoke('artifact:show-in-folder', filePath),
   readArtifactContent: (filePath) => ipcRenderer.invoke('artifact:read-content', filePath),
+
+  // Skill
+  listSkills: () => ipcRenderer.invoke('skill:list'),
+  reloadSkills: () => ipcRenderer.invoke('skill:reload'),
+  getSkillsDir: () => ipcRenderer.invoke('skill:get-dir'),
 
   // Onboarding
   writeOnboardingArtifact: (spaceId, filename, content) =>

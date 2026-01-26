@@ -527,5 +527,15 @@
   "Writing & Documents": "写作办公",
   "Research & Organization": "资料整理",
   "Automation": "自动化",
-  "Efficiency Tools": "效率工具"
+  "Efficiency Tools": "效率工具",
+  "Skills": "技能",
+  "Refresh": "刷新",
+  "Refresh skill list": "刷新技能列表",
+  "Refreshing...": "刷新中...",
+  "Skills directory": "技能目录",
+  "Loading skills...": "加载技能中...",
+  "No skills installed": "暂无已安装的技能",
+  "Add skills to the skills directory to see them here": "将技能添加到技能目录即可在此显示",
+  "Each skill folder should contain a SKILL.md file": "每个技能文件夹应包含一个 SKILL.md 文件",
+  "Skills are automatically loaded when the app starts": "技能在应用启动时自动加载"
 }

@@ -40,6 +40,28 @@ interface InputAreaProps {
   noBorder?: boolean  // Hide top border (used in empty state centered layout)
 }
 
+// Mobile breakpoint (matches Tailwind sm: 640px)
+const MOBILE_BREAKPOINT = 640
+
+// Hook to detect mobile viewport (responsive to window resize)
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return window.innerWidth < MOBILE_BREAKPOINT
+  })
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < MOBILE_BREAKPOINT)
+    }
+
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
+  return isMobile
+}
+
 // Image constraints
 const MAX_IMAGE_SIZE = 20 * 1024 * 1024  // 20MB max per image (before compression)
 const MAX_IMAGES = 10  // Max images per message
@@ -447,8 +469,8 @@ function InputToolbar({
 }: InputToolbarProps) {
   const { t } = useTranslation()
 
-  // Detect mobile viewport for simplified toolbar
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 640
+  // Detect mobile viewport for simplified toolbar (responsive to window resize)
+  const isMobile = useIsMobile()
 
   return (
     <div className="flex items-center justify-between px-2 pb-2 pt-1">
@@ -501,18 +523,18 @@ function InputToolbar({
           </div>
         )}
 
-        {/* Model Selector - hidden on mobile */}
-        {!isGenerating && !isOnboarding && !isMobile && (
-          <ModelSelector variant="compact" />
+        {/* Model Selector - icon only on narrow windows */}
+        {!isGenerating && !isOnboarding && (
+          <ModelSelector variant="compact" iconOnly={isMobile} />
         )}
 
-        {/* Space Selector - hidden on mobile */}
-        {!isGenerating && !isOnboarding && !isMobile && (
-          <SpaceSelector />
+        {/* Space Selector - icon only on narrow windows */}
+        {!isGenerating && !isOnboarding && (
+          <SpaceSelector iconOnly={isMobile} />
         )}
 
-        {/* AI Browser toggle - hidden on mobile */}
-        {!isGenerating && !isOnboarding && !isMobile && (
+        {/* AI Browser toggle - temporarily hidden */}
+        {/* {!isGenerating && !isOnboarding && (
           <button
             onClick={onAIBrowserToggle}
             className={`h-8 flex items-center gap-1.5 px-2.5 rounded-lg
@@ -525,9 +547,9 @@ function InputToolbar({
             title={aiBrowserEnabled ? t('AI Browser enabled (click to disable)') : t('Enable AI Browser')}
           >
             <Globe size={15} />
-            <span className="text-xs">{t('Browser')}</span>
+            {!isMobile && <span className="text-xs">{t('Browser')}</span>}
           </button>
-        )}
+        )} */}
 
       </div>
 

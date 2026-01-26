@@ -16,7 +16,11 @@ import { HaloLogo } from '../brand/HaloLogo'
 import { CreateSpaceDialog } from '../space/CreateSpaceDialog'
 import { useTranslation } from '../../i18n'
 
-export function SpaceSelector() {
+interface SpaceSelectorProps {
+  iconOnly?: boolean  // Show only icon without text (for narrow windows)
+}
+
+export function SpaceSelector({ iconOnly = false }: SpaceSelectorProps = {}) {
   const { t } = useTranslation()
   const { haloSpace, spaces, currentSpace, setCurrentSpace, loadSpaces } = useSpaceStore()
   const { setView } = useAppStore()
@@ -101,9 +105,11 @@ export function SpaceSelector() {
               <span className="text-[10px] text-muted-foreground">?</span>
             </div>
           )}
-          <span className="max-w-[80px] truncate">
-            {displaySpace?.isTemp ? t('SkillsFan') : displaySpace?.name || t('Space')}
-          </span>
+          {!iconOnly && (
+            <span className="max-w-[80px] truncate">
+              {displaySpace?.isTemp ? t('SkillsFan') : displaySpace?.name || t('Space')}
+            </span>
+          )}
         </button>
 
         {/* Dropdown Menu */}

@@ -473,6 +473,28 @@ export const api = {
     return httpRequest('GET', `/api/artifacts/content?path=${encodeURIComponent(filePath)}`)
   },
 
+  // ===== Skill =====
+  listSkills: async (): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.skillsfan.listSkills()
+    }
+    return httpRequest('GET', '/api/skills')
+  },
+
+  reloadSkills: async (): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.skillsfan.reloadSkills()
+    }
+    return httpRequest('POST', '/api/skills/reload')
+  },
+
+  getSkillsDir: async (): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.skillsfan.getSkillsDir()
+    }
+    return httpRequest('GET', '/api/skills/dir')
+  },
+
   // ===== Onboarding =====
   writeOnboardingArtifact: async (
     spaceId: string,

@@ -147,9 +147,8 @@ export function ConversationList({
         className="border-r border-border/40 flex flex-col bg-card/50 relative"
         style={{ width: COLLAPSED_WIDTH }}
       >
-        {/* Logo + Toggle button */}
-        <div className="px-2 py-3 border-b border-border/50 flex flex-col items-center gap-2">
-          <HaloLogo size={24} hoverOnly={true} />
+        {/* Toggle button (no logo in collapsed state) */}
+        <div className="px-2 py-3 border-b border-border/50 flex flex-col items-center">
           {onToggleCollapse && (
             <div className="relative">
               <button
@@ -159,11 +158,11 @@ export function ConversationList({
                 }}
                 onMouseEnter={() => setShowCollapseTooltip(true)}
                 onMouseLeave={() => setShowCollapseTooltip(false)}
-                className="p-1.5 hover:bg-muted rounded-md transition-colors text-muted-foreground hover:text-foreground"
+                className="p-2 hover:bg-muted rounded-md transition-colors text-muted-foreground hover:text-foreground"
                 aria-label={t('Expand sidebar')}
                 aria-expanded={false}
               >
-                <PanelLeft size={16} />
+                <PanelLeft size={20} />
               </button>
               {showCollapseTooltip && (
                 <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2 z-50 pointer-events-none">

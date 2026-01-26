@@ -520,5 +520,15 @@
   "Writing & Documents": "Writing & Documents",
   "Research & Organization": "Research & Organization",
   "Automation": "Automation",
-  "Efficiency Tools": "Efficiency Tools"
+  "Efficiency Tools": "Efficiency Tools",
+  "Skills": "Skills",
+  "Refresh": "Refresh",
+  "Refresh skill list": "Refresh skill list",
+  "Refreshing...": "Refreshing...",
+  "Skills directory": "Skills directory",
+  "Loading skills...": "Loading skills...",
+  "No skills installed": "No skills installed",
+  "Add skills to the skills directory to see them here": "Add skills to the skills directory to see them here",
+  "Each skill folder should contain a SKILL.md file": "Each skill folder should contain a SKILL.md file",
+  "Skills are automatically loaded when the app starts": "Skills are automatically loaded when the app starts"
 }
