@@ -453,6 +453,41 @@ export function deleteConversation(spaceId: string, conversationId: string): boo
   return false
 }
 
+// Clear all conversations for a space (delete records only, not user files)
+export function clearAllConversations(spaceId: string): number {
+  const conversationsDir = getConversationsDir(spaceId)
+
+  if (!existsSync(conversationsDir)) {
+    return 0
+  }
+
+  // Get all conversation files
+  const files = readdirSync(conversationsDir).filter(
+    (f) => f.endsWith('.json') && f !== 'index.json'
+  )
+
+  let deletedCount = 0
+
+  // Delete each conversation file
+  for (const file of files) {
+    const filePath = join(conversationsDir, file)
+    try {
+      rmSync(filePath)
+      deletedCount++
+    } catch (error) {
+      console.error(`Failed to delete conversation file: ${filePath}`, error)
+    }
+  }
+
+  // Clear the index file
+  const indexPath = join(conversationsDir, 'index.json')
+  if (existsSync(indexPath)) {
+    writeFileSync(indexPath, JSON.stringify([], null, 2))
+  }
+
+  return deletedCount
+}
+
 // Save session ID for a conversation
 export function saveSessionId(spaceId: string, conversationId: string, sessionId: string): void {
   const conversation = getConversation(spaceId, conversationId)

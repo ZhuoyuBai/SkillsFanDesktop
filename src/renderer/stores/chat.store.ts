@@ -116,6 +116,7 @@ interface ChatState {
   createConversation: (spaceId: string) => Promise<Conversation | null>
   selectConversation: (conversationId: string) => void
   deleteConversation: (spaceId: string, conversationId: string) => Promise<boolean>
+  clearAllConversations: (spaceId: string) => Promise<boolean>
   renameConversation: (spaceId: string, conversationId: string, newTitle: string) => Promise<boolean>
 
   // Messaging
@@ -435,6 +436,56 @@ export const useChatStore = create<ChatState>((set, get) => ({
       return false
     } catch (error) {
       console.error('Failed to delete conversation:', error)
+      return false
+    }
+  },
+
+  // Clear all conversations for a space
+  clearAllConversations: async (spaceId) => {
+    try {
+      const response = await api.clearAllConversations(spaceId)
+
+      if (response.success) {
+        set((state) => {
+          // Get current space state
+          const existingState = state.spaceStates.get(spaceId)
+          if (!existingState) return state
+
+          // Get all conversation IDs for this space
+          const conversationIds = existingState.conversations.map((c) => c.id)
+
+          // Clean up sessions for these conversations
+          const newSessions = new Map(state.sessions)
+          for (const id of conversationIds) {
+            newSessions.delete(id)
+          }
+
+          // Clean up cache for these conversations
+          const newCache = new Map(state.conversationCache)
+          for (const id of conversationIds) {
+            newCache.delete(id)
+          }
+
+          // Clear conversations and reset current
+          const newSpaceStates = new Map(state.spaceStates)
+          newSpaceStates.set(spaceId, {
+            conversations: [],
+            currentConversationId: null
+          })
+
+          return {
+            spaceStates: newSpaceStates,
+            sessions: newSessions,
+            conversationCache: newCache
+          }
+        })
+
+        return true
+      }
+
+      return false
+    } catch (error) {
+      console.error('Failed to clear all conversations:', error)
       return false
     }
   },

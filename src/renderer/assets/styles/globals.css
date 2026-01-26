@@ -80,7 +80,7 @@
 
 /* Light theme */
 .light {
-  --background: 0 0% 100%;
+  --background: 0 0% 99%;
   --foreground: 0 0% 9%;
   --card: 0 0% 98%;
   --card-foreground: 0 0% 9%;
@@ -88,7 +88,7 @@
   --popover-foreground: 0 0% 9%;
   --primary: 24 90% 42%;
   --primary-foreground: 0 0% 100%;
-  --secondary: 0 0% 94%;
+  --secondary: 0 0% 98%;
   --secondary-foreground: 0 0% 20%;
   --muted: 0 0% 94%;
   --muted-foreground: 0 0% 45%;
@@ -118,6 +118,7 @@
 
 html {
   color-scheme: dark;
+  font-size: 17px; /* Larger base font for better readability (default is 16px) */
 }
 
 html.light {

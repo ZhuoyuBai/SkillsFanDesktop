@@ -9,6 +9,7 @@ import {
   getConversation,
   updateConversation,
   deleteConversation,
+  clearAllConversations,
   addMessage,
   updateLastMessage
 } from '../services/conversation.service'
@@ -66,6 +67,17 @@ export function registerConversationHandlers(): void {
     try {
       const result = deleteConversation(spaceId, conversationId)
       return { success: true, data: result }
+    } catch (error: unknown) {
+      const err = error as Error
+      return { success: false, error: err.message }
+    }
+  })
+
+  // Clear all conversations for a space
+  ipcMain.handle('conversation:clear-all', async (_event, spaceId: string) => {
+    try {
+      const deletedCount = clearAllConversations(spaceId)
+      return { success: true, data: deletedCount }
     } catch (error: unknown) {
       const err = error as Error
       return { success: false, error: err.message }

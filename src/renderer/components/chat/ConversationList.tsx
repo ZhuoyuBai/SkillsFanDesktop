@@ -14,10 +14,21 @@ import { useTranslation } from '../../i18n'
 import { UserAvatarMenu } from './UserAvatarMenu'
 
 // Width constraints (in pixels)
-const MIN_WIDTH = 140
-const MAX_WIDTH = 320
-const DEFAULT_WIDTH = 192 // w-48 = 12rem = 192px
+const MIN_WIDTH = 160 // Allow smaller width
+const MAX_WIDTH = 400
 const COLLAPSED_WIDTH = 48 // Width when collapsed (icon only)
+const WIDTH_RATIO = 0.15 // 15% of window width
+
+// Calculate width based on window width (clamped to constraints)
+function calculateWidth(windowWidth: number): number {
+  const targetWidth = Math.round(windowWidth * WIDTH_RATIO)
+  return Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, targetWidth))
+}
+
+function getDefaultWidth(): number {
+  if (typeof window === 'undefined') return 240
+  return calculateWidth(window.innerWidth)
+}
 
 interface ConversationListProps {
   conversations: ConversationMeta[]
@@ -26,6 +37,7 @@ interface ConversationListProps {
   onNew: () => void
   onDelete?: (id: string) => void
   onRename?: (id: string, newTitle: string) => void
+  onClearAll?: () => void  // Clear all task history
   isCollapsed?: boolean
   onToggleCollapse?: () => void
   isMobileOverlay?: boolean  // Mobile overlay mode - full width, no drag resize
@@ -38,13 +50,27 @@ export function ConversationList({
   onNew,
   onDelete,
   onRename,
+  onClearAll,
   isCollapsed = false,
   onToggleCollapse,
   isMobileOverlay = false
 }: ConversationListProps) {
   const { t } = useTranslation()
-  const [width, setWidth] = useState(DEFAULT_WIDTH)
+  const [width, setWidth] = useState(getDefaultWidth)
   const [isDragging, setIsDragging] = useState(false)
+  const [hasUserResized, setHasUserResized] = useState(false) // Track if user manually resized
+
+  // Update width when window resizes (only if user hasn't manually resized)
+  useEffect(() => {
+    if (hasUserResized) return
+
+    const handleResize = () => {
+      setWidth(calculateWidth(window.innerWidth))
+    }
+
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [hasUserResized])
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingTitle, setEditingTitle] = useState('')
   const [showCollapseTooltip, setShowCollapseTooltip] = useState(false)
@@ -71,6 +97,7 @@ export function ConversationList({
 
     const handleMouseUp = () => {
       setIsDragging(false)
+      setHasUserResized(true) // User manually resized, stop auto-resize
     }
 
     document.addEventListener('mousemove', handleMouseMove)
@@ -143,7 +170,7 @@ export function ConversationList({
   if (isCollapsed) {
     return (
       <div
-        className="border-r border-border/40 flex flex-col bg-card/50 relative"
+        className="border-r border-border/40 flex flex-col bg-secondary relative"
         style={{ width: COLLAPSED_WIDTH }}
       >
         {/* Toggle button (no logo in collapsed state) */}
@@ -232,7 +259,7 @@ export function ConversationList({
   return (
     <div
       ref={containerRef}
-      className={`flex flex-col relative ${isMobileOverlay ? 'bg-background flex-1' : 'border-r border-border/40 bg-card/50'}`}
+      className={`flex flex-col relative ${isMobileOverlay ? 'bg-background flex-1' : 'border-r border-border/40 bg-secondary'}`}
       style={isMobileOverlay ? undefined : {
         width,
         transition: isDragging ? 'none' : 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -243,8 +270,8 @@ export function ConversationList({
       {!isMobileOverlay && (
       <div className="px-4 py-3 border-b border-border/50 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <HaloLogo size={22} hoverOnly={true} />
-          <span className="text-sm font-medium text-foreground/80">技能范</span>
+          <HaloLogo size={26} hoverOnly={true} />
+          <span className="text-base font-medium text-foreground/80">技能范</span>
         </div>
         {onToggleCollapse && (
           <div className="relative">
@@ -259,7 +286,7 @@ export function ConversationList({
               aria-label={t('Collapse sidebar')}
               aria-expanded={true}
             >
-              <PanelLeftClose size={16} />
+              <PanelLeftClose size={18} />
             </button>
             {showCollapseTooltip && (
               <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2 z-50 pointer-events-none">
@@ -278,30 +305,42 @@ export function ConversationList({
         <button
           onClick={onNew}
           className="w-full flex items-center justify-start gap-2 px-2 py-1.5
-            text-sm font-medium text-foreground/80 hover:text-foreground
-            hover:bg-muted/60
+            text-sm font-medium text-foreground hover:bg-muted/60
             rounded transition-all duration-150
             active:scale-[0.98]"
         >
-          <SquarePen className="w-4 h-4" />
+          <SquarePen className="w-4 h-4 text-foreground" />
           {t('New conversation')}
         </button>
         <button
           onClick={() => openSearch('global')}
           className="w-full flex items-center justify-start gap-2 px-2 py-1.5
-            text-sm text-foreground/70 hover:text-foreground
-            hover:bg-muted/50
+            text-sm text-foreground hover:bg-muted/50
             rounded transition-all duration-150"
         >
-          <Search className="w-4 h-4" />
+          <Search className="w-4 h-4 text-foreground" />
           {t('Search')}
         </button>
       </div>
 
       {/* Conversation list */}
       <div className="flex-1 overflow-auto">
-        <div className="px-4 py-2 text-xs text-muted-foreground font-medium">
-          {t('Task history')}
+        <div className="px-4 py-2 flex items-center justify-between">
+          <span className="text-xs text-muted-foreground font-medium">
+            {t('Task history')}
+          </span>
+          {onClearAll && conversations.length > 0 && (
+            <button
+              onClick={onClearAll}
+              className="p-1 hover:bg-destructive/20 text-muted-foreground hover:text-destructive rounded transition-colors"
+              title={t('Clear all tasks')}
+              aria-label={t('Clear all tasks')}
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
+          )}
         </div>
         {conversations.map((conversation) => (
           <div

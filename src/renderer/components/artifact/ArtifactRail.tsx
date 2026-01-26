@@ -17,6 +17,7 @@ import { useIsGenerating } from '../../stores/chat.store'
 import { useOnboardingStore } from '../../stores/onboarding.store'
 import { useCanvasStore } from '../../stores/canvas.store'
 import { ChevronRight, FolderOpen, Monitor, LayoutGrid, FolderTree, X } from 'lucide-react'
+import logoImage from '../../assets/logo.png'
 import { ONBOARDING_ARTIFACT_NAME } from '../onboarding/onboardingData'
 import { useTranslation } from '../../i18n'
 
@@ -27,10 +28,21 @@ const isWebMode = api.isRemoteMode()
 const VIEW_MODE_STORAGE_KEY = 'halo:artifact-view-mode'
 
 // Width constraints (in pixels) - Desktop only
-const MIN_WIDTH = 180
-const MAX_WIDTH = 400
-const DEFAULT_WIDTH = 240
+const MIN_WIDTH = 180 // Allow smaller width
+const MAX_WIDTH = 480
 const COLLAPSED_WIDTH = 48
+const WIDTH_RATIO = 0.18 // 18% of window width
+
+// Calculate width based on window width (clamped to constraints)
+function calculateWidth(windowWidth: number): number {
+  const targetWidth = Math.round(windowWidth * WIDTH_RATIO)
+  return Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, targetWidth))
+}
+
+function getDefaultWidth(): number {
+  if (typeof window === 'undefined') return 280
+  return calculateWidth(window.innerWidth)
+}
 
 // Mobile breakpoint (matches Tailwind sm)
 const MOBILE_BREAKPOINT = 640
@@ -85,8 +97,9 @@ export function ArtifactRail({
   const isExpanded = isControlled ? externalExpanded : internalExpanded
 
   const [isLoading, setIsLoading] = useState(false)
-  const [width, setWidth] = useState(DEFAULT_WIDTH)
+  const [width, setWidth] = useState(getDefaultWidth)
   const [isDragging, setIsDragging] = useState(false)
+  const [hasUserResized, setHasUserResized] = useState(false) // Track if user manually resized
   const [viewMode, setViewMode] = useState<ArtifactViewMode>(getInitialViewMode)
   const [mobileOverlayOpen, setMobileOverlayOpen] = useState(false)
   const railRef = useRef<HTMLDivElement>(null)
@@ -94,6 +107,17 @@ export function ArtifactRail({
   const { isActive: isOnboarding, currentStep, completeOnboarding } = useOnboardingStore()
   const isMobile = useIsMobile()
 
+  // Update width when window resizes (only if user hasn't manually resized)
+  useEffect(() => {
+    if (hasUserResized || isMobile) return
+
+    const handleResize = () => {
+      setWidth(calculateWidth(window.innerWidth))
+    }
+
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [hasUserResized, isMobile])
 
   // Check if any browser tab is open (native BrowserView)
   // When browser tabs exist, disable CSS transition to sync with native view resize
@@ -169,6 +193,7 @@ export function ArtifactRail({
 
     const handleMouseUp = () => {
       setIsDragging(false)
+      setHasUserResized(true) // User manually resized, stop auto-resize
     }
 
     document.addEventListener('mousemove', handleMouseMove)
@@ -242,7 +267,7 @@ export function ArtifactRail({
           ) : artifacts.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center px-2">
               <div className="w-12 h-12 rounded-full border-2 border-dashed border-muted-foreground/30 flex items-center justify-center mb-3 halo-breathe">
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/20 to-transparent" />
+                <img src={logoImage} alt="SkillsFan" className="w-8 h-8 rounded-full object-cover" />
               </div>
               <p className="text-xs text-muted-foreground">
                 {isTemp ? t('Ideas will crystallize here') : t('Files will appear here')}
@@ -404,7 +429,7 @@ export function ArtifactRail({
   return (
     <div
       ref={railRef}
-      className="h-full border-l border-border bg-card/30 flex flex-col relative"
+      className="h-full border-l border-border bg-secondary flex flex-col relative"
       style={{
         width: displayWidth,
         // Disable transition when: dragging OR browser tab exists (to sync with native BrowserView)
@@ -415,7 +440,7 @@ export function ArtifactRail({
       {/* Drag handle - only show when expanded */}
       {isExpanded && (
         <div
-          className={`absolute left-0 top-0 bottom-0 w-2 cursor-col-resize z-20 group/handle
+          className={`absolute left-0 top-0 bottom-0 w-1 cursor-col-resize z-20 group/handle
             transition-all duration-200
             ${isDragging ? 'bg-primary/60' : 'hover:bg-primary/40'}`}
           onMouseDown={handleMouseDown}

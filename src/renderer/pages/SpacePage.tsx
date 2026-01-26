@@ -72,6 +72,7 @@ export function SpacePage() {
     createConversation,
     selectConversation,
     deleteConversation,
+    clearAllConversations,
     renameConversation
   } = useChatStore()
 
@@ -85,6 +86,9 @@ export function SpacePage() {
 
   // Mobile sidebar overlay state
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
+
+  // Clear all conversations dialog state
+  const [showClearAllDialog, setShowClearAllDialog] = useState(false)
 
   // Canvas state - use precise selectors to minimize re-renders
   const isCanvasOpen = useCanvasIsOpen()
@@ -277,6 +281,22 @@ export function SpacePage() {
     }
   }
 
+  // Handle clear all conversations
+  const handleClearAllClick = () => {
+    setShowClearAllDialog(true)
+  }
+
+  const handleClearAllConfirm = async () => {
+    if (currentSpace) {
+      await clearAllConversations(currentSpace.id)
+      setShowClearAllDialog(false)
+    }
+  }
+
+  const handleClearAllCancel = () => {
+    setShowClearAllDialog(false)
+  }
+
   // Exit maximized mode when canvas closes
   useEffect(() => {
     if (!isCanvasOpen && isCanvasMaximized) {
@@ -425,6 +445,7 @@ export function SpacePage() {
             onNew={handleNewConversation}
             onDelete={handleDeleteConversation}
             onRename={handleRenameConversation}
+            onClearAll={handleClearAllClick}
             isCollapsed={isConversationListCollapsed}
             onToggleCollapse={() => setIsConversationListCollapsed(!isConversationListCollapsed)}
           />
@@ -572,6 +593,7 @@ export function SpacePage() {
             }}
             onDelete={handleDeleteConversation}
             onRename={handleRenameConversation}
+            onClearAll={handleClearAllClick}
             isCollapsed={false}
             isMobileOverlay={true}
           />
@@ -585,6 +607,34 @@ export function SpacePage() {
           isTemp={currentSpace.isTemp}
           onOpenFolder={handleOpenFolder}
         />
+      )}
+
+      {/* Clear All Conversations Confirmation Dialog */}
+      {showClearAllDialog && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 no-drag">
+          <div className="bg-card border border-border/80 rounded-2xl p-7 w-full max-w-sm animate-fade-in shadow-2xl">
+            <h2 className="text-lg font-semibold mb-4 text-foreground/95 tracking-tight">
+              {t('Clear Task History')}
+            </h2>
+            <p className="text-sm text-muted-foreground mb-6">
+              {t('Are you sure you want to clear all task history? This will not delete any files created by your tasks.')}
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={handleClearAllCancel}
+                className="px-5 py-2.5 text-muted-foreground hover:text-foreground hover:bg-secondary/60 rounded-xl transition-all"
+              >
+                {t('Cancel')}
+              </button>
+              <button
+                onClick={handleClearAllConfirm}
+                className="px-5 py-2.5 bg-destructive/90 hover:bg-destructive text-destructive-foreground rounded-xl shadow-sm hover:shadow-md transition-all"
+              >
+                {t('Clear All')}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

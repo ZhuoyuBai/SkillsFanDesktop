@@ -35,9 +35,9 @@ interface InputAreaProps {
   onSend: (content: string, images?: ImageAttachment[], thinkingEnabled?: boolean) => void
   onStop: () => void
   isGenerating: boolean
-  placeholder?: string
   isCompact?: boolean
   noBorder?: boolean  // Hide top border (used in empty state centered layout)
+  suggestedContent?: string  // External suggested content to fill in
 }
 
 // Mobile breakpoint (matches Tailwind sm: 640px)
@@ -62,6 +62,81 @@ function useIsMobile() {
   return isMobile
 }
 
+// Typewriter animation phrases - matches QUICK_PROMPTS in ChatView
+const TYPEWRITER_PHRASES = [
+  '帮我在桌面创建一个"每日计划.txt"文件...',
+  '在桌面创建一个"sales.csv"示例文件...',
+  '帮我在桌面创建一个"创意灵感.md"文件...',
+  '在桌面创建一个"项目笔记"文件夹...',
+  '帮我在桌面创建一个"商品文案.md"文件...',
+]
+
+// Hook for typewriter animation effect
+function useTypewriter(phrases: string[], options?: {
+  typeSpeed?: number      // Speed of typing each character (ms)
+  deleteSpeed?: number    // Speed of deleting each character (ms)
+  pauseAfterType?: number // Pause after typing complete (ms)
+  pauseAfterDelete?: number // Pause after deleting complete (ms)
+}) {
+  const {
+    typeSpeed = 80,
+    deleteSpeed = 40,
+    pauseAfterType = 2000,
+    pauseAfterDelete = 500,
+  } = options || {}
+
+  const [displayText, setDisplayText] = useState('')
+  const [phraseIndex, setPhraseIndex] = useState(0)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [isPaused, setIsPaused] = useState(false)
+
+  useEffect(() => {
+    if (phrases.length === 0) return
+
+    const currentPhrase = phrases[phraseIndex]
+
+    if (isPaused) {
+      const pauseDuration = isDeleting ? pauseAfterDelete : pauseAfterType
+      const timer = setTimeout(() => {
+        setIsPaused(false)
+        if (!isDeleting) {
+          setIsDeleting(true)
+        } else {
+          setPhraseIndex((prev) => (prev + 1) % phrases.length)
+          setIsDeleting(false)
+        }
+      }, pauseDuration)
+      return () => clearTimeout(timer)
+    }
+
+    if (!isDeleting) {
+      // Typing
+      if (displayText.length < currentPhrase.length) {
+        const timer = setTimeout(() => {
+          setDisplayText(currentPhrase.slice(0, displayText.length + 1))
+        }, typeSpeed)
+        return () => clearTimeout(timer)
+      } else {
+        // Finished typing, pause before deleting
+        setIsPaused(true)
+      }
+    } else {
+      // Deleting
+      if (displayText.length > 0) {
+        const timer = setTimeout(() => {
+          setDisplayText(displayText.slice(0, -1))
+        }, deleteSpeed)
+        return () => clearTimeout(timer)
+      } else {
+        // Finished deleting, pause before next phrase
+        setIsPaused(true)
+      }
+    }
+  }, [displayText, phraseIndex, isDeleting, isPaused, phrases, typeSpeed, deleteSpeed, pauseAfterType, pauseAfterDelete])
+
+  return displayText
+}
+
 // Image constraints
 const MAX_IMAGE_SIZE = 20 * 1024 * 1024  // 20MB max per image (before compression)
 const MAX_IMAGES = 10  // Max images per message
@@ -72,10 +147,11 @@ interface ImageError {
   message: string
 }
 
-export function InputArea({ onSend, onStop, isGenerating, placeholder, isCompact = false, noBorder = false }: InputAreaProps) {
+export function InputArea({ onSend, onStop, isGenerating, isCompact = false, noBorder = false, suggestedContent }: InputAreaProps) {
   const { t } = useTranslation()
   const [content, setContent] = useState('')
   const [isFocused, setIsFocused] = useState(false)
+  const [isHovered, setIsHovered] = useState(false)
   const [images, setImages] = useState<ImageAttachment[]>([])
   const [isDragOver, setIsDragOver] = useState(false)
   const [isProcessingImages, setIsProcessingImages] = useState(false)
@@ -88,6 +164,14 @@ export function InputArea({ onSend, onStop, isGenerating, placeholder, isCompact
 
   // AI Browser state
   const { enabled: aiBrowserEnabled, setEnabled: setAIBrowserEnabled } = useAIBrowserStore()
+
+  // Typewriter animation for placeholder
+  const typewriterText = useTypewriter(TYPEWRITER_PHRASES, {
+    typeSpeed: 40,
+    deleteSpeed: 20,
+    pauseAfterType: 4000,
+    pauseAfterDelete: 200,
+  })
 
   // Auto-clear error after 3 seconds
   useEffect(() => {
@@ -111,6 +195,14 @@ export function InputArea({ onSend, onStop, isGenerating, placeholder, isCompact
     }
   }, [showAttachMenu])
 
+  // Apply suggested content from external source
+  useEffect(() => {
+    if (suggestedContent) {
+      setContent(suggestedContent)
+      textareaRef.current?.focus()
+    }
+  }, [suggestedContent])
+
   // Show error to user
   const showError = (message: string) => {
     setImageError({ id: `err-${Date.now()}`, message })
@@ -123,6 +215,9 @@ export function InputArea({ onSend, onStop, isGenerating, placeholder, isCompact
   // In onboarding send step, show prefilled prompt
   const onboardingPrompt = getOnboardingPrompt(t)
   const displayContent = isOnboardingSendStep ? onboardingPrompt : content
+
+  // Show typewriter only when input is empty, not focused, and not hovered
+  const showTypewriter = !content && !isFocused && !isHovered && !isOnboardingSendStep && !isGenerating
 
   // Process file to ImageAttachment with professional compression
   const processFileWithCompression = async (file: File): Promise<ImageAttachment | null> => {
@@ -341,7 +436,7 @@ export function InputArea({ onSend, onStop, isGenerating, placeholder, isCompact
         <div
           className={`
             relative flex flex-col rounded-2xl
-            border border-border/60 bg-card shadow-sm
+            border border-border/60 bg-[#ffffff] shadow-md
             ${isGenerating ? 'opacity-60' : ''}
             ${isDragOver ? 'ring-2 ring-primary/50 bg-primary/5' : ''}
           `}
@@ -378,7 +473,16 @@ export function InputArea({ onSend, onStop, isGenerating, placeholder, isCompact
           )}
 
           {/* Textarea area */}
-          <div className="px-5 pt-5 pb-4">
+          <div className="px-5 pt-5 pb-4 relative">
+            {/* Typewriter animation overlay */}
+            {showTypewriter && (
+              <div
+                className="absolute left-0 top-0 px-5 pt-5 pb-4 pointer-events-none
+                  text-muted-foreground/50 text-base leading-relaxed text-left"
+              >
+                {typewriterText}
+              </div>
+            )}
             <textarea
               ref={textareaRef}
               value={displayContent}
@@ -387,7 +491,9 @@ export function InputArea({ onSend, onStop, isGenerating, placeholder, isCompact
               onPaste={handlePaste}
               onFocus={() => setIsFocused(true)}
               onBlur={() => setIsFocused(false)}
-              placeholder={placeholder || t('Type a message, let Halo help you...')}
+              onMouseEnter={() => setIsHovered(true)}
+              onMouseLeave={() => setIsHovered(false)}
+              placeholder=""
               disabled={isGenerating}
               readOnly={isOnboardingSendStep}
               rows={2}
@@ -574,7 +680,7 @@ function InputToolbar({
               w-8 h-8 flex items-center justify-center rounded-full transition-all duration-200
               ${canSend
                 ? 'bg-primary text-primary-foreground hover:bg-primary/90 active:scale-95'
-                : 'bg-muted/50 text-muted-foreground/40 cursor-not-allowed'
+                : 'bg-muted text-muted-foreground/60 cursor-not-allowed'
               }
             `}
             title={thinkingEnabled ? t('Send (Deep Thinking)') : t('Send')}

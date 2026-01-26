@@ -19,7 +19,7 @@ import { MessageList } from './MessageList'
 import { InputArea } from './InputArea'
 import { ScrollToBottomButton } from './ScrollToBottomButton'
 import { HaloLogo } from '../brand/HaloLogo'
-import { PenLine, BarChart3, Palette, FolderSearch, Zap, Wrench, LucideIcon } from 'lucide-react'
+import { PenLine, BarChart3, Palette, FolderSearch, ShoppingBag, LucideIcon } from 'lucide-react'
 import {
   ONBOARDING_ARTIFACT_NAME,
   getOnboardingAiResponse,
@@ -293,15 +293,25 @@ export function ChatView({ isCompact = false }: ChatViewProps) {
     prevCompactRef.current = isCompact
   }, [isCompact])
 
+  // Quick suggestion content state
+  const [suggestedContent, setSuggestedContent] = useState<string>('')
+
+  // Handle suggestion click from EmptyState
+  const handleSuggestionClick = useCallback((prompt: string) => {
+    setSuggestedContent(prompt)
+    // Reset to allow clicking same suggestion again
+    setTimeout(() => setSuggestedContent(''), 100)
+  }, [])
+
   // Input area for empty state (centered, no border)
   const emptyStateInputArea = (
     <InputArea
       onSend={handleSend}
       onStop={handleStop}
       isGenerating={isGenerating}
-      placeholder={t('Say what you want to do...')}
       isCompact={isCompact}
       noBorder
+      suggestedContent={suggestedContent}
     />
   )
 
@@ -311,7 +321,6 @@ export function ChatView({ isCompact = false }: ChatViewProps) {
       onSend={handleSend}
       onStop={handleStop}
       isGenerating={isGenerating}
-      placeholder={isCompact ? t('Continue conversation...') : t('Continue conversation...')}
       isCompact={isCompact}
     />
   )
@@ -344,6 +353,7 @@ export function ChatView({ isCompact = false }: ChatViewProps) {
               isCompact={isCompact}
               inputArea={emptyStateInputArea}
               isMobile={isMobile}
+              onSuggestionClick={handleSuggestionClick}
             />
           ) : (
             <>
@@ -389,26 +399,36 @@ function LoadingState() {
 }
 
 // Quick category definitions for MiniMax-style display
-const QUICK_CATEGORIES: { key: string; icon: LucideIcon }[] = [
-  { key: 'Writing & Documents', icon: PenLine },
-  { key: 'Data Analysis', icon: BarChart3 },
-  { key: 'Content Creation', icon: Palette },
-  { key: 'Research & Organization', icon: FolderSearch },
-  { key: 'Automation', icon: Zap },
-  { key: 'Efficiency Tools', icon: Wrench },
+const QUICK_CATEGORIES: { key: string; icon: LucideIcon; color: string }[] = [
+  { key: 'Writing & Documents', icon: PenLine, color: 'text-blue-500' },
+  { key: 'Data Analysis', icon: BarChart3, color: 'text-emerald-500' },
+  { key: 'Content Creation', icon: Palette, color: 'text-purple-500' },
+  { key: 'Research & Organization', icon: FolderSearch, color: 'text-amber-500' },
+  { key: 'E-commerce', icon: ShoppingBag, color: 'text-pink-500' },
 ]
+
+// Quick prompts for each category - simple desktop tasks for user experience
+const QUICK_PROMPTS: Record<string, string> = {
+  'Writing & Documents': '帮我在桌面创建一个"每日计划.txt"文件，里面写上今天的日期和一个简单的待办事项模板',
+  'Data Analysis': '在桌面创建一个"sales.csv"示例文件，包含产品名称、销量、价格三列，生成5条模拟数据',
+  'Content Creation': '帮我在桌面创建一个"创意灵感.md"文件，用Markdown格式写3个有趣的短视频创意点子',
+  'Research & Organization': '在桌面创建一个"项目笔记"文件夹，里面包含"会议记录.md"和"待办事项.md"两个文件',
+  'E-commerce': '帮我在桌面创建一个"商品文案.md"文件，为一款无线蓝牙耳机写淘宝标题、5个卖点和详情页文案',
+}
 
 // Empty state component - adapts to compact mode and mobile
 function EmptyState({
   isTemp,
   isCompact = false,
   inputArea,
-  isMobile = false
+  isMobile = false,
+  onSuggestionClick
 }: {
   isTemp: boolean;
   isCompact?: boolean;
   inputArea?: React.ReactNode;
   isMobile?: boolean;
+  onSuggestionClick?: (prompt: string) => void;
 }) {
   const { t } = useTranslation()
   // Compact mode shows minimal UI
@@ -451,14 +471,17 @@ function EmptyState({
         {categoriesToShow.map((cat) => {
           const Icon = cat.icon
           return (
-            <div
+            <button
               key={cat.key}
+              onClick={() => onSuggestionClick?.(QUICK_PROMPTS[cat.key])}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-full
-                bg-secondary/60 text-sm text-muted-foreground"
+                bg-secondary/60 text-sm text-muted-foreground
+                hover:bg-secondary hover:text-foreground
+                transition-colors cursor-pointer"
             >
-              <Icon size={14} />
+              <Icon size={14} className={cat.color} />
               <span>{t(cat.key)}</span>
-            </div>
+            </button>
           )
         })}
       </div>

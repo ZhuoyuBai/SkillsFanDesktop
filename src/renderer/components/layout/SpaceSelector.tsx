@@ -91,7 +91,7 @@ export function SpaceSelector({ iconOnly = false }: SpaceSelectorProps = {}) {
             transition-all duration-200 border
             ${isOpen
               ? 'bg-primary/15 text-primary border-primary/30'
-              : 'text-foreground/80 border-border/60 hover:text-foreground hover:bg-muted hover:border-border'
+              : 'text-foreground border-border/60 hover:bg-muted hover:border-border'
             }
           `.trim().replace(/\s+/g, ' ')}
         >

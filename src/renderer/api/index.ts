@@ -281,6 +281,13 @@ export const api = {
     )
   },
 
+  clearAllConversations: async (spaceId: string): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.skillsfan.clearAllConversations(spaceId)
+    }
+    return httpRequest('DELETE', `/api/spaces/${spaceId}/conversations`)
+  },
+
   addMessage: async (
     spaceId: string,
     conversationId: string,

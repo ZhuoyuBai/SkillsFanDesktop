@@ -203,10 +203,10 @@ export function ModelSelector({ variant = 'header', iconOnly = false }: ModelSel
         className={`
           ${styles.button}
           ${variant === 'header'
-            ? 'text-muted-foreground hover:text-foreground hover:bg-secondary/80 rounded-lg transition-colors'
+            ? 'text-foreground hover:bg-secondary/80 rounded-lg transition-colors'
             : `transition-all duration-200 border ${isOpen
                 ? 'bg-primary/15 text-primary border-primary/30'
-                : 'text-foreground/80 border-border/60 hover:text-foreground hover:bg-muted hover:border-border'
+                : 'text-foreground border-border/60 hover:bg-muted hover:border-border'
               }`
           }
         `.trim().replace(/\s+/g, ' ')}
