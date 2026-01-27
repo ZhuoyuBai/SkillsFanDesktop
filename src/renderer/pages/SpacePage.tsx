@@ -388,12 +388,15 @@ export function SpacePage() {
         )
       ) : (
       <Header
+        className="bg-card/50 backdrop-blur-sm border-b border-border/40"
         left={
           <>
             {/* Back button - always on the left */}
             <button
               onClick={handleBack}
               className="p-1.5 hover:bg-secondary rounded-lg transition-colors"
+              aria-label={t('Back to home')}
+              title={t('Back to home')}
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
