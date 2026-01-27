@@ -246,6 +246,12 @@ export function SettingsPage() {
   // API Key visibility state
   const [showApiKey, setShowApiKey] = useState(false)
 
+  // Version update state
+  const [appVersion, setAppVersion] = useState<string>('0.1.0')
+  const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'available' | 'not-available' | 'error'>('idle')
+  const [latestVersion, setLatestVersion] = useState<string | null>(null)
+  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false)
+
   // Load remote access status
   useEffect(() => {
     loadRemoteStatus()
@@ -259,6 +265,40 @@ export function SettingsPage() {
       unsubscribe()
     }
   }, [])
+
+  // Load app version and listen for update status
+  useEffect(() => {
+    // Get current app version
+    api.getVersion().then((result) => {
+      if (result.success && result.data) {
+        setAppVersion(result.data as string)
+      }
+    })
+
+    // Listen for update status changes
+    const unsubscribe = api.onUpdaterStatus((data) => {
+      setUpdateStatus(data.status)
+      if (data.latestVersion) {
+        setLatestVersion(data.latestVersion)
+      }
+      setIsCheckingUpdate(false)
+    })
+
+    return () => {
+      unsubscribe()
+    }
+  }, [])
+
+  // Handler for check updates button
+  const handleCheckForUpdates = async () => {
+    setIsCheckingUpdate(true)
+    await api.checkForUpdates()
+  }
+
+  // Handler for download update button
+  const handleOpenDownloadPage = () => {
+    api.openDownloadPage()
+  }
 
   // Load auth providers and refresh AI sources config
   useEffect(() => {
@@ -647,9 +687,14 @@ export function SettingsPage() {
           {/* About section at bottom */}
           <div className="p-3 border-t border-border">
             <div className="text-xs text-muted-foreground space-y-1">
-              <div className="flex justify-between">
+              <div className="flex justify-between items-center">
                 <span>{t('Version')}</span>
-                <span>1.0.0</span>
+                <span className="font-mono flex items-center gap-1.5">
+                  {appVersion}
+                  {updateStatus === 'available' && (
+                    <span className="w-2 h-2 rounded-full bg-primary animate-pulse" title={t('New version available')} />
+                  )}
+                </span>
               </div>
             </div>
           </div>
@@ -1004,7 +1049,7 @@ export function SettingsPage() {
                       onChange={(e) => handleAutoLaunchChange(e.target.checked)}
                       className="sr-only peer"
                     />
-                    <div className="w-11 h-6 bg-secondary rounded-full peer peer-checked:bg-primary transition-colors">
+                    <div className="w-11 h-6 bg-muted-foreground/40 rounded-full peer peer-checked:bg-primary transition-colors">
                       <div
                         className={`w-5 h-5 bg-white rounded-full shadow-md transform transition-transform ${autoLaunch ? 'translate-x-5' : 'translate-x-0.5'
                           } mt-0.5`}
@@ -1030,11 +1075,6 @@ export function SettingsPage() {
                         trayType: window.platform?.isMac ? t('menu bar') : t('system tray')
                       })}
                     </p>
-                    <p className="text-xs text-muted-foreground/70 mt-1">
-                      {t('When enabled, you can remotely control anytime, click {{trayType}} icon to awaken', {
-                        trayType: window.platform?.isMac ? t('menu bar') : t('tray')
-                      })}
-                    </p>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
                     <input
@@ -1043,13 +1083,56 @@ export function SettingsPage() {
                       onChange={(e) => handleMinimizeToTrayChange(e.target.checked)}
                       className="sr-only peer"
                     />
-                    <div className="w-11 h-6 bg-secondary rounded-full peer peer-checked:bg-primary transition-colors">
+                    <div className="w-11 h-6 bg-muted-foreground/40 rounded-full peer peer-checked:bg-primary transition-colors">
                       <div
                         className={`w-5 h-5 bg-white rounded-full shadow-md transform transition-transform ${minimizeToTray ? 'translate-x-5' : 'translate-x-0.5'
                           } mt-0.5`}
                       />
                     </div>
                   </label>
+                </div>
+
+                {/* Version Update */}
+                <div className="pt-4 border-t border-border">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <p className="font-medium">{t('Version Update')}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {t('Current version')}: <span className="font-mono">{appVersion}</span>
+                        {updateStatus === 'available' && latestVersion && (
+                          <span className="ml-2 text-primary">
+                            → {latestVersion} {t('available')}
+                          </span>
+                        )}
+                      </p>
+                      {updateStatus === 'not-available' && (
+                        <p className="text-xs text-muted-foreground/70 mt-1">
+                          {t('Already latest version')}
+                        </p>
+                      )}
+                      {updateStatus === 'error' && (
+                        <p className="text-xs text-red-500/70 mt-1">
+                          {t('Update check failed')}
+                        </p>
+                      )}
+                    </div>
+                    {updateStatus === 'available' ? (
+                      <button
+                        onClick={handleOpenDownloadPage}
+                        className="px-4 py-2 bg-primary text-primary-foreground text-sm rounded-lg hover:bg-primary/90 transition-colors"
+                      >
+                        {t('Download Update')}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={handleCheckForUpdates}
+                        disabled={isCheckingUpdate}
+                        className="px-4 py-2 bg-secondary text-secondary-foreground text-sm rounded-lg hover:bg-secondary/80 transition-colors disabled:opacity-50"
+                      >
+                        {isCheckingUpdate ? t('Checking...') : t('Check for Updates')}
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             </section>

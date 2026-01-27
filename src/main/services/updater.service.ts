@@ -1,192 +1,334 @@
 /**
- * Halo Auto-Updater Service
- * Handles automatic updates via GitHub Releases
+ * Updater Service - Version Update Detection via Website API
+ *
+ * Checks for updates from SkillsFan website instead of GitHub Releases.
+ * Users are directed to download updates from the website.
  */
 
 // Node/Electron imports
-import { app, BrowserWindow, ipcMain } from 'electron'
-
-// Third-party imports
-import electronUpdater from 'electron-updater'
+import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import { is } from '@electron-toolkit/utils'
 
-// Local imports
-import { setIsQuitting } from './tray.service'
-
-// Type imports
-const { autoUpdater } = electronUpdater
-type UpdateInfo = electronUpdater.UpdateInfo
-
 // ============================================================================
-// Constants
+// Types
 // ============================================================================
 
-/** Delay before quitAndInstall to ensure windows close properly (ms) */
-const QUIT_AND_INSTALL_DELAY_MS = 300
+/** API response from website version endpoint */
+interface VersionApiResponse {
+  success: boolean
+  data?: {
+    version: string
+    releaseDate: string
+    releaseNotes: string
+    downloads: {
+      'mac-arm64'?: string
+      'mac-x64'?: string
+      'win-x64'?: string
+      'linux-x64'?: string
+    }
+    downloadPageUrl: string
+  }
+  error?: {
+    code: string
+    message: string
+  }
+}
+
+/** Update information */
+interface UpdateInfo {
+  currentVersion: string
+  latestVersion: string | null
+  releaseDate: string | null
+  releaseNotes: string | null
+  downloadUrl: string | null
+  downloadPageUrl: string | null
+}
+
+/** Updater status */
+type UpdaterStatus = 'idle' | 'checking' | 'available' | 'not-available' | 'error'
+
+/** Full updater state */
+interface UpdaterState {
+  status: UpdaterStatus
+  updateInfo: UpdateInfo
+  errorMessage: string | null
+  lastChecked: string | null
+}
 
 // ============================================================================
 // Configuration
 // ============================================================================
 
-// Configure logging
-autoUpdater.logger = console
+const UPDATER_CONFIG = {
+  /** Version detection API URL */
+  API_URL: 'https://www.skills.fan/api/app/version',
 
-// Auto download updates
-autoUpdater.autoDownload = true
-autoUpdater.autoInstallOnAppQuit = true
+  /** Fallback download page URL */
+  DOWNLOAD_PAGE_URL: 'https://www.skills.fan/download',
 
-// Disable code signing verification for ad-hoc signed apps (no Apple Developer certificate)
-// This allows updates to work without purchasing an Apple Developer account
-if (process.platform === 'darwin') {
-  autoUpdater.forceDevUpdateConfig = true
+  /** Delay before first check after startup (ms) */
+  STARTUP_DELAY: 5000,
+
+  /** Request timeout (ms) */
+  REQUEST_TIMEOUT: 10000
 }
+
+// ============================================================================
+// State
+// ============================================================================
 
 let mainWindow: BrowserWindow | null = null
 
+let state: UpdaterState = {
+  status: 'idle',
+  updateInfo: {
+    currentVersion: '',
+    latestVersion: null,
+    releaseDate: null,
+    releaseNotes: null,
+    downloadUrl: null,
+    downloadPageUrl: null
+  },
+  errorMessage: null,
+  lastChecked: null
+}
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
 /**
- * Initialize auto-updater
+ * Compare two semantic versions
+ * @returns 1 if v1 > v2, -1 if v1 < v2, 0 if equal
+ */
+function compareVersions(v1: string, v2: string): number {
+  const normalize = (v: string): number[] =>
+    v
+      .replace(/^v/, '')
+      .split('.')
+      .map((n) => parseInt(n, 10) || 0)
+
+  const parts1 = normalize(v1)
+  const parts2 = normalize(v2)
+
+  for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
+    const a = parts1[i] || 0
+    const b = parts2[i] || 0
+    if (a > b) return 1
+    if (a < b) return -1
+  }
+
+  return 0
+}
+
+/**
+ * Get download URL for current platform
+ */
+function getDownloadUrlForPlatform(
+  downloads: VersionApiResponse['data']['downloads']
+): string | null {
+  const platform = process.platform
+  const arch = process.arch
+
+  if (platform === 'darwin') {
+    return arch === 'arm64' ? (downloads['mac-arm64'] ?? null) : (downloads['mac-x64'] ?? null)
+  } else if (platform === 'win32') {
+    return downloads['win-x64'] ?? null
+  } else if (platform === 'linux') {
+    return downloads['linux-x64'] ?? null
+  }
+
+  return null
+}
+
+/**
+ * Send update status to renderer process
+ */
+function sendUpdateStatus(): void {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('updater:status', {
+      status: state.status,
+      ...state.updateInfo,
+      errorMessage: state.errorMessage,
+      lastChecked: state.lastChecked
+    })
+  }
+}
+
+/**
+ * Update state and notify renderer
+ */
+function updateState(updates: Partial<UpdaterState>): void {
+  state = { ...state, ...updates }
+  sendUpdateStatus()
+}
+
+// ============================================================================
+// Core Functions
+// ============================================================================
+
+/**
+ * Initialize updater service
  */
 export function initAutoUpdater(window: BrowserWindow): void {
   mainWindow = window
 
-  // Skip updates in development
+  // Initialize current version
+  state.updateInfo.currentVersion = app.getVersion()
+
   if (is.dev) {
     console.log('[Updater] Skipping auto-update in development mode')
     return
   }
 
-  // Set up event handlers
-  autoUpdater.on('checking-for-update', () => {
-    console.log('[Updater] Checking for updates...')
-    sendUpdateStatus('checking')
-  })
-
-  autoUpdater.on('update-available', (info: UpdateInfo) => {
-    console.log('[Updater] Update available:', info.version)
-
-    // On macOS without code signing, skip auto-download and show manual download option
-    if (process.platform === 'darwin') {
-      console.log('[Updater] macOS: Skipping auto-download, showing manual download option')
-      sendUpdateStatus('manual-download', {
-        version: info.version,
-        releaseDate: info.releaseDate,
-        releaseNotes: info.releaseNotes
-      })
-    } else {
-      // Windows/Linux: Proceed with auto-download
-      sendUpdateStatus('available', {
-        version: info.version,
-        releaseDate: info.releaseDate,
-        releaseNotes: info.releaseNotes
-      })
-    }
-  })
-
-  autoUpdater.on('update-not-available', (info: UpdateInfo) => {
-    console.log('[Updater] No update available, current version is latest:', info.version)
-    sendUpdateStatus('not-available', { version: info.version })
-  })
-
-  autoUpdater.on('download-progress', (progress) => {
-    console.log(`[Updater] Download progress: ${progress.percent.toFixed(1)}%`)
-    sendUpdateStatus('downloading', {
-      percent: progress.percent,
-      bytesPerSecond: progress.bytesPerSecond,
-      transferred: progress.transferred,
-      total: progress.total
-    })
-  })
-
-  autoUpdater.on('update-downloaded', (info: UpdateInfo) => {
-    console.log('[Updater] Update downloaded:', info.version)
-    sendUpdateStatus('downloaded', {
-      version: info.version,
-      releaseNotes: info.releaseNotes
-    })
-  })
-
-  autoUpdater.on('error', (error) => {
-    console.error('[Updater] Error:', error.message)
-    // On auto-download failure, show manual download option instead of error
-    // User won't see "failed", just "version available for manual download"
-    sendUpdateStatus('manual-download', {
-      message: 'Version available for manual download'
-    })
-  })
-
   // Check for updates on startup (with delay to not block app launch)
   setTimeout(() => {
     checkForUpdates()
-  }, 5000)
+  }, UPDATER_CONFIG.STARTUP_DELAY)
 }
 
 /**
- * Send update status to renderer
+ * Check for updates from website API
  */
-function sendUpdateStatus(
-  status: 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'manual-download' | 'error',
-  data?: Record<string, unknown>
-): void {
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send('updater:status', { status, ...data })
-  }
-}
+export async function checkForUpdates(): Promise<UpdaterState> {
+  // Update current version in case it changed
+  state.updateInfo.currentVersion = app.getVersion()
 
-/**
- * Check for updates
- */
-export async function checkForUpdates(): Promise<void> {
-  if (is.dev) {
-    console.log('[Updater] Skipping update check in development mode')
-    return
-  }
+  // TODO: Uncomment after testing
+  // if (is.dev) {
+  //   console.log('[Updater] Skipping update check in development mode')
+  //   return state
+  // }
+
+  console.log('[Updater] Checking for updates...')
+  updateState({ status: 'checking', errorMessage: null })
 
   try {
-    await autoUpdater.checkForUpdates()
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), UPDATER_CONFIG.REQUEST_TIMEOUT)
+
+    const response = await fetch(UPDATER_CONFIG.API_URL, {
+      signal: controller.signal,
+      headers: {
+        'User-Agent': `SkillsFan/${app.getVersion()} (${process.platform}; ${process.arch})`,
+        Accept: 'application/json'
+      }
+    })
+
+    clearTimeout(timeoutId)
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+    }
+
+    const result: VersionApiResponse = await response.json()
+
+    if (!result.success || !result.data) {
+      throw new Error(result.error?.message || 'Invalid API response')
+    }
+
+    const { version, releaseDate, releaseNotes, downloads, downloadPageUrl } = result.data
+    const currentVersion = app.getVersion()
+    const hasUpdate = compareVersions(version, currentVersion) > 0
+    const downloadUrl = getDownloadUrlForPlatform(downloads)
+
+    const updateInfo: UpdateInfo = {
+      currentVersion,
+      latestVersion: version,
+      releaseDate,
+      releaseNotes,
+      downloadUrl,
+      downloadPageUrl
+    }
+
+    if (hasUpdate) {
+      console.log(`[Updater] Update available: ${currentVersion} -> ${version}`)
+      updateState({
+        status: 'available',
+        updateInfo,
+        lastChecked: new Date().toISOString()
+      })
+    } else {
+      console.log(`[Updater] Current version ${currentVersion} is up to date`)
+      updateState({
+        status: 'not-available',
+        updateInfo,
+        lastChecked: new Date().toISOString()
+      })
+    }
+
+    return state
   } catch (error) {
-    console.error('[Updater] Failed to check for updates:', error)
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    console.error('[Updater] Failed to check for updates:', errorMessage)
+
+    updateState({
+      status: 'error',
+      errorMessage,
+      lastChecked: new Date().toISOString()
+    })
+
+    return state
   }
 }
 
 /**
- * Quit and install update
- *
- * Important timing considerations for Windows NSIS:
- * 1. Set isQuitting flag to bypass minimize-to-tray behavior
- * 2. Add delay to ensure app fully closes before installer starts
- * 3. Use isSilent=false to show installer UI, isForceRunAfter=true to restart after install
- *
- * @see https://github.com/electron-userland/electron-builder/issues/1368
+ * Open download page in default browser
  */
-export function quitAndInstall(): void {
-  // Bypass minimize-to-tray behavior during update
-  setIsQuitting(true)
+export function openDownloadPage(): void {
+  // Always open the download page, not the direct download URL
+  const url = UPDATER_CONFIG.DOWNLOAD_PAGE_URL
 
-  // Delay to ensure all windows close before installer launches
-  setTimeout(() => {
-    try {
-      // isSilent=false: show installer UI for user feedback
-      // isForceRunAfter=true: restart app after install completes
-      autoUpdater.quitAndInstall(false, true)
-    } catch (error) {
-      console.error('[Updater] quitAndInstall failed:', error)
-    }
-  }, QUIT_AND_INSTALL_DELAY_MS)
+  shell.openExternal(url)
+  console.log('[Updater] Opened download page:', url)
 }
+
+/**
+ * Get current updater state
+ */
+export function getUpdateInfo(): UpdaterState {
+  // Ensure current version is up to date
+  state.updateInfo.currentVersion = app.getVersion()
+  return { ...state }
+}
+
+// ============================================================================
+// IPC Handlers
+// ============================================================================
 
 /**
  * Register IPC handlers for updater
  */
 export function registerUpdaterHandlers(): void {
+  // Check for updates
   ipcMain.handle('updater:check', async () => {
-    await checkForUpdates()
+    try {
+      const result = await checkForUpdates()
+      return { success: true, data: result }
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+    }
   })
 
-  ipcMain.handle('updater:install', () => {
-    quitAndInstall()
-  })
-
+  // Get current app version
   ipcMain.handle('updater:get-version', () => {
-    return app.getVersion()
+    return { success: true, data: app.getVersion() }
+  })
+
+  // Get full update state
+  ipcMain.handle('updater:get-info', () => {
+    return { success: true, data: getUpdateInfo() }
+  })
+
+  // Open download page
+  ipcMain.handle('updater:open-download', () => {
+    openDownloadPage()
+    return { success: true }
+  })
+
+  // Legacy: keep for backward compatibility (now opens download page)
+  ipcMain.handle('updater:install', () => {
+    openDownloadPage()
+    return { success: true }
   })
 }

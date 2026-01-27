@@ -3,46 +3,38 @@
  * Shows a toast-like notification for available updates
  *
  * Behavior:
- * - 'downloaded': Update ready to install (Windows: auto-install, macOS: manual download)
- * - 'manual-download': Need manual download (macOS platform or auto-download failed)
+ * - 'available': New version available, user can click to download from website
  *
- * The component shows the same UI for both states, with button text depending on the action.
+ * The component shows a notification when a new version is detected.
  */
 
 import { useEffect, useState } from 'react'
-import { Download, X, RefreshCw, ExternalLink } from 'lucide-react'
+import { Download, X, ExternalLink } from 'lucide-react'
 import { api } from '../../api'
 import { useTranslation } from '../../i18n'
 
-const isMac = navigator.platform.includes('Mac')
-
 interface UpdateInfo {
-  status: 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'manual-download' | 'error'
-  version?: string
-  percent?: number
-  message?: string
-  releaseNotes?: string | { version: string; note: string }[]
+  status: 'idle' | 'checking' | 'available' | 'not-available' | 'error'
+  currentVersion?: string
+  latestVersion?: string | null
+  releaseDate?: string | null
+  releaseNotes?: string | null
+  downloadUrl?: string | null
+  downloadPageUrl?: string | null
+  errorMessage?: string | null
+  lastChecked?: string | null
 }
 
 // Parse release notes to array of strings
-function parseReleaseNotes(notes: string | { version: string; note: string }[] | undefined): string[] {
+function parseReleaseNotes(notes: string | null | undefined): string[] {
   if (!notes) return []
 
-  if (typeof notes === 'string') {
-    // Split by newlines and filter out empty lines
-    return notes
-      .split('\n')
-      .map(line => line.trim())
-      .filter(line => line.length > 0)
-      .map(line => line.replace(/^[-*]\s*/, '')) // Remove leading - or *
-  }
-
-  // Array format from electron-updater
-  if (Array.isArray(notes)) {
-    return notes.map(item => item.note)
-  }
-
-  return []
+  // Split by newlines and filter out empty lines
+  return notes
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .map((line) => line.replace(/^[-*]\s*/, '')) // Remove leading - or *
 }
 
 export function UpdateNotification() {
@@ -50,18 +42,16 @@ export function UpdateNotification() {
   const [dismissed, setDismissed] = useState(false)
   const [notificationVersion, setNotificationVersion] = useState<string | null>(null)
   const [releaseNotes, setReleaseNotes] = useState<string[]>([])
-  const [isManualDownload, setIsManualDownload] = useState(false)
 
   useEffect(() => {
     // Listen for updater status events
-    const unsubscribe = api.onUpdaterStatus((data) => {
+    const unsubscribe = api.onUpdaterStatus((data: UpdateInfo) => {
       console.log('[UpdateNotification] Received update status:', data)
 
-      // Show notification for both 'downloaded' and 'manual-download' states
-      if ((data.status === 'downloaded' || data.status === 'manual-download') && data.version) {
-        setNotificationVersion(data.version)
+      // Show notification when update is available
+      if (data.status === 'available' && data.latestVersion) {
+        setNotificationVersion(data.latestVersion)
         setReleaseNotes(parseReleaseNotes(data.releaseNotes))
-        setIsManualDownload(data.status === 'manual-download')
         setDismissed(false)
       }
     })
@@ -71,19 +61,9 @@ export function UpdateNotification() {
     }
   }, [])
 
-  const handleInstall = () => {
-    if (isManualDownload || isMac) {
-      // Open GitHub release page for manual download (macOS always, or when manual-download status)
-      if (notificationVersion) {
-        window.open(
-          `https://github.com/openkursar/hello-halo/releases/tag/v${notificationVersion}`,
-          '_blank'
-        )
-      }
-    } else {
-      // Windows auto-install
-      api.installUpdate()
-    }
+  const handleDownload = () => {
+    // Open download page in browser
+    api.openDownloadPage()
   }
 
   const handleDismiss = () => {
@@ -98,53 +78,46 @@ export function UpdateNotification() {
   const hasNotes = releaseNotes.length > 0
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 animate-in slide-in-from-bottom-4 fade-in duration-300">
-      <div className={`bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl p-4 ${hasNotes ? 'max-w-md' : 'max-w-sm'}`}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center animate-in fade-in duration-300">
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/30" onClick={handleDismiss} />
+      <div
+        className={`relative bg-card border border-border rounded-lg shadow-xl p-4 ${hasNotes ? 'max-w-md' : 'max-w-sm'}`}
+      >
         <div className="flex items-start gap-3">
-          <div className="flex-shrink-0 w-10 h-10 bg-emerald-500/20 rounded-full flex items-center justify-center">
-            <Download className="w-5 h-5 text-emerald-400" />
+          <div className="flex-shrink-0 w-10 h-10 bg-primary/20 rounded-full flex items-center justify-center">
+            <Download className="w-5 h-5 text-primary" />
           </div>
 
           <div className="flex-1 min-w-0">
-            <h4 className="text-sm font-medium text-zinc-100">
-              {t('New version Halo {{version}} available', { version: notificationVersion })}
+            <h4 className="text-sm font-medium text-foreground">
+              {t('New version {{version}} available', { version: notificationVersion })}
             </h4>
 
             {hasNotes ? (
-              <ul className="mt-2 space-y-1 max-h-32 overflow-y-auto text-xs text-zinc-300">
+              <ul className="mt-2 space-y-1 max-h-32 overflow-y-auto text-xs text-muted-foreground">
                 {releaseNotes.map((note, index) => (
                   <li key={index} className="flex items-start gap-1.5">
-                    <span className="text-emerald-400 mt-0.5">•</span>
+                    <span className="text-primary mt-0.5">•</span>
                     <span>{note}</span>
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="text-xs text-zinc-400 mt-1">
-                {isManualDownload || isMac ? t('Click to download') : t('Click to restart and complete update')}
-              </p>
+              <p className="text-xs text-muted-foreground mt-1">{t('Click to download')}</p>
             )}
 
             <div className="flex items-center gap-2 mt-3">
               <button
-                onClick={handleInstall}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium rounded-md transition-colors"
+                onClick={handleDownload}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-medium rounded-md transition-colors"
               >
-                {isManualDownload || isMac ? (
-                  <>
-                    <ExternalLink className="w-3.5 h-3.5" />
-                    {t('Go to download')}
-                  </>
-                ) : (
-                  <>
-                    <RefreshCw className="w-3.5 h-3.5" />
-                    {t('Restart now')}
-                  </>
-                )}
+                <ExternalLink className="w-3.5 h-3.5" />
+                {t('Go to download')}
               </button>
               <button
                 onClick={handleDismiss}
-                className="px-3 py-1.5 text-zinc-400 hover:text-zinc-200 text-xs transition-colors"
+                className="px-3 py-1.5 text-muted-foreground hover:text-foreground text-xs transition-colors"
               >
                 {t('Later')}
               </button>
@@ -153,7 +126,7 @@ export function UpdateNotification() {
 
           <button
             onClick={handleDismiss}
-            className="flex-shrink-0 text-zinc-500 hover:text-zinc-300 transition-colors"
+            className="flex-shrink-0 text-muted-foreground hover:text-foreground transition-colors"
           >
             <X className="w-4 h-4" />
           </button>

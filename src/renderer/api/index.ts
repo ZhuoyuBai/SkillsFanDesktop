@@ -944,12 +944,30 @@ export const api = {
     return window.skillsfan.getVersion()
   },
 
+  getUpdateInfo: async (): Promise<ApiResponse> => {
+    if (!isElectron()) {
+      return { success: false, error: 'Only available in desktop app' }
+    }
+    return window.skillsfan.getUpdateInfo()
+  },
+
+  openDownloadPage: async (): Promise<ApiResponse> => {
+    if (!isElectron()) {
+      return { success: false, error: 'Only available in desktop app' }
+    }
+    return window.skillsfan.openDownloadPage()
+  },
+
   onUpdaterStatus: (callback: (data: {
-    status: 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'manual-download' | 'error'
-    version?: string
-    percent?: number
-    message?: string
-    releaseNotes?: string | { version: string; note: string }[]
+    status: 'idle' | 'checking' | 'available' | 'not-available' | 'error'
+    currentVersion?: string
+    latestVersion?: string | null
+    releaseDate?: string | null
+    releaseNotes?: string | null
+    downloadUrl?: string | null
+    downloadPageUrl?: string | null
+    errorMessage?: string | null
+    lastChecked?: string | null
   }) => void) => {
     if (!isElectron()) {
       return () => { } // No-op in remote mode
