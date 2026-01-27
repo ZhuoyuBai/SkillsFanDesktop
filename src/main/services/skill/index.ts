@@ -16,3 +16,10 @@ export {
 export { startSkillWatcher } from './skill-watcher'
 
 export { createSkillMcpServer } from './skill-mcp-server'
+
+export {
+  installSkill,
+  deleteSkill,
+  openSkillFolder,
+  selectSkillArchive
+} from './skill-manager'

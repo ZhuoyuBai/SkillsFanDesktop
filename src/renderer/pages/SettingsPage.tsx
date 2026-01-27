@@ -28,7 +28,7 @@ import { McpServerList } from '../components/settings/McpServerList'
 import { SkillList } from '../components/settings/SkillList'
 import { SkillsFanAccountSection } from '../components/settings/SkillsFanAccountSection'
 import { useTranslation, setLanguage, getCurrentLanguage, SUPPORTED_LOCALES, type LocaleCode } from '../i18n'
-import { Loader2, LogOut, Plus, Check, Globe, Key, MessageSquare, Bot, Palette, Server, Settings as SettingsIcon, Wifi, ExternalLink, X, Sparkles, User, type LucideIcon } from 'lucide-react'
+import { Loader2, LogOut, Plus, Check, Globe, Key, MessageSquare, Bot, Palette, Server, Settings as SettingsIcon, Wifi, ExternalLink, X, Package, User, type LucideIcon } from 'lucide-react'
 
 // Import provider logos
 import zhipuLogo from '../assets/providers/zhipu.jpg'
@@ -596,7 +596,7 @@ export function SettingsPage() {
   const navItems: { id: SettingsSection; icon: LucideIcon; label: string; desktopOnly?: boolean; hidden?: boolean }[] = [
     { id: 'account', icon: User, label: t('Account'), desktopOnly: true },
     { id: 'ai-model', icon: Bot, label: t('AI Model') },
-    { id: 'skills', icon: Sparkles, label: t('Skills') },
+    { id: 'skills', icon: Package, label: t('Skills') },
     { id: 'display', icon: Palette, label: t('Display & Language') },
     { id: 'system', icon: SettingsIcon, label: t('System'), desktopOnly: true },
     { id: 'mcp', icon: Server, label: t('MCP Servers'), hidden: true },

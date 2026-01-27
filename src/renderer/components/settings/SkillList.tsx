@@ -5,7 +5,7 @@
 
 import { useState, useEffect } from 'react'
 import {
-  Sparkles,
+  Package,
   RefreshCw,
   FolderOpen,
   FileText,
@@ -13,10 +13,15 @@ import {
   Wrench,
   BookOpen,
   Code,
-  Zap
+  Zap,
+  Plus,
+  Upload,
+  Trash2
 } from 'lucide-react'
 import { api } from '../../api'
 import { useTranslation } from '../../i18n'
+import { SkillConflictDialog } from './SkillConflictDialog'
+import { SkillDeleteDialog } from './SkillDeleteDialog'
 
 // Skill info type from backend
 interface SkillInfo {
@@ -31,21 +36,21 @@ interface SkillInfo {
 function getSkillIcon(name: string) {
   const lowerName = name.toLowerCase()
   if (lowerName.includes('create') || lowerName.includes('creator')) {
-    return <Wand2 className="w-5 h-5" />
+    return <Wand2 className="w-4 h-4" />
   }
   if (lowerName.includes('optimize') || lowerName.includes('optimizer')) {
-    return <Wrench className="w-5 h-5" />
+    return <Wrench className="w-4 h-4" />
   }
   if (lowerName.includes('evaluate') || lowerName.includes('evaluator') || lowerName.includes('test')) {
-    return <FileText className="w-5 h-5" />
+    return <FileText className="w-4 h-4" />
   }
   if (lowerName.includes('doc') || lowerName.includes('guide') || lowerName.includes('write')) {
-    return <BookOpen className="w-5 h-5" />
+    return <BookOpen className="w-4 h-4" />
   }
   if (lowerName.includes('code') || lowerName.includes('dev')) {
-    return <Code className="w-5 h-5" />
+    return <Code className="w-4 h-4" />
   }
-  return <Zap className="w-5 h-5" />
+  return <Zap className="w-4 h-4" />
 }
 
 // Format description - extract key points from the description
@@ -62,41 +67,52 @@ function formatDescription(description: string): string {
 }
 
 // Skill card component
-function SkillCard({ skill }: { skill: SkillInfo }) {
-  // Shorten the path for display
-  const shortPath = skill.baseDir.replace(/^.*[/\\]\.skillsfan(-dev)?[/\\]skills[/\\]/, '~/.../skills/')
+function SkillCard({
+  skill,
+  onOpenFolder,
+  onDelete
+}: {
+  skill: SkillInfo
+  onOpenFolder: (skillName: string) => void
+  onDelete: (skill: SkillInfo) => void
+}) {
+  const { t } = useTranslation()
 
   return (
-    <div className="bg-secondary/30 hover:bg-secondary/50 rounded-lg p-4 transition-colors">
-      <div className="flex items-start gap-4">
-        {/* Icon */}
-        <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
-          {getSkillIcon(skill.name)}
-        </div>
+    <div className="bg-card border border-border rounded-xl p-5 hover:shadow-md transition-all">
+      {/* First row: Icon + Chinese Name */}
+      <div className="flex items-center gap-2 mb-2">
+        <div className="text-primary flex-shrink-0">{getSkillIcon(skill.name)}</div>
+        <h4 className="font-semibold text-foreground truncate">{skill.displayName}</h4>
+      </div>
 
-        {/* Content */}
-        <div className="flex-1 min-w-0">
-          {/* Display Name (Chinese) */}
-          <h4 className="font-medium text-foreground">
-            {skill.displayName}
-          </h4>
+      {/* Second row: English Name */}
+      <p className="text-xs text-muted-foreground/70 font-mono mb-3">{skill.name}</p>
 
-          {/* Technical Name (English) */}
-          <p className="text-xs text-muted-foreground/60 font-mono mt-0.5">
-            {skill.name}
-          </p>
+      {/* Description Area */}
+      <p className="text-sm text-muted-foreground line-clamp-4 mb-4">
+        {formatDescription(skill.description)}
+      </p>
 
-          {/* Description */}
-          <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
-            {formatDescription(skill.description)}
-          </p>
+      {/* Bottom Action Buttons */}
+      <div className="flex items-center gap-2 pt-3 border-t border-border/50">
+        <button
+          onClick={() => onOpenFolder(skill.name)}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/60 rounded-lg transition-colors"
+          title={t('Open in file manager')}
+        >
+          <FolderOpen className="w-3.5 h-3.5" />
+          文件
+        </button>
 
-          {/* Path */}
-          <div className="flex items-center gap-1.5 mt-3 text-xs text-muted-foreground/50">
-            <FolderOpen className="w-3 h-3" />
-            <span className="truncate font-mono">{shortPath}</span>
-          </div>
-        </div>
+        <button
+          onClick={() => onDelete(skill)}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-destructive/80 hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors ml-auto"
+          title={t('Delete skill')}
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+          {t('Delete')}
+        </button>
       </div>
     </div>
   )
@@ -111,15 +127,43 @@ export function SkillList() {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Installation flow state
+  const [isInstalling, setIsInstalling] = useState(false)
+  const [conflictInfo, setConflictInfo] = useState<{
+    skillName: string
+    archivePath: string
+  } | null>(null)
+
+  // Deletion flow state
+  const [deleteDialogInfo, setDeleteDialogInfo] = useState<{
+    skillName: string
+    skillDisplayName: string
+    skillPath: string
+  } | null>(null)
+
+  // Toast notifications
+  const [toast, setToast] = useState<{
+    message: string
+    type: 'success' | 'error'
+  } | null>(null)
+
   // Load skills on mount
   useEffect(() => {
     loadSkills()
     loadSkillsDir()
   }, [])
 
+  // Auto-hide toast after 3 seconds
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(null), 3000)
+      return () => clearTimeout(timer)
+    }
+  }, [toast])
+
   const loadSkills = async () => {
     try {
-      const result = await api.listSkills()
+      const result = await api.reloadSkills()
       if (result.success && result.data) {
         setSkills(result.data as SkillInfo[])
         setError(null)
@@ -161,6 +205,125 @@ export function SkillList() {
     }
   }
 
+  // Handler for Add Skill button
+  const handleAddSkill = async () => {
+    setIsInstalling(true)
+    setError(null)
+
+    try {
+      // Step 1: Show file picker
+      const selectResult = await api.selectSkillArchive()
+      if (!selectResult.success) {
+        throw new Error(selectResult.error || 'Failed to open file picker')
+      }
+
+      // User cancelled
+      if (!selectResult.data) {
+        setIsInstalling(false)
+        return
+      }
+
+      const archivePath = selectResult.data
+
+      // Step 2: Attempt installation (will return conflict info if name exists)
+      const installResult = await api.installSkill(archivePath)
+
+      if (installResult.success) {
+        // Success - reload skills
+        await loadSkills()
+        setToast({ message: t('Skill installed successfully'), type: 'success' })
+      } else if (installResult.conflict) {
+        // Name conflict - show resolution dialog
+        setConflictInfo({
+          skillName: installResult.conflict.skillName,
+          archivePath
+        })
+      } else {
+        // Installation error
+        throw new Error(installResult.error || 'Installation failed')
+      }
+    } catch (err) {
+      setError((err as Error).message)
+      setToast({ message: (err as Error).message, type: 'error' })
+    } finally {
+      setIsInstalling(false)
+    }
+  }
+
+  // Handler for conflict resolution
+  const handleConflictResolve = async (resolution: 'replace' | 'rename' | 'cancel') => {
+    if (!conflictInfo) return
+
+    const { archivePath } = conflictInfo
+    setConflictInfo(null)
+
+    if (resolution === 'cancel') {
+      return
+    }
+
+    setIsInstalling(true)
+    try {
+      const result = await api.installSkill(archivePath, resolution)
+
+      if (result.success) {
+        await loadSkills()
+        const message =
+          resolution === 'rename'
+            ? t('Skill installed as {{name}}', { name: result.data?.skillName })
+            : t('Skill installed successfully')
+        setToast({ message, type: 'success' })
+      } else {
+        throw new Error(result.error || 'Installation failed')
+      }
+    } catch (err) {
+      setToast({ message: (err as Error).message, type: 'error' })
+    } finally {
+      setIsInstalling(false)
+    }
+  }
+
+  // Handler for Open Folder button
+  const handleOpenFolder = async (skillName: string) => {
+    try {
+      const result = await api.openSkillFolder(skillName)
+      if (!result.success) {
+        setToast({ message: result.error || t('Failed to open folder'), type: 'error' })
+      }
+    } catch (err) {
+      setToast({ message: (err as Error).message, type: 'error' })
+    }
+  }
+
+  // Handler for Delete button click
+  const handleDeleteClick = (skill: SkillInfo) => {
+    setDeleteDialogInfo({
+      skillName: skill.name,
+      skillDisplayName: skill.displayName,
+      skillPath: skill.baseDir
+    })
+  }
+
+  // Handler for delete confirmation
+  const handleDeleteConfirm = async () => {
+    if (!deleteDialogInfo) return
+
+    const { skillName } = deleteDialogInfo
+    setDeleteDialogInfo(null)
+
+    try {
+      const result = await api.deleteSkill(skillName)
+
+      if (result.success) {
+        await loadSkills()
+        setToast({ message: t('Skill deleted successfully'), type: 'success' })
+      } else {
+        throw new Error(result.error || t('Failed to delete skill'))
+      }
+    } catch (err) {
+      setToast({ message: (err as Error).message, type: 'error' })
+    }
+  }
+
   // Shorten skills dir for display
   const shortSkillsDir = skillsDir.replace(/^\/Users\/[^/]+/, '~')
 
@@ -169,7 +332,7 @@ export function SkillList() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Sparkles className="w-5 h-5 text-primary" />
+          <Package className="w-5 h-5 text-primary" />
           <h3 className="font-medium text-foreground">
             {t('Skills')}
           </h3>
@@ -180,15 +343,36 @@ export function SkillList() {
           )}
         </div>
 
-        <button
-          onClick={handleRefresh}
-          disabled={isRefreshing}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg transition-colors disabled:opacity-50"
-          title={t('Refresh skill list')}
-        >
-          <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-          {isRefreshing ? t('Refreshing...') : t('Refresh')}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleAddSkill}
+            disabled={isInstalling}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-primary/90 hover:bg-primary text-primary-foreground rounded-lg transition-colors disabled:opacity-50"
+            title={t('Add Skill')}
+          >
+            {isInstalling ? (
+              <>
+                <Upload className="w-4 h-4 animate-pulse" />
+                {t('Installing...')}
+              </>
+            ) : (
+              <>
+                <Plus className="w-4 h-4" />
+                {t('Add Skill')}
+              </>
+            )}
+          </button>
+
+          <button
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg transition-colors disabled:opacity-50"
+            title={t('Refresh skill list')}
+          >
+            <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            {isRefreshing ? t('Refreshing...') : t('Refresh')}
+          </button>
+        </div>
       </div>
 
       {/* Skills directory info */}
@@ -215,7 +399,7 @@ export function SkillList() {
       ) : skills.length === 0 ? (
         /* Empty state */
         <div className="py-8 text-center">
-          <Sparkles className="w-12 h-12 mx-auto text-muted-foreground/30 mb-3" />
+          <Package className="w-12 h-12 mx-auto text-muted-foreground/30 mb-3" />
           <p className="text-muted-foreground text-sm">
             {t('No skills installed')}
           </p>
@@ -224,10 +408,15 @@ export function SkillList() {
           </p>
         </div>
       ) : (
-        /* Skills list */
-        <div className="space-y-3">
+        /* Skills list - Grid layout (2 columns) */
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {skills.map((skill) => (
-            <SkillCard key={skill.name} skill={skill} />
+            <SkillCard
+              key={skill.name}
+              skill={skill}
+              onOpenFolder={handleOpenFolder}
+              onDelete={handleDeleteClick}
+            />
           ))}
         </div>
       )}
@@ -243,6 +432,33 @@ export function SkillList() {
           {t('Skills are automatically loaded when the app starts')}
         </p>
       </div>
+
+      {/* Conflict Resolution Dialog */}
+      {conflictInfo && (
+        <SkillConflictDialog skillName={conflictInfo.skillName} onResolve={handleConflictResolve} />
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      {deleteDialogInfo && (
+        <SkillDeleteDialog
+          skillName={deleteDialogInfo.skillName}
+          skillDisplayName={deleteDialogInfo.skillDisplayName}
+          skillPath={deleteDialogInfo.skillPath}
+          onConfirm={handleDeleteConfirm}
+          onCancel={() => setDeleteDialogInfo(null)}
+        />
+      )}
+
+      {/* Toast Notification */}
+      {toast && (
+        <div
+          className={`fixed bottom-6 right-6 px-4 py-3 rounded-xl shadow-lg animate-fade-in z-50 ${
+            toast.type === 'success' ? 'bg-green-500/90 text-white' : 'bg-red-500/90 text-white'
+          }`}
+        >
+          <p className="text-sm font-medium">{toast.message}</p>
+        </div>
+      )}
     </div>
   )
 }

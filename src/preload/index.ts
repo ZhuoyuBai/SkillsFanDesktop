@@ -124,6 +124,13 @@ export interface HaloAPI {
   listSkills: () => Promise<IpcResponse>
   reloadSkills: () => Promise<IpcResponse>
   getSkillsDir: () => Promise<IpcResponse>
+  selectSkillArchive: () => Promise<IpcResponse<string | undefined>>
+  installSkill: (
+    archivePath: string,
+    conflictResolution?: 'replace' | 'rename' | 'cancel'
+  ) => Promise<IpcResponse>
+  deleteSkill: (skillName: string) => Promise<IpcResponse>
+  openSkillFolder: (skillName: string) => Promise<IpcResponse>
 
   // Onboarding
   writeOnboardingArtifact: (spaceId: string, filename: string, content: string) => Promise<IpcResponse>
@@ -369,6 +376,11 @@ const api: HaloAPI = {
   listSkills: () => ipcRenderer.invoke('skill:list'),
   reloadSkills: () => ipcRenderer.invoke('skill:reload'),
   getSkillsDir: () => ipcRenderer.invoke('skill:get-dir'),
+  selectSkillArchive: () => ipcRenderer.invoke('skill:select-archive'),
+  installSkill: (archivePath, conflictResolution) =>
+    ipcRenderer.invoke('skill:install', archivePath, conflictResolution),
+  deleteSkill: (skillName) => ipcRenderer.invoke('skill:delete', skillName),
+  openSkillFolder: (skillName) => ipcRenderer.invoke('skill:open-folder', skillName),
 
   // Onboarding
   writeOnboardingArtifact: (spaceId, filename, content) =>

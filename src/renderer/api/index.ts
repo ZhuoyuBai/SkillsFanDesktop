@@ -503,6 +503,37 @@ export const api = {
     return httpRequest('GET', '/api/skills/dir')
   },
 
+  selectSkillArchive: async (): Promise<ApiResponse<string | undefined>> => {
+    if (isElectron()) {
+      return window.skillsfan.selectSkillArchive()
+    }
+    return { success: false, error: 'Only available in desktop app' }
+  },
+
+  installSkill: async (
+    archivePath: string,
+    conflictResolution?: 'replace' | 'rename' | 'cancel'
+  ): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.skillsfan.installSkill(archivePath, conflictResolution)
+    }
+    return httpRequest('POST', '/api/skills/install', { archivePath, conflictResolution })
+  },
+
+  deleteSkill: async (skillName: string): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.skillsfan.deleteSkill(skillName)
+    }
+    return httpRequest('DELETE', `/api/skills/${encodeURIComponent(skillName)}`)
+  },
+
+  openSkillFolder: async (skillName: string): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.skillsfan.openSkillFolder(skillName)
+    }
+    return { success: false, error: 'Only available in desktop app' }
+  },
+
   // ===== Onboarding =====
   writeOnboardingArtifact: async (
     spaceId: string,

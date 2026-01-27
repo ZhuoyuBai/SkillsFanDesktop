@@ -46,6 +46,7 @@
     "@electron-toolkit/utils": "^3.0.0",
     "@tailwindcss/typography": "^0.5.19",
     "@types/diff": "^7.0.2",
+    "adm-zip": "^0.5.16",
     "cloudflared": "^0.7.1",
     "clsx": "^2.1.0",
     "diff": "^8.0.2",
@@ -73,6 +74,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.57.0",
+    "@types/adm-zip": "^0.5.7",
     "@types/express": "^5.0.5",
     "@types/node": "^20.10.0",
     "@types/qrcode": "^1.5.6",
