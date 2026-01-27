@@ -1,6 +1,9 @@
 /**
  * Secure Storage Service
  *
+ * @deprecated No longer used for new data - we store API keys directly in config.json
+ * Kept for backward compatibility during migration from encrypted to plaintext storage
+ *
  * Uses Electron's safeStorage API to encrypt sensitive data like tokens.
  * - macOS: Uses Keychain
  * - Windows: Uses DPAPI

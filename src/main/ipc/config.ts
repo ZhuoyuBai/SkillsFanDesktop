@@ -5,35 +5,69 @@
 import { ipcMain, BrowserWindow } from 'electron'
 import { getConfig, saveConfig, validateApiConnection } from '../services/config.service'
 import { getAISourceManager } from '../services/ai-sources'
-import { encryptString, decryptString } from '../services/secure-storage.service'
+import { decryptString } from '../services/secure-storage.service'
 import { setIsQuitting } from '../services/tray.service'
 
+/**
+ * Migrate encrypted config to plaintext (one-time migration)
+ * This will trigger keychain prompt once on first run after update
+ */
+function migrateEncryptedConfig(): void {
+  try {
+    const config = getConfig() as any
+    let needsSave = false
+
+    // Check if any field is encrypted (starts with 'enc:')
+    const decryptIfNeeded = (value: string): string => {
+      if (value && typeof value === 'string' && value.startsWith('enc:')) {
+        try {
+          needsSave = true
+          return decryptString(value) // One-time decryption
+        } catch (err) {
+          console.error('[Config Migration] Failed to decrypt:', err)
+          return ''
+        }
+      }
+      return value
+    }
+
+    // Migrate AI source API keys
+    if (config.aiSources) {
+      if (config.aiSources.custom?.apiKey) {
+        config.aiSources.custom.apiKey = decryptIfNeeded(config.aiSources.custom.apiKey)
+      }
+      if (config.aiSources.anthropic?.apiKey) {
+        config.aiSources.anthropic.apiKey = decryptIfNeeded(config.aiSources.anthropic.apiKey)
+      }
+      if (config.aiSources.openai?.apiKey) {
+        config.aiSources.openai.apiKey = decryptIfNeeded(config.aiSources.openai.apiKey)
+      }
+    }
+
+    // Migrate legacy api.apiKey
+    if (config.api?.apiKey) {
+      config.api.apiKey = decryptIfNeeded(config.api.apiKey)
+    }
+
+    // Save the migrated config if any field was decrypted
+    if (needsSave) {
+      console.log('[Config Migration] Migrated encrypted config to plaintext')
+      saveConfig(config)
+    }
+  } catch (err) {
+    console.error('[Config Migration] Migration failed:', err)
+  }
+}
+
 export function registerConfigHandlers(): void {
+  // Run migration once when handlers are registered
+  migrateEncryptedConfig()
   // Get configuration
   ipcMain.handle('config:get', async () => {
     try {
-      const config = getConfig() as Record<string, any>
-
-      // Decrypt custom API key before sending to renderer
-      const decryptedConfig = { ...config }
-      if (decryptedConfig.aiSources?.custom?.apiKey) {
-        decryptedConfig.aiSources = {
-          ...decryptedConfig.aiSources,
-          custom: {
-            ...decryptedConfig.aiSources.custom,
-            apiKey: decryptString(decryptedConfig.aiSources.custom.apiKey)
-          }
-        }
-      }
-      // Also handle legacy api.apiKey
-      if (decryptedConfig.api?.apiKey) {
-        decryptedConfig.api = {
-          ...decryptedConfig.api,
-          apiKey: decryptString(decryptedConfig.api.apiKey)
-        }
-      }
-
-      return { success: true, data: decryptedConfig }
+      const config = getConfig()
+      // No decryption needed - config is already in plaintext after migration
+      return { success: true, data: config }
     } catch (error: unknown) {
       const err = error as Error
       return { success: false, error: err.message }
@@ -43,7 +77,7 @@ export function registerConfigHandlers(): void {
   // Save configuration
   ipcMain.handle('config:set', async (_event, updates: Record<string, unknown>) => {
     try {
-      // Encrypt custom API key if present
+      // Merge aiSources properly to preserve existing configs
       const processedUpdates = { ...updates }
       const incomingAiSources = processedUpdates.aiSources as Record<string, any> | undefined
       if (incomingAiSources && typeof incomingAiSources === 'object') {
@@ -70,21 +104,7 @@ export function registerConfigHandlers(): void {
         processedUpdates.aiSources = mergedAiSources
       }
 
-      const aiSources = processedUpdates.aiSources as Record<string, any> | undefined
-      if (aiSources?.custom?.apiKey && typeof aiSources.custom.apiKey === 'string') {
-        // Only encrypt if not already encrypted
-        if (!aiSources.custom.apiKey.startsWith('enc:')) {
-          aiSources.custom.apiKey = encryptString(aiSources.custom.apiKey)
-        }
-      }
-      // Also handle legacy api.apiKey
-      const api = processedUpdates.api as Record<string, any> | undefined
-      if (api?.apiKey && typeof api.apiKey === 'string') {
-        if (!api.apiKey.startsWith('enc:')) {
-          api.apiKey = encryptString(api.apiKey)
-        }
-      }
-
+      // No encryption needed - save API keys in plaintext
       const config = saveConfig(processedUpdates)
       return { success: true, data: config }
     } catch (error: unknown) {
