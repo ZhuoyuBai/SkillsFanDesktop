@@ -17,7 +17,7 @@ export function SplashScreen() {
   }, [])
 
   return (
-    <div className="h-full w-full flex flex-col items-center justify-start pt-[25%] bg-background">
+    <div className="h-full w-full flex flex-col items-center justify-start pt-[15%] bg-background">
       {/* SkillsFan Logo */}
       <div
         className={`transition-all duration-1000 ${

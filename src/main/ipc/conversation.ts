@@ -8,6 +8,7 @@ import {
   createConversation,
   getConversation,
   updateConversation,
+  touchConversation,
   deleteConversation,
   clearAllConversations,
   addMessage,
@@ -61,6 +62,17 @@ export function registerConversationHandlers(): void {
       }
     }
   )
+
+  // Touch a conversation (update timestamp)
+  ipcMain.handle('conversation:touch', async (_event, spaceId: string, conversationId: string) => {
+    try {
+      const conversation = touchConversation(spaceId, conversationId)
+      return { success: true, data: conversation }
+    } catch (error: unknown) {
+      const err = error as Error
+      return { success: false, error: err.message }
+    }
+  })
 
   // Delete a conversation
   ipcMain.handle('conversation:delete', async (_event, spaceId: string, conversationId: string) => {

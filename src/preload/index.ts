@@ -48,6 +48,7 @@ export interface HaloAPI {
     conversationId: string,
     updates: Record<string, unknown>
   ) => Promise<IpcResponse>
+  touchConversation: (spaceId: string, conversationId: string) => Promise<IpcResponse>
   deleteConversation: (spaceId: string, conversationId: string) => Promise<IpcResponse>
   clearAllConversations: (spaceId: string) => Promise<IpcResponse>
   addMessage: (
@@ -336,6 +337,8 @@ const api: HaloAPI = {
     ipcRenderer.invoke('conversation:get', spaceId, conversationId),
   updateConversation: (spaceId, conversationId, updates) =>
     ipcRenderer.invoke('conversation:update', spaceId, conversationId, updates),
+  touchConversation: (spaceId, conversationId) =>
+    ipcRenderer.invoke('conversation:touch', spaceId, conversationId),
   deleteConversation: (spaceId, conversationId) =>
     ipcRenderer.invoke('conversation:delete', spaceId, conversationId),
   clearAllConversations: (spaceId) =>

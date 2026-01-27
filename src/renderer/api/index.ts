@@ -268,6 +268,19 @@ export const api = {
     )
   },
 
+  touchConversation: async (
+    spaceId: string,
+    conversationId: string
+  ): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.skillsfan.touchConversation(spaceId, conversationId)
+    }
+    return httpRequest(
+      'PUT',
+      `/api/spaces/${spaceId}/conversations/${conversationId}/touch`
+    )
+  },
+
   deleteConversation: async (
     spaceId: string,
     conversationId: string

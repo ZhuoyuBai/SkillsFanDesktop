@@ -111,7 +111,7 @@ export function UserAvatarMenu({ collapsed = false }: UserAvatarMenuProps) {
   }
 
   const isLoggedIn = authState?.isLoggedIn && authState.user
-  const userName = isLoggedIn ? authState.user!.name : t('Not logged in')
+  const userName = isLoggedIn ? authState.user!.name : t('Login')
   const userEmail = isLoggedIn ? authState.user!.email : ''
   const userAvatar = isLoggedIn ? authState.user!.avatar : null
 

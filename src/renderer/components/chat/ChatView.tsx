@@ -382,7 +382,17 @@ export function ChatView({ isCompact = false }: ChatViewProps) {
       </div>
 
       {/* Input area - only show at bottom when there are messages */}
-      {hasMessages && bottomInputArea}
+      {hasMessages && (
+        <>
+          {bottomInputArea}
+          {/* AI Safety Disclaimer */}
+          <div className="px-4 pb-4 pt-2">
+            <p className="text-xs text-center text-muted-foreground/60 leading-relaxed max-w-3xl mx-auto">
+              {t('AI can read and write files in the current space. Please review generated content and back up regularly.')}
+            </p>
+          </div>
+        </>
+      )}
     </div>
   )
 }
@@ -406,6 +416,13 @@ const QUICK_CATEGORIES: { key: string; icon: LucideIcon; color: string }[] = [
   { key: 'Research & Organization', icon: FolderSearch, color: 'text-amber-500' },
   { key: 'E-commerce', icon: ShoppingBag, color: 'text-pink-500' },
 ]
+
+// i18next-parser hint: These keys are used dynamically via t(cat.key)
+// t('Writing & Documents')
+// t('Data Analysis')
+// t('Content Creation')
+// t('Research & Organization')
+// t('E-commerce')
 
 // Quick prompts for each category - simple desktop tasks for user experience
 const QUICK_PROMPTS: Record<string, string> = {
@@ -486,9 +503,9 @@ function EmptyState({
         })}
       </div>
 
-      {/* Permission hint - pushed to bottom */}
-      <p className="mt-auto text-xs text-muted-foreground/50">
-        {t('Halo has full access to the current space')}
+      {/* AI Safety Disclaimer - pushed to bottom */}
+      <p className="mt-auto text-xs text-center text-muted-foreground/60 leading-relaxed px-4">
+        {t('AI can read and write files in the current space. Please review generated content and back up regularly.')}
       </p>
 
     </div>

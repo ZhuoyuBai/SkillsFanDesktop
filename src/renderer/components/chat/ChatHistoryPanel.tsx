@@ -268,11 +268,6 @@ export function ChatHistoryPanel({
                         animation: !isAnimatingOut ? 'fade-in 0.2s ease-out forwards' : undefined
                       }}
                     >
-                      {/* Selection indicator */}
-                      {conv.id === currentConversationId && (
-                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-primary rounded-r" />
-                      )}
-
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
                           {/* Title / Preview - with edit mode */}

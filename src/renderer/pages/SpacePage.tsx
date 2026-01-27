@@ -213,22 +213,45 @@ export function SpacePage() {
       const store = useChatStore.getState()
       const spaceState = store.getSpaceState(currentSpace.id)
 
-      // On app fresh start, always create a new conversation
-      if (store.freshStart) {
+      // Decision tree based on actual conversation state (不再依赖 freshStart)
+      if (spaceState.conversations.length === 0) {
+        // Case 1: No conversations exist at all
+        // This handles first-time users - create a new conversation
+        console.log('[SpacePage] No conversations found, creating first conversation')
         await createConversation(currentSpace.id)
-        store.setFreshStart(false)
+
+        // Clear freshStart flag for backward compatibility
+        if (store.freshStart) {
+          store.setFreshStart(false)
+        }
         return
       }
 
-      // Normal flow: select existing or create new
-      if (spaceState.conversations.length > 0) {
-        // If no conversation selected, select the first one
-        if (!spaceState.currentConversationId) {
-          selectConversation(spaceState.conversations[0].id)
-        }
-      } else {
-        // No conversations exist - create a new one
-        await createConversation(currentSpace.id)
+      // Case 2: Conversations exist - find and reuse an empty one
+      const emptyConversation = spaceState.conversations.find((c) => c.messageCount === 0)
+
+      if (emptyConversation) {
+        // Reuse the latest empty conversation (already sorted by backend)
+        console.log('[SpacePage] Reusing empty conversation:', emptyConversation.id)
+
+        // Touch it to update timestamp and move to top
+        await api.touchConversation(currentSpace.id, emptyConversation.id)
+
+        // Reload to get updated sort order
+        await loadConversations(currentSpace.id)
+
+        // Select the touched conversation
+        selectConversation(emptyConversation.id)
+      } else if (!spaceState.currentConversationId) {
+        // No empty conversation and nothing selected - select the first one
+        console.log('[SpacePage] No empty conversation, selecting most recent')
+        selectConversation(spaceState.conversations[0].id)
+      }
+      // else: A conversation is already selected, do nothing
+
+      // Clear freshStart flag for backward compatibility
+      if (store.freshStart) {
+        store.setFreshStart(false)
       }
     }
 

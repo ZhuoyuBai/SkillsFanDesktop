@@ -375,6 +375,28 @@ export function updateConversation(
   return updated
 }
 
+// Touch a conversation (update updatedAt timestamp)
+export function touchConversation(
+  spaceId: string,
+  conversationId: string
+): Conversation | null {
+  const conversation = getConversation(spaceId, conversationId)
+  if (!conversation) {
+    return null
+  }
+
+  conversation.updatedAt = new Date().toISOString()
+
+  const conversationsDir = getConversationsDir(spaceId)
+  writeFileSync(
+    join(conversationsDir, `${conversationId}.json`),
+    JSON.stringify(conversation, null, 2)
+  )
+
+  updateIndexEntry(conversationsDir, spaceId, conversationId, toMeta(conversation))
+  return conversation
+}
+
 // Add a message to a conversation
 export function addMessage(spaceId: string, conversationId: string, message: Omit<Message, 'id' | 'timestamp'>): Message {
   const conversation = getConversation(spaceId, conversationId)

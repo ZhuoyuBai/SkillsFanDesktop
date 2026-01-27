@@ -239,8 +239,8 @@ export function ConversationList({
                 transition-all duration-200
                 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-inset
                 ${conversation.id === currentConversationId
-                  ? 'bg-primary/8 border-l-2 border-primary/70'
-                  : 'hover:bg-secondary/40 border-l-2 border-transparent'
+                  ? 'bg-primary/8'
+                  : 'hover:bg-secondary/40'
                 }`}
               title={conversation.title}
             >
@@ -360,8 +360,8 @@ export function ConversationList({
               transition-all duration-200
               focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-inset
               ${conversation.id === currentConversationId
-                ? 'bg-gradient-to-r from-primary/8 via-primary/5 to-transparent border-l-2 border-primary/70'
-                : 'hover:bg-secondary/40 border-l-2 border-transparent'
+                ? 'bg-gradient-to-r from-primary/8 via-primary/5 to-transparent'
+                : 'hover:bg-secondary/40'
               }`}
           >
             {/* Edit mode */}
@@ -441,7 +441,7 @@ export function ConversationList({
         <div
           className={`absolute right-0 top-0 bottom-0 w-2 cursor-col-resize z-20 group/handle
             transition-all duration-200
-            ${isDragging ? 'bg-primary/60' : 'hover:bg-primary/40'}`}
+            ${isDragging ? 'bg-border/40' : ''}`}
           onMouseDown={handleMouseDown}
           title={t('Drag to resize width')}
         >

@@ -197,7 +197,7 @@ export function SetupFlow() {
   }
 
   if (step === 'custom') {
-    return <ApiSetup showBack onBack={handleBackFromCustom} initialProviderId={selectedProviderId} />
+    return <ApiSetup key={selectedProviderId} showBack onBack={handleBackFromCustom} initialProviderId={selectedProviderId} />
   }
 
   return null

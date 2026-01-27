@@ -118,6 +118,7 @@ interface ChatState {
   deleteConversation: (spaceId: string, conversationId: string) => Promise<boolean>
   clearAllConversations: (spaceId: string) => Promise<boolean>
   renameConversation: (spaceId: string, conversationId: string, newTitle: string) => Promise<boolean>
+  touchConversation: (spaceId: string, conversationId: string) => Promise<boolean>
 
   // Messaging
   sendMessage: (content: string, images?: ImageAttachment[], aiBrowserEnabled?: boolean, thinkingEnabled?: boolean) => Promise<void>
@@ -534,6 +535,55 @@ export const useChatStore = create<ChatState>((set, get) => ({
       return false
     } catch (error) {
       console.error('Failed to rename conversation:', error)
+      return false
+    }
+  },
+
+  // Touch conversation (update updatedAt to bring to top)
+  touchConversation: async (spaceId, conversationId) => {
+    try {
+      const response = await api.touchConversation(spaceId, conversationId)
+
+      if (response.success) {
+        set((state) => {
+          // Update cache if exists
+          const newCache = new Map(state.conversationCache)
+          const cached = newCache.get(conversationId)
+          if (cached) {
+            newCache.set(conversationId, {
+              ...cached,
+              updatedAt: new Date().toISOString()
+            })
+          }
+
+          // Update space state metadata - move to top of list
+          const newSpaceStates = new Map(state.spaceStates)
+          const existingState = newSpaceStates.get(spaceId)
+          if (existingState) {
+            const conversationMeta = existingState.conversations.find((c) => c.id === conversationId)
+            if (conversationMeta) {
+              // Update timestamp and move to front
+              const updatedMeta = { ...conversationMeta, updatedAt: new Date().toISOString() }
+              const filtered = existingState.conversations.filter((c) => c.id !== conversationId)
+              newSpaceStates.set(spaceId, {
+                ...existingState,
+                conversations: [updatedMeta, ...filtered]
+              })
+            }
+          }
+
+          return {
+            spaceStates: newSpaceStates,
+            conversationCache: newCache
+          }
+        })
+
+        return true
+      }
+
+      return false
+    } catch (error) {
+      console.error('Failed to touch conversation:', error)
       return false
     }
   },

@@ -698,9 +698,30 @@ export function SettingsPage() {
                         setSelectedProviderId(preset.id)
                         // Update form values when switching providers
                         if (!preset.isCustom) {
+                          // Check if the saved config matches this provider
+                          const savedApiUrl = config?.aiSources?.custom?.apiUrl || config?.api?.apiUrl || ''
+                          const savedApiKey = config?.aiSources?.custom?.apiKey || config?.api?.apiKey || ''
+                          const savedModel = config?.aiSources?.custom?.model || config?.api?.model || ''
+
+                          const presetDomain = preset.apiUrl?.replace('https://', '').replace('http://', '').split('/')[0]
+                          const isMatchingProvider = presetDomain && savedApiUrl.includes(presetDomain)
+
+                          // Set API URL and Model
                           setApiUrl(preset.apiUrl || '')
                           setModel(preset.defaultModel || '')
                           setProvider(preset.apiType === 'openai' ? 'openai' : 'anthropic')
+
+                          // Only keep API Key if it matches the current provider, otherwise clear it
+                          setApiKey(isMatchingProvider ? savedApiKey : '')
+                        } else {
+                          // Custom provider - load saved configuration
+                          const savedApiKey = config?.aiSources?.custom?.apiKey || config?.api?.apiKey || ''
+                          const savedApiUrl = config?.aiSources?.custom?.apiUrl || config?.api?.apiUrl || ''
+                          const savedModel = config?.aiSources?.custom?.model || config?.api?.model || ''
+
+                          setApiKey(savedApiKey)
+                          setApiUrl(savedApiUrl)
+                          setModel(savedModel)
                         }
                       }}
                       className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
