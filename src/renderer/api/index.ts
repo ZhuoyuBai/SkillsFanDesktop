@@ -129,6 +129,14 @@ export const api = {
     return httpRequest('POST', '/api/config/refresh-ai-sources')
   },
 
+  resetToDefault: async (): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.skillsfan.resetToDefault()
+    }
+    // Remote mode does not support reset
+    return { success: false, error: 'Reset to default is only available in desktop mode' }
+  },
+
   // ===== Space =====
   getHaloSpace: async (): Promise<ApiResponse> => {
     if (isElectron()) {

@@ -2,10 +2,11 @@
  * Config IPC Handlers
  */
 
-import { ipcMain } from 'electron'
+import { ipcMain, BrowserWindow } from 'electron'
 import { getConfig, saveConfig, validateApiConnection } from '../services/config.service'
 import { getAISourceManager } from '../services/ai-sources'
 import { encryptString, decryptString } from '../services/secure-storage.service'
+import { setIsQuitting } from '../services/tray.service'
 
 export function registerConfigHandlers(): void {
   // Get configuration
@@ -116,6 +117,51 @@ export function registerConfigHandlers(): void {
     } catch (error: unknown) {
       const err = error as Error
       console.error('[Config IPC] Refresh AI sources error:', err)
+      return { success: false, error: err.message }
+    }
+  })
+
+  // Reset to default settings
+  ipcMain.handle('config:reset-to-default', async () => {
+    try {
+      const { app } = await import('electron')
+      const fs = await import('fs-extra')
+      const path = await import('path')
+
+      // Get app data path
+      const isDev = process.env.NODE_ENV === 'development'
+      const appDataPath = isDev
+        ? path.join(app.getPath('home'), '.skillsfan-dev')
+        : path.join(app.getPath('home'), '.skillsfan')
+
+      console.log('[Config IPC] Resetting to default, clearing:', appDataPath)
+
+      // Clear all data
+      if (await fs.pathExists(appDataPath)) {
+        await fs.remove(appDataPath)
+        console.log('[Config IPC] Data cleared successfully')
+      }
+
+      // Set quitting flag to bypass minimize-to-tray
+      setIsQuitting(true)
+
+      // Close all windows gracefully
+      const windows = BrowserWindow.getAllWindows()
+      windows.forEach(window => {
+        window.destroy()
+      })
+
+      // Delay to ensure cleanup, then restart
+      setTimeout(() => {
+        console.log('[Config IPC] Restarting app...')
+        app.relaunch()
+        app.quit()  // Use quit() instead of exit() for proper cleanup
+      }, 500)
+
+      return { success: true }
+    } catch (error: unknown) {
+      const err = error as Error
+      console.error('[Config IPC] Reset to default error:', err)
       return { success: false, error: err.message }
     }
   })

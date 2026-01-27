@@ -513,5 +513,21 @@
   "Zoom in": "Zoom in",
   "Zoom in (+)": "Zoom in (+)",
   "Zoom out": "Zoom out",
-  "Zoom out (-)": "Zoom out (-)"
+  "Zoom out (-)": "Zoom out (-)",
+  "Danger Zone": "Danger Zone",
+  "Reset to Default Settings": "Reset to Default Settings",
+  "This will clear all local data including configurations, history, and account information. The app will restart and return to the initial setup.": "This will clear all local data including configurations, history, and account information. The app will restart and return to the initial setup.",
+  "Reset to Default": "Reset to Default",
+  "Confirm Reset to Default": "Confirm Reset to Default",
+  "Are you sure you want to reset all settings?": "Are you sure you want to reset all settings?",
+  "This action will:": "This action will:",
+  "Delete all configurations": "Delete all configurations",
+  "Delete all Spaces and conversations": "Delete all Spaces and conversations",
+  "Log out from your account": "Log out from your account",
+  "Clear API keys and model settings": "Clear API keys and model settings",
+  "This action cannot be undone.": "This action cannot be undone.",
+  "Confirm Reset": "Confirm Reset",
+  "Resetting...": "Resetting...",
+  "Reset successful, restarting app...": "Reset successful, restarting app...",
+  "Reset failed": "Reset failed"
 }

@@ -436,7 +436,7 @@ export function InputArea({ onSend, onStop, isGenerating, isCompact = false, noB
         <div
           className={`
             relative flex flex-col rounded-2xl
-            border border-border/60 bg-[#ffffff] shadow-md
+            border border-border/60 bg-card shadow-md
             ${isGenerating ? 'opacity-60' : ''}
             ${isDragOver ? 'ring-2 ring-primary/50 bg-primary/5' : ''}
           `}

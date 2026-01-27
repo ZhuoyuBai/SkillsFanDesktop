@@ -27,6 +27,7 @@ import { CheckCircle2, XCircle, Eye, EyeOff } from '../components/icons/ToolIcon
 import { McpServerList } from '../components/settings/McpServerList'
 import { SkillList } from '../components/settings/SkillList'
 import { SkillsFanAccountSection } from '../components/settings/SkillsFanAccountSection'
+import { ResetSection } from '../components/settings/ResetSection'
 import { useTranslation, setLanguage, getCurrentLanguage, SUPPORTED_LOCALES, type LocaleCode } from '../i18n'
 import { Loader2, LogOut, Plus, Check, Globe, Key, MessageSquare, Bot, Palette, Server, Settings as SettingsIcon, Wifi, ExternalLink, X, Package, User, type LucideIcon } from 'lucide-react'
 
@@ -675,10 +676,15 @@ export function SettingsPage() {
 
           {/* SkillsFan Account Section */}
           {activeSection === 'account' && !api.isRemoteMode() && (
-          <section className="bg-card rounded-xl border border-border p-6">
-            <h2 className="text-lg font-medium mb-4">{t('SkillsFan Account')}</h2>
-            <SkillsFanAccountSection />
-          </section>
+          <>
+            <section className="bg-card rounded-xl border border-border p-6">
+              <h2 className="text-lg font-medium mb-4">{t('SkillsFan Account')}</h2>
+              <SkillsFanAccountSection />
+            </section>
+
+            {/* Reset to Default Section */}
+            <ResetSection />
+          </>
           )}
 
           {/* AI Model Section - Grid Layout */}

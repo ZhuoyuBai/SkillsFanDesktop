@@ -388,7 +388,7 @@ export function SpacePage() {
         )
       ) : (
       <Header
-        className="bg-card/50 backdrop-blur-sm border-b border-border/40"
+        className="bg-card backdrop-blur-sm border-b border-border/40"
         left={
           <>
             {/* Back button - always on the left */}

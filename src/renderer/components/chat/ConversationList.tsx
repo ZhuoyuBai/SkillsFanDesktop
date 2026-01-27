@@ -170,7 +170,7 @@ export function ConversationList({
   if (isCollapsed) {
     return (
       <div
-        className="border-r border-border/40 flex flex-col bg-secondary relative"
+        className="border-r border-border/40 flex flex-col bg-card relative"
         style={{ width: COLLAPSED_WIDTH }}
       >
         {/* Toggle button (no logo in collapsed state) */}
@@ -259,7 +259,7 @@ export function ConversationList({
   return (
     <div
       ref={containerRef}
-      className={`flex flex-col relative ${isMobileOverlay ? 'bg-background flex-1' : 'border-r border-border/40 bg-secondary'}`}
+      className={`flex flex-col relative ${isMobileOverlay ? 'bg-background flex-1' : 'border-r border-border/40 bg-card'}`}
       style={isMobileOverlay ? undefined : {
         width,
         transition: isDragging ? 'none' : 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',

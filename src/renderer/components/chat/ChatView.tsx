@@ -471,7 +471,7 @@ function EmptyState({
     <div className={`h-full flex flex-col items-center justify-start text-center pb-6
       ${isMobile ? 'pt-[8vh] px-4' : 'pt-[15vh] px-8'}`}>
       {/* Title - smaller on mobile */}
-      <h1 className={`mt-8 font-semibold tracking-tight
+      <h1 className={`mt-8 font-semibold tracking-tight text-foreground/85
         ${isMobile ? 'text-2xl' : 'text-4xl'}`}>
         {t('Halo, not just chat, can help you get things done')}
       </h1>
