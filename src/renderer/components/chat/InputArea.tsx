@@ -38,6 +38,7 @@ interface InputAreaProps {
   isCompact?: boolean
   noBorder?: boolean  // Hide top border (used in empty state centered layout)
   suggestedContent?: string  // External suggested content to fill in
+  showTypewriterAnimation?: boolean  // Show typewriter placeholder animation (default: true, set to false when in conversation)
 }
 
 // Mobile breakpoint (matches Tailwind sm: 640px)
@@ -147,7 +148,7 @@ interface ImageError {
   message: string
 }
 
-export function InputArea({ onSend, onStop, isGenerating, isCompact = false, noBorder = false, suggestedContent }: InputAreaProps) {
+export function InputArea({ onSend, onStop, isGenerating, isCompact = false, noBorder = false, suggestedContent, showTypewriterAnimation = true }: InputAreaProps) {
   const { t } = useTranslation()
   const [content, setContent] = useState('')
   const [isFocused, setIsFocused] = useState(false)
@@ -216,8 +217,8 @@ export function InputArea({ onSend, onStop, isGenerating, isCompact = false, noB
   const onboardingPrompt = getOnboardingPrompt(t)
   const displayContent = isOnboardingSendStep ? onboardingPrompt : content
 
-  // Show typewriter only when input is empty, not focused, and not hovered
-  const showTypewriter = !content && !isFocused && !isHovered && !isOnboardingSendStep && !isGenerating
+  // Show typewriter only when input is empty, not focused, not hovered, and animation is enabled
+  const showTypewriter = showTypewriterAnimation && !content && !isFocused && !isHovered && !isOnboardingSendStep && !isGenerating
 
   // Process file to ImageAttachment with professional compression
   const processFileWithCompression = async (file: File): Promise<ImageAttachment | null> => {
@@ -664,12 +665,13 @@ function InputToolbar({
           <button
             onClick={onStop}
             className="w-8 h-8 flex items-center justify-center
-              bg-destructive/10 text-destructive rounded-lg
-              hover:bg-destructive/20 active:bg-destructive/30
-              transition-all duration-150"
+              bg-destructive text-destructive-foreground rounded-full
+              hover:bg-destructive/90 active:scale-95
+              transition-all duration-150
+              animate-pulse shadow-sm shadow-destructive/30"
             title={t('Stop generation (Esc)')}
           >
-            <div className="w-3 h-3 border-2 border-current rounded-sm" />
+            <div className="w-3 h-3 bg-current rounded-sm" />
           </button>
         ) : (
           <button

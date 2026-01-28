@@ -672,7 +672,8 @@ body {
 .message-working {
   position: relative;
   border-color: hsl(var(--muted-foreground) / 0.25);
-  overflow: hidden;
+  overflow-y: hidden;
+  overflow-x: auto;
   transition: border-color 0.5s ease-out, opacity 0.5s ease-out;
 }
 
@@ -744,6 +745,12 @@ body {
 /* ============================================
    Component Styles
    ============================================ */
+
+/* Markdown content - allow horizontal scroll for long content */
+.markdown-content {
+  overflow-x: auto;
+  max-width: 100%;
+}
 
 /* Code block styles */
 .code-block {

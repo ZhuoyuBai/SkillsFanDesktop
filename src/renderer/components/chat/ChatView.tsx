@@ -322,6 +322,7 @@ export function ChatView({ isCompact = false }: ChatViewProps) {
       onStop={handleStop}
       isGenerating={isGenerating}
       isCompact={isCompact}
+      showTypewriterAnimation={false}
     />
   )
 

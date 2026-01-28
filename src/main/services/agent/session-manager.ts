@@ -12,6 +12,7 @@ import { unstable_v2_createSession } from '@anthropic-ai/claude-agent-sdk'
 import { getConfig, onApiConfigChange } from '../config.service'
 import { getConversation } from '../conversation.service'
 import { ensureOpenAICompatRouter, encodeBackendConfig } from '../../openai-compat-router'
+import { ensureSkillsInitialized, hasSkills, createSkillMcpServer } from '../skill'
 import type {
   V2SDKSession,
   V2SessionInfo,
@@ -294,17 +295,38 @@ export async function ensureSessionWarm(
     includePartialMessages: true,
     executable: electronPath,
     executableArgs: ['--no-warnings'],
-    // MCP servers configuration - pass through enabled servers only
-    ...((() => {
+    // MCP servers configuration
+    // - Pass through enabled user MCP servers
+    // - Add Skill MCP server if skills are available (must match sendMessage)
+    ...(await (async () => {
       const enabledMcp = getEnabledMcpServers(config.mcpServers || {})
-      return enabledMcp ? { mcpServers: enabledMcp } : {}
+      const mcpServers: Record<string, any> = enabledMcp ? { ...enabledMcp } : {}
+
+      // Check skills availability and add Skill MCP server
+      await ensureSkillsInitialized()
+      if (hasSkills()) {
+        mcpServers['skill'] = await createSkillMcpServer()
+        console.log(`[Agent] Skill MCP server added for warm-up: ${conversationId}`)
+      }
+
+      return Object.keys(mcpServers).length > 0 ? { mcpServers } : {}
     })())
   }
 
   try {
     console.log(`[Agent] Warming up V2 session: ${conversationId}`)
-    await getOrCreateV2Session(spaceId, conversationId, sdkOptions, sessionId)
-    console.log(`[Agent] V2 session warmed up: ${conversationId}`)
+
+    // Skills already initialized in sdkOptions block above
+    const skillsAvailable = hasSkills()
+
+    // Session config must match sendMessage to avoid rebuild
+    const sessionConfig: SessionConfig = {
+      aiBrowserEnabled: false,  // Default to false for warm-up (user hasn't enabled it yet)
+      hasSkills: skillsAvailable
+    }
+
+    await getOrCreateV2Session(spaceId, conversationId, sdkOptions, sessionId, sessionConfig)
+    console.log(`[Agent] V2 session warmed up: ${conversationId}, hasSkills: ${skillsAvailable}`)
   } catch (error) {
     console.error(`[Agent] Failed to warm up session ${conversationId}:`, error)
     // Don't throw on warm-up failure, sendMessage() will reinitialize (just slower)

@@ -192,7 +192,7 @@ function StreamingBubble({
   const containerHeight = currentHeight > 0 ? currentHeight : 'auto'
 
   return (
-    <div className="rounded-2xl px-4 py-3 message-assistant message-working w-full overflow-hidden">
+    <div className="rounded-2xl px-4 py-3 message-assistant message-working w-full overflow-y-hidden overflow-x-auto">
       {/* Working indicator */}
       <div className="flex items-center gap-1.5 mb-2 pb-2 border-b border-border/30 working-indicator-fade">
         <span className="text-xs text-muted-foreground/70">{t('Halo is working')}</span>
@@ -200,7 +200,7 @@ function StreamingBubble({
 
       {/* Viewport - height matches current content only */}
       <div
-        className="overflow-hidden transition-[height] duration-300"
+        className="overflow-y-hidden overflow-x-visible transition-[height] duration-300"
         style={{ height: containerHeight }}
       >
         {/* Scrollable container */}
