@@ -102,6 +102,7 @@ export function stopSessionCleanup(): void {
  */
 export function needsSessionRebuild(existing: V2SessionInfo, newConfig: SessionConfig): boolean {
   return existing.config.aiBrowserEnabled !== newConfig.aiBrowserEnabled
+    || existing.config.hasSkills !== newConfig.hasSkills
 }
 
 /**
@@ -188,7 +189,7 @@ export async function getOrCreateV2Session(
     conversationId,
     createdAt: Date.now(),
     lastUsedAt: Date.now(),
-    config: config || { aiBrowserEnabled: false }
+    config: config || { aiBrowserEnabled: false, hasSkills: false }
   })
 
   // Start cleanup if not already running

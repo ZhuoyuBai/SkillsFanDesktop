@@ -10,7 +10,8 @@ export {
   getSkill,
   hasSkills,
   getSkillsDir,
-  reloadSkills
+  reloadSkills,
+  ensureSkillsInitialized
 } from './skill-registry'
 
 export { startSkillWatcher } from './skill-watcher'

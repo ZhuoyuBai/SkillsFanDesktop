@@ -164,6 +164,7 @@ export type V2SDKSession = {
  */
 export interface SessionConfig {
   aiBrowserEnabled: boolean
+  hasSkills: boolean
   // model is now dynamic, no rebuild needed
   // thinkingEnabled is now dynamic, no rebuild needed
 }

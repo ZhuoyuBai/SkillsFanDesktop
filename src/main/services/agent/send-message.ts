@@ -18,7 +18,7 @@ import {
   AI_BROWSER_SYSTEM_PROMPT,
   createAIBrowserMcpServer
 } from '../ai-browser'
-import { createSkillMcpServer, hasSkills } from '../skill'
+import { createSkillMcpServer, hasSkills, ensureSkillsInitialized } from '../skill'
 import type {
   AgentRequest,
   ToolCall,
@@ -155,6 +155,11 @@ export async function sendMessage(
     const electronPath = getHeadlessElectronPath()
     console.log(`[Agent] Using headless Electron as Node runtime: ${electronPath}`)
 
+    // Ensure skills are loaded before creating session
+    // This determines if Skill MCP server should be added and triggers session rebuild if needed
+    await ensureSkillsInitialized()
+    const skillsAvailable = hasSkills()
+
     // Configure SDK options
     // Note: These parameters require SDK patch to work in V2 Session
     // Native SDK SDKSessionOptions only supports model, executable, executableArgs
@@ -203,6 +208,7 @@ export async function sendMessage(
       // MCP servers configuration
       // - Pass through enabled user MCP servers
       // - Add AI Browser MCP server if enabled
+      // - Add Skill MCP server if skills are available
       //
       // NOTE: SDK patch adds proper handling of SDK-type MCP servers in SessionImpl,
       // extracting 'instance' before serialization (mirrors query() behavior).
@@ -218,7 +224,8 @@ export async function sendMessage(
         }
 
         // Add Skill MCP server if skills are available
-        if (hasSkills()) {
+        // Note: skills are ensured initialized before this point (see below)
+        if (skillsAvailable) {
           mcpServers['skill'] = await createSkillMcpServer()
           console.log(`[Agent][${conversationId}] Skill MCP server added`)
         }
@@ -239,7 +246,8 @@ export async function sendMessage(
 
     // Session config for rebuild detection
     const sessionConfig: SessionConfig = {
-      aiBrowserEnabled: !!aiBrowserEnabled
+      aiBrowserEnabled: !!aiBrowserEnabled,
+      hasSkills: skillsAvailable
     }
 
     // Get or create persistent V2 session for this conversation

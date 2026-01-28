@@ -111,3 +111,12 @@ export async function reloadSkills(): Promise<SkillInfo[]> {
 export function hasSkills(): boolean {
   return skillCache.size > 0
 }
+
+/**
+ * 确保已初始化（供外部模块使用）
+ */
+export async function ensureSkillsInitialized(): Promise<void> {
+  if (!initialized) {
+    await initializeRegistry()
+  }
+}
