@@ -9,7 +9,7 @@
 
 import { z } from 'zod'
 import { tool, createSdkMcpServer } from '@anthropic-ai/claude-agent-sdk'
-import { getAllSkills, getSkill } from './skill-registry'
+import { getAllSkills, getSkill, getSkillsDir } from './skill-registry'
 import { getSkillContent } from './skill-loader'
 
 /**
@@ -20,16 +20,33 @@ import { getSkillContent } from './skill-loader'
  */
 async function generateDescription(): Promise<string> {
   const skills = await getAllSkills()
+  const skillsDir = getSkillsDir()
 
   if (skills.length === 0) {
-    return 'Load a skill for detailed task instructions. No skills are currently available.'
+    return [
+      'Load a skill for detailed task instructions.',
+      'No skills are currently available.',
+      '',
+      `Skills directory: ${skillsDir}`,
+      'When asked about available skills, check this directory only.'
+    ].join(' ')
   }
 
   return [
     'Load a skill to get detailed instructions for a specific task.',
     'Skills provide specialized knowledge and step-by-step guidance.',
-    'Use this when a task matches an available skill\'s description.',
-    'Only the skills listed here are available:',
+    '',
+    'IMPORTANT: The complete list of available skills is shown below.',
+    'When asked "what skills do I have" or similar questions about available skills,',
+    'refer to this list directly - DO NOT scan the filesystem to discover skills.',
+    '',
+    `Skills directory: ${skillsDir}`,
+    '',
+    'Note: Once a skill is loaded and being executed, it may need to access',
+    'various directories (Photos, Documents, etc.) as part of its normal operation.',
+    'This is allowed - just follow the skill instructions and request permissions as needed.',
+    '',
+    'Available skills:',
     '<available_skills>',
     ...skills.flatMap(s => [
       '  <skill>',

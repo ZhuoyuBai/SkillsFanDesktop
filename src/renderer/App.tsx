@@ -17,8 +17,6 @@ import { SearchPanel } from './components/search/SearchPanel'
 import { SearchHighlightBar } from './components/search/SearchHighlightBar'
 import { OnboardingOverlay } from './components/onboarding'
 import { UpdateNotification } from './components/updater/UpdateNotification'
-import { usePlatform } from './components/layout/Header'
-import { isElectron } from './api/transport'
 import { api } from './api'
 import type { AgentEventBase, Thought, ToolCall, HaloConfig } from './types'
 import { hasAnyAISource } from './types'
@@ -92,10 +90,6 @@ export default function App() {
 
   // For search result navigation
   const { spaces, haloSpace, setCurrentSpace: setSpaceStoreCurrentSpace } = useSpaceStore()
-
-  // Platform detection for title bar spacing
-  const platform = usePlatform()
-  const isInElectron = isElectron()
 
   // Initialize app on mount - wait for backend extended services to be ready
   useEffect(() => {
@@ -464,9 +458,7 @@ export default function App() {
   }
 
   return (
-    <div className={`h-screen w-screen overflow-hidden bg-background ${
-      isInElectron && platform.isMac ? 'pt-[28px]' : ''
-    }`}>
+    <div className="h-screen w-screen overflow-hidden bg-background">
       {renderView()}
       {/* Search panel - full screen edit mode */}
       <SearchPanel isOpen={isSearchOpen} onClose={closeSearch} />

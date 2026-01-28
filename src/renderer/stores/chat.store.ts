@@ -289,6 +289,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
           return { spaceStates: newSpaceStates, conversationCache: newCache }
         })
 
+        // Warm up V2 Session in background - non-blocking
+        // When user sends a message, V2 Session is ready to avoid delay
+        try {
+          api.ensureSessionWarm(spaceId, newConversation.id)
+            .catch((error) => console.error('[ChatStore] Session warm up failed:', error))
+        } catch (error) {
+          console.error('[ChatStore] Failed to trigger session warm up:', error)
+        }
+
         return newConversation
       }
 

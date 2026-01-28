@@ -371,7 +371,7 @@ export function SpacePage() {
   })
 
   return (
-    <div className="h-full w-full flex flex-col">
+    <div className="h-full w-full flex flex-col bg-card">
       {/*
         ChatCapsule overlay is now managed via IPC to render above BrowserView.
         The overlay SPA is a separate WebContentsView that appears above all views.
@@ -394,7 +394,7 @@ export function SpacePage() {
             {/* Back button - always on the left */}
             <button
               onClick={handleBack}
-              className="p-1.5 hover:bg-secondary rounded-lg transition-colors"
+              className="p-1.5 bg-secondary/50 hover:bg-secondary rounded-lg transition-colors"
               aria-label={t('Back to home')}
               title={t('Back to home')}
             >

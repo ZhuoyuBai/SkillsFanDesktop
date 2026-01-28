@@ -22,7 +22,7 @@ process.on('uncaughtException', (error) => {
 // Executed after page load to avoid blocking startup
 // Note: fix-path is ESM-only, loaded dynamically to support both CJS and ESM builds
 
-import { app, shell, BrowserWindow, Menu } from 'electron'
+import { app, shell, BrowserWindow, Menu, nativeTheme } from 'electron'
 
 // GPU compatibility: Disable hardware acceleration on Windows to prevent blank window issues
 // Some Windows GPU configurations cause the GPU process to crash, resulting in a white/blank screen
@@ -230,6 +230,11 @@ function createWindow(): void {
   // Platform-specific window options
   const isMac = process.platform === 'darwin'
 
+  // Detect system theme for initial window colors
+  // This ensures the window background matches system preference on first launch
+  const isDarkMode = nativeTheme.shouldUseDarkColors
+  const backgroundColor = isDarkMode ? '#0a0a0a' : '#ffffff'
+
   // Create the browser window
   mainWindow = new BrowserWindow({
     width: 1200,
@@ -243,11 +248,11 @@ function createWindow(): void {
     titleBarStyle: isMac ? 'default' : 'hidden',
     // Windows/Linux: native window controls overlay in content area
     titleBarOverlay: !isMac ? {
-      color: '#0a0a0a',
-      symbolColor: '#ffffff',
+      color: backgroundColor,
+      symbolColor: isDarkMode ? '#ffffff' : '#1a1a1a',
       height: 40
     } : undefined,
-    backgroundColor: '#0a0a0a',
+    backgroundColor,
     webPreferences: {
       preload: join(__dirname, '../preload/index.mjs'),
       sandbox: false,
