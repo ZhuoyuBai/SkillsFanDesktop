@@ -105,9 +105,10 @@ function generateThoughtId(): string {
  *
  * @param message - Raw SDK message
  * @param displayModel - The actual model name to display (user-configured model, not SDK's internal model)
+ * @param parentToolId - Parent tool ID if this is a child tool call (e.g., inside a Skill)
  * @returns Thought object or null if message type is not relevant
  */
-export function parseSDKMessage(message: any, displayModel?: string): Thought | null {
+export function parseSDKMessage(message: any, displayModel?: string, parentToolId?: string): Thought | null {
   const timestamp = new Date().toISOString()
 
   // System initialization
@@ -142,13 +143,16 @@ export function parseSDKMessage(message: any, displayModel?: string): Thought | 
         }
         // Tool use blocks
         if (block.type === 'tool_use') {
+          const isSkillInvocation = block.name === 'Skill'
           return {
             id: block.id || generateThoughtId(),
             type: 'tool_use',
             content: `Tool call: ${block.name}`,
             timestamp,
             toolName: block.name,
-            toolInput: block.input
+            toolInput: block.input,
+            parentToolId,
+            isSkillInvocation
           }
         }
         // Text blocks
@@ -198,7 +202,8 @@ export function parseSDKMessage(message: any, displayModel?: string): Thought | 
             content: isError ? `Tool execution failed` : `Tool execution succeeded`,
             timestamp,
             toolOutput: resultContent,
-            isError
+            isError,
+            parentToolId
           }
         }
       }

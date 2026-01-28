@@ -361,6 +361,9 @@ export interface Thought {
   isError?: boolean;
   // For result thoughts
   duration?: number;
+  // Parent-child tool relationship (e.g., TodoWrite inside a Skill)
+  parentToolId?: string;
+  isSkillInvocation?: boolean;
 }
 
 // Legacy alias for backwards compatibility

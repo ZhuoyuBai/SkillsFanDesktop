@@ -176,7 +176,7 @@ export function ChatView({ isCompact = false }: ChatViewProps) {
   const currentConversation = getCurrentConversation()
   const { isLoadingConversation } = useChatStore()
   const session = getCurrentSession()
-  const { isGenerating, streamingContent, isStreaming, thoughts, isThinking, compactInfo, error, textBlockVersion } = session
+  const { isGenerating, streamingContent, isStreaming, thoughts, isThinking, compactInfo, error } = session
 
   // Smart auto-scroll: only scrolls when user is at bottom
   const {
@@ -367,7 +367,6 @@ export function ChatView({ isCompact = false }: ChatViewProps) {
                 compactInfo={compactInfo}
                 error={error}
                 isCompact={isCompact}
-                textBlockVersion={textBlockVersion}
               />
               <div ref={bottomRef} />
             </>

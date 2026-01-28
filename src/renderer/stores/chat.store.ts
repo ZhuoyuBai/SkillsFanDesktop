@@ -44,8 +44,6 @@ interface SessionState {
   error: string | null
   // Compact notification
   compactInfo: CompactInfo | null
-  // Text block version - increments on each new text block (for StreamingBubble reset)
-  textBlockVersion: number
 }
 
 // Create empty session state
@@ -58,8 +56,7 @@ function createEmptySessionState(): SessionState {
     isThinking: false,
     pendingToolApproval: null,
     error: null,
-    compactInfo: null,
-    textBlockVersion: 0
+    compactInfo: null
   }
 }
 
@@ -624,7 +621,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
           thoughts: [],
           isThinking: true,
           pendingToolApproval: null,
-          error: null
+          error: null,
+          compactInfo: null
         })
         return { sessions: newSessions }
       })
@@ -783,45 +781,27 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   // Handle agent message - update session-specific streaming content
-  // Supports both incremental (delta) and full (content) modes for backward compatibility
+  // Backend now sends full accumulated content (all text blocks concatenated)
   handleAgentMessage: (data) => {
-    const { conversationId, content, delta, isStreaming, isNewTextBlock } = data as AgentEventBase & {
+    const { conversationId, content, isStreaming } = data as AgentEventBase & {
       content?: string
-      delta?: string
       isComplete: boolean
       isStreaming?: boolean
-      isNewTextBlock?: boolean  // Signal from content_block_start (type='text')
     }
 
     set((state) => {
       const newSessions = new Map(state.sessions)
       const session = newSessions.get(conversationId) || createEmptySessionState()
 
-      // New text block signal: increment version number
-      // StreamingBubble detects version change to reset activeSnapshotLen
-      const newTextBlockVersion = isNewTextBlock
-        ? (session.textBlockVersion || 0) + 1
-        : (session.textBlockVersion || 0)
+      // Backend sends full accumulated content, just update directly
+      const newContent = content ?? session.streamingContent
 
-      // Incremental mode: append delta to existing content
-      // Full mode: replace directly (backward compatible)
-      const newContent = delta
-        ? (session.streamingContent || '') + delta
-        : (content ?? session.streamingContent)
-
-      if (isNewTextBlock) {
-        console.log(`[ChatStore] 🆕 New text block signal [${conversationId}]: version ${newTextBlockVersion}`)
-      } else if (delta) {
-        console.log(`[ChatStore] handleAgentMessage [${conversationId}]: +${delta.length} chars (total: ${newContent.length})`)
-      } else {
-        console.log(`[ChatStore] handleAgentMessage [${conversationId}]:`, content?.substring(0, 100), `streaming: ${isStreaming}`)
-      }
+      console.log(`[ChatStore] handleAgentMessage [${conversationId}]:`, content?.substring(0, 100), `streaming: ${isStreaming}, length: ${newContent?.length || 0}`)
 
       newSessions.set(conversationId, {
         ...session,
         streamingContent: newContent,
-        isStreaming: isStreaming ?? false,
-        textBlockVersion: newTextBlockVersion
+        isStreaming: isStreaming ?? false
       })
       return { sessions: newSessions }
     })

@@ -363,9 +363,9 @@ async function processMessageStream(
   abortController: AbortController,
   t0: number
 ): Promise<void> {
-  // Only keep track of the LAST text block as the final reply
-  // Intermediate text blocks are shown in thought process, not accumulated into message bubble
-  let lastTextContent = ''
+  // Accumulate ALL text blocks (separated by double newlines) for complete output
+  let accumulatedTextContent = ''
+  let textBlockCount = 0
   let capturedSessionId: string | undefined
 
   // Token usage tracking
@@ -377,6 +377,14 @@ async function processMessageStream(
   let currentStreamingText = ''  // Accumulates text_delta tokens
   let isStreamingTextBlock = false  // True when inside a text content block
   const STREAM_THROTTLE_MS = 30  // Throttle updates to ~33fps
+
+  // Tool call stack for parent-child relationship tracking
+  // When a Skill tool is active, subsequent tool calls are marked as children
+  interface ActiveToolCall {
+    id: string
+    toolName: string
+  }
+  let activeToolStack: ActiveToolCall[] = []
 
   const t1 = Date.now()
   console.log(`[Agent][${conversationId}] Sending message to V2 session...`)
@@ -439,29 +447,25 @@ async function processMessageStream(
       if (event.type === 'content_block_start' && event.content_block?.type === 'text') {
         isStreamingTextBlock = true
         currentStreamingText = event.content_block.text || ''
+        textBlockCount++
 
-        // 🔑 Send precise signal for new text block (fixes truncation bug)
-        // This is 100% reliable - comes directly from SDK's content_block_start event
-        sendToRenderer('agent:message', spaceId, conversationId, {
-          type: 'message',
-          content: '',
-          isComplete: false,
-          isStreaming: false,
-          isNewTextBlock: true  // Signal: new text block started
-        })
+        // Add separator between text blocks (not before the first one)
+        if (textBlockCount > 1 && accumulatedTextContent) {
+          accumulatedTextContent += '\n\n'
+        }
 
-        console.log(`[Agent][${conversationId}] ⏱️ Text block started (isNewTextBlock signal): ${Date.now() - t1}ms after send`)
+        console.log(`[Agent][${conversationId}] ⏱️ Text block #${textBlockCount} started: ${Date.now() - t1}ms after send`)
       }
 
-      // Text delta - accumulate locally, send delta to frontend
+      // Text delta - accumulate locally, send full content to frontend
       if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta' && isStreamingTextBlock) {
         const delta = event.delta.text || ''
         currentStreamingText += delta
 
-        // Send delta immediately without throttling
+        // Send full accumulated content (not just delta) for proper display
         sendToRenderer('agent:message', spaceId, conversationId, {
           type: 'message',
-          delta,
+          content: accumulatedTextContent + currentStreamingText,
           isComplete: false,
           isStreaming: true
         })
@@ -470,16 +474,16 @@ async function processMessageStream(
       // Text block ended
       if (event.type === 'content_block_stop' && isStreamingTextBlock) {
         isStreamingTextBlock = false
-        // Send final content of this block
+        // Accumulate this block's content
+        accumulatedTextContent += currentStreamingText
+        // Send full accumulated content
         sendToRenderer('agent:message', spaceId, conversationId, {
           type: 'message',
-          content: currentStreamingText,
+          content: accumulatedTextContent,
           isComplete: false,
           isStreaming: false
         })
-        // Update lastTextContent for final result
-        lastTextContent = currentStreamingText
-        console.log(`[Agent][${conversationId}] Text block completed, length: ${currentStreamingText.length}`)
+        console.log(`[Agent][${conversationId}] Text block #${textBlockCount} completed, block length: ${currentStreamingText.length}, total: ${accumulatedTextContent.length}`)
       }
 
       continue  // stream_event handled, skip normal processing
@@ -509,9 +513,28 @@ async function processMessageStream(
 
     // Parse SDK message into Thought and send to renderer
     // Pass credentials.model to display the user's actual configured model
-    const thought = parseSDKMessage(sdkMessage, displayModel)
+    // Pass current parent tool ID for child tool relationship tracking
+    const currentParentId = activeToolStack.length > 0
+      ? activeToolStack[activeToolStack.length - 1].id
+      : undefined
+    const thought = parseSDKMessage(sdkMessage, displayModel, currentParentId)
 
     if (thought) {
+      // Track Skill tool calls in stack (for parent-child relationship)
+      if (thought.type === 'tool_use' && thought.isSkillInvocation) {
+        activeToolStack.push({ id: thought.id, toolName: thought.toolName! })
+        console.log(`[Agent][${conversationId}] Skill tool pushed to stack: ${thought.toolName}, depth: ${activeToolStack.length}`)
+      }
+
+      // Pop from stack when Skill result comes back
+      if (thought.type === 'tool_result') {
+        const topTool = activeToolStack[activeToolStack.length - 1]
+        if (topTool && thought.id === topTool.id) {
+          activeToolStack.pop()
+          console.log(`[Agent][${conversationId}] Skill tool popped from stack: ${topTool.toolName}, depth: ${activeToolStack.length}`)
+        }
+      }
+
       // Accumulate thought in backend session (Single Source of Truth)
       sessionState.thoughts.push(thought)
 
@@ -521,45 +544,52 @@ async function processMessageStream(
 
       // Handle specific thought types
       if (thought.type === 'text') {
-        // Keep only the latest text block (overwritten by each new text block)
-        // This becomes the final reply when generation completes
-        // Intermediate texts stay in the thought process area only
-        lastTextContent = thought.content
+        // Text blocks are handled via stream_event for token-level streaming
+        // Only use this fallback for non-streaming SDKs (when textBlockCount is still 0)
+        // If textBlockCount > 0, content was already accumulated via stream_event - skip to avoid duplication
+        if (textBlockCount === 0) {
+          accumulatedTextContent += thought.content
+          textBlockCount++
 
-        // Send streaming update - frontend shows this during generation
-        sendToRenderer('agent:message', spaceId, conversationId, {
-          type: 'message',
-          content: lastTextContent,
-          isComplete: false
-        })
-      } else if (thought.type === 'tool_use') {
-        // Send tool call event
-        const toolCall: ToolCall = {
-          id: thought.id,
-          name: thought.toolName || '',
-          status: 'running',
-          input: thought.toolInput || {}
+          // Send streaming update with accumulated content
+          sendToRenderer('agent:message', spaceId, conversationId, {
+            type: 'message',
+            content: accumulatedTextContent,
+            isComplete: false
+          })
         }
-        sendToRenderer('agent:tool-call', spaceId, conversationId, toolCall as unknown as Record<string, unknown>)
+      } else if (thought.type === 'tool_use') {
+        // Only send tool-call event for top-level tools (not children of Skill)
+        if (!thought.parentToolId) {
+          const toolCall: ToolCall = {
+            id: thought.id,
+            name: thought.toolName || '',
+            status: 'running',
+            input: thought.toolInput || {}
+          }
+          sendToRenderer('agent:tool-call', spaceId, conversationId, toolCall as unknown as Record<string, unknown>)
+        }
       } else if (thought.type === 'tool_result') {
-        // Send tool result event
-        sendToRenderer('agent:tool-result', spaceId, conversationId, {
-          type: 'tool_result',
-          toolId: thought.id,
-          result: thought.toolOutput || '',
-          isError: thought.isError || false
-        })
+        // Only send tool-result event for top-level tools (not children of Skill)
+        if (!thought.parentToolId) {
+          sendToRenderer('agent:tool-result', spaceId, conversationId, {
+            type: 'tool_result',
+            toolId: thought.id,
+            result: thought.toolOutput || '',
+            isError: thought.isError || false
+          })
+        }
       } else if (thought.type === 'result') {
-        // Final result - use the last text block as the final reply
-        const finalContent = lastTextContent || thought.content
+        // Final result - use accumulated text content
+        const finalContent = accumulatedTextContent || thought.content
         sendToRenderer('agent:message', spaceId, conversationId, {
           type: 'message',
           content: finalContent,
           isComplete: true
         })
         // Fallback: if no text block was received, use result content for persistence
-        if (!lastTextContent && thought.content) {
-          lastTextContent = thought.content
+        if (!accumulatedTextContent && thought.content) {
+          accumulatedTextContent = thought.content
         }
         // Note: updateLastMessage is called after loop to include tokenUsage
         console.log(`[Agent][${conversationId}] Result thought received, ${sessionState.thoughts.length} thoughts accumulated`)
@@ -626,11 +656,11 @@ async function processMessageStream(
   }
 
   // Ensure complete event is sent even if no result message was received
-  if (lastTextContent) {
-    console.log(`[Agent][${conversationId}] Sending final complete event with last text`)
+  if (accumulatedTextContent) {
+    console.log(`[Agent][${conversationId}] Sending final complete event with accumulated text (${textBlockCount} blocks)`)
     // Backend saves complete message with thoughts and tokenUsage (Single Source of Truth)
     updateLastMessage(spaceId, conversationId, {
-      content: lastTextContent,
+      content: accumulatedTextContent,
       thoughts: sessionState.thoughts.length > 0 ? [...sessionState.thoughts] : undefined,
       tokenUsage: tokenUsage || undefined  // Include token usage if available
     })

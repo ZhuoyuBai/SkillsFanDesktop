@@ -115,6 +115,10 @@ export interface Thought {
   toolOutput?: string
   isError?: boolean
   duration?: number
+  /** Parent tool ID if this is a child tool call (e.g., TodoWrite inside a Skill) */
+  parentToolId?: string
+  /** True if this tool is a Skill invocation */
+  isSkillInvocation?: boolean
 }
 
 // ============================================

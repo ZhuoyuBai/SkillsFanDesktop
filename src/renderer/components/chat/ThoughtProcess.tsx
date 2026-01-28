@@ -101,9 +101,12 @@ function getThoughtLabelKey(type: Thought['type']): string {
 // Shows what the agent is currently doing with key details (filename, command, etc.)
 // Returns { key: translationKey, params: interpolation params }
 function getActionSummaryData(thoughts: Thought[]): { key: string; params?: Record<string, unknown> } {
-  // Search from end to find the most recent action
+  // Search from end to find the most recent TOP-LEVEL action
   for (let i = thoughts.length - 1; i >= 0; i--) {
     const t = thoughts[i]
+    // Skip child tool calls (e.g., tools called inside a Skill)
+    if (t.parentToolId) continue
+
     if (t.type === 'tool_use' && t.toolName) {
       const input = t.toolInput
       switch (t.toolName) {
@@ -119,6 +122,11 @@ function getActionSummaryData(thoughts: Thought[]): { key: string; params?: Reco
         case 'Task': return { key: 'Executing {{task}}...', params: { task: extractSearchTerm(input?.description) } }
         case 'NotebookEdit': return { key: 'Editing {{file}}...', params: { file: extractFileName(input?.notebook_path) } }
         case 'AskUserQuestion': return { key: 'Waiting for user response...' }
+        // Skill tool - show the skill name
+        case 'Skill': {
+          const skillName = (input?.skill as string) || 'skill'
+          return { key: 'Running {{skill}}...', params: { skill: skillName } }
+        }
         default: return { key: 'Processing...' }
       }
     }
@@ -315,12 +323,14 @@ export function ThoughtProcess({ thoughts, isThinking }: ThoughtProcessProps) {
     return parseTodoInput(latest.toolInput!)
   }, [thoughts])
 
-  // Filter thoughts for display (exclude TodoWrite and its results)
+  // Filter thoughts for display (exclude TodoWrite, child tools, and results)
   const displayThoughts = useMemo(() => {
     return thoughts.filter(t => {
       if (t.type === 'result') return false
       // Exclude TodoWrite tool_use and tool_result (shown separately at bottom)
       if (t.toolName === 'TodoWrite') return false
+      // Exclude child tool calls (e.g., tools called inside a Skill)
+      if (t.parentToolId) return false
       return true
     })
   }, [thoughts])

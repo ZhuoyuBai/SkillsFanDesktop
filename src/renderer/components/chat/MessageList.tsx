@@ -32,7 +32,6 @@ interface MessageListProps {
   compactInfo?: CompactInfo | null
   error?: string | null  // Error message to display when generation fails
   isCompact?: boolean  // Compact mode when Canvas is open
-  textBlockVersion?: number  // Increments on each new text block (for StreamingBubble reset)
 }
 
 /**
@@ -55,13 +54,11 @@ interface MessageListProps {
 function StreamingBubble({
   content,
   isStreaming,
-  thoughts,
-  textBlockVersion = 0
+  thoughts
 }: {
   content: string
   isStreaming: boolean
   thoughts: Thought[]
-  textBlockVersion?: number
 }) {
   // DOM refs for measuring heights
   const historyRef = useRef<HTMLDivElement>(null)  // Contains all past segments
@@ -77,24 +74,9 @@ function StreamingBubble({
   // Refs for tracking (don't trigger re-renders)
   const prevThoughtsLenRef = useRef(0)           // Previous thoughts array length
   const pendingSnapshotRef = useRef<string | null>(null)  // Content waiting to be saved
-  const prevTextBlockVersionRef = useRef(textBlockVersion)  // Track version changes
 
-  /**
-   * Step 0: Reset on new text block (100% reliable signal from SDK)
-   * When textBlockVersion changes, it means a new content_block_start (type='text') arrived.
-   * This is the precise signal to reset activeSnapshotLen.
-   */
-  useEffect(() => {
-    if (textBlockVersion !== prevTextBlockVersionRef.current) {
-      console.log(`[StreamingBubble] 🆕 New text block detected: version ${prevTextBlockVersionRef.current} → ${textBlockVersion}`)
-      // Reset all state for new text block
-      setActiveSnapshotLen(0)
-      setSegments([])
-      setScrollOffset(0)
-      pendingSnapshotRef.current = null
-      prevTextBlockVersionRef.current = textBlockVersion
-    }
-  }, [textBlockVersion])
+  // Note: textBlockVersion reset logic removed - backend now sends full accumulated content
+  // All text blocks are concatenated on backend, so frontend just displays the full content
 
   /**
    * Step 1: Detect tool_use and mark content as pending
@@ -159,7 +141,6 @@ function StreamingBubble({
       setCurrentHeight(0)
       setActiveSnapshotLen(0)
       prevThoughtsLenRef.current = 0
-      prevTextBlockVersionRef.current = 0
     }
   }, [content, thoughts.length])
 
@@ -261,8 +242,7 @@ export function MessageList({
   isThinking = false,
   compactInfo = null,
   error = null,
-  isCompact = false,
-  textBlockVersion = 0
+  isCompact = false
 }: MessageListProps) {
   const { t } = useTranslation()
 
@@ -356,7 +336,6 @@ export function MessageList({
               content={streamingContent}
               isStreaming={isStreaming}
               thoughts={thoughts}
-              textBlockVersion={textBlockVersion}
             />
           </div>
         </div>
