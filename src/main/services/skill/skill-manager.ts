@@ -102,7 +102,10 @@ function extractArchive(archivePath: string): string {
     zip.extractAllTo(tempDir, true)
 
     // Check if extraction created a single top-level directory
-    const entries = readdirSync(tempDir)
+    // Filter out macOS metadata folder and hidden files
+    const entries = readdirSync(tempDir).filter(
+      (name) => name !== '__MACOSX' && !name.startsWith('.')
+    )
     if (entries.length === 1 && statSync(join(tempDir, entries[0])).isDirectory()) {
       // Return the inner directory path
       return join(tempDir, entries[0])
