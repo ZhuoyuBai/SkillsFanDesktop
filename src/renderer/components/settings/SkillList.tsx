@@ -16,7 +16,8 @@ import {
   Zap,
   Plus,
   Upload,
-  Trash2
+  Trash2,
+  Compass
 } from 'lucide-react'
 import { api } from '../../api'
 import { useTranslation } from '../../i18n'
@@ -345,9 +346,18 @@ export function SkillList() {
 
         <div className="flex items-center gap-2">
           <button
+            onClick={() => api.openExternal('https://www.skills.fan/market')}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-primary/90 hover:bg-primary text-primary-foreground rounded-lg transition-colors"
+            title={t('Discover Skills')}
+          >
+            <Compass className="w-4 h-4" />
+            {t('Discover Skills')}
+          </button>
+
+          <button
             onClick={handleAddSkill}
             disabled={isInstalling}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-primary/90 hover:bg-primary text-primary-foreground rounded-lg transition-colors disabled:opacity-50"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg transition-colors disabled:opacity-50"
             title={t('Add Skill')}
           >
             {isInstalling ? (
