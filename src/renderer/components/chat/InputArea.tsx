@@ -34,6 +34,7 @@ import { useTranslation } from '../../i18n'
 interface InputAreaProps {
   onSend: (content: string, images?: ImageAttachment[], thinkingEnabled?: boolean) => void
   onStop: () => void
+  onInject?: (content: string, images?: ImageAttachment[]) => void  // Inject message during generation
   isGenerating: boolean
   isCompact?: boolean
   noBorder?: boolean  // Hide top border (used in empty state centered layout)
@@ -148,7 +149,7 @@ interface ImageError {
   message: string
 }
 
-export function InputArea({ onSend, onStop, isGenerating, isCompact = false, noBorder = false, suggestedContent, showTypewriterAnimation = true }: InputAreaProps) {
+export function InputArea({ onSend, onStop, onInject, isGenerating, isCompact = false, noBorder = false, suggestedContent, showTypewriterAnimation = true }: InputAreaProps) {
   const { t } = useTranslation()
   const [content, setContent] = useState('')
   const [isFocused, setIsFocused] = useState(false)
@@ -363,7 +364,18 @@ export function InputArea({ onSend, onStop, isGenerating, isCompact = false, noB
     const textToSend = isOnboardingSendStep ? onboardingPrompt : content.trim()
     const hasContent = textToSend || images.length > 0
 
-    if (hasContent && !isGenerating) {
+    if (!hasContent) return
+
+    if (isGenerating && onInject) {
+      // During generation: inject message instead of normal send
+      onInject(textToSend, images.length > 0 ? images : undefined)
+      setContent('')
+      setImages([])
+      if (textareaRef.current) {
+        textareaRef.current.style.height = 'auto'
+      }
+    } else if (!isGenerating) {
+      // Normal send
       onSend(textToSend, images.length > 0 ? images : undefined, thinkingEnabled)
 
       if (!isOnboardingSendStep) {
@@ -395,16 +407,26 @@ export function InputArea({ onSend, onStop, isGenerating, isCompact = false, noB
       e.preventDefault()
       handleSend()
     }
-    // Esc to stop
+    // Esc behavior during generation:
+    // - If input has content: clear input (don't stop)
+    // - If input is empty: stop generation
     if (e.key === 'Escape' && isGenerating) {
       e.preventDefault()
-      onStop()
+      if (content.trim()) {
+        setContent('')
+        if (textareaRef.current) {
+          textareaRef.current.style.height = 'auto'
+        }
+      } else {
+        onStop()
+      }
     }
   }
 
   // In onboarding mode, can always send (prefilled content)
-  // Can send if has text OR has images (and not processing/generating)
-  const canSend = isOnboardingSendStep || ((content.trim().length > 0 || images.length > 0) && !isGenerating && !isProcessingImages)
+  // Can send if has text OR has images (and not processing images)
+  // Allow sending during generation if onInject is provided (for inject feature)
+  const canSend = isOnboardingSendStep || ((content.trim().length > 0 || images.length > 0) && !isProcessingImages && (!isGenerating || !!onInject))
   const hasImages = images.length > 0
 
   return (
@@ -438,7 +460,7 @@ export function InputArea({ onSend, onStop, isGenerating, isCompact = false, noB
           className={`
             relative flex flex-col rounded-2xl
             border border-border bg-card/95 shadow-lg ring-1 ring-inset ring-white/5
-            ${isGenerating ? 'opacity-60' : ''}
+            ${isGenerating && !onInject ? 'opacity-60' : ''}
             ${isDragOver ? 'ring-2 ring-primary/50 bg-primary/5' : ''}
           `}
           onDragOver={handleDragOver}
@@ -495,7 +517,7 @@ export function InputArea({ onSend, onStop, isGenerating, isCompact = false, noB
               onMouseEnter={() => setIsHovered(true)}
               onMouseLeave={() => setIsHovered(false)}
               placeholder=""
-              disabled={isGenerating}
+              disabled={isGenerating && !onInject}
               readOnly={isOnboardingSendStep}
               rows={2}
               className={`w-full bg-transparent resize-none

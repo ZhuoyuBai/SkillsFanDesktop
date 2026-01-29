@@ -27,6 +27,7 @@ import { MarkdownRenderer } from './MarkdownRenderer'
 import { FileChangesFooter } from '../diff'
 import { MessageImages } from './ImageAttachmentPreview'
 import { TokenUsageIndicator } from './TokenUsageIndicator'
+import { HaloLogo } from '../brand/HaloLogo'
 import type { Message, Thought } from '../../types'
 import { useTranslation } from '../../i18n'
 
@@ -213,13 +214,17 @@ export function MessageItem({ message, previousCost = 0, hideThoughts = false, i
             <MarkdownRenderer content={message.content} />
           )
         )}
-        {/* Streaming cursor when actively receiving tokens */}
+        {/* Streaming logo animation when actively receiving tokens */}
         {isStreaming && (
-          <span className="inline-block w-0.5 h-5 ml-0.5 bg-primary streaming-cursor align-middle" />
+          <span className="inline-flex items-center ml-1 align-middle">
+            <HaloLogo size={16} animated={true} />
+          </span>
         )}
-        {/* Waiting dots when content paused but still working (e.g., tool call in progress) */}
+        {/* Waiting logo when content paused but still working (e.g., tool call in progress) */}
         {isWaitingMore && !isStreaming && (
-          <span className="waiting-dots ml-1 text-muted-foreground/60" />
+          <span className="inline-flex items-center ml-1 align-middle">
+            <HaloLogo size={16} animated={true} />
+          </span>
         )}
       </div>
 

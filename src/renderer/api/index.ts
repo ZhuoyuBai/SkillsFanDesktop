@@ -15,6 +15,7 @@ import {
   clearAuthToken,
   getAuthToken
 } from './transport'
+import type { ImageAttachment } from '../types'
 
 // Response type
 interface ApiResponse<T = unknown> {
@@ -389,6 +390,18 @@ export const api = {
       return window.skillsfan.stopGeneration(conversationId)
     }
     return httpRequest('POST', '/api/agent/stop', { conversationId })
+  },
+
+  injectMessage: async (request: {
+    spaceId: string
+    conversationId: string
+    message: string
+    images?: ImageAttachment[]
+  }): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.skillsfan.injectMessage(request)
+    }
+    return httpRequest('POST', '/api/agent/inject', request)
   },
 
   approveTool: async (conversationId: string): Promise<ApiResponse> => {

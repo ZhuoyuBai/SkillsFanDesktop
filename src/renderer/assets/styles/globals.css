@@ -118,7 +118,7 @@
 
 html {
   color-scheme: dark;
-  font-size: 17px; /* Larger base font for better readability (default is 16px) */
+  font-size: 15px; /* Compact font for more content visibility */
 }
 
 html.light {

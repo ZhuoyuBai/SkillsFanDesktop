@@ -66,6 +66,7 @@ export function ChatView({ isCompact = false }: ChatViewProps) {
     getCurrentSession,
     sendMessage,
     stopGeneration,
+    injectMessage,
     addMockMessage,
     answerUserQuestion
   } = useChatStore()
@@ -276,6 +277,12 @@ export function ChatView({ isCompact = false }: ChatViewProps) {
     }
   }
 
+  // Handle inject message during generation
+  const handleInject = useCallback(async (content: string, images?: ImageAttachment[]) => {
+    if (!isGenerating) return
+    await injectMessage(content, images)
+  }, [isGenerating, injectMessage])
+
   // Combine real messages with mock onboarding messages
   const realMessages = currentConversation?.messages || []
   const displayMessages = mockUserMessage
@@ -317,6 +324,7 @@ export function ChatView({ isCompact = false }: ChatViewProps) {
     <InputArea
       onSend={handleSend}
       onStop={handleStop}
+      onInject={handleInject}
       isGenerating={isGenerating}
       isCompact={isCompact}
       noBorder
@@ -329,6 +337,7 @@ export function ChatView({ isCompact = false }: ChatViewProps) {
     <InputArea
       onSend={handleSend}
       onStop={handleStop}
+      onInject={handleInject}
       isGenerating={isGenerating}
       isCompact={isCompact}
       showTypewriterAnimation={false}

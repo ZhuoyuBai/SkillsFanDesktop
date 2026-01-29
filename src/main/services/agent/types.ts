@@ -152,6 +152,8 @@ export interface SessionState {
   thoughts: Thought[]  // Backend accumulates thoughts (Single Source of Truth)
   /** Pending user question - pauses execution until answered */
   pendingUserQuestion: UserQuestionInfo | null
+  /** Current streaming text content (for inject feature) */
+  currentStreamingContent: string
 }
 
 // ============================================

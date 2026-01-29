@@ -22,6 +22,7 @@ import {
 import { getToolIcon } from '../icons/ToolIcons'
 import { MarkdownRenderer } from './MarkdownRenderer'
 import { TodoCard, parseTodoInput } from '../tool/TodoCard'
+import { HaloLogo } from '../brand/HaloLogo'
 import type { Thought, TimelineItem, TextSegment, TodoItem } from '../../types'
 import { useTranslation } from '../../i18n'
 
@@ -374,7 +375,9 @@ const TextBlock = memo(function TextBlock({
     <div className="py-2 text-foreground break-words leading-relaxed">
       <MarkdownRenderer content={content} />
       {isStreaming && isLast && (
-        <span className="inline-block w-0.5 h-5 ml-0.5 bg-primary streaming-cursor align-middle" />
+        <span className="inline-flex items-center ml-1 align-middle">
+          <HaloLogo size={16} animated={true} />
+        </span>
       )}
     </div>
   )
@@ -640,7 +643,7 @@ export function LinearStream({
       {/* Waiting indicator when thinking but no streaming */}
       {isThinking && !isStreaming && !currentText.trim() && (
         <div className="py-2">
-          <span className="waiting-dots text-muted-foreground/60" />
+          <HaloLogo size={16} animated={true} />
         </div>
       )}
     </div>

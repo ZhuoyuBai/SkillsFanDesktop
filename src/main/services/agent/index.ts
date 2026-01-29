@@ -52,6 +52,7 @@ export { sendMessage } from './send-message'
 // Generation control
 export {
   stopGeneration,
+  interruptAndInject,
   isGenerating,
   getActiveSessions,
   getSessionState

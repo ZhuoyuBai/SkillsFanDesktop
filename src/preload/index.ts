@@ -98,6 +98,19 @@ export interface HaloAPI {
     }
   }) => Promise<IpcResponse>
   stopGeneration: (conversationId?: string) => Promise<IpcResponse>
+  injectMessage: (request: {
+    spaceId: string
+    conversationId: string
+    message: string
+    images?: Array<{
+      id: string
+      type: 'image'
+      mediaType: 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'
+      data: string
+      name?: string
+      size?: number
+    }>
+  }) => Promise<IpcResponse>
   approveTool: (conversationId: string) => Promise<IpcResponse>
   rejectTool: (conversationId: string) => Promise<IpcResponse>
   getSessionState: (conversationId: string) => Promise<IpcResponse>
@@ -358,6 +371,7 @@ const api: HaloAPI = {
   // Agent
   sendMessage: (request) => ipcRenderer.invoke('agent:send-message', request),
   stopGeneration: (conversationId) => ipcRenderer.invoke('agent:stop', conversationId),
+  injectMessage: (request) => ipcRenderer.invoke('agent:inject-message', request),
   approveTool: (conversationId) => ipcRenderer.invoke('agent:approve-tool', conversationId),
   rejectTool: (conversationId) => ipcRenderer.invoke('agent:reject-tool', conversationId),
   getSessionState: (conversationId) => ipcRenderer.invoke('agent:get-session-state', conversationId),

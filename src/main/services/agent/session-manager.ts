@@ -430,7 +430,8 @@ export function createSessionState(
     conversationId,
     pendingPermissionResolve: null,
     thoughts: [],
-    pendingUserQuestion: null
+    pendingUserQuestion: null,
+    currentStreamingContent: ''
   }
 }
 

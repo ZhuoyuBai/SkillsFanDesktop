@@ -470,6 +470,9 @@ async function processMessageStream(
         const delta = event.delta.text || ''
         currentStreamingText += delta
 
+        // Update session state for inject feature
+        sessionState.currentStreamingContent = accumulatedTextContent + currentStreamingText
+
         // Send full accumulated content (not just delta) for proper display
         sendToRenderer('agent:message', spaceId, conversationId, {
           type: 'message',
@@ -484,6 +487,10 @@ async function processMessageStream(
         isStreamingTextBlock = false
         // Accumulate this block's content
         accumulatedTextContent += currentStreamingText
+
+        // Update session state for inject feature
+        sessionState.currentStreamingContent = accumulatedTextContent
+
         // Send full accumulated content
         sendToRenderer('agent:message', spaceId, conversationId, {
           type: 'message',

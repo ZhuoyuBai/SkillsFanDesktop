@@ -3,7 +3,7 @@
  */
 
 import { ipcMain, BrowserWindow } from 'electron'
-import { sendMessage, stopGeneration, handleToolApproval, handleUserQuestionAnswer, getSessionState, ensureSessionWarm, testMcpConnections } from '../services/agent'
+import { sendMessage, stopGeneration, interruptAndInject, handleToolApproval, handleUserQuestionAnswer, getSessionState, ensureSessionWarm, testMcpConnections } from '../services/agent'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -51,6 +51,35 @@ export function registerAgentHandlers(window: BrowserWindow | null): void {
       return { success: false, error: err.message }
     }
   })
+
+  // Inject message during generation (pause current, add user message, continue)
+  ipcMain.handle(
+    'agent:inject-message',
+    async (
+      _event,
+      request: {
+        spaceId: string
+        conversationId: string
+        message: string
+        images?: Array<{
+          id: string
+          type: 'image'
+          mediaType: 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'
+          data: string
+          name?: string
+          size?: number
+        }>
+      }
+    ) => {
+      try {
+        await interruptAndInject(mainWindow, request)
+        return { success: true }
+      } catch (error: unknown) {
+        const err = error as Error
+        return { success: false, error: err.message }
+      }
+    }
+  )
 
   // Approve tool execution for a specific conversation
   ipcMain.handle('agent:approve-tool', async (_event, conversationId: string) => {

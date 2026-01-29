@@ -201,7 +201,10 @@ export function handleUserQuestionAnswer(
 ): void {
   const session = activeSessions.get(conversationId)
   if (session?.pendingUserQuestion?.inputResolve) {
+    const spaceId = session.spaceId
     session.pendingUserQuestion.inputResolve(answers)
+    // Notify frontend to clear the question UI
+    sendToRenderer('agent:user-question-answered', spaceId, conversationId, {})
     // Note: inputResolve will clear pendingUserQuestion after resolving
   } else {
     console.warn(`[Agent][${conversationId}] No pending question to answer`)

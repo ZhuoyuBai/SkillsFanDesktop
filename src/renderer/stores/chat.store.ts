@@ -147,6 +147,7 @@ interface ChatState {
   // Messaging
   sendMessage: (content: string, images?: ImageAttachment[], aiBrowserEnabled?: boolean, thinkingEnabled?: boolean) => Promise<void>
   stopGeneration: (conversationId?: string) => Promise<void>
+  injectMessage: (content: string, images?: ImageAttachment[]) => Promise<void>
 
   // Tool approval
   approveTool: (conversationId: string) => Promise<void>
@@ -791,6 +792,55 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }
     } catch (error) {
       console.error('Failed to stop generation:', error)
+    }
+  },
+
+  // Inject message during generation (pause current, add user message, continue)
+  injectMessage: async (content: string, images?: ImageAttachment[]) => {
+    const { currentSpaceId } = get()
+    const conversation = get().getCurrentConversation()
+
+    if (!currentSpaceId || !conversation) {
+      console.error('[ChatStore] Cannot inject: no active conversation')
+      return
+    }
+
+    const conversationId = conversation.id
+    console.log(`[ChatStore] Injecting message into conversation: ${conversationId}`)
+
+    // Add user message to UI immediately
+    const userMessage: Message = {
+      id: `msg-${Date.now()}`,
+      role: 'user',
+      content,
+      timestamp: new Date().toISOString(),
+      images
+    }
+
+    // Update cache with user message
+    set((state) => {
+      const newCache = new Map(state.conversationCache)
+      const cached = newCache.get(conversationId)
+      if (cached) {
+        newCache.set(conversationId, {
+          ...cached,
+          messages: [...cached.messages, userMessage],
+          updatedAt: new Date().toISOString()
+        })
+      }
+      return { conversationCache: newCache }
+    })
+
+    try {
+      // Call backend to interrupt and inject
+      await api.injectMessage({
+        spaceId: currentSpaceId,
+        conversationId,
+        message: content,
+        images
+      })
+    } catch (error) {
+      console.error('Failed to inject message:', error)
     }
   },
 
