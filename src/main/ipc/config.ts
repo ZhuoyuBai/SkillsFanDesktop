@@ -156,10 +156,31 @@ export function registerConfigHandlers(): void {
 
       console.log('[Config IPC] Resetting to default, clearing:', appDataPath)
 
-      // Clear all data
+      // Clear all data with verification (Windows may have file locking issues)
       if (await fs.pathExists(appDataPath)) {
+        // 1. First try to empty directory contents (helps with locked files on Windows)
+        try {
+          await fs.emptyDir(appDataPath)
+        } catch (emptyErr) {
+          console.warn('[Config IPC] emptyDir failed, trying remove:', emptyErr)
+        }
+
+        // 2. Delete the directory
         await fs.remove(appDataPath)
-        console.log('[Config IPC] Data cleared successfully')
+
+        // 3. Wait for filesystem to sync (Windows needs more time)
+        await new Promise(resolve => setTimeout(resolve, 500))
+
+        // 4. Verify deletion succeeded
+        if (await fs.pathExists(appDataPath)) {
+          console.error('[Config IPC] Failed to delete data directory, it still exists')
+          return {
+            success: false,
+            error: 'Failed to clear data directory. Please close other applications that may be using SkillsFan files and try again.'
+          }
+        }
+
+        console.log('[Config IPC] Data cleared and verified successfully')
       }
 
       // Set quitting flag to bypass minimize-to-tray
@@ -171,12 +192,12 @@ export function registerConfigHandlers(): void {
         window.destroy()
       })
 
-      // Delay to ensure cleanup, then restart
+      // Delay to ensure cleanup, then restart (increased for Windows)
       setTimeout(() => {
         console.log('[Config IPC] Restarting app...')
         app.relaunch()
-        app.quit()  // Use quit() instead of exit() for proper cleanup
-      }, 500)
+        app.quit()
+      }, 1000)
 
       return { success: true }
     } catch (error: unknown) {

@@ -3,7 +3,7 @@
  */
 
 import { useState } from 'react'
-import { FolderOpen, Pencil, Trash2, Star, Plus, StarOff } from 'lucide-react'
+import { FolderOpen, Pencil, Trash2, Star, Plus, StarOff, ExternalLink } from 'lucide-react'
 import { useSpaceStore } from '../../stores/space.store'
 import { useAppStore } from '../../stores/app.store'
 import { SpaceIcon } from '../icons/ToolIcons'
@@ -17,7 +17,7 @@ import { SPACE_ICONS, SPACE_ICON_COLORS, DEFAULT_SPACE_ICON, DEFAULT_SPACE_ICON_
 export function SpaceManagementSection() {
   const { t } = useTranslation()
   const { haloSpace, spaces, updateSpace, deleteSpace, openSpaceFolder, setCurrentSpace, currentSpace } = useSpaceStore()
-  const { config, setConfig } = useAppStore()
+  const { config, setConfig, setView } = useAppStore()
 
   const [showCreateDialog, setShowCreateDialog] = useState(false)
 
@@ -117,6 +117,12 @@ export function SpaceManagementSection() {
     setDeletingSpace(null)
   }
 
+  // Handle enter space - switch to space and navigate to space view
+  const handleEnterSpace = (space: Space) => {
+    setCurrentSpace(space)
+    setView('space')
+  }
+
   // Render space card
   const renderSpaceCard = (space: Space, isHalo: boolean = false) => {
     const isDefault = isHalo ? !defaultSpaceId : defaultSpaceId === space.id
@@ -126,36 +132,43 @@ export function SpaceManagementSection() {
         key={space.id}
         className={`p-4 rounded-xl border transition-all ${
           isDefault ? 'border-primary/50 bg-primary/5' : 'border-border'
-        }`}
+        } hover:border-primary/30 hover:bg-muted/30`}
       >
         <div className="flex items-start gap-3">
-          {/* Icon */}
-          <div className="flex-shrink-0 pt-0.5">
-            {isHalo ? (
-              <HaloLogo size={28} hoverOnly={true} />
-            ) : (
-              <SpaceIcon iconId={space.icon} size={24} iconColor={space.iconColor} />
-            )}
-          </div>
-
-          {/* Info */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <h4 className="font-medium truncate">
-                {isHalo ? t('Default Space') : space.name}
-              </h4>
-              {isDefault && (
-                <span className="px-2 py-0.5 text-xs bg-primary/10 text-primary rounded-full flex-shrink-0">
-                  {t('Default')}
-                </span>
+          {/* Clickable area: Icon + Info */}
+          <div
+            className="flex items-start gap-3 flex-1 min-w-0 cursor-pointer group"
+            onClick={() => handleEnterSpace(space)}
+          >
+            {/* Icon */}
+            <div className="flex-shrink-0 pt-0.5">
+              {isHalo ? (
+                <HaloLogo size={28} hoverOnly={true} />
+              ) : (
+                <SpaceIcon iconId={space.icon} size={24} iconColor={space.iconColor} />
               )}
             </div>
-            <p className="text-xs text-muted-foreground truncate mt-1">
-              {space.path.replace(/\/Users\/[^/]+/, '~')}
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">
-              {t('Created')} {formatTimeAgo(space.createdAt)}
-            </p>
+
+            {/* Info */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <h4 className="font-medium truncate group-hover:text-primary transition-colors">
+                  {isHalo ? t('Default Space') : space.name}
+                </h4>
+                {isDefault && (
+                  <span className="px-2 py-0.5 text-xs bg-primary/10 text-primary rounded-full flex-shrink-0">
+                    {t('Default')}
+                  </span>
+                )}
+                <ExternalLink className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+              </div>
+              <p className="text-xs text-muted-foreground truncate mt-1">
+                {space.path.replace(/\/Users\/[^/]+/, '~')}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {t('Created')} {formatTimeAgo(space.createdAt)}
+              </p>
+            </div>
           </div>
 
           {/* Actions */}
@@ -251,6 +264,10 @@ export function SpaceManagementSection() {
       <CreateSpaceDialog
         isOpen={showCreateDialog}
         onClose={() => setShowCreateDialog(false)}
+        onCreated={(newSpace) => {
+          setCurrentSpace(newSpace)
+          setView('space')
+        }}
       />
 
       {/* Edit Space Dialog */}

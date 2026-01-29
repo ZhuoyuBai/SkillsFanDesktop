@@ -10,7 +10,7 @@
 import { join } from 'path'
 import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, rmSync } from 'fs'
 import { getTempSpacePath } from './config.service'
-import { getSpace } from './space.service'
+import { getSpace, getSpaceMetaDir } from './space.service'
 import { v4 as uuidv4 } from 'uuid'
 
 // Thought types for agent reasoning
@@ -267,7 +267,7 @@ function getConversationsDir(spaceId: string): string {
 
   const convDir = space.isTemp
     ? join(space.path, 'conversations')
-    : join(space.path, '.halo', 'conversations')
+    : join(getSpaceMetaDir(space.path), 'conversations')
   console.log(`[Conversation] Found space "${space.name}", conversations dir: ${convDir}`)
   return convDir
 }

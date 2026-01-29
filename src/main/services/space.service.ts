@@ -47,7 +47,27 @@ interface SpaceMeta {
 
 // Space index for tracking custom path spaces
 interface SpaceIndex {
-  customPaths: string[]  // Array of paths to spaces outside ~/.halo/spaces/
+  customPaths: string[]  // Array of paths to spaces outside ~/.skillsfan/spaces/
+}
+
+// New Space uses this directory name
+const SPACE_DATA_DIR = '.skillsfan'
+// Legacy directory name for backward compatibility
+const LEGACY_DATA_DIR = '.halo'
+
+// Get the metadata directory for a space (with backward compatibility)
+export function getSpaceMetaDir(spacePath: string): string {
+  const newDir = join(spacePath, SPACE_DATA_DIR)
+  if (existsSync(newDir)) {
+    return newDir
+  }
+  // Fallback to legacy directory
+  const legacyDir = join(spacePath, LEGACY_DATA_DIR)
+  if (existsSync(legacyDir)) {
+    return legacyDir
+  }
+  // Default to new directory (for creation)
+  return newDir
 }
 
 function getSpaceIndexPath(): string {
@@ -132,7 +152,7 @@ export function getAllSpacePaths(): string[] {
 // Get space stats
 function getSpaceStats(spacePath: string): { artifactCount: number; conversationCount: number } {
   const artifactsDir = join(spacePath, 'artifacts')
-  const conversationsDir = join(spacePath, '.halo', 'conversations')
+  const conversationsDir = join(getSpaceMetaDir(spacePath), 'conversations')
 
   let artifactCount = 0
   let conversationCount = 0
@@ -184,7 +204,7 @@ export function getHaloSpace(): Space {
   const stats = getSpaceStats(tempPath)
 
   // Load preferences if they exist
-  const metaPath = join(tempPath, '.halo', 'meta.json')
+  const metaPath = join(getSpaceMetaDir(tempPath), 'meta.json')
   let preferences: SpacePreferences | undefined
 
   if (existsSync(metaPath)) {
@@ -206,7 +226,7 @@ export function getHaloSpace(): Space {
 
 // Helper to load a space from a path
 function loadSpaceFromPath(spacePath: string): Space | null {
-  const metaPath = join(spacePath, '.halo', 'meta.json')
+  const metaPath = join(getSpaceMetaDir(spacePath), 'meta.json')
 
   if (existsSync(metaPath)) {
     try {
@@ -286,8 +306,8 @@ export function createSpace(input: { name: string; icon: string; iconColor?: str
 
   // Create directories
   mkdirSync(spacePath, { recursive: true })
-  mkdirSync(join(spacePath, '.halo'), { recursive: true })
-  mkdirSync(join(spacePath, '.halo', 'conversations'), { recursive: true })
+  mkdirSync(join(spacePath, SPACE_DATA_DIR), { recursive: true })
+  mkdirSync(join(spacePath, SPACE_DATA_DIR, 'conversations'), { recursive: true })
 
   // Create meta file
   const meta: SpaceMeta = {
@@ -299,7 +319,7 @@ export function createSpace(input: { name: string; icon: string; iconColor?: str
     updatedAt: now
   }
 
-  writeFileSync(join(spacePath, '.halo', 'meta.json'), JSON.stringify(meta, null, 2))
+  writeFileSync(join(spacePath, SPACE_DATA_DIR, 'meta.json'), JSON.stringify(meta, null, 2))
 
   // Register custom path in index
   if (isCustomPath) {
@@ -336,10 +356,15 @@ export function deleteSpace(spaceId: string): boolean {
 
   try {
     if (isCustomPath) {
-      // For custom path spaces, only delete the .halo folder (preserve user's files)
-      const haloDir = join(spacePath, '.halo')
-      if (existsSync(haloDir)) {
-        rmSync(haloDir, { recursive: true, force: true })
+      // For custom path spaces, only delete the data folder (preserve user's files)
+      // Check both new and legacy directory names
+      const newDataDir = join(spacePath, SPACE_DATA_DIR)
+      const legacyDataDir = join(spacePath, LEGACY_DATA_DIR)
+      if (existsSync(newDataDir)) {
+        rmSync(newDataDir, { recursive: true, force: true })
+      }
+      if (existsSync(legacyDataDir)) {
+        rmSync(legacyDataDir, { recursive: true, force: true })
       }
       // Remove from index
       removeFromSpaceIndex(spacePath)
@@ -393,7 +418,7 @@ export function updateSpace(spaceId: string, updates: { name?: string; icon?: st
     return null
   }
 
-  const metaPath = join(space.path, '.halo', 'meta.json')
+  const metaPath = join(getSpaceMetaDir(space.path), 'meta.json')
 
   try {
     const meta: SpaceMeta = JSON.parse(readFileSync(metaPath, 'utf-8'))
@@ -427,15 +452,13 @@ export function updateSpacePreferences(
   }
 
   // For temp space, store preferences in a special location
-  const metaPath = space.isTemp
-    ? join(space.path, '.halo', 'meta.json')
-    : join(space.path, '.halo', 'meta.json')
+  const metaDir = getSpaceMetaDir(space.path)
+  const metaPath = join(metaDir, 'meta.json')
 
   try {
-    // Ensure .halo directory exists for temp space
-    const haloDir = join(space.path, '.halo')
-    if (!existsSync(haloDir)) {
-      mkdirSync(haloDir, { recursive: true })
+    // Ensure data directory exists for temp space
+    if (!existsSync(metaDir)) {
+      mkdirSync(metaDir, { recursive: true })
     }
 
     // Load or create meta
@@ -484,7 +507,7 @@ export function getSpacePreferences(spaceId: string): SpacePreferences | null {
     return null
   }
 
-  const metaPath = join(space.path, '.halo', 'meta.json')
+  const metaPath = join(getSpaceMetaDir(space.path), 'meta.json')
 
   try {
     if (existsSync(metaPath)) {
@@ -547,7 +570,7 @@ export function saveOnboardingConversation(
     // Determine conversations directory
     const conversationsDir = space.isTemp
       ? join(space.path, 'conversations')
-      : join(space.path, '.halo', 'conversations')
+      : join(getSpaceMetaDir(space.path), 'conversations')
 
     // Ensure directory exists
     mkdirSync(conversationsDir, { recursive: true })

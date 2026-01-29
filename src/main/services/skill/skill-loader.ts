@@ -7,24 +7,7 @@
 import { readFileSync, readdirSync, existsSync } from 'fs'
 import { join, dirname } from 'path'
 import type { SkillInfo } from './types'
-
-/**
- * 简化版 YAML frontmatter 解析（不依赖 gray-matter）
- */
-function parseFrontmatter(content: string): { data: Record<string, string>; content: string } | null {
-  const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---/)
-  if (!match) return null
-
-  const yaml = match[1]
-  const data: Record<string, string> = {}
-
-  for (const line of yaml.split('\n')) {
-    const kv = line.match(/^(\w+):\s*(.*)$/)
-    if (kv) data[kv[1]] = kv[2].trim()
-  }
-
-  return { data, content: content.slice(match[0].length).trim() }
-}
+import { parseFrontmatter } from './frontmatter'
 
 /**
  * 从 Markdown 内容中提取 H1 标题
@@ -63,7 +46,7 @@ export function loadSkillsFromDir(skillsDir: string): SkillInfo[] {
       }
 
       // 从正文提取 H1 标题作为显示名称，如果没有则使用 name
-      const displayName = extractH1Title(parsed.content) || parsed.data.name
+      const displayName = extractH1Title(parsed.body) || parsed.data.name
 
       skills.push({
         name: parsed.data.name,
@@ -88,5 +71,5 @@ export function loadSkillsFromDir(skillsDir: string): SkillInfo[] {
 export function getSkillContent(location: string): string {
   const content = readFileSync(location, 'utf-8')
   const parsed = parseFrontmatter(content)
-  return parsed?.content || ''
+  return parsed?.body || ''
 }

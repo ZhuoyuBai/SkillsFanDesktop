@@ -86,7 +86,14 @@ export function registerGitBashHandlers(window: BrowserWindow | null): void {
 
   // Open external URL (for manual download link)
   ipcMain.handle('shell:open-external', async (_event, url: string) => {
-    await shell.openExternal(url)
+    if (process.platform === 'win32') {
+      // Windows: use 'start' command for more reliable default browser opening
+      const { exec } = require('child_process')
+      exec(`start "" "${url}"`)
+    } else {
+      // macOS/Linux: shell.openExternal works correctly
+      await shell.openExternal(url)
+    }
   })
 }
 

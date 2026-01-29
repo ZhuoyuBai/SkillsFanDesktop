@@ -12,7 +12,7 @@
 import { join } from 'path'
 import { existsSync, readdirSync, readFileSync, statSync } from 'fs'
 import { getTempSpacePath, getHaloDir } from './config.service'
-import { getSpace } from './space.service'
+import { getSpace, getSpaceMetaDir } from './space.service'
 
 /**
  * Search result for a single message match
@@ -226,7 +226,7 @@ export class SearchService {
         try {
           const space = getSpace(spaceId)
           if (space) {
-            return this.scanConversationFiles(join(space.path, '.halo', 'conversations'))
+            return this.scanConversationFiles(join(getSpaceMetaDir(space.path), 'conversations'))
           }
         } catch (e) {
           console.error(`Failed to get space ${spaceId}:`, e)
@@ -250,7 +250,8 @@ export class SearchService {
         const spaceNames = readdirSync(spacesDir)
         spaceNames.forEach(spaceName => {
           try {
-            const convDir = join(spacesDir, spaceName, '.halo', 'conversations')
+            const spacePath = join(spacesDir, spaceName)
+            const convDir = join(getSpaceMetaDir(spacePath), 'conversations')
             if (existsSync(convDir)) {
               files.push(...this.scanConversationFiles(convDir))
             }
@@ -308,7 +309,7 @@ export class SearchService {
         try {
           const space = getSpace(spaceId)
           if (space) {
-            const filePath = join(space.path, '.halo', 'conversations', `${conversationId}.json`)
+            const filePath = join(getSpaceMetaDir(space.path), 'conversations', `${conversationId}.json`)
             if (existsSync(filePath)) {
               return filePath
             }
@@ -333,7 +334,8 @@ export class SearchService {
       const spaceNames = readdirSync(spacesDir)
       for (const spaceName of spaceNames) {
         try {
-          filePath = join(spacesDir, spaceName, '.halo', 'conversations', `${conversationId}.json`)
+          const spacePath = join(spacesDir, spaceName)
+          filePath = join(getSpaceMetaDir(spacePath), 'conversations', `${conversationId}.json`)
           if (existsSync(filePath)) {
             return filePath
           }

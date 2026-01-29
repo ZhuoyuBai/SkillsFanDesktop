@@ -17,6 +17,7 @@ import {
 import { tmpdir } from 'os'
 import AdmZip from 'adm-zip'
 import { getSkillsDir } from './skill-registry'
+import { parseFrontmatter } from './frontmatter'
 
 // Validation errors
 export class SkillValidationError extends Error {
@@ -45,22 +46,11 @@ function validateSkillStructure(
 
   try {
     const content = readFileSync(skillMdPath, 'utf-8')
-
-    // Parse frontmatter (simple regex for ---...--- block)
-    const frontmatterMatch = content.match(/^---\r?\n([\s\S]*?)\r?\n---/)
-    if (!frontmatterMatch) {
+    const parsed = parseFrontmatter(content)
+    if (!parsed) {
       return { valid: false, error: 'SKILL.md missing frontmatter (--- ... ---)' }
     }
-
-    const yaml = frontmatterMatch[1]
-    const data: Record<string, string> = {}
-
-    for (const line of yaml.split('\n')) {
-      const match = line.match(/^(\w+):\s*(.*)$/)
-      if (match) {
-        data[match[1]] = match[2].trim()
-      }
-    }
+    const data = parsed.data
 
     // Required fields
     if (!data.name) {

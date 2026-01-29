@@ -29,9 +29,9 @@ describe('Space Service', () => {
       const haloSpace = getHaloSpace()
 
       expect(haloSpace.id).toBe('halo-temp')
-      expect(haloSpace.name).toBe('Halo')
+      expect(haloSpace.name).toBe('技能范')
       expect(haloSpace.isTemp).toBe(true)
-      expect(haloSpace.icon).toBe('sparkles')
+      expect(haloSpace.icon).toBe('skillsfan')
     })
 
     it('should have valid path', () => {
@@ -86,14 +86,14 @@ describe('Space Service', () => {
       expect(fs.existsSync(space.path)).toBe(true)
     })
 
-    it('should create .halo directory inside space', async () => {
+    it('should create .skillsfan directory inside space', async () => {
       const space = await createSpace({
         name: 'Test Space',
         icon: 'folder'
       })
 
-      const haloDir = path.join(space.path, '.halo')
-      expect(fs.existsSync(haloDir)).toBe(true)
+      const dataDir = path.join(space.path, '.skillsfan')
+      expect(fs.existsSync(dataDir)).toBe(true)
     })
 
     it('should create meta.json with space info', async () => {
@@ -102,7 +102,7 @@ describe('Space Service', () => {
         icon: 'star'
       })
 
-      const metaPath = path.join(space.path, '.halo', 'meta.json')
+      const metaPath = path.join(space.path, '.skillsfan', 'meta.json')
       expect(fs.existsSync(metaPath)).toBe(true)
 
       const meta = JSON.parse(fs.readFileSync(metaPath, 'utf-8'))
@@ -122,7 +122,7 @@ describe('Space Service', () => {
       })
 
       expect(space.path).toBe(customPath)
-      expect(fs.existsSync(path.join(customPath, '.halo', 'meta.json'))).toBe(true)
+      expect(fs.existsSync(path.join(customPath, '.skillsfan', 'meta.json'))).toBe(true)
     })
   })
 
@@ -155,19 +155,19 @@ describe('Space Service', () => {
   })
 
   describe('deleteSpace', () => {
-    it('should delete space and its .halo directory', async () => {
+    it('should delete space and its .skillsfan directory', async () => {
       const space = await createSpace({
         name: 'Delete Test',
         icon: 'folder'
       })
 
-      const haloDir = path.join(space.path, '.halo')
-      expect(fs.existsSync(haloDir)).toBe(true)
+      const dataDir = path.join(space.path, '.skillsfan')
+      expect(fs.existsSync(dataDir)).toBe(true)
 
       await deleteSpace(space.id)
 
-      // .halo should be deleted, but space directory may remain (for custom paths)
-      expect(fs.existsSync(haloDir)).toBe(false)
+      // .skillsfan should be deleted, but space directory may remain (for custom paths)
+      expect(fs.existsSync(dataDir)).toBe(false)
     })
 
     it('should not allow deleting Halo temp space', async () => {

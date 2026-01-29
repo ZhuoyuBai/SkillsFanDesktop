@@ -386,25 +386,15 @@ export function SpacePage() {
       <Header
         className="bg-card backdrop-blur-sm border-b border-border/40"
         left={
-          <>
-            {/* Mobile menu button */}
-            {isMobile && (
-              <button
-                onClick={() => setMobileSidebarOpen(true)}
-                className="p-1.5 hover:bg-secondary rounded-lg transition-colors"
-                aria-label={t('Open menu')}
-              >
-                <Menu className="w-5 h-5" />
-              </button>
-            )}
-
-            {!currentSpace.isTemp && (
-              <>
-                <SpaceIcon iconId={currentSpace.icon} size={22} iconColor={currentSpace.iconColor} />
-                <span className="font-medium text-sm">{currentSpace.name}</span>
-              </>
-            )}
-          </>
+          isMobile ? (
+            <button
+              onClick={() => setMobileSidebarOpen(true)}
+              className="p-1.5 hover:bg-secondary rounded-lg transition-colors"
+              aria-label={t('Open menu')}
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+          ) : undefined
         }
         right={
           isMobile ? (

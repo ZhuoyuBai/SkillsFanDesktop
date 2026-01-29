@@ -99,7 +99,7 @@ export function SpaceSelector({ iconOnly = false }: SpaceSelectorProps = {}) {
           {displaySpace?.isTemp ? (
             <HaloLogo size={16} animated={false} />
           ) : displaySpace ? (
-            <SpaceIcon iconId={displaySpace.icon} size={14} colored={false} className="text-current" />
+            <SpaceIcon iconId={displaySpace.icon} size={14} iconColor={displaySpace.iconColor} />
           ) : (
             <div className="w-4 h-4 rounded bg-muted flex items-center justify-center flex-shrink-0">
               <span className="text-[10px] text-muted-foreground">?</span>
@@ -151,7 +151,7 @@ export function SpaceSelector({ iconOnly = false }: SpaceSelectorProps = {}) {
                   currentSpace?.id === space.id ? 'text-primary' : 'text-foreground'
                 }`}
               >
-                <SpaceIcon iconId={space.icon} size={18} colored={false} className="text-current flex-shrink-0" />
+                <SpaceIcon iconId={space.icon} size={18} iconColor={space.iconColor} className="flex-shrink-0" />
                 <span className="flex-1 truncate">{space.name}</span>
                 {currentSpace?.id === space.id && (
                   <span className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
