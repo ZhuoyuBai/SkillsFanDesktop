@@ -6,7 +6,8 @@ import { useState, useEffect, useRef } from 'react'
 import { api } from '../../api'
 import { useTranslation } from '../../i18n'
 import { useAppStore } from '../../stores/app.store'
-import { User, Settings, LogOut, Loader2 } from 'lucide-react'
+import { User, Settings, LogOut, Loader2, HelpCircle } from 'lucide-react'
+import { SpaceGuideDialog } from '../space/SpaceGuideDialog'
 import type { SkillsFanAuthState } from '../../../shared/types/skillsfan'
 
 interface UserAvatarMenuProps {
@@ -23,6 +24,7 @@ export function UserAvatarMenu({ collapsed = false }: UserAvatarMenuProps) {
   const [isLoggingOut, setIsLoggingOut] = useState(false)
   const [avatarError, setAvatarError] = useState(false)
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [showSpaceGuide, setShowSpaceGuide] = useState(false)
 
   const menuRef = useRef<HTMLDivElement>(null)
   const buttonRef = useRef<HTMLButtonElement>(null)
@@ -110,6 +112,11 @@ export function UserAvatarMenu({ collapsed = false }: UserAvatarMenuProps) {
     setView('settings')
   }
 
+  const handleSpaceGuideClick = () => {
+    setIsMenuOpen(false)
+    setShowSpaceGuide(true)
+  }
+
   const isLoggedIn = authState?.isLoggedIn && authState.user
   const userName = isLoggedIn ? authState.user!.name : t('Login')
   const userEmail = isLoggedIn ? authState.user!.email : ''
@@ -160,6 +167,17 @@ export function UserAvatarMenu({ collapsed = false }: UserAvatarMenuProps) {
                 <p className="text-xs text-muted-foreground truncate">{userEmail}</p>
               )}
             </div>
+          </button>
+
+          <div className="border-t border-border/50" />
+
+          {/* What is a Space */}
+          <button
+            onClick={handleSpaceGuideClick}
+            className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-muted/50 transition-colors text-left"
+          >
+            <HelpCircle className="w-4 h-4 text-muted-foreground" />
+            <span className="text-sm">{t('What is a Space?')}</span>
           </button>
 
           <div className="border-t border-border/50" />
@@ -224,6 +242,12 @@ export function UserAvatarMenu({ collapsed = false }: UserAvatarMenuProps) {
           <span className="truncate">{userName}</span>
         )}
       </button>
+
+      {/* Space Guide Dialog */}
+      <SpaceGuideDialog
+        isOpen={showSpaceGuide}
+        onClose={() => setShowSpaceGuide(false)}
+      />
     </div>
   )
 }

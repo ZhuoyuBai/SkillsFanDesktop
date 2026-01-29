@@ -172,6 +172,11 @@ export interface McpServerStatus {
   error?: string;
 }
 
+// Spaces configuration (default space settings)
+export interface SpacesConfig {
+  defaultSpaceId: string | null;  // null = Halo space
+}
+
 export interface HaloConfig {
   api: ApiConfig;  // Legacy, kept for backward compatibility
   aiSources?: AISourcesConfig;  // New multi-source configuration
@@ -180,6 +185,7 @@ export interface HaloConfig {
   system: SystemConfig;
   remoteAccess: RemoteAccessConfig;
   mcpServers: McpServersConfig;  // MCP servers configuration
+  spaces?: SpacesConfig;  // Space settings (default space, etc.)
   isFirstLaunch: boolean;
 }
 
@@ -484,7 +490,7 @@ export type AgentEvent =
 // App State Types
 // ============================================
 
-export type AppView = 'splash' | 'gitBashSetup' | 'setup' | 'home' | 'space' | 'settings';
+export type AppView = 'splash' | 'gitBashSetup' | 'setup' | 'space' | 'settings';
 
 export interface AppState {
   view: AppView;

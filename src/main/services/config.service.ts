@@ -78,6 +78,10 @@ interface HaloConfig {
     path: string | null
     skipped: boolean
   }
+  // Spaces configuration (default space settings)
+  spaces?: {
+    defaultSpaceId: string | null  // null = Halo space
+  }
 }
 
 // MCP server configuration types
@@ -178,7 +182,10 @@ const DEFAULT_CONFIG: HaloConfig = {
     completed: false
   },
   mcpServers: {},  // Empty by default
-  isFirstLaunch: true
+  isFirstLaunch: true,
+  spaces: {
+    defaultSpaceId: null  // null = Halo space
+  }
 }
 
 function normalizeAiSources(parsed: Record<string, any>): AISourcesConfig {
@@ -298,7 +305,9 @@ export function getConfig(): HaloConfig {
       // mcpServers is a flat map, just use parsed value or default
       mcpServers: parsed.mcpServers || DEFAULT_CONFIG.mcpServers,
       // analytics: keep as-is (managed by analytics.service.ts)
-      analytics: parsed.analytics
+      analytics: parsed.analytics,
+      // spaces: merge with defaults
+      spaces: { ...DEFAULT_CONFIG.spaces, ...parsed.spaces }
     }
   } catch (error) {
     console.error('Failed to read config:', error)
@@ -339,6 +348,10 @@ export function saveConfig(config: Partial<HaloConfig>): HaloConfig {
   // gitBash: replace entirely when provided (Windows only)
   if ((config as any).gitBash !== undefined) {
     (newConfig as any).gitBash = (config as any).gitBash
+  }
+  // spaces: merge with current config
+  if (config.spaces) {
+    newConfig.spaces = { ...currentConfig.spaces, ...config.spaces }
   }
 
   const configPath = getConfigPath()

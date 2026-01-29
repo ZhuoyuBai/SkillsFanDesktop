@@ -4,6 +4,7 @@
  */
 
 import { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { Monitor } from 'lucide-react'
 import { useSpaceStore } from '../../stores/space.store'
 import { SPACE_ICONS, DEFAULT_SPACE_ICON, SPACE_ICON_COLORS, DEFAULT_SPACE_ICON_COLOR } from '../../types'
@@ -11,6 +12,7 @@ import type { Space, CreateSpaceInput, SpaceIconId, SpaceIconColorId } from '../
 import { SpaceIcon, FolderOpen, ChevronDown } from '../icons/ToolIcons'
 import { api } from '../../api'
 import { useTranslation } from '../../i18n'
+import { canvasLifecycle } from '../../services/canvas-lifecycle'
 
 // Check if running in web mode
 const isWebMode = api.isRemoteMode()
@@ -36,6 +38,7 @@ export function CreateSpaceDialog({ isOpen, onClose, onCreated }: CreateSpaceDia
 
   // Ref for space name input
   const spaceNameInputRef = useRef<HTMLInputElement>(null)
+  const restoreBrowserViewsRef = useRef(false)
 
   // Load default path when dialog opens
   useEffect(() => {
@@ -49,6 +52,24 @@ export function CreateSpaceDialog({ isOpen, onClose, onCreated }: CreateSpaceDia
       setTimeout(() => {
         spaceNameInputRef.current?.focus()
       }, 100)
+    }
+  }, [isOpen])
+
+  // Hide BrowserViews while dialog is open to avoid overlay gaps
+  useEffect(() => {
+    if (!isOpen) return
+    if (!canvasLifecycle.getIsOpen()) return
+
+    restoreBrowserViewsRef.current = true
+    void canvasLifecycle.hideAllBrowserViews()
+
+    return () => {
+      if (!restoreBrowserViewsRef.current) return
+      restoreBrowserViewsRef.current = false
+
+      if (canvasLifecycle.getIsOpen()) {
+        void canvasLifecycle.showActiveBrowserView()
+      }
     }
   }, [isOpen])
 
@@ -121,9 +142,15 @@ export function CreateSpaceDialog({ isOpen, onClose, onCreated }: CreateSpaceDia
 
   if (!isOpen) return null
 
-  return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 no-drag">
-      <div className="bg-card border border-border/80 rounded-2xl p-7 w-full max-w-md max-h-[85vh] overflow-y-auto animate-fade-in shadow-2xl">
+  const dialog = (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 no-drag">
+      {/* Backdrop - click to close */}
+      <div
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={handleClose}
+      />
+      {/* Dialog content */}
+      <div className="relative bg-card border border-border/80 rounded-2xl p-7 w-full max-w-md max-h-[85vh] overflow-y-auto animate-fade-in shadow-2xl">
         <h2 className="text-lg font-semibold mb-6 text-foreground/95 tracking-tight">{t('Create Dedicated Space')}</h2>
 
         {/* 1. Space name - Primary input, most important */}
@@ -320,4 +347,7 @@ export function CreateSpaceDialog({ isOpen, onClose, onCreated }: CreateSpaceDia
       </div>
     </div>
   )
+
+  if (typeof document === 'undefined') return dialog
+  return createPortal(dialog, document.body)
 }

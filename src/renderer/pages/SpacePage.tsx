@@ -258,11 +258,6 @@ export function SpacePage() {
     initSpace()
   }, [currentSpace?.id]) // Only re-run when space ID changes
 
-  // Handle back
-  const handleBack = () => {
-    setView('home')
-  }
-
   // Handle new conversation
   const handleNewConversation = async () => {
     if (!currentSpace) return
@@ -282,10 +277,11 @@ export function SpacePage() {
     }
   }
 
+  // Fallback if no space is selected (should not happen normally)
   if (!currentSpace) {
     return (
       <div className="h-full w-full flex items-center justify-center">
-        <p className="text-muted-foreground">No space selected</p>
+        <p className="text-muted-foreground">{t('No space selected')}</p>
       </div>
     )
   }
@@ -391,19 +387,7 @@ export function SpacePage() {
         className="bg-card backdrop-blur-sm border-b border-border/40"
         left={
           <>
-            {/* Back button - always on the left */}
-            <button
-              onClick={handleBack}
-              className="p-1.5 bg-secondary/50 hover:bg-secondary rounded-lg transition-colors"
-              aria-label={t('Back to home')}
-              title={t('Back to home')}
-            >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-            </button>
-
-            {/* Mobile menu button - after back button */}
+            {/* Mobile menu button */}
             {isMobile && (
               <button
                 onClick={() => setMobileSidebarOpen(true)}
@@ -637,8 +621,14 @@ export function SpacePage() {
 
       {/* Clear All Conversations Confirmation Dialog */}
       {showClearAllDialog && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 no-drag">
-          <div className="bg-card border border-border/80 rounded-2xl p-7 w-full max-w-sm animate-fade-in shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 no-drag">
+          {/* Backdrop - click to close */}
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={handleClearAllCancel}
+          />
+          {/* Dialog content */}
+          <div className="relative bg-card border border-border/80 rounded-2xl p-7 w-full max-w-sm animate-fade-in shadow-2xl">
             <h2 className="text-lg font-semibold mb-4 text-foreground/95 tracking-tight">
               {t('Clear Task History')}
             </h2>

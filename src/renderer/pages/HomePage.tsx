@@ -236,8 +236,14 @@ export function HomePage() {
 
       {/* Edit Space Dialog */}
       {editingSpace && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 no-drag">
-          <div className="bg-card border border-border/80 rounded-2xl p-7 w-full max-w-md max-h-[85vh] overflow-y-auto animate-fade-in shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 no-drag">
+          {/* Backdrop - click to close */}
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={handleCancelEdit}
+          />
+          {/* Dialog content */}
+          <div className="relative bg-card border border-border/80 rounded-2xl p-7 w-full max-w-md max-h-[85vh] overflow-y-auto animate-fade-in shadow-2xl">
             <h2 className="text-lg font-semibold mb-6 text-foreground/95 tracking-tight">{t('Edit Space')}</h2>
 
             {/* Space name */}

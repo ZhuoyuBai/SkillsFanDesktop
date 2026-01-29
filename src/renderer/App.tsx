@@ -23,7 +23,6 @@ import { hasAnyAISource } from './types'
 
 // Lazy load heavy page components for better initial load performance
 // These pages contain complex components (chat, markdown, code highlighting, etc.)
-const HomePage = lazy(() => import('./pages/HomePage').then(m => ({ default: m.HomePage })))
 const SpacePage = lazy(() => import('./pages/SpacePage').then(m => ({ default: m.SpacePage })))
 const SettingsPage = lazy(() => import('./pages/SettingsPage').then(m => ({ default: m.SettingsPage })))
 
@@ -433,7 +432,7 @@ export default function App() {
       if (loadedConfig.isFirstLaunch || !hasAnyAISource(loadedConfig)) {
         setView('setup')
       } else {
-        setView('home')
+        setView('space')
       }
     } else {
       setView('setup')
@@ -450,12 +449,6 @@ export default function App() {
         return <GitBashSetup onComplete={handleGitBashSetupComplete} />
       case 'setup':
         return <SetupFlow />
-      case 'home':
-        return (
-          <Suspense fallback={<PageLoader />}>
-            <HomePage />
-          </Suspense>
-        )
       case 'space':
         return (
           <Suspense fallback={<PageLoader />}>

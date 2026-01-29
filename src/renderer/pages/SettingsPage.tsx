@@ -27,9 +27,10 @@ import { CheckCircle2, XCircle, Eye, EyeOff } from '../components/icons/ToolIcon
 import { McpServerList } from '../components/settings/McpServerList'
 import { SkillList } from '../components/settings/SkillList'
 import { SkillsFanAccountSection } from '../components/settings/SkillsFanAccountSection'
+import { SpaceManagementSection } from '../components/settings/SpaceManagementSection'
 import { ResetSection } from '../components/settings/ResetSection'
 import { useTranslation, setLanguage, getCurrentLanguage, SUPPORTED_LOCALES, type LocaleCode } from '../i18n'
-import { Loader2, LogOut, Plus, Check, Globe, Key, MessageSquare, Bot, Palette, Server, Settings as SettingsIcon, Wifi, ExternalLink, X, Package, User, type LucideIcon } from 'lucide-react'
+import { Loader2, LogOut, Plus, Check, Globe, Key, MessageSquare, Bot, Palette, Server, Settings as SettingsIcon, Wifi, ExternalLink, X, Package, User, Layers, type LucideIcon } from 'lucide-react'
 
 // Import provider logos
 import zhipuLogo from '../assets/providers/zhipu.jpg'
@@ -638,6 +639,7 @@ export function SettingsPage() {
     { id: 'account', icon: User, label: t('Account'), desktopOnly: true },
     { id: 'ai-model', icon: Bot, label: t('AI Model') },
     { id: 'skills', icon: Package, label: t('Skills') },
+    { id: 'spaces', icon: Layers, label: t('Spaces'), desktopOnly: true },
     { id: 'display', icon: Palette, label: t('Display & Language') },
     { id: 'system', icon: SettingsIcon, label: t('System'), desktopOnly: true },
     { id: 'mcp', icon: Server, label: t('MCP Servers'), hidden: true },
@@ -1170,6 +1172,14 @@ export function SettingsPage() {
           {activeSection === 'skills' && (
           <section className="bg-card rounded-xl border border-border p-6">
             <SkillList />
+          </section>
+          )}
+
+          {/* Spaces Management Section */}
+          {activeSection === 'spaces' && !api.isRemoteMode() && (
+          <section className="bg-card rounded-xl border border-border p-6">
+            <h2 className="text-lg font-medium mb-4">{t('Space Management')}</h2>
+            <SpaceManagementSection />
           </section>
           )}
 

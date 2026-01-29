@@ -8,8 +8,8 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import type { ConversationMeta } from '../../types'
 import { MessageSquare } from '../icons/ToolIcons'
 import { PanelLeftClose, PanelLeft, Search, SquarePen } from 'lucide-react'
-import { HaloLogo } from '../brand/HaloLogo'
 import { useSearchStore } from '../../stores/search.store'
+import { SpaceSwitcher } from '../space/SpaceSwitcher'
 import { useTranslation } from '../../i18n'
 import { UserAvatarMenu } from './UserAvatarMenu'
 
@@ -173,8 +173,9 @@ export function ConversationList({
         className="border-r border-border/40 flex flex-col bg-card relative"
         style={{ width: COLLAPSED_WIDTH }}
       >
-        {/* Toggle button (no logo in collapsed state) */}
-        <div className="px-2 py-3 border-b border-border/50 flex flex-col items-center">
+        {/* Space switcher and toggle button in collapsed state */}
+        <div className="px-2 py-3 border-b border-border/50 flex flex-col items-center gap-2">
+          <SpaceSwitcher collapsed={true} />
           {onToggleCollapse && (
             <div className="relative">
               <button
@@ -266,15 +267,12 @@ export function ConversationList({
         willChange: isDragging ? 'width' : 'auto'
       }}
     >
-      {/* Header with logo and toggle button - hidden in mobile overlay (header is provided by parent) */}
+      {/* Header with space switcher and toggle button - hidden in mobile overlay (header is provided by parent) */}
       {!isMobileOverlay && (
-      <div className="px-4 py-3 border-b border-border/50 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <HaloLogo size={26} hoverOnly={true} />
-          <span className="text-base font-medium text-foreground/80">技能范</span>
-        </div>
+      <div className="px-3 py-3 border-b border-border/50 flex items-center gap-2">
+        <SpaceSwitcher />
         {onToggleCollapse && (
-          <div className="relative">
+          <div className="relative flex-shrink-0">
             <button
               onClick={() => {
                 setShowCollapseTooltip(false)

@@ -6,9 +6,10 @@ import { create } from 'zustand'
 import { api } from '../api'
 import type { HaloConfig, AppView, McpServerStatus } from '../types'
 import { hasAnyAISource } from '../types'
+import { useSpaceStore } from './space.store'
 
 // Settings section type (must match SettingsPage)
-export type SettingsSection = 'ai-model' | 'display' | 'mcp' | 'skills' | 'system' | 'remote' | 'account'
+export type SettingsSection = 'ai-model' | 'display' | 'mcp' | 'skills' | 'system' | 'remote' | 'account' | 'spaces'
 
 // Git Bash installation progress
 interface GitBashInstallProgress {
@@ -87,8 +88,8 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   goBack: () => {
     const previousView = get().previousView
-    // Go back to previous view, or default to home
-    set({ view: previousView || 'home', previousView: null })
+    // Go back to previous view, or default to space
+    set({ view: previousView || 'space', previousView: null })
   },
 
   setLoading: (isLoading) => set({ isLoading }),
@@ -230,9 +231,35 @@ export const useAppStore = create<AppState>((set, get) => ({
           console.log('[Store] First launch or no AI source, showing setup')
           set({ view: 'setup' })
         } else {
-          // Go to home
-          console.log('[Store] Config loaded, showing home')
-          set({ view: 'home' })
+          // Go to space directly (skip home page)
+          // Load all spaces (including Halo) and set default space
+          console.log('[Store] Loading spaces before showing space view...')
+          await useSpaceStore.getState().loadSpaces()
+
+          // Get loaded spaces and configured default
+          const { haloSpace, spaces } = useSpaceStore.getState()
+          const defaultSpaceId = config.spaces?.defaultSpaceId
+
+          // Determine target space: configured default or Halo
+          let targetSpace = haloSpace
+          if (defaultSpaceId) {
+            const customSpace = spaces.find(s => s.id === defaultSpaceId)
+            if (customSpace) {
+              targetSpace = customSpace
+              console.log('[Store] Using configured default space:', customSpace.name)
+            } else {
+              console.warn('[Store] Configured default space not found, falling back to Halo')
+            }
+          }
+
+          if (targetSpace) {
+            useSpaceStore.getState().setCurrentSpace(targetSpace)
+            console.log('[Store] Default space loaded and set:', targetSpace.name)
+          } else {
+            console.warn('[Store] No space found, but continuing to space view')
+          }
+          console.log('[Store] Config loaded, showing space')
+          set({ view: 'space' })
         }
       } else {
         console.error('[Store] Failed to load config:', response.error)

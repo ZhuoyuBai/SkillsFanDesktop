@@ -26,8 +26,14 @@ export function SkillDeleteDialog({
   const shortPath = skillPath.replace(/^.*[/\\]\.skillsfan(-dev)?[/\\]skills[/\\]/, '~/.../skills/')
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 no-drag">
-      <div className="bg-card border border-border/80 rounded-2xl p-7 w-full max-w-md animate-fade-in shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 no-drag">
+      {/* Backdrop - click to cancel */}
+      <div
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={onCancel}
+      />
+      {/* Dialog content */}
+      <div className="relative bg-card border border-border/80 rounded-2xl p-7 w-full max-w-md animate-fade-in shadow-2xl">
         {/* Icon + Title */}
         <div className="flex items-start gap-3 mb-4">
           <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-destructive/10 text-destructive flex items-center justify-center">
