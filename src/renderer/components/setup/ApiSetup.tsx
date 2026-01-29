@@ -118,7 +118,7 @@ interface ApiSetupProps {
 
 export function ApiSetup({ onBack, showBack = false, initialProviderId }: ApiSetupProps) {
   const { t } = useTranslation()
-  const { config, setConfig, setView } = useAppStore()
+  const { config, setConfig, initialize } = useAppStore()
 
   // Selected provider - use initialProviderId if provided, otherwise infer from config
   const selectedProvider = initialProviderId || 'claude'
@@ -201,8 +201,8 @@ export function ApiSetup({ onBack, showBack = false, initialProviderId }: ApiSet
       }
       setConfig(newConfig as any)
 
-      // Enter Halo
-      setView('home')
+      // Re-run app initialization to load spaces and set the correct view
+      await initialize()
     } catch (err) {
       setError(t('Save failed, please try again'))
     } finally {

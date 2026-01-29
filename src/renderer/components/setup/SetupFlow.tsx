@@ -23,7 +23,7 @@ interface DeviceCodeInfo {
 
 export function SetupFlow() {
   const { t } = useTranslation()
-  const { setView, setConfig } = useAppStore()
+  const { setConfig, initialize } = useAppStore()
   const [step, setStep] = useState<SetupStep>('select')
   const [currentProvider, setCurrentProvider] = useState<string | null>(null)
   const [oauthState, setOauthState] = useState<string | null>(null)
@@ -76,13 +76,13 @@ export function SetupFlow() {
         throw new Error(completeResult.error || 'Login failed')
       }
 
-      // Success! Reload config and go to home
+      // Success! Reload config and enter space view
       const configResult = await api.getConfig()
       if (configResult.success && configResult.data) {
         setConfig(configResult.data as any)
       }
-
-      setView('home')
+      // Re-run app initialization to load spaces and set the correct view
+      await initialize()
     } catch (err) {
       console.error(`[SetupFlow] ${providerType} login error:`, err)
       setError(err instanceof Error ? err.message : 'Login failed')
