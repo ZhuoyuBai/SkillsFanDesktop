@@ -14,11 +14,12 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { MessageItem } from './MessageItem'
-import { ThoughtProcess } from './ThoughtProcess'
 import { CollapsedThoughtProcess } from './CollapsedThoughtProcess'
+import { InlineActivity } from './InlineActivity'
 import { CompactNotice } from './CompactNotice'
 import { MarkdownRenderer } from './MarkdownRenderer'
 import { BrowserTaskCard, isBrowserTool } from '../tool/BrowserTaskCard'
+import { TodoCard, parseTodoInput } from '../tool/TodoCard'
 import type { Message, Thought, CompactInfo } from '../../types'
 import { useTranslation } from '../../i18n'
 
@@ -54,16 +55,17 @@ interface MessageListProps {
 function StreamingBubble({
   content,
   isStreaming,
-  thoughts
+  thoughts,
+  isThinking
 }: {
   content: string
   isStreaming: boolean
   thoughts: Thought[]
+  isThinking: boolean
 }) {
   // DOM refs for measuring heights
   const historyRef = useRef<HTMLDivElement>(null)  // Contains all past segments
   const currentRef = useRef<HTMLDivElement>(null)  // Contains current (new) content
-  const { t } = useTranslation()
 
   // State for scroll animation
   const [segments, setSegments] = useState<string[]>([])     // Saved content snapshots
@@ -75,8 +77,15 @@ function StreamingBubble({
   const prevThoughtsLenRef = useRef(0)           // Previous thoughts array length
   const pendingSnapshotRef = useRef<string | null>(null)  // Content waiting to be saved
 
-  // Note: textBlockVersion reset logic removed - backend now sends full accumulated content
-  // All text blocks are concatenated on backend, so frontend just displays the full content
+  // Get latest todo data for inline display
+  const latestTodos = useMemo(() => {
+    const todoThoughts = thoughts.filter(
+      t => t.type === 'tool_use' && t.toolName === 'TodoWrite' && t.toolInput
+    )
+    if (todoThoughts.length === 0) return null
+    const latest = todoThoughts[todoThoughts.length - 1]
+    return parseTodoInput(latest.toolInput!)
+  }, [thoughts])
 
   /**
    * Step 1: Detect tool_use and mark content as pending
@@ -101,14 +110,10 @@ function StreamingBubble({
    * Step 2: Save snapshot when new content arrives
    * We wait until new content appears (content grows beyond pending)
    * before saving the snapshot. This ensures smooth transition.
-   *
-   * Key: Update segments first, then update activeSnapshotLen in next effect.
-   * This ensures the history DOM renders BEFORE we slice the display content.
    */
   useEffect(() => {
     const pending = pendingSnapshotRef.current
     if (pending && content && content.length > pending.length) {
-      // New content has arrived, now save the snapshot
       setSegments(prev => [...prev, pending])
       pendingSnapshotRef.current = null
     }
@@ -116,11 +121,9 @@ function StreamingBubble({
 
   /**
    * Step 2b: Update slice position AFTER segments are in DOM
-   * This runs after segments update, ensuring history is visible before we slice
    */
   useEffect(() => {
     if (segments.length > 0) {
-      // Calculate total length of all segments
       const totalLen = segments.reduce((sum, seg) => sum + seg.length, 0)
       if (totalLen !== activeSnapshotLen) {
         setActiveSnapshotLen(totalLen)
@@ -130,12 +133,9 @@ function StreamingBubble({
 
   /**
    * Step 3: Reset state on new conversation
-   * Note: New text block reset is now handled by Step 0 (textBlockVersion change)
    */
   useEffect(() => {
     if (!content && thoughts.length === 0) {
-      // Full reset for new conversation
-      console.log(`[StreamingBubble] 🔄 Full reset (new conversation)`)
       setSegments([])
       setScrollOffset(0)
       setCurrentHeight(0)
@@ -146,13 +146,10 @@ function StreamingBubble({
 
   /**
    * Step 4: Measure current content height (throttled)
-   * Only update height every 100ms to avoid excessive measurements during streaming.
-   * Viewport height = current content height only (not history)
    */
   const heightMeasureRef = useRef<number>(0)
   useEffect(() => {
     if (currentRef.current) {
-      // Throttle: only measure every 100ms
       const now = Date.now()
       if (now - heightMeasureRef.current < 100) return
       heightMeasureRef.current = now
@@ -167,12 +164,9 @@ function StreamingBubble({
 
   /**
    * Step 5: Calculate scroll offset when segments change
-   * scrollOffset = total height of history segments
-   * This value is used for translateY(-scrollOffset)
    */
   useEffect(() => {
     if (segments.length > 0 && historyRef.current) {
-      // Wait for DOM to update
       requestAnimationFrame(() => {
         if (historyRef.current) {
           setScrollOffset(historyRef.current.scrollHeight)
@@ -181,54 +175,67 @@ function StreamingBubble({
     }
   }, [segments])
 
-  if (!content) return null
-
   // Calculate what to show in current content area
-  // activeSnapshotLen is updated AFTER segments render, ensuring no content loss
-  const displayContent = activeSnapshotLen > 0 && content.length >= activeSnapshotLen
+  const displayContent = activeSnapshotLen > 0 && content && content.length >= activeSnapshotLen
     ? content.slice(activeSnapshotLen)
     : content
 
   const containerHeight = currentHeight > 0 ? currentHeight : 'auto'
 
+  // Check if we have any content to show (text, activity, or todos)
+  const hasContent = content || thoughts.length > 0 || latestTodos
+
+  if (!hasContent) return null
+
   return (
-    <div className="rounded-2xl px-4 py-3 message-assistant message-working w-full overflow-y-hidden overflow-x-auto">
-      {/* Working indicator */}
-      <div className="flex items-center gap-1.5 mb-2 pb-2 border-b border-border/30 working-indicator-fade">
-        <span className="text-xs text-muted-foreground/70">{t('Halo is working')}</span>
-      </div>
+    <div className="rounded-2xl px-4 py-3 message-assistant w-full overflow-y-hidden overflow-x-auto">
+      {/* Inline activity stream - CLI-style tool calls */}
+      {thoughts.length > 0 && (
+        <div className="mb-3">
+          <InlineActivity thoughts={thoughts} isThinking={isThinking} />
+        </div>
+      )}
 
-      {/* Viewport - height matches current content only */}
-      <div
-        className="overflow-y-hidden overflow-x-visible transition-[height] duration-300"
-        style={{ height: containerHeight }}
-      >
-        {/* Scrollable container */}
+      {/* Inline TodoCard */}
+      {latestTodos && latestTodos.length > 0 && (
+        <div className="mb-3">
+          <TodoCard todos={latestTodos} />
+        </div>
+      )}
+
+      {/* Text content viewport */}
+      {content && (
         <div
-          className="transition-transform duration-300"
-          style={{ transform: `translateY(-${scrollOffset}px)` }}
+          className="overflow-y-hidden overflow-x-visible transition-[height] duration-300"
+          style={{ height: containerHeight }}
         >
-          {/* History segments - will be scrolled out of view */}
-          <div ref={historyRef}>
-            {segments.map((seg, i) => (
-              <div key={i} className="pb-4 break-words leading-relaxed">
-                <MarkdownRenderer content={seg} />
-              </div>
-            ))}
-          </div>
+          {/* Scrollable container */}
+          <div
+            className="transition-transform duration-300"
+            style={{ transform: `translateY(-${scrollOffset}px)` }}
+          >
+            {/* History segments - will be scrolled out of view */}
+            <div ref={historyRef}>
+              {segments.map((seg, i) => (
+                <div key={i} className="pb-4 break-words leading-relaxed">
+                  <MarkdownRenderer content={seg} />
+                </div>
+              ))}
+            </div>
 
-          {/* Current content - always visible, shows only NEW part after snapshots */}
-          <div ref={currentRef} className="break-words leading-relaxed">
-            <MarkdownRenderer content={displayContent} />
-            {isStreaming && (
-              <span className="inline-block w-0.5 h-5 ml-0.5 bg-primary streaming-cursor align-middle" />
-            )}
-            {!isStreaming && (
-              <span className="waiting-dots ml-1 text-muted-foreground/60" />
-            )}
+            {/* Current content - always visible */}
+            <div ref={currentRef} className="break-words leading-relaxed">
+              <MarkdownRenderer content={displayContent} />
+              {isStreaming && (
+                <span className="inline-block w-0.5 h-5 ml-0.5 bg-primary streaming-cursor align-middle" />
+              )}
+              {!isStreaming && isThinking && (
+                <span className="waiting-dots ml-1 text-muted-foreground/60" />
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }
@@ -310,17 +317,12 @@ export function MessageList({
         return <MessageItem key={message.id} message={message} previousCost={previousCost} />
       })}
 
-      {/* Current generation block: Thoughts above + Streaming content below */}
+      {/* Current generation block: Inline activity + Streaming content */}
       {/* Use fixed width container to prevent jumping when content changes */}
       {isGenerating && (
         <div className="flex justify-start animate-fade-in">
           {/* Fixed width - same as completed messages */}
           <div className="w-[85%] relative">
-            {/* Real-time thought process at top */}
-            {(thoughts.length > 0 || isThinking) && (
-              <ThoughtProcess thoughts={thoughts} isThinking={isThinking} />
-            )}
-
             {/* Real-time browser task card - shows AI browser operations as they happen */}
             {streamingBrowserToolCalls.length > 0 && (
               <div className="mb-4">
@@ -331,11 +333,12 @@ export function MessageList({
               </div>
             )}
 
-            {/* Streaming bubble with accumulated content and auto-scroll */}
+            {/* Unified streaming bubble with inline activity, todos, and text */}
             <StreamingBubble
               content={streamingContent}
               isStreaming={isStreaming}
               thoughts={thoughts}
+              isThinking={isThinking}
             />
           </div>
         </div>
