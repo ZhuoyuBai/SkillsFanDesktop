@@ -21,7 +21,7 @@
 
 import { create } from 'zustand'
 import { api } from '../api'
-import type { Conversation, ConversationMeta, Message, ToolCall, Artifact, Thought, AgentEventBase, ImageAttachment, CompactInfo, CanvasContext } from '../types'
+import type { Conversation, ConversationMeta, Message, ToolCall, Artifact, Thought, AgentEventBase, ImageAttachment, CompactInfo, CanvasContext, TextSegment } from '../types'
 import { canvasLifecycle } from '../services/canvas-lifecycle'
 
 // LRU cache size limit
@@ -31,6 +31,17 @@ const CONVERSATION_CACHE_SIZE = 10
 interface SpaceState {
   conversations: ConversationMeta[]  // Lightweight metadata, no messages
   currentConversationId: string | null
+}
+
+// User question info for AskUserQuestion tool
+interface UserQuestionInfo {
+  toolId: string
+  questions: Array<{
+    question: string
+    header: string
+    options: Array<{ label: string; description: string }>
+    multiSelect: boolean
+  }>
 }
 
 // Per-session runtime state (isolated per conversation, persists across space switches)
@@ -44,6 +55,16 @@ interface SessionState {
   error: string | null
   // Compact notification
   compactInfo: CompactInfo | null
+  // UI collapse states for task execution panel
+  todoCollapsed: boolean
+  activityCollapsed: boolean
+  // Task status history (task content -> status updates)
+  taskStatusHistory: Map<string, string[]>
+  // Linear stream: text segments for timeline reconstruction
+  textSegments: TextSegment[]
+  lastSegmentIndex: number  // End position of last saved segment
+  // Pending user question (AskUserQuestion tool)
+  pendingUserQuestion: UserQuestionInfo | null
 }
 
 // Create empty session state
@@ -56,7 +77,13 @@ function createEmptySessionState(): SessionState {
     isThinking: false,
     pendingToolApproval: null,
     error: null,
-    compactInfo: null
+    compactInfo: null,
+    todoCollapsed: false,
+    activityCollapsed: false,  // Expanded by default - show activity from start
+    taskStatusHistory: new Map(),
+    textSegments: [],
+    lastSegmentIndex: 0,
+    pendingUserQuestion: null
   }
 }
 
@@ -125,6 +152,11 @@ interface ChatState {
   approveTool: (conversationId: string) => Promise<void>
   rejectTool: (conversationId: string) => Promise<void>
 
+  // Task execution panel UI state
+  toggleTodoCollapsed: (conversationId: string) => void
+  toggleActivityCollapsed: (conversationId: string) => void
+  addTaskStatus: (conversationId: string, taskContent: string, status: string) => void
+
   // Event handlers (called from App component) - with session IDs
   handleAgentMessage: (data: AgentEventBase & { content: string; isComplete: boolean }) => void
   handleAgentToolCall: (data: AgentEventBase & ToolCall) => void
@@ -133,6 +165,9 @@ interface ChatState {
   handleAgentComplete: (data: AgentEventBase) => void
   handleAgentThought: (data: AgentEventBase & { thought: Thought }) => void
   handleAgentCompact: (data: AgentEventBase & { trigger: 'manual' | 'auto'; preTokens: number }) => void
+  handleAgentUserQuestion: (data: AgentEventBase & { toolId: string; questions: UserQuestionInfo['questions'] }) => void
+  handleAgentUserQuestionAnswered: (data: AgentEventBase) => void
+  answerUserQuestion: (conversationId: string, answers: Record<string, string>) => Promise<void>
 
   // Cleanup
   reset: () => void
@@ -623,7 +658,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
       // Initialize/reset session state for this conversation
       set((state) => {
         const newSessions = new Map(state.sessions)
+        const existingSession = newSessions.get(conversationId) || createEmptySessionState()
         newSessions.set(conversationId, {
+          ...existingSession,
           isGenerating: true,
           streamingContent: '',
           isStreaming: false,
@@ -631,7 +668,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
           isThinking: true,
           pendingToolApproval: null,
           error: null,
-          compactInfo: null
+          compactInfo: null,
+          textSegments: [],
+          lastSegmentIndex: 0
         })
         return { sessions: newSessions }
       })
@@ -787,6 +826,50 @@ export const useChatStore = create<ChatState>((set, get) => ({
     } catch (error) {
       console.error('Failed to reject tool:', error)
     }
+  },
+
+  // Toggle todo card collapsed state
+  toggleTodoCollapsed: (conversationId: string) => {
+    set((state) => {
+      const newSessions = new Map(state.sessions)
+      const session = newSessions.get(conversationId) || createEmptySessionState()
+      newSessions.set(conversationId, {
+        ...session,
+        todoCollapsed: !session.todoCollapsed
+      })
+      return { sessions: newSessions }
+    })
+  },
+
+  // Toggle activity section collapsed state
+  toggleActivityCollapsed: (conversationId: string) => {
+    set((state) => {
+      const newSessions = new Map(state.sessions)
+      const session = newSessions.get(conversationId) || createEmptySessionState()
+      newSessions.set(conversationId, {
+        ...session,
+        activityCollapsed: !session.activityCollapsed
+      })
+      return { sessions: newSessions }
+    })
+  },
+
+  // Add task status update to history
+  addTaskStatus: (conversationId: string, taskContent: string, status: string) => {
+    set((state) => {
+      const newSessions = new Map(state.sessions)
+      const session = newSessions.get(conversationId) || createEmptySessionState()
+
+      const newHistory = new Map(session.taskStatusHistory)
+      const existing = newHistory.get(taskContent) || []
+      newHistory.set(taskContent, [...existing, status])
+
+      newSessions.set(conversationId, {
+        ...session,
+        taskStatusHistory: newHistory
+      })
+      return { sessions: newSessions }
+    })
   },
 
   // Handle agent message - update session-specific streaming content
@@ -985,11 +1068,34 @@ export const useChatStore = create<ChatState>((set, get) => ({
         return state // No change
       }
 
+      // Linear stream: save text segment when tool_use appears
+      let newTextSegments = session.textSegments
+      let newLastSegmentIndex = session.lastSegmentIndex
+
+      if (thought.type === 'tool_use' && session.streamingContent) {
+        const currentContent = session.streamingContent
+        const newSegmentContent = currentContent.slice(session.lastSegmentIndex)
+
+        // Only save if there's actual content (not just whitespace)
+        if (newSegmentContent.trim()) {
+          const segment: TextSegment = {
+            content: newSegmentContent,
+            timestamp: thought.timestamp || new Date().toISOString(),
+            startIndex: session.lastSegmentIndex
+          }
+          newTextSegments = [...session.textSegments, segment]
+          newLastSegmentIndex = currentContent.length
+          console.log(`[ChatStore] Saved text segment: ${newSegmentContent.slice(0, 50)}...`)
+        }
+      }
+
       newSessions.set(conversationId, {
         ...session,
         thoughts: [...session.thoughts, thought],
         isThinking: true,
-        isGenerating: true // Ensure generating state is set
+        isGenerating: true, // Ensure generating state is set
+        textSegments: newTextSegments,
+        lastSegmentIndex: newLastSegmentIndex
       })
       return { sessions: newSessions }
     })
@@ -1010,6 +1116,47 @@ export const useChatStore = create<ChatState>((set, get) => ({
       })
       return { sessions: newSessions }
     })
+  },
+
+  // Handle user question from AskUserQuestion tool - pauses execution
+  handleAgentUserQuestion: (data) => {
+    const { conversationId, toolId, questions } = data
+    console.log(`[ChatStore] handleAgentUserQuestion [${conversationId}]: toolId=${toolId}, questions=${questions.length}`)
+
+    set((state) => {
+      const newSessions = new Map(state.sessions)
+      const session = newSessions.get(conversationId) || createEmptySessionState()
+
+      newSessions.set(conversationId, {
+        ...session,
+        pendingUserQuestion: { toolId, questions }
+      })
+      return { sessions: newSessions }
+    })
+  },
+
+  // Handle user question answered - clear pending question
+  handleAgentUserQuestionAnswered: (data) => {
+    const { conversationId } = data
+    console.log(`[ChatStore] handleAgentUserQuestionAnswered [${conversationId}]`)
+
+    set((state) => {
+      const newSessions = new Map(state.sessions)
+      const session = newSessions.get(conversationId)
+      if (session) {
+        newSessions.set(conversationId, {
+          ...session,
+          pendingUserQuestion: null
+        })
+      }
+      return { sessions: newSessions }
+    })
+  },
+
+  // Answer user question (AskUserQuestion tool)
+  answerUserQuestion: async (conversationId: string, answers: Record<string, string>) => {
+    console.log(`[ChatStore] answerUserQuestion [${conversationId}]:`, Object.keys(answers))
+    await api.answerUserQuestion(conversationId, answers)
   },
 
   // Reset all state (use sparingly - e.g., logout)

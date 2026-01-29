@@ -431,6 +431,41 @@ body {
   animation: pulse-gentle 2s ease-in-out infinite;
 }
 
+/* Skill gradient label animations (Claude Code ultrathink style) */
+@keyframes skill-breathe {
+  0%, 100% {
+    opacity: 0.9;
+    box-shadow: 0 0 15px rgba(139, 92, 246, 0.3);
+  }
+  50% {
+    opacity: 1;
+    box-shadow: 0 0 25px rgba(139, 92, 246, 0.5);
+  }
+}
+
+@keyframes skill-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skill-breathing {
+  animation: skill-breathe 2s ease-in-out infinite;
+}
+
+.skill-gradient {
+  background: linear-gradient(135deg, #8b5cf6, #d946ef, #ec4899);
+}
+
+.skill-gradient-animated {
+  background: linear-gradient(90deg, #8b5cf6, #d946ef, #ec4899, #8b5cf6);
+  background-size: 300% 100%;
+  animation: skill-shimmer 3s ease-in-out infinite;
+}
+
 /* Cursor blink for streaming */
 @keyframes cursor-blink {
   0%, 100% {

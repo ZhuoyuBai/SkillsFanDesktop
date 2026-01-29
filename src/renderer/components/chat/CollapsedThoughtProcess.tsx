@@ -1,141 +1,55 @@
 /**
- * CollapsedThoughtProcess - Displays saved thought history above completed messages
- * Collapsed by default, expandable to show full details
+ * CollapsedThoughtProcess - Unified thought process display
+ * Supports both realtime (during execution) and completed modes
  *
- * TodoWrite is rendered separately at the bottom (only one instance)
+ * Structure:
+ * - Header button (expand/collapse entire section)
+ * - TodoCard at top (with its own collapse)
+ * - Tool calls list (InlineActivity style)
  */
 
 import { useState, useMemo } from 'react'
 import {
   Lightbulb,
-  Wrench,
-  CheckCircle2,
+  Loader2,
   XCircle,
-  Info,
-  Sparkles,
-  FileText,
   ChevronRight,
 } from 'lucide-react'
-import { getToolIcon } from '../icons/ToolIcons'
 import { TodoCard, parseTodoInput } from '../tool/TodoCard'
+import { InlineActivity } from './InlineActivity'
 import type { Thought } from '../../types'
-import { getCurrentLanguage, useTranslation } from '../../i18n'
+import { useTranslation } from '../../i18n'
 
 interface CollapsedThoughtProcessProps {
   thoughts: Thought[]
+  isThinking?: boolean  // Realtime mode flag
+  // Collapse states for TodoCard
+  todoCollapsed?: boolean
+  onToggleTodo?: () => void
+  taskStatusHistory?: Map<string, string[]>
 }
 
-// Get icon for thought type
-function getThoughtIcon(type: Thought['type'], toolName?: string) {
-  switch (type) {
-    case 'thinking':
-      return Lightbulb
-    case 'tool_use':
-      return toolName ? getToolIcon(toolName) : Wrench
-    case 'tool_result':
-      return CheckCircle2
-    case 'system':
-      return Info
-    case 'error':
-      return XCircle
-    case 'result':
-      return Sparkles
-    default:
-      return FileText
-  }
-}
-
-// Get color class for thought type
-function getThoughtColor(type: Thought['type'], isError?: boolean): string {
-  if (isError) return 'text-destructive'
-  switch (type) {
-    case 'thinking':
-      return 'text-muted-foreground'
-    case 'tool_use':
-      return 'text-amber-400'
-    case 'tool_result':
-      return 'text-green-400'
-    case 'error':
-      return 'text-destructive'
-    default:
-      return 'text-muted-foreground'
-  }
-}
-
-// Get label for thought type
-function getThoughtLabel(type: Thought['type'], t: (key: string) => string): string {
-  switch (type) {
-    case 'thinking':
-      return t('Thinking')
-    case 'tool_use':
-      return t('Tool call')
-    case 'tool_result':
-      return t('Tool result')
-    case 'system':
-      return t('System')
-    case 'error':
-      return t('Error')
-    case 'result':
-      return t('Completed')
-    default:
-      return t('Event')
-  }
-}
-
-// Single thought item in expanded view
-function ThoughtItem({ thought }: { thought: Thought }) {
+export function CollapsedThoughtProcess({
+  thoughts,
+  isThinking = false,
+  todoCollapsed = false,
+  onToggleTodo,
+  taskStatusHistory
+}: CollapsedThoughtProcessProps) {
   const { t } = useTranslation()
-  const [isExpanded, setIsExpanded] = useState(false)
-  const color = getThoughtColor(thought.type, thought.isError)
-  const Icon = getThoughtIcon(thought.type, thought.toolName)
+  const [isExpanded, setIsExpanded] = useState(false)  // Default collapsed
 
-  const content = thought.type === 'tool_use'
-    ? `${thought.toolName}: ${JSON.stringify(thought.toolInput || {}).substring(0, 100)}`
-    : thought.type === 'tool_result'
-      ? (thought.toolOutput || '').substring(0, 200)
-      : thought.content
+  // Get summary preview from last thinking content
+  const thinkingSummary = useMemo(() => {
+    const thinkingThoughts = thoughts.filter(t => t.type === 'thinking')
+    if (thinkingThoughts.length === 0) return ''
+    const lastThinking = thinkingThoughts[thinkingThoughts.length - 1]
+    const content = lastThinking.content || ''
+    if (content.length <= 60) return content
+    return content.substring(0, 60) + '...'
+  }, [thoughts])
 
-  const maxLen = 120
-  const needsTruncate = content.length > maxLen
-
-  return (
-    <div className="flex gap-2 py-1.5 text-xs border-b border-border/20 last:border-b-0">
-      <Icon size={14} className={color} />
-      <div className="flex-1 min-w-0">
-        <span className={`font-medium ${color}`}>
-          {getThoughtLabel(thought.type, t)}
-          {thought.toolName && ` - ${thought.toolName}`}
-        </span>
-        {content && (
-          <div className="mt-0.5 text-muted-foreground/70 whitespace-pre-wrap break-words">
-            {isExpanded || !needsTruncate ? content : content.substring(0, maxLen) + '...'}
-            {needsTruncate && (
-              <button
-                onClick={() => setIsExpanded(!isExpanded)}
-                className="ml-1 text-primary/60 hover:text-primary"
-              >
-                {isExpanded ? t('Collapse') : t('Expand')}
-              </button>
-            )}
-          </div>
-        )}
-      </div>
-      <span className="text-muted-foreground/40 text-[10px] shrink-0">
-        {new Intl.DateTimeFormat(getCurrentLanguage(), {
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit'
-        }).format(new Date(thought.timestamp))}
-      </span>
-    </div>
-  )
-}
-
-export function CollapsedThoughtProcess({ thoughts }: CollapsedThoughtProcessProps) {
-  const { t } = useTranslation()
-  const [isExpanded, setIsExpanded] = useState(true)
-
-  // Get latest todo data (only render one TodoCard at bottom)
+  // Get latest todo data
   const latestTodos = useMemo(() => {
     const todoThoughts = thoughts.filter(
       t => t.type === 'tool_use' && t.toolName === 'TodoWrite' && t.toolInput
@@ -146,81 +60,121 @@ export function CollapsedThoughtProcess({ thoughts }: CollapsedThoughtProcessPro
     return parseTodoInput(latest.toolInput!)
   }, [thoughts])
 
-  // Filter thoughts for display (exclude TodoWrite and its results)
-  const displayThoughts = useMemo(() => {
-    return thoughts.filter(t => {
-      if (t.type === 'result') return false
-      if (t.toolName === 'TodoWrite') return false
-      return true
-    })
+  // Check if there's any activity (non-TodoWrite tool calls)
+  const hasActivity = useMemo(() => {
+    return thoughts.some(t =>
+      t.type === 'tool_use' &&
+      !t.parentToolId &&
+      t.toolName !== 'TodoWrite'
+    )
   }, [thoughts])
 
   // Check if there's anything to show
-  const hasContent = displayThoughts.length > 0 || (latestTodos && latestTodos.length > 0)
+  const hasTodos = latestTodos && latestTodos.length > 0
+  const hasContent = hasActivity || hasTodos || isThinking
+
   if (!hasContent) return null
 
-  // Only count system-level errors, not tool execution failures
+  // Count errors
   const errorCount = thoughts.filter(t => t.type === 'error').length
 
-  // Calculate duration from first to last thought
-  const duration = useMemo(() => {
-    if (thoughts.length < 1) return 0
-    const first = new Date(thoughts[0].timestamp).getTime()
-    const last = new Date(thoughts[thoughts.length - 1].timestamp).getTime()
-    return (last - first) / 1000
+  // Calculate stats
+  const stats = useMemo(() => {
+    const toolUses = thoughts.filter(t => t.type === 'tool_use' && !t.parentToolId && t.toolName !== 'TodoWrite')
+    const completed = toolUses.filter(toolUse => {
+      return thoughts.some(t =>
+        t.type === 'tool_result' &&
+        t.id.includes(toolUse.id.replace('tool_use_', ''))
+      )
+    }).length
+    const running = toolUses.length - completed
+
+    // Calculate duration
+    let duration = 0
+    if (thoughts.length >= 1) {
+      const first = new Date(thoughts[0].timestamp).getTime()
+      const last = new Date(thoughts[thoughts.length - 1].timestamp).getTime()
+      duration = (last - first) / 1000
+    }
+
+    return { running, completed, duration }
   }, [thoughts])
 
   return (
     <div className="mb-2">
+      {/* Header button - toggle entire section */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
         className={`
           flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs
           transition-all duration-200 w-full
           ${isExpanded
-            ? 'bg-primary/10 border border-primary/30'
-            : 'bg-muted/30 hover:bg-muted/50 border border-transparent'
+            ? 'bg-muted/20 border border-border/30'
+            : 'bg-muted/10 hover:bg-muted/20 border border-transparent'
           }
         `}
       >
         {/* Expand icon */}
         <ChevronRight
           size={12}
-          className={`text-muted-foreground transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`}
+          className={`text-muted-foreground/60 transition-transform duration-200 flex-shrink-0 ${isExpanded ? 'rotate-90' : ''}`}
         />
 
-        {/* Icon */}
-        {errorCount > 0 ? (
-          <XCircle size={14} className="text-destructive" />
+        {/* Icon - spinner when thinking, lightbulb when done */}
+        {isThinking ? (
+          <Loader2 size={14} className="text-muted-foreground/70 animate-spin flex-shrink-0" />
+        ) : errorCount > 0 ? (
+          <XCircle size={14} className="text-destructive/70 flex-shrink-0" />
         ) : (
-          <Lightbulb size={14} className="text-primary" />
+          <Lightbulb size={14} className="text-muted-foreground/60 flex-shrink-0" />
         )}
 
         {/* Label */}
-        <span className="text-muted-foreground">{t('Thought process')}</span>
+        <span className="text-muted-foreground/70">{t('Thought process')}</span>
 
-        {/* Stats: time only (file changes moved to message bubble footer) */}
-        <div className="flex items-center gap-1.5 text-muted-foreground/60">
-          <span>{duration.toFixed(1)}s</span>
+        {/* Summary preview when collapsed */}
+        {!isExpanded && thinkingSummary && (
+          <span className="text-muted-foreground/40 truncate max-w-[200px] text-[10px]">
+            {thinkingSummary}
+          </span>
+        )}
+
+        {/* Stats */}
+        <div className="flex items-center gap-2 text-muted-foreground/50 ml-auto flex-shrink-0">
+          {stats.running > 0 && (
+            <span className="text-muted-foreground/60">{t('{{count}} running', { count: stats.running })}</span>
+          )}
+          {stats.completed > 0 && (
+            <span>{t('{{count}} completed', { count: stats.completed })}</span>
+          )}
+          {!isThinking && stats.duration > 0 && (
+            <span>{stats.duration.toFixed(1)}s</span>
+          )}
         </div>
       </button>
 
       {/* Expanded content */}
       {isExpanded && (
-        <div className="mt-1 px-3 py-2 bg-muted/20 rounded-lg border border-border/30 animate-slide-down">
-          {/* Thought items */}
-          {displayThoughts.length > 0 && (
-            <div className="max-h-[300px] overflow-y-auto">
-              {displayThoughts.map((thought) => (
-                <ThoughtItem key={thought.id} thought={thought} />
-              ))}
+        <div className="mt-1 px-3 py-2 bg-muted/10 rounded-lg border border-border/20 animate-slide-down">
+          {/* TodoCard at top - with its own collapse */}
+          {hasTodos && (
+            <div className="mb-2">
+              <TodoCard
+                todos={latestTodos}
+                isCollapsed={todoCollapsed}
+                onToggleCollapse={onToggleTodo}
+                taskStatusHistory={taskStatusHistory}
+              />
             </div>
           )}
 
-          {/* TodoCard at bottom - only one instance */}
-          {latestTodos && latestTodos.length > 0 && (
-            <div className={displayThoughts.length > 0 ? 'mt-2 pt-2 border-t border-border/20' : ''}>
-              <TodoCard todos={latestTodos} />
+          {/* Tool calls list - using InlineActivity */}
+          {hasActivity && (
+            <div className={hasTodos ? 'pt-2 border-t border-border/20' : ''}>
+              <InlineActivity
+                thoughts={thoughts}
+                isThinking={isThinking}
+              />
             </div>
           )}
         </div>

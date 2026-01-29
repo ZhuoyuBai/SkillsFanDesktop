@@ -126,6 +126,21 @@ export interface Thought {
 // ============================================
 
 /**
+ * User question info for AskUserQuestion tool
+ * Used to pause execution and wait for user's answer
+ */
+export interface UserQuestionInfo {
+  toolId: string
+  questions: Array<{
+    question: string
+    header: string
+    options: Array<{ label: string; description: string }>
+    multiSelect: boolean
+  }>
+  inputResolve: ((answers: Record<string, string>) => void) | null
+}
+
+/**
  * Active session state for a conversation
  * Used to track in-flight requests and accumulated thoughts
  */
@@ -135,6 +150,8 @@ export interface SessionState {
   conversationId: string
   pendingPermissionResolve: ((approved: boolean) => void) | null
   thoughts: Thought[]  // Backend accumulates thoughts (Single Source of Truth)
+  /** Pending user question - pauses execution until answered */
+  pendingUserQuestion: UserQuestionInfo | null
 }
 
 // ============================================

@@ -72,7 +72,7 @@ export {
 // Permission Handling
 // ============================================
 
-export { handleToolApproval } from './permission-handler'
+export { handleToolApproval, handleUserQuestionAnswer, hasPendingQuestion } from './permission-handler'
 
 // ============================================
 // MCP Management

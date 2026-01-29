@@ -103,6 +103,7 @@ export interface HaloAPI {
   getSessionState: (conversationId: string) => Promise<IpcResponse>
   ensureSessionWarm: (spaceId: string, conversationId: string) => Promise<IpcResponse>
   testMcpConnections: () => Promise<{ success: boolean; servers: unknown[]; error?: string }>
+  answerUserQuestion: (conversationId: string, answers: Record<string, string>) => Promise<IpcResponse>
 
   // Event listeners
   onAgentMessage: (callback: (data: unknown) => void) => () => void
@@ -114,6 +115,8 @@ export interface HaloAPI {
   onAgentThought: (callback: (data: unknown) => void) => () => void
   onAgentMcpStatus: (callback: (data: unknown) => void) => () => void
   onAgentCompact: (callback: (data: unknown) => void) => () => void
+  onAgentUserQuestion: (callback: (data: unknown) => void) => () => void
+  onAgentUserQuestionAnswered: (callback: (data: unknown) => void) => () => void
 
   // Artifact
   listArtifacts: (spaceId: string) => Promise<IpcResponse>
@@ -360,6 +363,7 @@ const api: HaloAPI = {
   getSessionState: (conversationId) => ipcRenderer.invoke('agent:get-session-state', conversationId),
   ensureSessionWarm: (spaceId, conversationId) => ipcRenderer.invoke('agent:ensure-session-warm', spaceId, conversationId),
   testMcpConnections: () => ipcRenderer.invoke('agent:test-mcp'),
+  answerUserQuestion: (conversationId, answers) => ipcRenderer.invoke('agent:answer-question', conversationId, answers),
 
   // Event listeners
   onAgentMessage: (callback) => createEventListener('agent:message', callback),
@@ -371,6 +375,8 @@ const api: HaloAPI = {
   onAgentThought: (callback) => createEventListener('agent:thought', callback),
   onAgentMcpStatus: (callback) => createEventListener('agent:mcp-status', callback),
   onAgentCompact: (callback) => createEventListener('agent:compact', callback),
+  onAgentUserQuestion: (callback) => createEventListener('agent:user-question', callback),
+  onAgentUserQuestionAnswered: (callback) => createEventListener('agent:user-question-answered', callback),
 
   // Artifact
   listArtifacts: (spaceId) => ipcRenderer.invoke('artifact:list', spaceId),

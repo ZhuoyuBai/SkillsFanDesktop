@@ -18,6 +18,7 @@ import { useSmartScroll } from '../../hooks/useSmartScroll'
 import { MessageList } from './MessageList'
 import { InputArea } from './InputArea'
 import { ScrollToBottomButton } from './ScrollToBottomButton'
+import { UserQuestionCard } from './UserQuestionCard'
 import { HaloLogo } from '../brand/HaloLogo'
 import { PenLine, BarChart3, Palette, FolderSearch, ShoppingBag, LucideIcon } from 'lucide-react'
 import {
@@ -65,7 +66,8 @@ export function ChatView({ isCompact = false }: ChatViewProps) {
     getCurrentSession,
     sendMessage,
     stopGeneration,
-    addMockMessage
+    addMockMessage,
+    answerUserQuestion
   } = useChatStore()
 
   // Onboarding state
@@ -174,9 +176,16 @@ export function ChatView({ isCompact = false }: ChatViewProps) {
 
   // Get current conversation and its session state
   const currentConversation = getCurrentConversation()
-  const { isLoadingConversation } = useChatStore()
+  const { isLoadingConversation, toggleTodoCollapsed } = useChatStore()
   const session = getCurrentSession()
-  const { isGenerating, streamingContent, isStreaming, thoughts, isThinking, compactInfo, error } = session
+  const { isGenerating, streamingContent, isStreaming, thoughts, isThinking, compactInfo, error, todoCollapsed, taskStatusHistory, textSegments, lastSegmentIndex, pendingUserQuestion } = session
+
+  // Create toggle callbacks for the current conversation
+  const handleToggleTodo = useCallback(() => {
+    if (currentConversation) {
+      toggleTodoCollapsed(currentConversation.id)
+    }
+  }, [currentConversation, toggleTodoCollapsed])
 
   // Smart auto-scroll: only scrolls when user is at bottom
   const {
@@ -368,6 +377,11 @@ export function ChatView({ isCompact = false }: ChatViewProps) {
                 compactInfo={compactInfo}
                 error={error}
                 isCompact={isCompact}
+                todoCollapsed={todoCollapsed}
+                onToggleTodo={handleToggleTodo}
+                taskStatusHistory={taskStatusHistory}
+                textSegments={textSegments}
+                lastSegmentIndex={lastSegmentIndex}
               />
               <div ref={bottomRef} />
             </>
@@ -381,18 +395,19 @@ export function ChatView({ isCompact = false }: ChatViewProps) {
         />
       </div>
 
-      {/* Input area - only show at bottom when there are messages */}
-      {hasMessages && (
-        <>
-          {bottomInputArea}
-          {/* AI Safety Disclaimer */}
-          <div className="px-4 pb-4 pt-2">
-            <p className="text-xs text-center text-muted-foreground/60 leading-relaxed max-w-3xl mx-auto">
-              {t('AI can read and write files in the current space. Please review generated content and back up regularly.')}
-            </p>
-          </div>
-        </>
+      {/* UserQuestionCard - show when AI is asking a question */}
+      {pendingUserQuestion && currentConversation && (
+        <div className={`px-4 ${isCompact ? '' : 'max-w-3xl mx-auto w-full'}`}>
+          <UserQuestionCard
+            questions={pendingUserQuestion.questions}
+            onAnswer={(answers) => answerUserQuestion(currentConversation.id, answers)}
+            onSkip={() => answerUserQuestion(currentConversation.id, {})}
+          />
+        </div>
       )}
+
+      {/* Input area - only show at bottom when there are messages */}
+      {hasMessages && bottomInputArea}
     </div>
   )
 }

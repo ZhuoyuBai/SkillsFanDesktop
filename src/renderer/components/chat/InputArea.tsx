@@ -437,7 +437,7 @@ export function InputArea({ onSend, onStop, isGenerating, isCompact = false, noB
         <div
           className={`
             relative flex flex-col rounded-2xl
-            border border-border/60 bg-card shadow-md
+            border border-border bg-card/95 shadow-lg ring-1 ring-inset ring-white/5
             ${isGenerating ? 'opacity-60' : ''}
             ${isDragOver ? 'ring-2 ring-primary/50 bg-primary/5' : ''}
           `}
@@ -474,11 +474,11 @@ export function InputArea({ onSend, onStop, isGenerating, isCompact = false, noB
           )}
 
           {/* Textarea area */}
-          <div className="px-5 pt-5 pb-4 relative">
+          <div className="px-4 pt-3 pb-2 relative">
             {/* Typewriter animation overlay */}
             {showTypewriter && (
               <div
-                className="absolute left-0 top-0 px-5 pt-5 pb-4 pointer-events-none
+                className="absolute left-0 top-0 px-4 pt-3 pb-2 pointer-events-none
                   text-muted-foreground/50 text-base leading-relaxed text-left"
               >
                 {typewriterText}
@@ -500,7 +500,7 @@ export function InputArea({ onSend, onStop, isGenerating, isCompact = false, noB
               rows={2}
               className={`w-full bg-transparent resize-none
                 focus:outline-none text-foreground placeholder:text-muted-foreground/50
-                disabled:cursor-not-allowed min-h-[80px] text-base leading-relaxed
+                disabled:cursor-not-allowed min-h-[56px] text-base leading-relaxed
                 ${isOnboardingSendStep ? 'cursor-default' : ''}`}
               style={{ maxHeight: '200px' }}
             />

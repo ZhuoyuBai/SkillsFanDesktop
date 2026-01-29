@@ -80,6 +80,8 @@ export default function App() {
     handleAgentComplete,
     handleAgentThought,
     handleAgentCompact,
+    handleAgentUserQuestion,
+    handleAgentUserQuestionAnswered,
     currentSpaceId,
     setCurrentSpace: setChatCurrentSpace,
     loadConversations,
@@ -202,6 +204,16 @@ export default function App() {
       handleAgentCompact(data as AgentEventBase & { trigger: 'manual' | 'auto'; preTokens: number })
     })
 
+    const unsubUserQuestion = api.onAgentUserQuestion((data) => {
+      console.log('[App] Received agent:user-question event:', data)
+      handleAgentUserQuestion(data as AgentEventBase & { toolId: string; questions: Array<{ question: string; header: string; options: Array<{ label: string; description: string }>; multiSelect: boolean }> })
+    })
+
+    const unsubUserQuestionAnswered = api.onAgentUserQuestionAnswered((data) => {
+      console.log('[App] Received agent:user-question-answered event:', data)
+      handleAgentUserQuestionAnswered(data as AgentEventBase)
+    })
+
     // MCP status updates (global - not per-conversation)
     const unsubMcpStatus = api.onAgentMcpStatus((data) => {
       console.log('[App] Received agent:mcp-status event:', data)
@@ -219,6 +231,8 @@ export default function App() {
       unsubError()
       unsubComplete()
       unsubCompact()
+      unsubUserQuestion()
+      unsubUserQuestionAnswered()
       unsubMcpStatus()
     }
   }, [
@@ -229,6 +243,8 @@ export default function App() {
     handleAgentComplete,
     handleAgentThought,
     handleAgentCompact,
+    handleAgentUserQuestion,
+    handleAgentUserQuestionAnswered,
     setMcpStatus
   ])
 

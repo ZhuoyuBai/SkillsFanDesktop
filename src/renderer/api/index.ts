@@ -438,6 +438,14 @@ export const api = {
     return result as { success: boolean; servers: unknown[]; error?: string }
   },
 
+  // Answer user question (AskUserQuestion tool)
+  answerUserQuestion: async (conversationId: string, answers: Record<string, string>): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.skillsfan.answerUserQuestion(conversationId, answers)
+    }
+    return httpRequest('POST', '/api/agent/answer-question', { conversationId, answers })
+  },
+
   // ===== Artifact =====
   listArtifacts: async (spaceId: string): Promise<ApiResponse> => {
     if (isElectron()) {
@@ -727,6 +735,10 @@ export const api = {
     onEvent('agent:mcp-status', callback),
   onAgentCompact: (callback: (data: unknown) => void) =>
     onEvent('agent:compact', callback),
+  onAgentUserQuestion: (callback: (data: unknown) => void) =>
+    onEvent('agent:user-question', callback),
+  onAgentUserQuestionAnswered: (callback: (data: unknown) => void) =>
+    onEvent('agent:user-question-answered', callback),
   onRemoteStatusChange: (callback: (data: unknown) => void) =>
     onEvent('remote:status-change', callback),
 

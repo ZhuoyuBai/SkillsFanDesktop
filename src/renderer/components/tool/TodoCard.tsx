@@ -6,18 +6,20 @@
  * - Simple and intuitive - users see a familiar task list
  * - Non-intrusive - appears naturally in the thought flow
  * - Real-time updates - status changes animate smoothly
+ * - Collapsible - can be collapsed to save space
+ * - Task history - shows status updates per task when expanded
  */
 
-import { useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import {
   Circle,
   CheckCircle2,
   Loader2,
   ListTodo,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react'
 import { useTranslation } from '../../i18n'
-
-// Note: Loader2 is used for in_progress task icon animation
 
 // Todo item status from Claude Code SDK
 type TodoStatus = 'pending' | 'in_progress' | 'completed'
@@ -30,6 +32,9 @@ interface TodoItem {
 
 interface TodoCardProps {
   todos: TodoItem[]
+  isCollapsed?: boolean
+  onToggleCollapse?: () => void
+  taskStatusHistory?: Map<string, string[]>  // task content -> status updates
 }
 
 // Get icon and style for todo status
@@ -46,7 +51,7 @@ function getTodoStatusDisplay(status: TodoStatus) {
       return {
         Icon: Loader2,
         color: 'text-primary',
-        bgColor: 'bg-primary/10',
+        bgColor: 'bg-primary/10 border-l-2 border-l-primary',
         textStyle: 'text-foreground font-medium',
         spin: true,
       }
@@ -60,10 +65,18 @@ function getTodoStatusDisplay(status: TodoStatus) {
   }
 }
 
-// Single todo item
-function TodoItemRow({ item, index }: { item: TodoItem; index: number }) {
+// Single todo item with expandable history
+function TodoItemRow({
+  item,
+  statusHistory
+}: {
+  item: TodoItem
+  statusHistory?: string[]
+}) {
+  const [isExpanded, setIsExpanded] = useState(false)
   const display = getTodoStatusDisplay(item.status)
   const Icon = display.Icon
+  const hasHistory = statusHistory && statusHistory.length > 0
 
   // Show activeForm when in progress, otherwise show content
   const displayText = item.status === 'in_progress' && item.activeForm
@@ -71,30 +84,60 @@ function TodoItemRow({ item, index }: { item: TodoItem; index: number }) {
     : item.content
 
   return (
-    <div
-      className={`
-        flex items-start gap-3 px-3 py-2 rounded-lg transition-all duration-200
-        ${display.bgColor}
-        ${item.status === 'in_progress' ? 'animate-fade-in' : ''}
-      `}
-    >
-      <Icon
-        size={16}
+    <div>
+      <div
         className={`
-          flex-shrink-0 mt-0.5
-          ${display.color}
-          ${display.spin ? 'animate-spin' : ''}
+          flex items-start gap-3 px-3 py-2 rounded-lg transition-all duration-200
+          ${display.bgColor}
+          ${item.status === 'in_progress' ? 'animate-fade-in' : ''}
+          ${hasHistory ? 'cursor-pointer hover:bg-muted/30' : ''}
         `}
-      />
-      <span className={`text-sm leading-relaxed ${display.textStyle}`}>
-        {displayText}
-      </span>
+        onClick={() => hasHistory && setIsExpanded(!isExpanded)}
+      >
+        <Icon
+          size={16}
+          className={`
+            flex-shrink-0 mt-0.5
+            ${display.color}
+            ${display.spin ? 'animate-spin' : ''}
+          `}
+        />
+        <span className={`text-sm leading-relaxed flex-1 ${display.textStyle}`}>
+          {displayText}
+        </span>
+        {hasHistory && (
+          <ChevronRight
+            size={14}
+            className={`
+              text-muted-foreground/40 flex-shrink-0 mt-0.5 transition-transform
+              ${isExpanded ? 'rotate-90' : ''}
+            `}
+          />
+        )}
+      </div>
+
+      {/* Status history (when expanded) */}
+      {isExpanded && hasHistory && (
+        <div className="ml-9 mt-1 mb-2 pl-3 border-l-2 border-border/30 space-y-1">
+          {statusHistory.map((status, idx) => (
+            <div key={idx} className="text-xs text-muted-foreground/70">
+              {status}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
 
-export function TodoCard({ todos }: TodoCardProps) {
+export function TodoCard({
+  todos,
+  isCollapsed = false,
+  onToggleCollapse,
+  taskStatusHistory
+}: TodoCardProps) {
   const { t } = useTranslation()
+
   // Calculate progress stats
   const stats = useMemo(() => {
     const total = todos.length
@@ -110,43 +153,72 @@ export function TodoCard({ todos }: TodoCardProps) {
     return null
   }
 
+  const canCollapse = !!onToggleCollapse
+
   return (
     <div className="animate-fade-in">
       <div className="rounded-xl border border-border/50 bg-card/50 overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border/30 bg-secondary/20">
+        <div
+          className={`
+            flex items-center justify-between px-4 py-3 border-b border-border/30 bg-secondary/20
+            ${canCollapse ? 'cursor-pointer hover:bg-secondary/30 transition-colors' : ''}
+          `}
+          onClick={onToggleCollapse}
+        >
           <div className="flex items-center gap-2">
             <ListTodo size={16} className="text-primary" />
-            <span className="text-sm font-medium text-foreground">{t('Task plan')}</span>
+            <span className="text-sm font-medium text-foreground">{t('Task progress')}</span>
+            {/* Progress indicator (n/m) */}
+            <span className="text-xs text-muted-foreground">
+              ({stats.completed}/{stats.total})
+            </span>
           </div>
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            {stats.completed > 0 && (
-              <span className="text-green-500">{t('{{count}} completed', { count: stats.completed })}</span>
-            )}
             {stats.inProgress > 0 && (
-              <span className="text-primary">{t('{{count}} in progress', { count: stats.inProgress })}</span>
+              <span className="text-primary font-medium">{t('{{count}} in progress', { count: stats.inProgress })}</span>
             )}
             {stats.pending > 0 && (
               <span>{t('{{count}} pending', { count: stats.pending })}</span>
             )}
+            {canCollapse && (
+              <ChevronDown
+                size={16}
+                className={`text-muted-foreground transition-transform duration-200 ml-1 ${
+                  isCollapsed ? '-rotate-90' : ''
+                }`}
+              />
+            )}
           </div>
         </div>
 
-        {/* Progress bar */}
+        {/* Progress bar - always visible */}
         {stats.total > 0 && (
-          <div className="h-1 bg-secondary/30">
+          <div className="h-1.5 bg-secondary/30">
             <div
-              className="h-full bg-green-500 transition-all duration-500 ease-out"
+              className="h-full bg-primary transition-all duration-500 ease-out"
               style={{ width: `${stats.progress}%` }}
             />
           </div>
         )}
 
-        {/* Todo items */}
-        <div className="p-2 space-y-1">
-          {todos.map((item, index) => (
-            <TodoItemRow key={index} item={item} index={index} />
-          ))}
+        {/* Collapsible content */}
+        <div
+          className={`
+            transition-all duration-200 ease-out overflow-hidden
+            ${isCollapsed ? 'max-h-0 opacity-0' : 'max-h-[500px] opacity-100'}
+          `}
+        >
+          {/* Todo items */}
+          <div className="p-2 space-y-1">
+            {todos.map((item, index) => (
+              <TodoItemRow
+                key={index}
+                item={item}
+                statusHistory={taskStatusHistory?.get(item.content)}
+              />
+            ))}
+          </div>
         </div>
 
       </div>
@@ -172,3 +244,5 @@ export function parseTodoInput(input: Record<string, unknown>): TodoItem[] {
     activeForm: t.activeForm,
   }))
 }
+
+export type { TodoItem, TodoStatus }

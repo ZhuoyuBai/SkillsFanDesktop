@@ -691,3 +691,48 @@ export const FILE_ICON_IDS: Record<string, string> = {
 export function getFileIconId(extension: string): string {
   return FILE_ICON_IDS[extension.toLowerCase()] || FILE_ICON_IDS.default;
 }
+
+// ============================================
+// Linear Stream Types (Claude Code style timeline)
+// ============================================
+
+/**
+ * Unified timeline item for linear stream display.
+ * Merges thoughts, tool calls, and text into a single chronological timeline.
+ */
+export type TimelineItemType = 'thinking' | 'tool_use' | 'tool_result' | 'text' | 'skill' | 'todo' | 'error';
+
+export interface TodoItem {
+  content: string;
+  status: 'pending' | 'in_progress' | 'completed';
+  activeForm?: string;
+}
+
+export interface TimelineItem {
+  id: string;
+  timestamp: string;
+  type: TimelineItemType;
+  // Content fields (based on type)
+  content?: string;          // thinking, text, error
+  toolName?: string;         // tool_use, tool_result
+  toolInput?: Record<string, unknown>;  // tool_use
+  toolOutput?: string;       // tool_result
+  isError?: boolean;         // tool_result, error
+  isComplete?: boolean;      // tool_use: whether completed
+  duration?: number;         // tool_use: execution time in ms
+  // Special types
+  todos?: TodoItem[];        // todo: TodoWrite content
+  skillName?: string;        // skill: Skill name
+  childItems?: TimelineItem[];  // skill: child tool calls
+  parentToolId?: string;     // child tool reference
+}
+
+/**
+ * Text segment for tracking text content between tool calls.
+ * Used to reconstruct the timeline with proper text positioning.
+ */
+export interface TextSegment {
+  content: string;
+  timestamp: string;
+  startIndex: number;  // Position in streamingContent where this segment starts
+}

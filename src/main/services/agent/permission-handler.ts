@@ -10,7 +10,7 @@ import { getConfig } from '../config.service'
 import { isAIBrowserTool } from '../ai-browser'
 import { activeSessions } from './session-manager'
 import { sendToRenderer } from './helpers'
-import type { ToolCall } from './types'
+import type { ToolCall, UserQuestionInfo } from './types'
 
 // ============================================
 // Tool Permission Types
@@ -129,6 +129,45 @@ export function createCanUseTool(
       return { behavior: 'allow' as const }
     }
 
+    // Handle AskUserQuestion - pause and wait for user's answer
+    if (toolName === 'AskUserQuestion') {
+      console.log(`[Agent][${conversationId}] AskUserQuestion tool called, waiting for user input`)
+
+      const session = activeSessions.get(conversationId)
+      if (!session) {
+        return { behavior: 'deny' as const, message: 'Session not found' }
+      }
+
+      const questions = input.questions as UserQuestionInfo['questions'] || []
+
+      // Store question info and send to frontend
+      session.pendingUserQuestion = {
+        toolId: `question-${Date.now()}`,
+        questions,
+        inputResolve: null
+      }
+
+      sendToRenderer('agent:user-question', spaceId, conversationId, {
+        toolId: session.pendingUserQuestion.toolId,
+        questions
+      })
+
+      // Wait for user's answer
+      return new Promise((resolve) => {
+        session.pendingUserQuestion!.inputResolve = (answers) => {
+          console.log(`[Agent][${conversationId}] User answered AskUserQuestion:`, Object.keys(answers))
+          // Clear pending question
+          session.pendingUserQuestion = null
+          // Return allow with the answers in updatedInput
+          // The SDK will pass these answers to the tool execution
+          resolve({
+            behavior: 'allow' as const,
+            updatedInput: { ...input, answers }
+          })
+        }
+      })
+    }
+
     // Default: allow
     return { behavior: 'allow' as const }
   }
@@ -147,4 +186,32 @@ export function handleToolApproval(conversationId: string, approved: boolean): v
     session.pendingPermissionResolve(approved)
     session.pendingPermissionResolve = null
   }
+}
+
+// ============================================
+// User Question Handling
+// ============================================
+
+/**
+ * Handle user's answer to AskUserQuestion for a specific conversation
+ */
+export function handleUserQuestionAnswer(
+  conversationId: string,
+  answers: Record<string, string>
+): void {
+  const session = activeSessions.get(conversationId)
+  if (session?.pendingUserQuestion?.inputResolve) {
+    session.pendingUserQuestion.inputResolve(answers)
+    // Note: inputResolve will clear pendingUserQuestion after resolving
+  } else {
+    console.warn(`[Agent][${conversationId}] No pending question to answer`)
+  }
+}
+
+/**
+ * Check if there's a pending question for a conversation
+ */
+export function hasPendingQuestion(conversationId: string): boolean {
+  const session = activeSessions.get(conversationId)
+  return session?.pendingUserQuestion !== null
 }
