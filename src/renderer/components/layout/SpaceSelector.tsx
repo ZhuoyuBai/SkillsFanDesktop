@@ -18,9 +18,11 @@ import { useTranslation } from '../../i18n'
 
 interface SpaceSelectorProps {
   iconOnly?: boolean  // Show only icon without text (for narrow windows)
+  disabled?: boolean  // Disable interaction during generation
+  onDisabledClick?: () => void  // Callback when clicked while disabled
 }
 
-export function SpaceSelector({ iconOnly = false }: SpaceSelectorProps = {}) {
+export function SpaceSelector({ iconOnly = false, disabled = false, onDisabledClick }: SpaceSelectorProps = {}) {
   const { t } = useTranslation()
   const { haloSpace, spaces, currentSpace, setCurrentSpace, loadSpaces } = useSpaceStore()
   const { setView } = useAppStore()
@@ -85,7 +87,13 @@ export function SpaceSelector({ iconOnly = false }: SpaceSelectorProps = {}) {
       <div className="relative" ref={dropdownRef}>
         {/* Trigger Button */}
         <button
-          onClick={() => setIsOpen(!isOpen)}
+          onClick={() => {
+            if (disabled) {
+              onDisabledClick?.()
+              return
+            }
+            setIsOpen(!isOpen)
+          }}
           className={`
             h-8 flex items-center gap-1.5 px-2.5 rounded-lg text-xs
             transition-all duration-200 border

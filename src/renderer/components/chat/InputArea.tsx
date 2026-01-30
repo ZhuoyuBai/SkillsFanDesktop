@@ -20,7 +20,8 @@
  */
 
 import { useState, useRef, useEffect, KeyboardEvent, ClipboardEvent, DragEvent } from 'react'
-import { Plus, ImagePlus, Loader2, AlertCircle, Globe } from 'lucide-react'
+import { Plus, ImagePlus, Loader2, AlertCircle, Globe, Package } from 'lucide-react'
+import { useAppStore } from '../../stores/app.store'
 import { useOnboardingStore } from '../../stores/onboarding.store'
 import { useAIBrowserStore } from '../../stores/ai-browser.store'
 import { getOnboardingPrompt } from '../onboarding/onboardingData'
@@ -158,6 +159,7 @@ export function InputArea({ onSend, onStop, onInject, isGenerating, isCompact = 
   const [isDragOver, setIsDragOver] = useState(false)
   const [isProcessingImages, setIsProcessingImages] = useState(false)
   const [imageError, setImageError] = useState<ImageError | null>(null)
+  const [infoToast, setInfoToast] = useState<string | null>(null)  // Info toast message
   const [thinkingEnabled, setThinkingEnabled] = useState(false)  // Extended thinking mode
   const [showAttachMenu, setShowAttachMenu] = useState(false)  // Attachment menu visibility
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -166,6 +168,9 @@ export function InputArea({ onSend, onStop, onInject, isGenerating, isCompact = 
 
   // AI Browser state
   const { enabled: aiBrowserEnabled, setEnabled: setAIBrowserEnabled } = useAIBrowserStore()
+
+  // Settings navigation
+  const { openSettingsWithSection } = useAppStore()
 
   // Typewriter animation for placeholder
   const typewriterText = useTypewriter(TYPEWRITER_PHRASES, {
@@ -182,6 +187,19 @@ export function InputArea({ onSend, onStop, onInject, isGenerating, isCompact = 
       return () => clearTimeout(timer)
     }
   }, [imageError])
+
+  // Auto-clear info toast after 2 seconds
+  useEffect(() => {
+    if (infoToast) {
+      const timer = setTimeout(() => setInfoToast(null), 2000)
+      return () => clearTimeout(timer)
+    }
+  }, [infoToast])
+
+  // Show info toast when clicking disabled buttons during generation
+  const handleDisabledClick = () => {
+    setInfoToast(t('Please wait for the response to complete'))
+  }
 
   // Close attachment menu when clicking outside
   useEffect(() => {
@@ -445,6 +463,14 @@ export function InputArea({ onSend, onStop, onInject, isGenerating, isCompact = 
           </div>
         )}
 
+        {/* Info toast notification */}
+        {infoToast && (
+          <div className="mb-2 p-3 rounded-xl bg-muted border border-border
+            flex items-center gap-2 animate-fade-in">
+            <span className="text-sm text-muted-foreground">{infoToast}</span>
+          </div>
+        )}
+
         {/* Hidden file input */}
         <input
           ref={fileInputRef}
@@ -454,6 +480,28 @@ export function InputArea({ onSend, onStop, onInject, isGenerating, isCompact = 
           className="hidden"
           onChange={handleFileInputChange}
         />
+
+        {/* Skill Management Button - above input */}
+        {!isOnboarding && (
+          <div className="flex items-center mb-2">
+            <button
+              onClick={() => {
+                if (isGenerating) {
+                  handleDisabledClick()
+                  return
+                }
+                openSettingsWithSection('skills')
+              }}
+              className="h-8 flex items-center gap-1.5 px-2.5 rounded-lg text-xs
+                transition-all duration-200 border
+                text-muted-foreground border-border/60 hover:bg-muted hover:border-border hover:text-foreground"
+              title={t('Skill Management')}
+            >
+              <Package size={14} />
+              <span>{t('Skill Management')}</span>
+            </button>
+          </div>
+        )}
 
         {/* Input container */}
         <div
@@ -546,6 +594,7 @@ export function InputArea({ onSend, onStop, onInject, isGenerating, isCompact = 
             canSend={canSend}
             onSend={handleSend}
             onStop={onStop}
+            onDisabledClick={handleDisabledClick}
           />
         </div>
       </div>
@@ -576,6 +625,7 @@ interface InputToolbarProps {
   canSend: boolean
   onSend: () => void
   onStop: () => void
+  onDisabledClick: () => void  // Callback when clicking disabled buttons during generation
 }
 
 function InputToolbar({
@@ -594,7 +644,8 @@ function InputToolbar({
   attachMenuRef,
   canSend,
   onSend,
-  onStop
+  onStop,
+  onDisabledClick
 }: InputToolbarProps) {
   const { t } = useTranslation()
 
@@ -652,13 +703,13 @@ function InputToolbar({
         )} */}
 
         {/* Model Selector - icon only on narrow windows */}
-        {!isGenerating && !isOnboarding && (
-          <ModelSelector variant="compact" iconOnly={isMobile} />
+        {!isOnboarding && (
+          <ModelSelector variant="compact" iconOnly={isMobile} disabled={isGenerating} onDisabledClick={onDisabledClick} />
         )}
 
         {/* Space Selector - icon only on narrow windows */}
-        {!isGenerating && !isOnboarding && (
-          <SpaceSelector iconOnly={isMobile} />
+        {!isOnboarding && (
+          <SpaceSelector iconOnly={isMobile} disabled={isGenerating} onDisabledClick={onDisabledClick} />
         )}
 
         {/* AI Browser toggle - temporarily hidden */}

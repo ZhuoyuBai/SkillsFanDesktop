@@ -70,9 +70,11 @@ function getLocalizedText(value: LocalizedText): string {
 interface ModelSelectorProps {
   variant?: 'header' | 'compact'
   iconOnly?: boolean  // Show only icon without text (for narrow windows)
+  disabled?: boolean  // Disable interaction during generation
+  onDisabledClick?: () => void  // Callback when clicked while disabled
 }
 
-export function ModelSelector({ variant = 'header', iconOnly = false }: ModelSelectorProps = {}) {
+export function ModelSelector({ variant = 'header', iconOnly = false, disabled = false, onDisabledClick }: ModelSelectorProps = {}) {
   const { t } = useTranslation()
   const { config, setConfig, setView } = useAppStore()
   const [isOpen, setIsOpen] = useState(false)
@@ -199,11 +201,17 @@ export function ModelSelector({ variant = 'header', iconOnly = false }: ModelSel
     <div className="relative" ref={dropdownRef}>
       {/* Trigger Button */}
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => {
+          if (disabled) {
+            onDisabledClick?.()
+            return
+          }
+          setIsOpen(!isOpen)
+        }}
         className={`
           ${styles.button}
           ${variant === 'header'
-            ? 'text-foreground hover:bg-secondary/80 rounded-lg transition-colors'
+            ? 'text-foreground rounded-lg transition-colors hover:bg-secondary/80'
             : `transition-all duration-200 border ${isOpen
                 ? 'bg-primary/15 text-primary border-primary/30'
                 : 'text-muted-foreground border-border/60 hover:bg-muted hover:border-border hover:text-foreground'
