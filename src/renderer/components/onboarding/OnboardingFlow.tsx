@@ -143,18 +143,7 @@ export function OnboardingFlow({ onComplete, onLogin }: OnboardingFlowProps) {
     </div>
   )
 
-  // Back button for last page (top left)
-  const BackButton = () => (
-    <button
-      onClick={goPrev}
-      className="flex items-center gap-1 px-3 py-1.5 text-xs text-gray-500 hover:text-gray-900 transition-colors"
-    >
-      <ChevronLeft className="w-3.5 h-3.5" />
-      {t('onboarding.back')}
-    </button>
-  )
-
-  // Last page buttons - Full width login + Custom API text link (light mode)
+  // Last page buttons - Full width login + Custom API text link + Back button (light mode)
   const LastPageButtons = () => (
     <div className="flex flex-col items-stretch gap-2 w-full">
       <button
@@ -168,6 +157,14 @@ export function OnboardingFlow({ onComplete, onLogin }: OnboardingFlowProps) {
         className="py-1.5 text-xs text-gray-500 hover:text-gray-900 transition-colors"
       >
         {t('onboarding.customApi')}
+      </button>
+      <div className="flex-1 min-h-[80px]" />
+      <button
+        onClick={goPrev}
+        className="flex items-center gap-1 py-1.5 text-xs text-gray-500 hover:text-gray-900 transition-colors self-start"
+      >
+        <ChevronLeft className="w-3.5 h-3.5" />
+        {t('onboarding.prev')}
       </button>
     </div>
   )
@@ -247,7 +244,6 @@ export function OnboardingFlow({ onComplete, onLogin }: OnboardingFlowProps) {
         image={ONBOARDING_IMAGES.models}
         title={t('onboarding.models.title')}
         customContent={<ModelLogosGrid />}
-        topLeft={<BackButton />}
         footer={<ProgressDots />}
         isActive={currentStep === 3}
       >
