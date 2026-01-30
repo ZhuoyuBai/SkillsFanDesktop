@@ -4,7 +4,7 @@
  */
 
 import { useState } from 'react'
-import { Globe, ChevronDown, Settings } from 'lucide-react'
+import { Globe, ChevronDown, Settings, ChevronLeft } from 'lucide-react'
 import { useTranslation, setLanguage, getCurrentLanguage, SUPPORTED_LOCALES, type LocaleCode } from '../../i18n'
 import { HaloLogo } from '../brand/HaloLogo'
 
@@ -77,9 +77,11 @@ const PROVIDER_PRESETS: ProviderPreset[] = [
 
 interface LoginSelectorProps {
   onSelectProvider: (providerId: string) => void
+  onBack?: () => void  // Optional back button handler (e.g., from onboarding)
+  onSkip?: () => void  // Optional skip button handler (set up later)
 }
 
-export function LoginSelector({ onSelectProvider }: LoginSelectorProps) {
+export function LoginSelector({ onSelectProvider, onBack, onSkip }: LoginSelectorProps) {
   const { t } = useTranslation()
 
   // Language selector state
@@ -95,6 +97,19 @@ export function LoginSelector({ onSelectProvider }: LoginSelectorProps) {
 
   return (
     <div className="h-full w-full flex flex-col items-center bg-background pt-[12vh] px-8 relative overflow-y-auto">
+      {/* Back Button - Top Left (when coming from onboarding) */}
+      {onBack && (
+        <div className="absolute top-6 left-6">
+          <button
+            onClick={onBack}
+            className="flex items-center gap-1.5 px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ChevronLeft className="w-4 h-4" />
+            {t('onboarding.back')}
+          </button>
+        </div>
+      )}
+
       {/* Language Selector - Top Right */}
       <div className="absolute top-6 right-6">
         <div className="relative">
@@ -171,6 +186,16 @@ export function LoginSelector({ onSelectProvider }: LoginSelectorProps) {
             ))}
           </div>
         </div>
+
+        {/* Skip button - set up later */}
+        {onSkip && (
+          <button
+            onClick={onSkip}
+            className="mt-6 w-full py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            {t('setup.skipForNow')}
+          </button>
+        )}
       </div>
     </div>
   )

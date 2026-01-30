@@ -642,8 +642,9 @@ export function LinearStream({
 
       {/* Waiting indicator when thinking but no streaming */}
       {isThinking && !isStreaming && !currentText.trim() && (
-        <div className="py-2">
+        <div className="py-2 flex items-center gap-2">
           <HaloLogo size={16} animated={true} />
+          <span className="text-sm text-muted-foreground">{t('chat.thinking')}</span>
         </div>
       )}
     </div>

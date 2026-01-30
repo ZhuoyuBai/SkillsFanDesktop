@@ -15,7 +15,7 @@ import { SetupFlow } from './components/setup/SetupFlow'
 import { GitBashSetup } from './components/setup/GitBashSetup'
 import { SearchPanel } from './components/search/SearchPanel'
 import { SearchHighlightBar } from './components/search/SearchHighlightBar'
-import { OnboardingOverlay } from './components/onboarding'
+import { OnboardingOverlay, OnboardingFlow } from './components/onboarding'
 import { UpdateNotification } from './components/updater/UpdateNotification'
 import { api } from './api'
 import type { AgentEventBase, Thought, ToolCall, HaloConfig } from './types'
@@ -222,6 +222,23 @@ export default function App() {
       }
     })
 
+    // SkillsFan login success - go directly to chat (skip model config)
+    const unsubSkillsFanLogin = api.onSkillsFanLoginSuccess(async () => {
+      console.log('[App] SkillsFan login success, going to chat...')
+      // Mark first launch as complete
+      const currentConfig = useAppStore.getState().config
+      if (currentConfig) {
+        await api.setConfig({ ...currentConfig, isFirstLaunch: false })
+      }
+      // Load spaces and go directly to chat (skip setup)
+      await useSpaceStore.getState().loadSpaces()
+      const { haloSpace } = useSpaceStore.getState()
+      if (haloSpace) {
+        useSpaceStore.getState().setCurrentSpace(haloSpace)
+      }
+      setView('space')
+    })
+
     return () => {
       unsubThought()
       unsubMessage()
@@ -233,6 +250,7 @@ export default function App() {
       unsubUserQuestion()
       unsubUserQuestionAnswered()
       unsubMcpStatus()
+      unsubSkillsFanLogin()
     }
   }, [
     handleAgentMessage,
@@ -439,6 +457,23 @@ export default function App() {
     }
   }
 
+  // Handle onboarding login - open SkillsFan web login
+  const handleOnboardingLogin = async () => {
+    console.log('[App] Starting SkillsFan login from onboarding')
+    try {
+      const result = await api.skillsfanStartLogin()
+      if (result.success) {
+        // Login flow started, wait for callback
+        // The auth flow will trigger initialize() after successful login
+        console.log('[App] SkillsFan login started successfully')
+      } else {
+        console.error('[App] Failed to start SkillsFan login:', result.error)
+      }
+    } catch (e) {
+      console.error('[App] Error starting SkillsFan login:', e)
+    }
+  }
+
   // Render based on current view
   // Heavy pages (HomePage, SpacePage, SettingsPage) are lazy-loaded for better initial performance
   const renderView = () => {
@@ -447,6 +482,13 @@ export default function App() {
         return <SplashScreen />
       case 'gitBashSetup':
         return <GitBashSetup onComplete={handleGitBashSetupComplete} />
+      case 'onboarding':
+        return (
+          <OnboardingFlow
+            onComplete={() => setView('setup')}
+            onLogin={handleOnboardingLogin}
+          />
+        )
       case 'setup':
         return <SetupFlow />
       case 'space':

@@ -132,7 +132,9 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
     .filter(p => p.isLoggedIn)
 
   // Get current model display name
-  const currentModelName = getCurrentModelName(config)
+  const rawModelName = getCurrentModelName(config)
+  // Translate "No model" to "Add Model"
+  const currentModelName = rawModelName === 'No model' ? t('model.addModel') : rawModelName
 
   // Handle model selection for any provider
   const handleSelectModel = async (source: AISourceType, modelId: string) => {

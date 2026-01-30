@@ -6,6 +6,7 @@
 
 import { useState, useEffect } from 'react'
 import { useAppStore } from '../../stores/app.store'
+import { useSpaceStore } from '../../stores/space.store'
 import { api } from '../../api'
 import { LoginSelector } from './LoginSelector'
 import { ApiSetup } from './ApiSetup'
@@ -23,8 +24,11 @@ interface DeviceCodeInfo {
 
 export function SetupFlow() {
   const { t } = useTranslation()
-  const { setConfig, initialize } = useAppStore()
+  const { setConfig, initialize, previousView, setView } = useAppStore()
   const [step, setStep] = useState<SetupStep>('select')
+
+  // Check if we came from onboarding (for back button)
+  const fromOnboarding = previousView === 'onboarding'
   const [currentProvider, setCurrentProvider] = useState<string | null>(null)
   const [oauthState, setOauthState] = useState<string | null>(null)
   const [loginStatus, setLoginStatus] = useState<string>('')
@@ -110,11 +114,35 @@ export function SetupFlow() {
     return unsubscribe
   }, [step, currentProvider])
 
+  // Handle back to onboarding
+  const handleBackToOnboarding = () => {
+    setView('onboarding')
+  }
+
+  // Handle skip - go directly to space without configuring model
+  const handleSkip = async () => {
+    console.log('[SetupFlow] Skipping setup, going to chat...')
+    // Mark first launch as complete
+    const currentConfig = useAppStore.getState().config
+    if (currentConfig) {
+      await api.setConfig({ ...currentConfig, isFirstLaunch: false })
+    }
+    // Load spaces and go directly to chat
+    await useSpaceStore.getState().loadSpaces()
+    const { haloSpace } = useSpaceStore.getState()
+    if (haloSpace) {
+      useSpaceStore.getState().setCurrentSpace(haloSpace)
+    }
+    setView('space')
+  }
+
   // Render based on step
   if (step === 'select') {
     return (
       <LoginSelector
         onSelectProvider={handleSelectProvider}
+        onBack={fromOnboarding ? handleBackToOnboarding : undefined}
+        onSkip={handleSkip}
       />
     )
   }

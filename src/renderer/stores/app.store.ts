@@ -226,9 +226,13 @@ export const useAppStore = create<AppState>((set, get) => ({
         set({ config })
 
         // Determine initial view based on config
-        // Show setup if first launch or no AI source configured (OAuth or Custom API)
-        if (config.isFirstLaunch || !hasAnyAISource(config)) {
-          console.log('[Store] First launch or no AI source, showing setup')
+        // First launch: show onboarding flow
+        // No AI source configured: show setup directly
+        if (config.isFirstLaunch) {
+          console.log('[Store] First launch, showing onboarding')
+          set({ view: 'onboarding' })
+        } else if (!hasAnyAISource(config)) {
+          console.log('[Store] No AI source configured, showing setup')
           set({ view: 'setup' })
         } else {
           // Go to space directly (skip home page)
