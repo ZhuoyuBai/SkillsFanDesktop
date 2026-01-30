@@ -22,7 +22,9 @@
 import { create } from 'zustand'
 import { api } from '../api'
 import type { Conversation, ConversationMeta, Message, ToolCall, Artifact, Thought, AgentEventBase, ImageAttachment, CompactInfo, CanvasContext, TextSegment } from '../types'
+import { hasAnyAISource } from '../types'
 import { canvasLifecycle } from '../services/canvas-lifecycle'
+import { useAppStore } from './app.store'
 
 // LRU cache size limit
 const CONVERSATION_CACHE_SIZE = 10
@@ -655,6 +657,31 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const conversationId = conversationMeta?.id || conversation?.id
     if (!conversationId) return
 
+    // Check if AI source is configured before sending message
+    const appConfig = useAppStore.getState().config
+    if (!appConfig || !hasAnyAISource(appConfig)) {
+      console.error('[ChatStore] No AI source configured')
+      // Add error thought without entering thinking state
+      set((state) => {
+        const newSessions = new Map(state.sessions)
+        const session = newSessions.get(conversationId) || createEmptySessionState()
+        const errorThought: Thought = {
+          id: `thought-error-${Date.now()}`,
+          type: 'error',
+          content: 'No AI model configured. Please configure a model in Settings.',
+          timestamp: new Date().toISOString(),
+          isError: true
+        }
+        newSessions.set(conversationId, {
+          ...session,
+          error: 'No AI model configured',
+          thoughts: [...session.thoughts, errorThought]
+        })
+        return { sessions: newSessions }
+      })
+      return
+    }
+
     try {
       // Initialize/reset session state for this conversation
       set((state) => {
@@ -744,7 +771,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }
 
       // Send to agent (with images, AI Browser state, thinking mode, and canvas context)
-      await api.sendMessage({
+      const response = await api.sendMessage({
         spaceId: currentSpaceId,
         conversationId,
         message: content,
@@ -753,6 +780,30 @@ export const useChatStore = create<ChatState>((set, get) => ({
         thinkingEnabled,  // Pass thinking mode to API
         canvasContext: buildCanvasContext()  // Pass canvas context for AI awareness
       })
+
+      // Handle API-level errors (e.g., credential errors that return { success: false })
+      if (!response.success) {
+        console.error('[ChatStore] API returned error:', response.error)
+        set((state) => {
+          const newSessions = new Map(state.sessions)
+          const session = newSessions.get(conversationId) || createEmptySessionState()
+          const errorThought: Thought = {
+            id: `thought-error-${Date.now()}`,
+            type: 'error',
+            content: response.error || 'Failed to send message',
+            timestamp: new Date().toISOString(),
+            isError: true
+          }
+          newSessions.set(conversationId, {
+            ...session,
+            error: response.error || 'Failed to send message',
+            isGenerating: false,
+            isThinking: false,
+            thoughts: [...session.thoughts, errorThought]
+          })
+          return { sessions: newSessions }
+        })
+      }
     } catch (error) {
       console.error('Failed to send message:', error)
       // Update session error state

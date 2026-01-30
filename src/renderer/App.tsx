@@ -133,8 +133,8 @@ export default function App() {
 
   // Theme switching
   useEffect(() => {
-    // Default to 'dark' before config loads, then use config value
-    const theme = config?.appearance?.theme || 'dark'
+    // Default to 'light' before config loads, then use config value
+    const theme = config?.appearance?.theme || 'light'
     applyTheme(theme)
 
     // Listen for system theme changes when using 'system' mode

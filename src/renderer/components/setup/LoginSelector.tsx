@@ -96,13 +96,13 @@ export function LoginSelector({ onSelectProvider, onBack, onSkip }: LoginSelecto
   }
 
   return (
-    <div className="h-full w-full flex flex-col items-center bg-background pt-[12vh] px-8 relative overflow-y-auto">
+    <div className="h-full w-full flex flex-col items-center bg-white pt-[12vh] px-8 relative overflow-y-auto">
       {/* Back Button - Top Left (when coming from onboarding) */}
       {onBack && (
         <div className="absolute top-6 left-6">
           <button
             onClick={onBack}
-            className="flex items-center gap-1.5 px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            className="flex items-center gap-1.5 px-4 py-2 text-sm text-gray-500 hover:text-gray-900 transition-colors"
           >
             <ChevronLeft className="w-4 h-4" />
             {t('onboarding.back')}
@@ -115,7 +115,7 @@ export function LoginSelector({ onSelectProvider, onBack, onSkip }: LoginSelecto
         <div className="relative">
           <button
             onClick={() => setIsLangDropdownOpen(!isLangDropdownOpen)}
-            className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary/80 rounded-lg transition-colors"
+            className="flex items-center gap-2 px-3 py-2 text-sm text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
           >
             <Globe className="w-4 h-4" />
             <span>{SUPPORTED_LOCALES[currentLang]}</span>
@@ -130,13 +130,13 @@ export function LoginSelector({ onSelectProvider, onBack, onSkip }: LoginSelecto
                 className="fixed inset-0 z-10"
                 onClick={() => setIsLangDropdownOpen(false)}
               />
-              <div className="absolute right-0 mt-1 py-1 w-40 bg-card border border-border rounded-lg shadow-lg z-20">
+              <div className="absolute right-0 mt-1 py-1 w-40 bg-white border border-gray-200 rounded-lg shadow-lg z-20">
                 {Object.entries(SUPPORTED_LOCALES).map(([code, name]) => (
                   <button
                     key={code}
                     onClick={() => handleLanguageChange(code as LocaleCode)}
-                    className={`w-full px-4 py-2 text-left text-sm hover:bg-secondary/80 transition-colors ${
-                      currentLang === code ? 'text-primary font-medium' : 'text-foreground'
+                    className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 transition-colors ${
+                      currentLang === code ? 'text-orange-600 font-medium' : 'text-gray-900'
                     }`}
                   >
                     {name}
@@ -151,35 +151,35 @@ export function LoginSelector({ onSelectProvider, onBack, onSkip }: LoginSelecto
       {/* Header with Logo */}
       <div className="flex flex-col items-center mb-10 mt-8">
         <HaloLogo size={80} animated={false} />
-        <h1 className="mt-4 text-3xl font-bold tracking-wide">技能范</h1>
+        <h1 className="mt-4 text-3xl font-bold tracking-wide text-gray-900">技能范</h1>
       </div>
 
       {/* Main content */}
       <div className="w-full max-w-xl">
         {/* Provider Grid */}
-        <div className="bg-card rounded-xl p-5 border border-border/80">
-          <h3 className="text-sm text-muted-foreground mb-4">{t('Select AI Provider')}</h3>
+        <div className="bg-gray-50 rounded-xl p-5 border border-gray-200">
+          <h3 className="text-sm text-gray-500 mb-4">{t('Select AI Provider')}</h3>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {PROVIDER_PRESETS.map((preset) => (
               <button
                 key={preset.id}
                 type="button"
                 onClick={() => onSelectProvider(preset.id)}
-                className="flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-border hover:border-primary hover:bg-primary/5 transition-all"
+                className="flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-gray-200 bg-white hover:border-orange-500 hover:bg-orange-50 transition-all"
               >
                 {/* Logo or Icon */}
                 <div className="w-10 h-10 rounded-lg flex items-center justify-center overflow-hidden">
                   {preset.logo ? (
                     <img src={preset.logo} alt={preset.name} className="w-full h-full object-cover rounded-lg" />
                   ) : (
-                    <div className="w-full h-full bg-muted/50 flex items-center justify-center rounded-lg">
-                      <Settings className="w-5 h-5 text-muted-foreground" />
+                    <div className="w-full h-full bg-gray-100 flex items-center justify-center rounded-lg">
+                      <Settings className="w-5 h-5 text-gray-500" />
                     </div>
                   )}
                 </div>
 
                 {/* Name */}
-                <span className="text-sm font-medium text-muted-foreground">
+                <span className="text-sm font-medium text-gray-700">
                   {preset.isCustom ? t(preset.nameKey) : preset.name}
                 </span>
               </button>
@@ -191,7 +191,7 @@ export function LoginSelector({ onSelectProvider, onBack, onSkip }: LoginSelecto
         {onSkip && (
           <button
             onClick={onSkip}
-            className="mt-6 w-full py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            className="mt-6 w-full py-2 text-sm text-gray-500 hover:text-gray-900 transition-colors"
           >
             {t('setup.skipForNow')}
           </button>

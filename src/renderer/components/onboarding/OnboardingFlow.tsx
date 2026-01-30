@@ -25,32 +25,18 @@ import deepseekLogo from '../../assets/providers/deepseek.jpg'
 import claudeLogo from '../../assets/providers/claude.jpg'
 import openaiLogo from '../../assets/providers/openai.jpg'
 
-// Placeholder images - will be replaced with actual images later
-const PLACEHOLDER_IMAGES = {
-  welcome: 'data:image/svg+xml,' + encodeURIComponent(`
-    <svg width="640" height="360" viewBox="0 0 640 360" xmlns="http://www.w3.org/2000/svg">
-      <rect width="640" height="360" fill="#f4f4f5"/>
-      <text x="320" y="180" text-anchor="middle" fill="#a1a1aa" font-size="24" font-family="system-ui">Welcome Image</text>
-    </svg>
-  `),
-  skills: 'data:image/svg+xml,' + encodeURIComponent(`
-    <svg width="640" height="360" viewBox="0 0 640 360" xmlns="http://www.w3.org/2000/svg">
-      <rect width="640" height="360" fill="#f4f4f5"/>
-      <text x="320" y="180" text-anchor="middle" fill="#a1a1aa" font-size="24" font-family="system-ui">Skills Market Image</text>
-    </svg>
-  `),
-  agent: 'data:image/svg+xml,' + encodeURIComponent(`
-    <svg width="640" height="360" viewBox="0 0 640 360" xmlns="http://www.w3.org/2000/svg">
-      <rect width="640" height="360" fill="#f4f4f5"/>
-      <text x="320" y="180" text-anchor="middle" fill="#a1a1aa" font-size="24" font-family="system-ui">Agent Image</text>
-    </svg>
-  `),
-  models: 'data:image/svg+xml,' + encodeURIComponent(`
-    <svg width="640" height="360" viewBox="0 0 640 360" xmlns="http://www.w3.org/2000/svg">
-      <rect width="640" height="360" fill="#f4f4f5"/>
-      <text x="320" y="180" text-anchor="middle" fill="#a1a1aa" font-size="24" font-family="system-ui">Models Image</text>
-    </svg>
-  `)
+// Import onboarding images
+import welcomeImage from '../../assets/onboarding/welcome.png'
+import skillsImage from '../../assets/onboarding/skills.png'
+import agentImage from '../../assets/onboarding/agent.png'
+import modelsImage from '../../assets/onboarding/models.png'
+
+// Onboarding images
+const ONBOARDING_IMAGES = {
+  welcome: welcomeImage,
+  skills: skillsImage,
+  agent: agentImage,
+  models: modelsImage
 }
 
 // Model providers for the last page
@@ -135,13 +121,13 @@ export function OnboardingFlow({ onComplete, onLogin }: OnboardingFlowProps) {
     }
   ]
 
-  // Navigation buttons component - smaller, more subtle style
+  // Navigation buttons component - smaller, more subtle style (light mode)
   const NavigationButtons = ({ showPrev = true }: { showPrev?: boolean }) => (
     <div className="flex items-center justify-end gap-2">
       {showPrev && currentStep > 0 && (
         <button
           onClick={goPrev}
-          className="flex items-center gap-1 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          className="flex items-center gap-1 px-3 py-1.5 text-xs text-gray-500 hover:text-gray-900 transition-colors"
         >
           <ChevronLeft className="w-3.5 h-3.5" />
           {t('onboarding.prev')}
@@ -149,7 +135,7 @@ export function OnboardingFlow({ onComplete, onLogin }: OnboardingFlowProps) {
       )}
       <button
         onClick={goNext}
-        className="flex items-center gap-1 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+        className="flex items-center gap-1 px-3 py-1.5 text-xs text-gray-700 hover:text-gray-900 transition-colors"
       >
         {t('onboarding.next')}
         <ChevronRight className="w-3.5 h-3.5" />
@@ -161,60 +147,60 @@ export function OnboardingFlow({ onComplete, onLogin }: OnboardingFlowProps) {
   const BackButton = () => (
     <button
       onClick={goPrev}
-      className="flex items-center gap-1 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+      className="flex items-center gap-1 px-3 py-1.5 text-xs text-gray-500 hover:text-gray-900 transition-colors"
     >
       <ChevronLeft className="w-3.5 h-3.5" />
       {t('onboarding.back')}
     </button>
   )
 
-  // Last page buttons - Full width login + Custom API text link
+  // Last page buttons - Full width login + Custom API text link (light mode)
   const LastPageButtons = () => (
     <div className="flex flex-col items-stretch gap-2 w-full">
       <button
         onClick={handleLogin}
-        className="w-full py-2.5 text-sm font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+        className="w-full py-2.5 text-sm font-medium bg-orange-600 text-white rounded-md hover:bg-orange-700 transition-colors"
       >
         {t('onboarding.login')}
       </button>
       <button
         onClick={onComplete}
-        className="py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+        className="py-1.5 text-xs text-gray-500 hover:text-gray-900 transition-colors"
       >
         {t('onboarding.customApi')}
       </button>
     </div>
   )
 
-  // Model logos grid for last page
+  // Model logos grid for last page (light mode)
   const ModelLogosGrid = () => (
-    <div className="grid grid-cols-3 gap-3">
+    <div className="grid grid-cols-3 gap-3" style={{ minWidth: '340px' }}>
       {MODEL_PROVIDERS.map((provider) => (
         <div
           key={provider.name}
-          className="flex items-center gap-2 px-3 py-2 bg-muted/50 rounded-lg"
+          className="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg"
         >
           <img
             src={provider.logo}
             alt={provider.name}
             className="w-6 h-6 rounded object-cover"
           />
-          <span className="text-sm text-foreground">{provider.name}</span>
+          <span className="text-sm text-gray-900">{provider.name}</span>
         </div>
       ))}
     </div>
   )
 
-  // Progress dots
+  // Progress dots (light mode)
   const ProgressDots = () => (
-    <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-2">
+    <div className="flex items-center justify-center gap-2">
       {Array.from({ length: totalSteps }).map((_, index) => (
         <div
           key={index}
           className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${
             index === currentStep
-              ? 'bg-primary w-4'
-              : 'bg-muted-foreground/30'
+              ? 'bg-orange-500 w-4'
+              : 'bg-gray-300'
           }`}
         />
       ))}
@@ -222,12 +208,13 @@ export function OnboardingFlow({ onComplete, onLogin }: OnboardingFlowProps) {
   )
 
   return (
-    <div className="h-full w-full bg-background relative overflow-hidden">
+    <div className="h-full w-full bg-white relative overflow-hidden">
       {/* Page 1: Welcome / Slogan */}
       <OnboardingPage
-        image={PLACEHOLDER_IMAGES.welcome}
+        image={ONBOARDING_IMAGES.welcome}
         title={t('onboarding.welcome.title')}
         subtitle={t('onboarding.welcome.subtitle')}
+        footer={<ProgressDots />}
         isActive={currentStep === 0}
       >
         <NavigationButtons showPrev={false} />
@@ -235,9 +222,10 @@ export function OnboardingFlow({ onComplete, onLogin }: OnboardingFlowProps) {
 
       {/* Page 2: Skills Market */}
       <OnboardingPage
-        image={PLACEHOLDER_IMAGES.skills}
+        image={ONBOARDING_IMAGES.skills}
         title={t('onboarding.skills.title')}
         features={skillsFeatures}
+        footer={<ProgressDots />}
         isActive={currentStep === 1}
       >
         <NavigationButtons />
@@ -245,9 +233,10 @@ export function OnboardingFlow({ onComplete, onLogin }: OnboardingFlowProps) {
 
       {/* Page 3: Agent Ability */}
       <OnboardingPage
-        image={PLACEHOLDER_IMAGES.agent}
+        image={ONBOARDING_IMAGES.agent}
         title={t('onboarding.agent.title')}
         features={agentFeatures}
+        footer={<ProgressDots />}
         isActive={currentStep === 2}
       >
         <NavigationButtons />
@@ -255,16 +244,15 @@ export function OnboardingFlow({ onComplete, onLogin }: OnboardingFlowProps) {
 
       {/* Page 4: Model Support */}
       <OnboardingPage
-        image={PLACEHOLDER_IMAGES.models}
+        image={ONBOARDING_IMAGES.models}
         title={t('onboarding.models.title')}
         customContent={<ModelLogosGrid />}
+        topLeft={<BackButton />}
+        footer={<ProgressDots />}
         isActive={currentStep === 3}
       >
         <LastPageButtons />
       </OnboardingPage>
-
-      {/* Progress Dots */}
-      <ProgressDots />
     </div>
   )
 }

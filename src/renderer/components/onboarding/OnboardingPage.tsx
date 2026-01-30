@@ -19,6 +19,7 @@ export interface OnboardingPageProps {
   features?: FeatureItem[]
   customContent?: ReactNode // Custom content slot (e.g., model logos grid)
   topLeft?: ReactNode // Top left slot (e.g., back button)
+  footer?: ReactNode // Footer slot (e.g., progress dots)
   children?: ReactNode // Button slot
   isActive: boolean
 }
@@ -30,6 +31,7 @@ export function OnboardingPage({
   features,
   customContent,
   topLeft,
+  footer,
   children,
   isActive
 }: OnboardingPageProps) {
@@ -45,12 +47,14 @@ export function OnboardingPage({
           {topLeft}
         </div>
       )}
-      {/* Responsive container: 80% of viewport width, max 1200px */}
-      <div className="flex items-start gap-[4vw] w-[85vw] max-w-[1200px] px-[3vw]">
-        {/* Left: 1:1 Image Container - responsive size based on viewport height */}
+      {/* Wrapper for content + footer */}
+      <div className="flex flex-col items-center">
+        {/* Responsive container: 80% of viewport width, max 1200px */}
+        <div className="flex items-start gap-[4vw] w-[85vw] max-w-[1200px] px-[3vw]">
+          {/* Left: 1:1 Image Container - responsive size based on viewport height */}
         <div
-          className="flex-shrink-0 aspect-square bg-muted/30 rounded-2xl overflow-hidden flex items-start justify-center"
-          style={{ width: 'min(45vh, 40vw)', height: 'min(45vh, 40vw)', minWidth: '200px', minHeight: '200px' }}
+          className="flex-shrink-0 aspect-square rounded-2xl overflow-hidden flex items-start justify-center"
+          style={{ width: 'min(65vh, 55vw)', height: 'min(65vh, 55vw)', minWidth: '200px', minHeight: '200px' }}
         >
           <img
             src={image}
@@ -62,11 +66,11 @@ export function OnboardingPage({
           />
         </div>
 
-        {/* Right: Content - aligned with image */}
+        {/* Right: Content - aligned with image (light mode) */}
         <div className="flex-1 flex flex-col min-w-0">
           {/* Title - responsive font size */}
           <h1
-            className={`text-[clamp(1.5rem,3vw,2.5rem)] font-semibold text-foreground whitespace-nowrap transition-all duration-300 ${
+            className={`text-[clamp(1.5rem,3vw,2.5rem)] font-semibold text-gray-900 whitespace-nowrap transition-all duration-300 ${
               isActive ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
             }`}
             style={{ transitionDelay: '100ms' }}
@@ -79,7 +83,7 @@ export function OnboardingPage({
             {/* Subtitle - responsive font size */}
             {subtitle && (
               <p
-                className={`mt-4 text-muted-foreground text-[clamp(0.875rem,1.5vw,1.125rem)] leading-relaxed whitespace-pre-line transition-all duration-300 ${
+                className={`mt-4 text-gray-500 text-[clamp(0.875rem,1.5vw,1.125rem)] leading-relaxed whitespace-pre-line transition-all duration-300 ${
                   isActive ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
                 }`}
                 style={{ transitionDelay: '200ms' }}
@@ -102,14 +106,14 @@ export function OnboardingPage({
                     className="flex items-start gap-3"
                     style={{ transitionDelay: `${200 + index * 50}ms` }}
                   >
-                    <div className="flex-shrink-0 w-5 h-5 mt-0.5 text-primary">
+                    <div className="flex-shrink-0 w-5 h-5 mt-0.5 text-orange-500">
                       {feature.icon}
                     </div>
                     <div>
-                      <div className="font-medium text-foreground text-[clamp(0.875rem,1.2vw,1rem)]">
+                      <div className="font-medium text-gray-900 text-[clamp(0.875rem,1.2vw,1rem)]">
                         {feature.title}
                       </div>
-                      <div className="text-[clamp(0.75rem,1vw,0.875rem)] text-muted-foreground">
+                      <div className="text-[clamp(0.75rem,1vw,0.875rem)] text-gray-500">
                         {feature.description}
                       </div>
                     </div>
@@ -143,6 +147,14 @@ export function OnboardingPage({
             </div>
           )}
         </div>
+        </div>
+
+        {/* Footer slot - for progress dots */}
+        {footer && (
+          <div className="mt-6">
+            {footer}
+          </div>
+        )}
       </div>
     </div>
   )

@@ -621,6 +621,7 @@ export function SettingsPage() {
       setCurrentSource('custom')
       setValidationResult({ valid: true, message: t('Saved') })
       setShowCustomApiForm(false)
+      goBack()  // Close the modal immediately after successful save
     } catch (error) {
       setValidationResult({ valid: false, message: t('Save failed') })
     } finally {

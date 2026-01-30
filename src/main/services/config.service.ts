@@ -168,7 +168,7 @@ const DEFAULT_CONFIG: HaloConfig = {
     trustMode: false
   },
   appearance: {
-    theme: 'dark'
+    theme: 'light'
   },
   system: {
     autoLaunch: false,

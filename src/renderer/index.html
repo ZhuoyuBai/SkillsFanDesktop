@@ -9,28 +9,28 @@
     />
   <title>技能范-用高手经验帮你干活</title>
     <style>
-      /* Anti-flash: set background before CSS loads */
-      html, body, #root { background-color: #0a0a0a; }
-      html.light, html.light body, html.light #root { background-color: #ffffff; }
+      /* Anti-flash: set background before CSS loads (default to light) */
+      html, body, #root { background-color: #ffffff; }
+      html.dark, html.dark body, html.dark #root { background-color: #0a0a0a; }
     </style>
     <script>
       // Anti-flash: apply theme before render
-      // On first launch (no localStorage), follow system preference
+      // On first launch (no localStorage), default to light mode
       (function() {
         try {
           var theme = localStorage.getItem('skillsfan-theme');
-          var shouldBeLight = false;
+          var shouldBeDark = false;
 
-          if (theme === 'light') {
-            shouldBeLight = true;
-          } else if (theme === 'system' || !theme) {
-            // 'system' mode or first launch (no localStorage): check system preference
-            shouldBeLight = !window.matchMedia('(prefers-color-scheme: dark)').matches;
+          if (theme === 'dark') {
+            shouldBeDark = true;
+          } else if (theme === 'system') {
+            // 'system' mode: check system preference
+            shouldBeDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
           }
-          // theme === 'dark': stay dark (shouldBeLight remains false)
+          // theme === 'light' or !theme (first launch): stay light (shouldBeDark remains false)
 
-          if (shouldBeLight) {
-            document.documentElement.classList.add('light');
+          if (shouldBeDark) {
+            document.documentElement.classList.add('dark');
           }
         } catch (e) {}
       })();
