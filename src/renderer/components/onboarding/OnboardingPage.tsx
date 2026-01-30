@@ -50,11 +50,11 @@ export function OnboardingPage({
       {/* Wrapper for content + footer */}
       <div className="flex flex-col items-center">
         {/* Responsive container: 80% of viewport width, max 1200px */}
-        <div className="flex items-start gap-[4vw] w-[85vw] max-w-[1200px] px-[3vw]">
+        <div className="flex items-start gap-[clamp(1rem,4vw,3rem)] w-[85vw] max-w-[1200px] px-[clamp(1rem,3vw,2rem)]">
           {/* Left: 1:1 Image Container - responsive size based on viewport height */}
         <div
           className="flex-shrink-0 aspect-square rounded-2xl overflow-hidden flex items-start justify-center"
-          style={{ width: 'min(65vh, 55vw)', height: 'min(65vh, 55vw)', minWidth: '200px', minHeight: '200px' }}
+          style={{ width: 'min(65vh, 55vw, 50%)', height: 'min(65vh, 55vw, 50%)', minWidth: '200px', minHeight: '200px' }}
         >
           <img
             src={image}
@@ -67,7 +67,7 @@ export function OnboardingPage({
         </div>
 
         {/* Right: Content - aligned with image (light mode) */}
-        <div className="flex-1 flex flex-col min-w-0">
+        <div className="flex-1 flex flex-col min-w-[280px]">
           {/* Title - responsive font size */}
           <h1
             className={`text-[clamp(1.5rem,3vw,2.5rem)] font-semibold text-gray-900 whitespace-nowrap transition-all duration-300 ${
