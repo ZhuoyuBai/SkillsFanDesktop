@@ -7,7 +7,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import type { ConversationMeta } from '../../types'
 import { MessageSquare } from '../icons/ToolIcons'
-import { PanelLeftClose, PanelLeft, Search, SquarePen, RefreshCw, Plus } from 'lucide-react'
+import { PanelLeftClose, PanelLeft, SquarePen, Zap, ChevronRight } from 'lucide-react'
 import { useSearchStore } from '../../stores/search.store'
 import { SpaceSwitcher } from '../space/SpaceSwitcher'
 import { useTranslation } from '../../i18n'
@@ -40,7 +40,8 @@ interface ConversationListProps {
   onNew: () => void
   onDelete?: (id: string) => void
   onRename?: (id: string, newTitle: string) => void
-  onClearAll?: () => void  // Clear all task history
+  onClearAll?: () => void  // Clear all normal tasks
+  onClearAllAdvanced?: () => void  // Clear all advanced tasks
   isCollapsed?: boolean
   onToggleCollapse?: () => void
   isMobileOverlay?: boolean  // Mobile overlay mode - full width, no drag resize
@@ -55,6 +56,7 @@ export function ConversationList({
   onDelete,
   onRename,
   onClearAll,
+  onClearAllAdvanced,
   isCollapsed = false,
   onToggleCollapse,
   isMobileOverlay = false,
@@ -107,6 +109,8 @@ export function ConversationList({
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingTitle, setEditingTitle] = useState('')
   const [showCollapseTooltip, setShowCollapseTooltip] = useState(false)
+  const [isNormalTasksExpanded, setIsNormalTasksExpanded] = useState(true)
+  const [isAdvancedTasksExpanded, setIsAdvancedTasksExpanded] = useState(true)
   const containerRef = useRef<HTMLDivElement>(null)
   const editInputRef = useRef<HTMLInputElement>(null)
 
@@ -267,21 +271,29 @@ export function ConversationList({
           )}
         </div>
 
-        {/* New conversation + Search buttons (icon only) */}
+        {/* New conversation + Advanced task buttons (icon only) */}
         <div className="px-2 py-2 flex flex-col items-center gap-1">
           <button
-            onClick={onNew}
+            onClick={() => {
+              setIsNormalTasksExpanded(true)
+              setIsAdvancedTasksExpanded(false)
+              onNew()
+            }}
             className="p-1.5 text-primary hover:bg-primary/10 rounded-md transition-colors"
             title={t('New conversation')}
           >
             <SquarePen className="w-4 h-4" />
           </button>
           <button
-            onClick={() => openSearch('global')}
+            onClick={() => {
+              setIsNormalTasksExpanded(false)
+              setIsAdvancedTasksExpanded(true)
+              handleNewLoopTask()
+            }}
             className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-md transition-colors"
-            title={t('Search')}
+            title={t('Advanced task')}
           >
-            <Search className="w-4 h-4" />
+            <Zap className="w-4 h-4" />
           </button>
         </div>
 
@@ -314,7 +326,7 @@ export function ConversationList({
             </div>
           ))}
 
-          {/* Loop tasks section (collapsed) */}
+          {/* Advanced tasks section (collapsed) */}
           {loopTasks.length > 0 && (
             <>
               <div className="border-t border-border/50 my-2" />
@@ -331,16 +343,6 @@ export function ConversationList({
               ))}
             </>
           )}
-          {/* New loop task button (collapsed) */}
-          <div className="border-t border-border/50 mt-2 pt-2">
-            <button
-              onClick={handleNewLoopTask}
-              className="w-full p-2 flex justify-center cursor-pointer hover:bg-muted/50 rounded-md transition-colors"
-              title={t('New loop task')}
-            >
-              <Plus className="w-4 h-4 text-muted-foreground" />
-            </button>
-          </div>
         </div>
 
         {/* User avatar menu (collapsed) */}
@@ -391,10 +393,14 @@ export function ConversationList({
       </div>
       )}
 
-      {/* New conversation + Search buttons */}
+      {/* New conversation + Advanced task buttons */}
       <div className="px-4 py-3 border-b border-border/50 space-y-2">
         <button
-          onClick={onNew}
+          onClick={() => {
+            setIsNormalTasksExpanded(true)
+            setIsAdvancedTasksExpanded(false)
+            onNew()
+          }}
           className="w-full flex items-center justify-start gap-2 px-2 py-1.5
             text-sm font-medium text-foreground hover:bg-muted/60
             rounded transition-all duration-150
@@ -404,158 +410,198 @@ export function ConversationList({
           {t('New conversation')}
         </button>
         <button
-          onClick={() => openSearch('global')}
+          onClick={() => {
+            setIsNormalTasksExpanded(false)
+            setIsAdvancedTasksExpanded(true)
+            handleNewLoopTask()
+          }}
           className="w-full flex items-center justify-start gap-2 px-2 py-1.5
             text-sm text-foreground hover:bg-muted/50
             rounded transition-all duration-150"
         >
-          <Search className="w-4 h-4 text-foreground" />
-          {t('Search')}
+          <Zap className="w-4 h-4 text-foreground" />
+          {t('Advanced task')}
         </button>
       </div>
 
-      {/* Conversation list */}
+      {/* Task history with collapsible categories */}
       <div className="flex-1 overflow-auto">
-        <div className="px-4 py-2 flex items-center justify-between">
-          <span className="text-xs text-muted-foreground font-medium">
-            {t('Task history')}
-          </span>
-          {onClearAll && conversations.length > 0 && (
+        {/* Normal Tasks - Collapsible */}
+        <div>
+          <div className="flex items-center px-4 py-1.5 hover:bg-muted/50 transition-colors">
             <button
-              onClick={onClearAll}
-              className="p-1 hover:bg-destructive/20 text-muted-foreground hover:text-destructive rounded transition-colors"
-              title={t('Clear all tasks')}
-              aria-label={t('Clear all tasks')}
+              onClick={() => setIsNormalTasksExpanded(!isNormalTasksExpanded)}
+              className="flex-1 flex items-center gap-2 text-xs text-muted-foreground"
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
+              <ChevronRight className={`w-3 h-3 transition-transform duration-200 ${isNormalTasksExpanded ? 'rotate-90' : ''}`} />
+              <span>{t('Normal tasks')}</span>
+              <span className="text-muted-foreground/60">({conversations.length})</span>
             </button>
-          )}
-        </div>
-        {conversations.map((conversation) => (
-          <div
-            key={conversation.id}
-            role="button"
-            tabIndex={0}
-            aria-label={`${conversation.title}, ${formatDate(conversation.updatedAt)}`}
-            aria-selected={conversation.id === currentConversationId && selectionType === 'conversation'}
-            onClick={() => editingId !== conversation.id && handleSelectConversation(conversation.id)}
-            onKeyDown={(e) => {
-              if ((e.key === 'Enter' || e.key === ' ') && editingId !== conversation.id) {
-                e.preventDefault()
-                handleSelectConversation(conversation.id)
-              }
-            }}
-            className={`w-full px-4 py-2.5 text-left cursor-pointer group relative
-              transition-all duration-200
-              focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-inset
-              ${conversation.id === currentConversationId && selectionType === 'conversation'
-                ? 'bg-gradient-to-r from-primary/8 via-primary/5 to-transparent'
-                : 'hover:bg-secondary/40'
-              }`}
-          >
-            {/* Edit mode */}
-            {editingId === conversation.id ? (
-              <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                <input
-                  ref={editInputRef}
-                  type="text"
-                  value={editingTitle}
-                  onChange={(e) => setEditingTitle(e.target.value)}
-                  onKeyDown={handleEditKeyDown}
-                  onBlur={handleSaveEdit}
-                  className="flex-1 text-sm bg-input border border-border rounded px-2 py-1 focus:outline-none focus:border-primary min-w-0"
-                  placeholder={t('Conversation title...')}
-                />
-                <button
-                  onClick={handleSaveEdit}
-                  className="p-1 hover:bg-secondary text-foreground rounded transition-colors flex-shrink-0"
-                  title={t('Save')}
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                </button>
-              </div>
-            ) : (
-              <>
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="text-sm truncate flex-1 min-w-0">
-                    {conversation.title}
-                  </span>
-                  {/* Action buttons (on hover) */}
-                  <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0">
-                    {onRename && (
-                      <button
-                        onClick={(e) => handleStartEdit(e, conversation)}
-                        className="p-1.5 hover:bg-secondary text-muted-foreground hover:text-foreground rounded transition-colors"
-                        title={t('Edit title')}
-                        aria-label={t('Edit title')}
-                      >
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                        </svg>
-                      </button>
-                    )}
-                    {onDelete && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          onDelete(conversation.id)
-                        }}
-                        className="p-1.5 hover:bg-destructive/20 text-muted-foreground hover:text-destructive rounded transition-colors"
-                        title={t('Delete conversation')}
-                        aria-label={t('Delete conversation')}
-                      >
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
-                    )}
-                  </div>
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {formatDate(conversation.updatedAt)}
-                </p>
-              </>
+            {onClearAll && conversations.length > 0 && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onClearAll()
+                }}
+                className="p-1 hover:bg-destructive/20 text-muted-foreground hover:text-destructive rounded transition-colors"
+                title={t('Clear all')}
+                aria-label={t('Clear all normal tasks')}
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
             )}
           </div>
-        ))}
-
-        {/* Loop Tasks Section */}
-        <div className="border-t border-border/50 mt-2">
-          <div className="px-4 py-2 flex items-center justify-between">
-            <span className="text-xs text-muted-foreground font-medium flex items-center gap-1">
-              <RefreshCw className="w-3 h-3" />
-              {t('Loop Tasks')}
-            </span>
-            <button
-              onClick={handleNewLoopTask}
-              className="p-1 hover:bg-muted/60 text-muted-foreground hover:text-foreground rounded transition-colors"
-              title={t('New loop task')}
-              aria-label={t('New loop task')}
-            >
-              <Plus className="w-3.5 h-3.5" />
-            </button>
-          </div>
-          {loopTasks.length === 0 ? (
-            <div className="px-4 py-2 text-xs text-muted-foreground">
-              {t('No loop tasks yet')}
+          {isNormalTasksExpanded && (
+            <div>
+              {conversations.length === 0 ? (
+                <div className="px-4 py-2 text-xs text-muted-foreground">
+                  {t('No tasks yet')}
+                </div>
+              ) : (
+                conversations.map((conversation) => (
+                  <div
+                    key={conversation.id}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`${conversation.title}, ${formatDate(conversation.updatedAt)}`}
+                    aria-selected={conversation.id === currentConversationId && selectionType === 'conversation'}
+                    onClick={() => editingId !== conversation.id && handleSelectConversation(conversation.id)}
+                    onKeyDown={(e) => {
+                      if ((e.key === 'Enter' || e.key === ' ') && editingId !== conversation.id) {
+                        e.preventDefault()
+                        handleSelectConversation(conversation.id)
+                      }
+                    }}
+                    className={`w-full px-4 py-2.5 text-left cursor-pointer group relative
+                      transition-all duration-200
+                      focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-inset
+                      ${conversation.id === currentConversationId && selectionType === 'conversation'
+                        ? 'bg-gradient-to-r from-primary/8 via-primary/5 to-transparent'
+                        : 'hover:bg-secondary/40'
+                      }`}
+                  >
+                    {/* Edit mode */}
+                    {editingId === conversation.id ? (
+                      <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          ref={editInputRef}
+                          type="text"
+                          value={editingTitle}
+                          onChange={(e) => setEditingTitle(e.target.value)}
+                          onKeyDown={handleEditKeyDown}
+                          onBlur={handleSaveEdit}
+                          className="flex-1 text-sm bg-input border border-border rounded px-2 py-1 focus:outline-none focus:border-primary min-w-0"
+                          placeholder={t('Conversation title...')}
+                        />
+                        <button
+                          onClick={handleSaveEdit}
+                          className="p-1 hover:bg-secondary text-foreground rounded transition-colors flex-shrink-0"
+                          title={t('Save')}
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-sm truncate flex-1 min-w-0">
+                            {conversation.title}
+                          </span>
+                          {/* Action buttons (on hover) */}
+                          <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0">
+                            {onRename && (
+                              <button
+                                onClick={(e) => handleStartEdit(e, conversation)}
+                                className="p-1.5 hover:bg-secondary text-muted-foreground hover:text-foreground rounded transition-colors"
+                                title={t('Edit title')}
+                                aria-label={t('Edit title')}
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                              </button>
+                            )}
+                            {onDelete && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  onDelete(conversation.id)
+                                }}
+                                className="p-1.5 hover:bg-destructive/20 text-muted-foreground hover:text-destructive rounded transition-colors"
+                                title={t('Delete conversation')}
+                                aria-label={t('Delete conversation')}
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {formatDate(conversation.updatedAt)}
+                        </p>
+                      </>
+                    )}
+                  </div>
+                ))
+              )}
             </div>
-          ) : (
-            <div className="px-2">
-              {loopTasks.map((task) => (
-                <LoopTaskItem
-                  key={task.id}
-                  task={task}
-                  isActive={task.id === currentTaskId && selectionType === 'loopTask'}
-                  onSelect={() => handleSelectLoopTask(task.id)}
-                  onRename={(name) => handleRenameLoopTask(task.id, name)}
-                  onDelete={() => handleDeleteLoopTask(task.id)}
-                  isCollapsed={false}
-                />
-              ))}
+          )}
+        </div>
+
+        {/* Advanced Tasks - Collapsible */}
+        <div className="border-t border-border/50 mt-1">
+          <div className="flex items-center px-4 py-1.5 hover:bg-muted/50 transition-colors">
+            <button
+              onClick={() => setIsAdvancedTasksExpanded(!isAdvancedTasksExpanded)}
+              className="flex-1 flex items-center gap-2 text-xs text-muted-foreground"
+            >
+              <ChevronRight className={`w-3 h-3 transition-transform duration-200 ${isAdvancedTasksExpanded ? 'rotate-90' : ''}`} />
+              <span>{t('Advanced tasks')}</span>
+              <span className="text-muted-foreground/60">({loopTasks.length})</span>
+            </button>
+            {onClearAllAdvanced && loopTasks.length > 0 && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onClearAllAdvanced()
+                }}
+                className="p-1 hover:bg-destructive/20 text-muted-foreground hover:text-destructive rounded transition-colors"
+                title={t('Clear all')}
+                aria-label={t('Clear all advanced tasks')}
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
+            )}
+          </div>
+          {isAdvancedTasksExpanded && (
+            <div>
+              {loopTasks.length === 0 ? (
+                <div className="px-4 py-2 text-xs text-muted-foreground">
+                  {t('No advanced tasks yet')}
+                </div>
+              ) : (
+                <div className="px-2">
+                  {loopTasks.map((task) => (
+                    <LoopTaskItem
+                      key={task.id}
+                      task={task}
+                      isActive={task.id === currentTaskId && selectionType === 'loopTask'}
+                      onSelect={() => handleSelectLoopTask(task.id)}
+                      onRename={(name) => handleRenameLoopTask(task.id, name)}
+                      onDelete={() => handleDeleteLoopTask(task.id)}
+                      isCollapsed={false}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>

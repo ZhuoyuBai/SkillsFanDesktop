@@ -20,6 +20,7 @@ import { useChatStore } from '../stores/chat.store'
 import { useCanvasStore, useCanvasIsOpen, useCanvasIsMaximized } from '../stores/canvas.store'
 import { canvasLifecycle } from '../services/canvas-lifecycle'
 import { useSearchStore } from '../stores/search.store'
+import { useLoopTaskStore } from '../stores/loop-task.store'
 import { ChatView } from '../components/chat/ChatView'
 import { ArtifactRail } from '../components/artifact/ArtifactRail'
 import { ConversationList } from '../components/chat/ConversationList'
@@ -93,6 +94,10 @@ export function SpacePage() {
 
   // Clear all conversations dialog state
   const [showClearAllDialog, setShowClearAllDialog] = useState(false)
+  const [showClearAllAdvancedDialog, setShowClearAllAdvancedDialog] = useState(false)
+
+  // Loop task store for clearing advanced tasks
+  const { getTasks, deleteTask } = useLoopTaskStore()
 
   // Canvas state - use precise selectors to minimize re-renders
   const isCanvasOpen = useCanvasIsOpen()
@@ -320,6 +325,25 @@ export function SpacePage() {
     setShowClearAllDialog(false)
   }
 
+  // Handle clear all advanced tasks
+  const handleClearAllAdvancedClick = () => {
+    setShowClearAllAdvancedDialog(true)
+  }
+
+  const handleClearAllAdvancedConfirm = async () => {
+    if (currentSpace) {
+      const tasks = getTasks()
+      for (const task of tasks) {
+        await deleteTask(currentSpace.id, task.id)
+      }
+      setShowClearAllAdvancedDialog(false)
+    }
+  }
+
+  const handleClearAllAdvancedCancel = () => {
+    setShowClearAllAdvancedDialog(false)
+  }
+
   // Exit maximized mode when canvas closes
   useEffect(() => {
     if (!isCanvasOpen && isCanvasMaximized) {
@@ -450,6 +474,7 @@ export function SpacePage() {
             onDelete={handleDeleteConversation}
             onRename={handleRenameConversation}
             onClearAll={handleClearAllClick}
+            onClearAllAdvanced={handleClearAllAdvancedClick}
             isCollapsed={isConversationListCollapsed}
             onToggleCollapse={() => setIsConversationListCollapsed(!isConversationListCollapsed)}
             spaceId={currentSpace.id}
@@ -608,6 +633,7 @@ export function SpacePage() {
             onDelete={handleDeleteConversation}
             onRename={handleRenameConversation}
             onClearAll={handleClearAllClick}
+            onClearAllAdvanced={handleClearAllAdvancedClick}
             isCollapsed={false}
             isMobileOverlay={true}
             spaceId={currentSpace.id}
@@ -649,6 +675,40 @@ export function SpacePage() {
               </button>
               <button
                 onClick={handleClearAllConfirm}
+                className="px-5 py-2.5 bg-destructive/90 hover:bg-destructive text-destructive-foreground rounded-xl shadow-sm hover:shadow-md transition-all"
+              >
+                {t('Clear All')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Clear all advanced tasks confirmation dialog */}
+      {showClearAllAdvancedDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 no-drag">
+          {/* Backdrop - click to close */}
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={handleClearAllAdvancedCancel}
+          />
+          {/* Dialog content */}
+          <div className="relative bg-card border border-border/80 rounded-2xl p-7 w-full max-w-sm animate-fade-in shadow-2xl">
+            <h2 className="text-lg font-semibold mb-4 text-foreground/95 tracking-tight">
+              {t('Clear Advanced Tasks')}
+            </h2>
+            <p className="text-sm text-muted-foreground mb-6">
+              {t('Are you sure you want to clear all advanced tasks? This action cannot be undone.')}
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={handleClearAllAdvancedCancel}
+                className="px-5 py-2.5 text-muted-foreground hover:text-foreground hover:bg-secondary/60 rounded-xl transition-all"
+              >
+                {t('Cancel')}
+              </button>
+              <button
+                onClick={handleClearAllAdvancedConfirm}
                 className="px-5 py-2.5 bg-destructive/90 hover:bg-destructive text-destructive-foreground rounded-xl shadow-sm hover:shadow-md transition-all"
               >
                 {t('Clear All')}
