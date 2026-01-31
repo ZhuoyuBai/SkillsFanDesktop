@@ -12,6 +12,12 @@ export type TaskStatus = 'idle' | 'running' | 'paused' | 'completed' | 'failed'
 // Task source
 export type TaskSource = 'import' | 'generate' | 'manual'
 
+// Wizard step for task creation flow
+export type WizardStep = 1 | 2 | 3 | 4
+
+// Creation method for wizard step 1
+export type CreateMethod = 'ai' | 'manual' | 'import'
+
 /**
  * A single user story in the task
  */

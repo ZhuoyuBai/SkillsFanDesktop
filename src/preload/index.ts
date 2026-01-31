@@ -339,6 +339,21 @@ export interface HaloAPI {
   loopTaskUpdateStory: (spaceId: string, taskId: string, storyId: string, updates: Record<string, unknown>) => Promise<IpcResponse>
   loopTaskRemoveStory: (spaceId: string, taskId: string, storyId: string) => Promise<IpcResponse>
   loopTaskReorderStories: (spaceId: string, taskId: string, fromIndex: number, toIndex: number) => Promise<IpcResponse>
+  loopTaskExportPrd: (config: {
+    projectDir: string
+    description: string
+    stories: Array<{
+      id: string
+      title: string
+      description: string
+      acceptanceCriteria: string[]
+      priority: number
+      notes?: string
+    }>
+    branchName?: string
+  }) => Promise<IpcResponse>
+  loopTaskDeletePrd: (prdPath: string) => Promise<IpcResponse>
+  readFile: (filePath: string) => Promise<IpcResponse>
 
   // SkillsFan Account Auth
   skillsfanStartLogin: () => Promise<IpcResponse>
@@ -606,6 +621,9 @@ const api: HaloAPI = {
   loopTaskUpdateStory: (spaceId, taskId, storyId, updates) => ipcRenderer.invoke('loop-task:update-story', spaceId, taskId, storyId, updates),
   loopTaskRemoveStory: (spaceId, taskId, storyId) => ipcRenderer.invoke('loop-task:remove-story', spaceId, taskId, storyId),
   loopTaskReorderStories: (spaceId, taskId, fromIndex, toIndex) => ipcRenderer.invoke('loop-task:reorder-stories', spaceId, taskId, fromIndex, toIndex),
+  loopTaskExportPrd: (config) => ipcRenderer.invoke('loop-task:export-prd', config),
+  loopTaskDeletePrd: (prdPath) => ipcRenderer.invoke('loop-task:delete-prd', prdPath),
+  readFile: (filePath) => ipcRenderer.invoke('file:read', filePath),
 
   // SkillsFan Account Auth
   skillsfanStartLogin: () => ipcRenderer.invoke('skillsfan:start-login'),

@@ -1343,6 +1343,39 @@ export const api = {
     return httpRequest('POST', `/api/spaces/${spaceId}/loop-tasks/${taskId}/stories/reorder`, { fromIndex, toIndex })
   },
 
+  loopTaskExportPrd: async (config: {
+    projectDir: string
+    description: string
+    stories: Array<{
+      id: string
+      title: string
+      description: string
+      acceptanceCriteria: string[]
+      priority: number
+      notes?: string
+    }>
+    branchName?: string
+  }): Promise<ApiResponse<{ path: string }>> => {
+    if (isElectron()) {
+      return window.skillsfan.loopTaskExportPrd(config)
+    }
+    return httpRequest('POST', '/api/loop-tasks/export-prd', config)
+  },
+
+  loopTaskDeletePrd: async (prdPath: string): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.skillsfan.loopTaskDeletePrd(prdPath)
+    }
+    return httpRequest('DELETE', '/api/loop-tasks/prd', { prdPath })
+  },
+
+  readFile: async (filePath: string): Promise<ApiResponse<string>> => {
+    if (isElectron()) {
+      return window.skillsfan.readFile(filePath)
+    }
+    return httpRequest('POST', '/api/files/read', { filePath })
+  },
+
   // ===== SkillsFan Account Auth (Electron only) =====
   skillsfanStartLogin: async (): Promise<ApiResponse> => {
     if (!isElectron()) {

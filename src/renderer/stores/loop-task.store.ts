@@ -12,11 +12,13 @@ import type {
   LoopTaskMeta,
   UserStory,
   TaskSource,
-  CreateLoopTaskConfig
+  CreateLoopTaskConfig,
+  WizardStep,
+  CreateMethod
 } from '../../shared/types/loop-task'
 
 // Re-export types for convenience
-export type { LoopTask, LoopTaskMeta, UserStory, TaskSource }
+export type { LoopTask, LoopTaskMeta, UserStory, TaskSource, WizardStep, CreateMethod }
 
 // ============================================
 // Types
@@ -47,6 +49,12 @@ interface LoopTaskState {
   // Editing state (for new/edit task form)
   editingTask: Partial<LoopTask> | null
   isEditing: boolean
+
+  // Wizard state (for new task creation flow)
+  wizardStep: WizardStep
+  createMethod: CreateMethod | null
+  aiDescription: string
+  generatedPrdPath: string | null
 
   // Error state
   error: string | null
@@ -89,6 +97,13 @@ interface LoopTaskState {
   updateEditing: (updates: Partial<LoopTask>) => void
   cancelEditing: () => void
 
+  // Actions - Wizard
+  setWizardStep: (step: WizardStep) => void
+  setCreateMethod: (method: CreateMethod | null) => void
+  setAiDescription: (desc: string) => void
+  setGeneratedPrdPath: (path: string | null) => void
+  resetWizard: () => void
+
   // Actions - Execution log
   appendLog: (log: string) => void
   clearLog: () => void
@@ -115,6 +130,10 @@ export const useLoopTaskStore = create<LoopTaskState>((set, get) => ({
   isCreating: false,
   editingTask: null,
   isEditing: false,
+  wizardStep: 1 as WizardStep,
+  createMethod: null,
+  aiDescription: '',
+  generatedPrdPath: null,
   error: null,
 
   // Set current space
@@ -452,7 +471,46 @@ export const useLoopTaskStore = create<LoopTaskState>((set, get) => ({
 
   // Cancel editing
   cancelEditing: () => {
-    set({ editingTask: null, isEditing: false })
+    set({
+      editingTask: null,
+      isEditing: false,
+      wizardStep: 1 as WizardStep,
+      createMethod: null,
+      aiDescription: '',
+      generatedPrdPath: null
+    })
+  },
+
+  // Set wizard step
+  setWizardStep: (step) => {
+    set({ wizardStep: step })
+  },
+
+  // Set creation method
+  setCreateMethod: (method) => {
+    set({ createMethod: method })
+  },
+
+  // Set AI description
+  setAiDescription: (desc) => {
+    set({ aiDescription: desc })
+  },
+
+  // Set generated prd path
+  setGeneratedPrdPath: (path) => {
+    set({ generatedPrdPath: path })
+  },
+
+  // Reset wizard to initial state
+  resetWizard: () => {
+    set({
+      wizardStep: 1 as WizardStep,
+      createMethod: null,
+      aiDescription: '',
+      generatedPrdPath: null,
+      editingTask: null,
+      isEditing: false
+    })
   },
 
   // Append to execution log (with size limit to prevent memory leak)

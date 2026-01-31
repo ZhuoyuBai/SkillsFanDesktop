@@ -4,6 +4,8 @@
  */
 
 import { ipcMain, BrowserWindow } from 'electron'
+import * as fs from 'fs-extra'
+import * as path from 'path'
 import {
   listTasks,
   createTask,
@@ -170,6 +172,80 @@ export function registerLoopTaskHandlers(window: BrowserWindow | null): void {
       }
     }
   )
+
+  // Export prd.json - generate prd.json file for wizard step 2->3
+  ipcMain.handle(
+    'loop-task:export-prd',
+    async (
+      _event,
+      config: {
+        projectDir: string
+        description: string
+        stories: Array<{
+          id: string
+          title: string
+          description: string
+          acceptanceCriteria: string[]
+          priority: number
+          notes?: string
+        }>
+        branchName?: string
+      }
+    ) => {
+      try {
+        const prdPath = path.join(config.projectDir, 'prd.json')
+        const prdContent = {
+          project: path.basename(config.projectDir),
+          branchName: config.branchName || `ralph/${Date.now()}`,
+          description: config.description,
+          userStories: config.stories.map((s) => ({
+            id: s.id,
+            title: s.title,
+            description: s.description,
+            acceptanceCriteria: s.acceptanceCriteria,
+            priority: s.priority,
+            passes: false,
+            notes: s.notes || ''
+          }))
+        }
+        await fs.writeFile(prdPath, JSON.stringify(prdContent, null, 2))
+        return { success: true, data: { path: prdPath } }
+      } catch (error: unknown) {
+        const err = error as Error
+        console.error('[LoopTask IPC] export-prd error:', err)
+        return { success: false, error: err.message }
+      }
+    }
+  )
+
+  // Delete prd.json - called when returning from wizard step 3->2
+  ipcMain.handle('loop-task:delete-prd', async (_event, prdPath: string) => {
+    try {
+      if (await fs.pathExists(prdPath)) {
+        await fs.remove(prdPath)
+      }
+      return { success: true }
+    } catch (error: unknown) {
+      const err = error as Error
+      console.error('[LoopTask IPC] delete-prd error:', err)
+      return { success: false, error: err.message }
+    }
+  })
+
+  // Read file content - generic file reader
+  ipcMain.handle('file:read', async (_event, filePath: string) => {
+    try {
+      if (!(await fs.pathExists(filePath))) {
+        return { success: false, error: 'File not found' }
+      }
+      const content = await fs.readFile(filePath, 'utf-8')
+      return { success: true, data: content }
+    } catch (error: unknown) {
+      const err = error as Error
+      console.error('[LoopTask IPC] file:read error:', err)
+      return { success: false, error: err.message }
+    }
+  })
 
   console.log('[LoopTask IPC] Handlers registered')
 }
