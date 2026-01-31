@@ -75,6 +75,7 @@ export function ConversationList({
     renameTask,
     deleteTask,
     startEditing,
+    cancelEditing,
     setCurrentSpace,
     loadTasks
   } = useLoopTaskStore()
@@ -275,6 +276,8 @@ export function ConversationList({
         <div className="px-2 py-2 flex flex-col items-center gap-1">
           <button
             onClick={() => {
+              cancelEditing()
+              setSelectionType('conversation')
               setIsNormalTasksExpanded(true)
               setIsAdvancedTasksExpanded(false)
               onNew()
@@ -397,6 +400,8 @@ export function ConversationList({
       <div className="px-4 py-3 border-b border-border/50 space-y-2">
         <button
           onClick={() => {
+            cancelEditing()
+            setSelectionType('conversation')
             setIsNormalTasksExpanded(true)
             setIsAdvancedTasksExpanded(false)
             onNew()
