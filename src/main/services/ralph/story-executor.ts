@@ -5,7 +5,8 @@
 
 import { BrowserWindow } from 'electron'
 import type { RalphTask, UserStory, CompletionSignal } from './types'
-import { RALPH_SYSTEM_PROMPT, buildIterationPrompt } from './prompts'
+import { RALPH_SYSTEM_PROMPT, buildIterationPrompt, type SkillSummary } from './prompts'
+import { getAllSkills, ensureSkillsInitialized } from '../skill'
 
 // Completion signal patterns to detect in agent output
 const COMPLETION_PATTERNS = {
@@ -82,8 +83,16 @@ export async function executeStory(
     // Dynamically import agent service to avoid circular dependencies
     const { sendMessage } = await import('../agent')
 
-    // Build the iteration prompt
-    const prompt = buildIterationPrompt(task, story)
+    // Get available skills for the iteration prompt
+    await ensureSkillsInitialized()
+    const allSkills = await getAllSkills()
+    const skills: SkillSummary[] = allSkills.map(s => ({
+      name: s.name,
+      description: s.description
+    }))
+
+    // Build the iteration prompt with available skills
+    const prompt = buildIterationPrompt(task, story, skills)
 
     onLog(`[Ralph] Starting story ${story.id}: ${story.title}`)
     onLog(`[Ralph] Working directory: ${task.projectDir}`)

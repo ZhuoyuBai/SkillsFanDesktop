@@ -76,7 +76,10 @@ export function LoopTaskPanel({ spaceId }: LoopTaskPanelProps) {
   }, [handleTaskUpdate, appendLog])
 
   // Handle cancel
-  const handleCancel = () => {
+  const handleCancel = async () => {
+    // Clean up any browser views created during the wizard
+    await api.destroyAllBrowserViews()
+
     cancelEditing()
     // If we were creating a new task, go back to conversation view
     if (isNewTask) {
@@ -117,11 +120,13 @@ export function LoopTaskPanel({ spaceId }: LoopTaskPanelProps) {
         {/* Step Indicator */}
         <StepIndicator currentStep={wizardStep} />
 
-        {/* Step Content */}
-        {wizardStep === 1 && <Step1CreateTask />}
-        {wizardStep === 2 && <Step2PlanEdit />}
-        {wizardStep === 3 && <Step3Confirm spaceId={spaceId} />}
-        {wizardStep === 4 && <Step4Execute />}
+        {/* Step Content - flex-1 to take remaining space, overflow-hidden to enable child scrolling */}
+        <div className="flex-1 overflow-hidden">
+          {wizardStep === 1 && <Step1CreateTask />}
+          {wizardStep === 2 && <Step2PlanEdit />}
+          {wizardStep === 3 && <Step3Confirm spaceId={spaceId} />}
+          {wizardStep === 4 && <Step4Execute />}
+        </div>
       </div>
     )
   }
@@ -198,6 +203,8 @@ function TaskViewMode({ task, spaceId }: TaskViewModeProps) {
     setIsStopping(true)
     try {
       await api.ralphStop(task.id)
+      // Clean up any browser views created during execution
+      await api.destroyAllBrowserViews()
     } catch (err) {
       console.error('Failed to stop task:', err)
     } finally {

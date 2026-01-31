@@ -201,6 +201,7 @@ export interface HaloAPI {
   // Browser (embedded browser for Content Canvas)
   createBrowserView: (viewId: string, url?: string) => Promise<IpcResponse>
   destroyBrowserView: (viewId: string) => Promise<IpcResponse>
+  destroyAllBrowserViews: () => Promise<IpcResponse>
   showBrowserView: (viewId: string, bounds: { x: number; y: number; width: number; height: number }) => Promise<IpcResponse>
   hideBrowserView: (viewId: string) => Promise<IpcResponse>
   resizeBrowserView: (viewId: string, bounds: { x: number; y: number; width: number; height: number }) => Promise<IpcResponse>
@@ -533,6 +534,7 @@ const api: HaloAPI = {
   // Browser (embedded browser for Content Canvas)
   createBrowserView: (viewId, url) => ipcRenderer.invoke('browser:create', { viewId, url }),
   destroyBrowserView: (viewId) => ipcRenderer.invoke('browser:destroy', { viewId }),
+  destroyAllBrowserViews: () => ipcRenderer.invoke('browser:destroy-all'),
   showBrowserView: (viewId, bounds) => ipcRenderer.invoke('browser:show', { viewId, bounds }),
   hideBrowserView: (viewId) => ipcRenderer.invoke('browser:hide', { viewId }),
   resizeBrowserView: (viewId, bounds) => ipcRenderer.invoke('browser:resize', { viewId, bounds }),

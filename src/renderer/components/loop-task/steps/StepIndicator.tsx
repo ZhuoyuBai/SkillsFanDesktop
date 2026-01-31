@@ -29,7 +29,7 @@ export function StepIndicator({ currentStep }: StepIndicatorProps) {
   const { t } = useTranslation()
 
   return (
-    <div className="flex items-center justify-center gap-2 py-4 border-b border-border px-4">
+    <div className="flex items-center justify-center gap-2 py-4 border-b border-border px-4 shrink-0">
       {STEPS.map((step, index) => (
         <Fragment key={step.key}>
           <div

@@ -22,7 +22,8 @@ import {
 } from './prd-manager'
 import { initializeProgress, appendProgress, appendError } from './progress-tracker'
 import { executeStory, stopStoryExecution, extractCommitHash } from './story-executor'
-import { buildStoryGenerationPrompt } from './prompts'
+import { buildStoryGenerationPrompt, type SkillSummary } from './prompts'
+import { getAllSkills, ensureSkillsInitialized } from '../skill'
 
 // ============================================
 // State Management
@@ -333,8 +334,18 @@ export async function generateStories(config: GenerateStoriesConfig): Promise<Us
 
   console.log(`[Ralph] Generating stories for: ${description}`)
 
-  // Build the generation prompt with Ralph PRD rules
-  const prompt = buildStoryGenerationPrompt(description, `Project: ${projectDir}`)
+  // Ensure skills are loaded and get available skills
+  await ensureSkillsInitialized()
+  const allSkills = await getAllSkills()
+  const skills: SkillSummary[] = allSkills.map(s => ({
+    name: s.name,
+    description: s.description
+  }))
+
+  console.log(`[Ralph] Found ${skills.length} skills to include in story generation`)
+
+  // Build the generation prompt with Ralph PRD rules and available skills
+  const prompt = buildStoryGenerationPrompt(description, `Project: ${projectDir}`, skills)
 
   // Dynamic import to avoid circular dependencies
   const { sendMessage } = await import('../agent')
@@ -404,6 +415,53 @@ function normalizeJsonString(str: string): string {
     // Normalize line endings
     .replace(/\r\n/g, '\n')
     .replace(/\r/g, '\n')
+}
+
+/**
+ * Sanitize JSON by escaping newlines within string values
+ * This handles cases where AI generates multi-line strings without proper escaping
+ */
+function sanitizeJsonStringValues(jsonStr: string): string {
+  let result = ''
+  let inString = false
+  let escapeNext = false
+
+  for (let i = 0; i < jsonStr.length; i++) {
+    const char = jsonStr[i]
+
+    if (escapeNext) {
+      result += char
+      escapeNext = false
+      continue
+    }
+
+    if (char === '\\' && inString) {
+      result += char
+      escapeNext = true
+      continue
+    }
+
+    if (char === '"') {
+      inString = !inString
+      result += char
+      continue
+    }
+
+    // Escape literal newlines inside string values
+    if (inString) {
+      if (char === '\n') {
+        result += '\\n'
+        continue
+      }
+      if (char === '\r') {
+        continue // Skip carriage returns
+      }
+    }
+
+    result += char
+  }
+
+  return result
 }
 
 /**
@@ -483,8 +541,9 @@ function parseStoriesFromOutput(output: string): UserStory[] {
     throw new Error('Failed to parse stories from AI output - no JSON array found')
   }
 
-  // Normalize the extracted JSON string as well
-  jsonStr = normalizeJsonString(jsonStr.trim())
+  // Normalize and sanitize the extracted JSON string
+  // First normalize quotes and line endings, then escape newlines inside string values
+  jsonStr = sanitizeJsonStringValues(normalizeJsonString(jsonStr.trim()))
 
   try {
     const parsed = JSON.parse(jsonStr)
@@ -509,7 +568,19 @@ function parseStoriesFromOutput(output: string): UserStory[] {
   } catch (error) {
     const err = error as Error
     console.error('[Ralph] Failed to parse JSON:', err.message)
-    console.error('[Ralph] JSON string (first 500 chars):', jsonStr?.substring(0, 500))
+
+    // Show context around error position for debugging
+    const match = err.message.match(/position (\d+)/)
+    if (match && jsonStr) {
+      const pos = parseInt(match[1])
+      const start = Math.max(0, pos - 50)
+      const end = Math.min(jsonStr.length, pos + 50)
+      console.error('[Ralph] JSON context around error:')
+      console.error(jsonStr.substring(start, pos) + '<<<ERROR>>>' + jsonStr.substring(pos, end))
+    } else {
+      console.error('[Ralph] JSON string (first 500 chars):', jsonStr?.substring(0, 500))
+    }
+
     throw new Error(`Failed to parse stories JSON: ${err.message}`)
   }
 }

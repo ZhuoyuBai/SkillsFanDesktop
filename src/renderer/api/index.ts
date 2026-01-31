@@ -778,6 +778,13 @@ export const api = {
     return { success: false, error: 'Browser views only available in desktop app' }
   },
 
+  destroyAllBrowserViews: async (): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.skillsfan.destroyAllBrowserViews()
+    }
+    return { success: false, error: 'Browser views only available in desktop app' }
+  },
+
   showBrowserView: async (
     viewId: string,
     bounds: { x: number; y: number; width: number; height: number }

@@ -6,6 +6,14 @@
 import type { RalphTask, UserStory } from './types'
 
 /**
+ * Skill info for prompt generation
+ */
+export interface SkillSummary {
+  name: string
+  description: string
+}
+
+/**
  * System prompt for Ralph agent iterations
  * This provides the core instructions for autonomous task execution
  */
@@ -82,21 +90,26 @@ Before committing, check if any edited files have learnings worth preserving in 
 
 Only update CLAUDE.md if you have **genuinely reusable knowledge** that would help future work in that directory.
 
-## Skill Priority Rule (Important!)
+## Skill Priority Rule (Critical!)
 
-Before implementing each step of a story, check if there are installed skills that can handle the task:
+Before implementing each step of a story, you MUST check for available skills:
 
-1. **Review available skills** - Check the skills listed in your system context (shown in <system-reminder> tags)
-2. **Match task to skill** - If a skill's description matches what you need to do, use it
-3. **Invoke via Skill tool** - Use the Skill tool with the skill name to execute it
-4. **Prefer skills over custom code** - Skills are pre-built, tested solutions; always prefer them over writing from scratch
+1. **Find available skills** - Call the \`Skill\` tool to view its description, which contains an \`<available_skills>\` section listing all installed skills
+2. **Match task to skill** - If a skill's description matches your current task, you MUST use it
+3. **Invoke the skill** - Use the \`Skill\` tool with the skill name to load and execute it
+4. **Prefer skills over custom code** - Skills are pre-built, tested solutions; ALWAYS use them instead of writing from scratch
+
+**How to find skills:**
+- The Skill tool's description contains all available skills with their names and descriptions
+- Each skill is listed in \`<skill><name>...</name><description>...</description></skill>\` format
+- Match the skill description to your current task
 
 **Examples of when to use skills:**
 - Need to create a commit? Use the \`commit\` skill if available
 - Need to review code? Use the \`review-pr\` skill if available
 - Need to generate documentation? Check for a documentation skill
 
-**Do NOT reinvent the wheel** - If a skill can do the job, use it!
+**IMPORTANT:** Do NOT reinvent the wheel - if a skill exists that can do the job, you MUST use it!
 
 ## Quality Requirements
 
@@ -139,7 +152,7 @@ If you encounter a blocking issue and cannot complete the story, reply with:
 /**
  * Build the iteration-specific prompt for a single story
  */
-export function buildIterationPrompt(task: RalphTask, story: UserStory): string {
+export function buildIterationPrompt(task: RalphTask, story: UserStory, skills?: SkillSummary[]): string {
   const storiesStatus = task.stories
     .map((s) => `- [${s.status === 'completed' ? 'x' : ' '}] ${s.id}: ${s.title}`)
     .join('\n')
@@ -148,13 +161,24 @@ export function buildIterationPrompt(task: RalphTask, story: UserStory): string 
     .map((c, i) => `${i + 1}. ${c}`)
     .join('\n')
 
+  // Build skills reminder section
+  const skillsReminder = skills && skills.length > 0
+    ? `
+## Available Skills (Check Before Coding!)
+The following skills are installed. Before writing code, check if any skill can accomplish your task:
+${skills.map(s => `- **${s.name}**: ${s.description}`).join('\n')}
+
+**IMPORTANT:** Use the \`Skill\` tool to invoke a skill when it matches your task!
+`
+    : ''
+
   return `
 # Ralph Iteration
 
 You are working on: ${task.description}
 Branch: ${task.branchName}
 Project: ${task.projectDir}
-
+${skillsReminder}
 ## Current User Story
 ID: ${story.id}
 Title: ${story.title}
@@ -169,6 +193,8 @@ ${storiesStatus}
 ## Instructions
 Follow the Ralph Agent Instructions in your system prompt. Focus on this ONE story.
 
+**Skill Check Reminder:** Before implementing each step, check if an available skill can do it!
+
 When done:
 - Output <promise>STORY_DONE</promise> if this story is complete but others remain
 - Output <promise>COMPLETE</promise> if ALL stories are now finished
@@ -180,7 +206,29 @@ When done:
  * Build prompt for AI story generation
  * Uses Ralph PRD format with critical rules for proper story sizing and ordering
  */
-export function buildStoryGenerationPrompt(description: string, projectContext: string): string {
+export function buildStoryGenerationPrompt(
+  description: string,
+  projectContext: string,
+  skills?: SkillSummary[]
+): string {
+  // Build skills section if skills are available
+  const skillsSection = skills && skills.length > 0
+    ? `
+## Available Skills
+
+The following skills are installed and can be leveraged in your stories:
+
+${skills.map(s => `- **${s.name}**: ${s.description}`).join('\n')}
+
+### Skill Usage Guidelines (Important!)
+- If a skill can accomplish a step in a story, **suggest using it** in the acceptance criteria
+- Example: If a \`commit\` skill exists, include "Use /commit skill to create the commit" as a criterion
+- Example: If a \`review-pr\` skill exists, include "Use /review-pr skill to review changes" as a criterion
+- Skills save development time and ensure consistent quality
+- **Prioritize skill usage** over writing custom code when a matching skill exists
+`
+    : ''
+
   return `
 # Generate User Stories for Ralph
 
@@ -191,7 +239,7 @@ ${description}
 
 ## Project Context
 ${projectContext}
-
+${skillsSection}
 ## Critical Rules
 
 ### Story Size (Most Important!)
@@ -217,6 +265,7 @@ Each criterion must be VERIFIABLE, not vague.
 - "Add status column: 'pending' | 'in_progress' | 'done' (default 'pending')"
 - "Filter dropdown has options: All, Active, Completed"
 - "Typecheck passes"
+- "Use /commit skill to commit changes" (if commit skill is available)
 
 **Bad criteria:**
 - "Works correctly"
@@ -225,10 +274,17 @@ Each criterion must be VERIFIABLE, not vague.
 ### Required Criteria
 - EVERY story must include: "Typecheck passes"
 - Stories that change UI must include: "Verify in browser"
+- If a skill matches a step, include it in acceptance criteria
 
 ## Output Format
 
-Return ONLY a JSON array (no markdown code blocks, no explanation text):
+Return ONLY a valid JSON array. Critical formatting rules:
+1. NO line breaks inside string values (keep each string on one line)
+2. NO markdown code blocks around the JSON
+3. NO explanatory text before or after the JSON
+4. Keep strings concise - if text is long, use short phrases
+
+Example format:
 [
   {
     "id": "US-001",
@@ -241,7 +297,6 @@ Return ONLY a JSON array (no markdown code blocks, no explanation text):
 ]
 
 Generate 3-8 stories that together implement the complete feature.
-Do NOT output any text before or after the JSON array.
 
 ## Language Requirement
 

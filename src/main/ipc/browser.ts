@@ -65,6 +65,21 @@ export function registerBrowserHandlers(mainWindow: BrowserWindow | null) {
   })
 
   /**
+   * Destroy all BrowserViews
+   * Used when canceling/stopping advanced tasks to clean up orphaned browser windows
+   */
+  ipcMain.handle('browser:destroy-all', async () => {
+    try {
+      browserViewManager.destroyAll()
+      console.log('[Browser IPC] All browser views destroyed')
+      return { success: true }
+    } catch (error) {
+      console.error('[Browser IPC] Destroy all failed:', error)
+      return { success: false, error: (error as Error).message }
+    }
+  })
+
+  /**
    * Show a BrowserView at specified bounds
    */
   ipcMain.handle(
