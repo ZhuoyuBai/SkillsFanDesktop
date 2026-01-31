@@ -82,6 +82,22 @@ Before committing, check if any edited files have learnings worth preserving in 
 
 Only update CLAUDE.md if you have **genuinely reusable knowledge** that would help future work in that directory.
 
+## Skill Priority Rule (Important!)
+
+Before implementing each step of a story, check if there are installed skills that can handle the task:
+
+1. **Review available skills** - Check the skills listed in your system context (shown in <system-reminder> tags)
+2. **Match task to skill** - If a skill's description matches what you need to do, use it
+3. **Invoke via Skill tool** - Use the Skill tool with the skill name to execute it
+4. **Prefer skills over custom code** - Skills are pre-built, tested solutions; always prefer them over writing from scratch
+
+**Examples of when to use skills:**
+- Need to create a commit? Use the \`commit\` skill if available
+- Need to review code? Use the \`review-pr\` skill if available
+- Need to generate documentation? Check for a documentation skill
+
+**Do NOT reinvent the wheel** - If a skill can do the job, use it!
+
 ## Quality Requirements
 
 - ALL commits must pass your project's quality checks (typecheck, lint, test)

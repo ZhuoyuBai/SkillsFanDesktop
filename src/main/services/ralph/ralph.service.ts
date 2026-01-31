@@ -390,25 +390,101 @@ export async function generateStories(config: GenerateStoriesConfig): Promise<Us
 }
 
 /**
+ * Normalize JSON string by replacing smart/Chinese quotes with ASCII quotes
+ * and cleaning up common formatting issues
+ */
+function normalizeJsonString(str: string): string {
+  return str
+    // Replace Chinese/smart double quotes with ASCII double quotes
+    .replace(/[""「」『』]/g, '"')
+    // Replace Chinese/smart single quotes with ASCII single quotes
+    .replace(/['']/g, "'")
+    // Remove any BOM or zero-width characters
+    .replace(/[\uFEFF\u200B-\u200D\u2060]/g, '')
+    // Normalize line endings
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+}
+
+/**
+ * Extract JSON array from output using bracket matching
+ * More robust than regex for nested structures
+ */
+function extractJsonArray(text: string): string | null {
+  // Find the first '[' that starts an array
+  const startIdx = text.indexOf('[')
+  if (startIdx === -1) return null
+
+  let depth = 0
+  let inString = false
+  let escapeNext = false
+
+  for (let i = startIdx; i < text.length; i++) {
+    const char = text[i]
+
+    if (escapeNext) {
+      escapeNext = false
+      continue
+    }
+
+    if (char === '\\' && inString) {
+      escapeNext = true
+      continue
+    }
+
+    if (char === '"' && !escapeNext) {
+      inString = !inString
+      continue
+    }
+
+    if (inString) continue
+
+    if (char === '[') {
+      depth++
+    } else if (char === ']') {
+      depth--
+      if (depth === 0) {
+        return text.substring(startIdx, i + 1)
+      }
+    }
+  }
+
+  return null
+}
+
+/**
  * Parse user stories from AI output
  * Handles both raw JSON and JSON wrapped in markdown code blocks
  */
 function parseStoriesFromOutput(output: string): UserStory[] {
+  // First normalize the output
+  let normalizedOutput = normalizeJsonString(output)
+
   // Try to find JSON array in output
   // First, try to find JSON wrapped in ```json ... ```
-  let jsonMatch = output.match(/```json\s*([\s\S]*?)\s*```/)
+  let jsonMatch = normalizedOutput.match(/```json\s*([\s\S]*?)\s*```/)
   let jsonStr = jsonMatch ? jsonMatch[1] : null
 
-  // If not found, try to find raw JSON array
+  // If not found, try to find JSON wrapped in ``` ... ```
   if (!jsonStr) {
-    const arrayMatch = output.match(/\[\s*\{[\s\S]*?\}\s*\]/)
-    jsonStr = arrayMatch ? arrayMatch[0] : null
+    jsonMatch = normalizedOutput.match(/```\s*([\s\S]*?)\s*```/)
+    if (jsonMatch && jsonMatch[1].trim().startsWith('[')) {
+      jsonStr = jsonMatch[1]
+    }
+  }
+
+  // If still not found, use bracket matching to extract JSON array
+  if (!jsonStr) {
+    jsonStr = extractJsonArray(normalizedOutput)
   }
 
   if (!jsonStr) {
     console.error('[Ralph] Could not find JSON in output:', output.substring(0, 500))
     throw new Error('Failed to parse stories from AI output - no JSON array found')
   }
+
+  // Normalize the extracted JSON string as well
+  jsonStr = normalizeJsonString(jsonStr.trim())
 
   try {
     const parsed = JSON.parse(jsonStr)
@@ -432,7 +508,8 @@ function parseStoriesFromOutput(output: string): UserStory[] {
     return stories
   } catch (error) {
     const err = error as Error
-    console.error('[Ralph] Failed to parse JSON:', err.message, jsonStr?.substring(0, 200))
+    console.error('[Ralph] Failed to parse JSON:', err.message)
+    console.error('[Ralph] JSON string (first 500 chars):', jsonStr?.substring(0, 500))
     throw new Error(`Failed to parse stories JSON: ${err.message}`)
   }
 }
