@@ -29,10 +29,14 @@ import { useAppStore } from './app.store'
 // LRU cache size limit
 const CONVERSATION_CACHE_SIZE = 10
 
+// Selection type for switching between conversations and loop tasks
+export type SelectionType = 'conversation' | 'loopTask'
+
 // Per-space state (conversations metadata belong to a space)
 interface SpaceState {
   conversations: ConversationMeta[]  // Lightweight metadata, no messages
   currentConversationId: string | null
+  selectionType: SelectionType  // What type is currently selected
 }
 
 // User question info for AskUserQuestion tool
@@ -93,7 +97,8 @@ function createEmptySessionState(): SessionState {
 function createEmptySpaceState(): SpaceState {
   return {
     conversations: [],
-    currentConversationId: null
+    currentConversationId: null,
+    selectionType: 'conversation'
   }
 }
 
@@ -132,10 +137,12 @@ interface ChatState {
   getConversations: () => ConversationMeta[]
   getCurrentConversationId: () => string | null
   getCachedConversation: (conversationId: string) => Conversation | null
+  getSelectionType: () => SelectionType
 
   // Space actions
   setCurrentSpace: (spaceId: string) => void
   setFreshStart: (value: boolean) => void
+  setSelectionType: (type: SelectionType) => void
 
   // Conversation actions
   loadConversations: (spaceId: string) => Promise<void>
@@ -234,6 +241,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
     return get().conversationCache.get(conversationId) || null
   },
 
+  // Get current selection type
+  getSelectionType: () => {
+    return get().getCurrentSpaceState().selectionType
+  },
+
   // Get current session state (for the currently viewed conversation)
   getCurrentSession: () => {
     const spaceState = get().getCurrentSpaceState()
@@ -254,6 +266,20 @@ export const useChatStore = create<ChatState>((set, get) => ({
   // Set fresh start flag (called after first space entry to disable auto-create)
   setFreshStart: (value: boolean) => {
     set({ freshStart: value })
+  },
+
+  // Set selection type (conversation or loopTask)
+  setSelectionType: (type) => {
+    const { currentSpaceId, spaceStates } = get()
+    if (!currentSpaceId) return
+
+    const newSpaceStates = new Map(spaceStates)
+    const existingState = newSpaceStates.get(currentSpaceId) || createEmptySpaceState()
+    newSpaceStates.set(currentSpaceId, {
+      ...existingState,
+      selectionType: type
+    })
+    set({ spaceStates: newSpaceStates })
   },
 
   // Load conversations for a space (returns lightweight metadata)
@@ -320,8 +346,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
           }
 
           newSpaceStates.set(spaceId, {
+            ...existingState,
             conversations: [meta, ...existingState.conversations],
-            currentConversationId: newConversation.id
+            currentConversationId: newConversation.id,
+            selectionType: 'conversation'  // Switch to conversation when creating new
           })
 
           return { spaceStates: newSpaceStates, conversationCache: newCache }
@@ -461,6 +489,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           const newConversations = existingState.conversations.filter((c) => c.id !== conversationId)
 
           newSpaceStates.set(spaceId, {
+            ...existingState,
             conversations: newConversations,
             currentConversationId:
               existingState.currentConversationId === conversationId
@@ -514,6 +543,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           // Clear conversations and reset current
           const newSpaceStates = new Map(state.spaceStates)
           newSpaceStates.set(spaceId, {
+            ...existingState,
             conversations: [],
             currentConversationId: null
           })

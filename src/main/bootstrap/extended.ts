@@ -31,6 +31,7 @@ import { registerPerfHandlers } from '../ipc/perf'
 import { registerGitBashHandlers, initializeGitBashOnStartup } from '../ipc/git-bash'
 import { initializeRegistry, startSkillWatcher, getSkillsDir } from '../services/skill'
 import { registerRalphHandlers } from '../ipc/ralph'
+import { registerLoopTaskHandlers } from '../ipc/loop-task'
 
 /**
  * Initialize extended services after window is visible
@@ -78,6 +79,9 @@ export function initializeExtendedServices(mainWindow: BrowserWindow): void {
 
   // Ralph: Loop task management (autonomous AI agent)
   registerRalphHandlers(mainWindow)
+
+  // Loop Task: Persistent loop task storage
+  registerLoopTaskHandlers(mainWindow)
 
   // Skill: Initialize skill registry and start file watcher
   // Skills are loaded from ~/.skillsfan-dev/skills or ~/.skillsfan/skills

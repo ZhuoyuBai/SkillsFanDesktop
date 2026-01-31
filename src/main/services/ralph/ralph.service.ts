@@ -50,10 +50,15 @@ export function setMainWindow(window: BrowserWindow | null): void {
 
 /**
  * Broadcast task update to renderer
+ * Uses deep copy to ensure React detects changes when stories array is mutated
  */
 function broadcastTaskUpdate(task: RalphTask): void {
   if (mainWindow && !mainWindow.isDestroyed()) {
-    const event: TaskUpdateEvent = { task }
+    // Deep copy to ensure each broadcast creates a new object reference
+    // This fixes the issue where rapid updates with the same object reference
+    // would not trigger React re-renders
+    const taskCopy = JSON.parse(JSON.stringify(task)) as RalphTask
+    const event: TaskUpdateEvent = { task: taskCopy }
     mainWindow.webContents.send('ralph:task-update', event)
   }
 }
@@ -269,13 +274,10 @@ async function runLoop(task: RalphTask): Promise<void> {
 
       broadcastTaskUpdate(task)
 
-      // If all complete, stop loop
+      // Log COMPLETE signal but don't break - let findNextPendingStory decide when loop ends
+      // This prevents Agent misreporting COMPLETE from skipping remaining stories
       if (signal === 'COMPLETE') {
-        console.log(`[Ralph] All stories complete signal received`)
-        task.status = 'completed'
-        task.completedAt = new Date().toISOString()
-        broadcastTaskUpdate(task)
-        break
+        console.log(`[Ralph] Agent returned COMPLETE signal (ignored, using findNextPendingStory)`)
       }
     } catch (error) {
       const err = error as Error

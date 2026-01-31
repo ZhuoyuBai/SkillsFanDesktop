@@ -7,12 +7,14 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import type { ConversationMeta } from '../../types'
 import { MessageSquare } from '../icons/ToolIcons'
-import { PanelLeftClose, PanelLeft, Search, SquarePen, RefreshCw } from 'lucide-react'
+import { PanelLeftClose, PanelLeft, Search, SquarePen, RefreshCw, Plus } from 'lucide-react'
 import { useSearchStore } from '../../stores/search.store'
 import { SpaceSwitcher } from '../space/SpaceSwitcher'
 import { useTranslation } from '../../i18n'
 import { UserAvatarMenu } from './UserAvatarMenu'
-import { useAppStore } from '../../stores/app.store'
+import { useLoopTaskStore } from '../../stores/loop-task.store'
+import { useChatStore } from '../../stores/chat.store'
+import { LoopTaskItem } from '../loop-task/LoopTaskItem'
 
 // Width constraints (in pixels)
 const MIN_WIDTH = 160 // Allow smaller width
@@ -42,6 +44,7 @@ interface ConversationListProps {
   isCollapsed?: boolean
   onToggleCollapse?: () => void
   isMobileOverlay?: boolean  // Mobile overlay mode - full width, no drag resize
+  spaceId?: string  // Current space ID for loop tasks
 }
 
 export function ConversationList({
@@ -54,12 +57,41 @@ export function ConversationList({
   onClearAll,
   isCollapsed = false,
   onToggleCollapse,
-  isMobileOverlay = false
+  isMobileOverlay = false,
+  spaceId
 }: ConversationListProps) {
   const { t } = useTranslation()
   const [width, setWidth] = useState(getDefaultWidth)
   const [isDragging, setIsDragging] = useState(false)
   const [hasUserResized, setHasUserResized] = useState(false) // Track if user manually resized
+
+  // Loop task store
+  const {
+    getTasks,
+    getCurrentTaskId,
+    selectTask,
+    renameTask,
+    deleteTask,
+    startEditing,
+    setCurrentSpace,
+    loadTasks
+  } = useLoopTaskStore()
+
+  // Chat store for selection type
+  const { setSelectionType, getSelectionType } = useChatStore()
+
+  // Get loop tasks for current space
+  const loopTasks = getTasks()
+  const currentTaskId = getCurrentTaskId()
+  const selectionType = getSelectionType()
+
+  // Load loop tasks when space changes
+  useEffect(() => {
+    if (spaceId) {
+      setCurrentSpace(spaceId)
+      loadTasks(spaceId)
+    }
+  }, [spaceId, setCurrentSpace, loadTasks])
 
   // Update width when window resizes (only if user hasn't manually resized)
   useEffect(() => {
@@ -167,8 +199,37 @@ export function ConversationList({
   // Get search store
   const { openSearch } = useSearchStore()
 
-  // Get app store for navigation
-  const { setView } = useAppStore()
+  // Handle conversation selection (set selection type)
+  const handleSelectConversation = (id: string) => {
+    setSelectionType('conversation')
+    onSelect(id)
+  }
+
+  // Handle loop task selection
+  const handleSelectLoopTask = (taskId: string) => {
+    setSelectionType('loopTask')
+    selectTask(taskId)
+  }
+
+  // Handle new loop task
+  const handleNewLoopTask = () => {
+    setSelectionType('loopTask')
+    startEditing()
+  }
+
+  // Handle rename loop task
+  const handleRenameLoopTask = (taskId: string, name: string) => {
+    if (spaceId) {
+      renameTask(spaceId, taskId, name)
+    }
+  }
+
+  // Handle delete loop task
+  const handleDeleteLoopTask = (taskId: string) => {
+    if (spaceId) {
+      deleteTask(spaceId, taskId)
+    }
+  }
 
   // Collapsed view - show only icons
   if (isCollapsed) {
@@ -206,7 +267,7 @@ export function ConversationList({
           )}
         </div>
 
-        {/* New conversation + Loop Task + Search buttons (icon only) */}
+        {/* New conversation + Search buttons (icon only) */}
         <div className="px-2 py-2 flex flex-col items-center gap-1">
           <button
             onClick={onNew}
@@ -214,13 +275,6 @@ export function ConversationList({
             title={t('New conversation')}
           >
             <SquarePen className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => setView('ralph')}
-            className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-md transition-colors"
-            title={t('Loop Task')}
-          >
-            <RefreshCw className="w-4 h-4" />
           </button>
           <button
             onClick={() => openSearch('global')}
@@ -239,18 +293,18 @@ export function ConversationList({
               role="button"
               tabIndex={0}
               aria-label={conversation.title}
-              aria-selected={conversation.id === currentConversationId}
-              onClick={() => onSelect(conversation.id)}
+              aria-selected={conversation.id === currentConversationId && selectionType === 'conversation'}
+              onClick={() => handleSelectConversation(conversation.id)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault()
-                  onSelect(conversation.id)
+                  handleSelectConversation(conversation.id)
                 }
               }}
               className={`w-full p-2 flex justify-center cursor-pointer
                 transition-all duration-200
                 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-inset
-                ${conversation.id === currentConversationId
+                ${conversation.id === currentConversationId && selectionType === 'conversation'
                   ? 'bg-primary/8'
                   : 'hover:bg-secondary/40'
                 }`}
@@ -259,6 +313,34 @@ export function ConversationList({
               <MessageSquare className="w-4 h-4 text-muted-foreground" />
             </div>
           ))}
+
+          {/* Loop tasks section (collapsed) */}
+          {loopTasks.length > 0 && (
+            <>
+              <div className="border-t border-border/50 my-2" />
+              {loopTasks.map((task) => (
+                <LoopTaskItem
+                  key={task.id}
+                  task={task}
+                  isActive={task.id === currentTaskId && selectionType === 'loopTask'}
+                  onSelect={() => handleSelectLoopTask(task.id)}
+                  onRename={(name) => handleRenameLoopTask(task.id, name)}
+                  onDelete={() => handleDeleteLoopTask(task.id)}
+                  isCollapsed={true}
+                />
+              ))}
+            </>
+          )}
+          {/* New loop task button (collapsed) */}
+          <div className="border-t border-border/50 mt-2 pt-2">
+            <button
+              onClick={handleNewLoopTask}
+              className="w-full p-2 flex justify-center cursor-pointer hover:bg-muted/50 rounded-md transition-colors"
+              title={t('New loop task')}
+            >
+              <Plus className="w-4 h-4 text-muted-foreground" />
+            </button>
+          </div>
         </div>
 
         {/* User avatar menu (collapsed) */}
@@ -309,7 +391,7 @@ export function ConversationList({
       </div>
       )}
 
-      {/* New conversation + Loop Task + Search buttons */}
+      {/* New conversation + Search buttons */}
       <div className="px-4 py-3 border-b border-border/50 space-y-2">
         <button
           onClick={onNew}
@@ -320,15 +402,6 @@ export function ConversationList({
         >
           <SquarePen className="w-4 h-4 text-foreground" />
           {t('New conversation')}
-        </button>
-        <button
-          onClick={() => setView('ralph')}
-          className="w-full flex items-center justify-start gap-2 px-2 py-1.5
-            text-sm text-foreground hover:bg-muted/50
-            rounded transition-all duration-150"
-        >
-          <RefreshCw className="w-4 h-4 text-foreground" />
-          {t('Loop Task')}
         </button>
         <button
           onClick={() => openSearch('global')}
@@ -366,18 +439,18 @@ export function ConversationList({
             role="button"
             tabIndex={0}
             aria-label={`${conversation.title}, ${formatDate(conversation.updatedAt)}`}
-            aria-selected={conversation.id === currentConversationId}
-            onClick={() => editingId !== conversation.id && onSelect(conversation.id)}
+            aria-selected={conversation.id === currentConversationId && selectionType === 'conversation'}
+            onClick={() => editingId !== conversation.id && handleSelectConversation(conversation.id)}
             onKeyDown={(e) => {
               if ((e.key === 'Enter' || e.key === ' ') && editingId !== conversation.id) {
                 e.preventDefault()
-                onSelect(conversation.id)
+                handleSelectConversation(conversation.id)
               }
             }}
             className={`w-full px-4 py-2.5 text-left cursor-pointer group relative
               transition-all duration-200
               focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-inset
-              ${conversation.id === currentConversationId
+              ${conversation.id === currentConversationId && selectionType === 'conversation'
                 ? 'bg-gradient-to-r from-primary/8 via-primary/5 to-transparent'
                 : 'hover:bg-secondary/40'
               }`}
@@ -449,6 +522,43 @@ export function ConversationList({
             )}
           </div>
         ))}
+
+        {/* Loop Tasks Section */}
+        <div className="border-t border-border/50 mt-2">
+          <div className="px-4 py-2 flex items-center justify-between">
+            <span className="text-xs text-muted-foreground font-medium flex items-center gap-1">
+              <RefreshCw className="w-3 h-3" />
+              {t('Loop Tasks')}
+            </span>
+            <button
+              onClick={handleNewLoopTask}
+              className="p-1 hover:bg-muted/60 text-muted-foreground hover:text-foreground rounded transition-colors"
+              title={t('New loop task')}
+              aria-label={t('New loop task')}
+            >
+              <Plus className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          {loopTasks.length === 0 ? (
+            <div className="px-4 py-2 text-xs text-muted-foreground">
+              {t('No loop tasks yet')}
+            </div>
+          ) : (
+            <div className="px-2">
+              {loopTasks.map((task) => (
+                <LoopTaskItem
+                  key={task.id}
+                  task={task}
+                  isActive={task.id === currentTaskId && selectionType === 'loopTask'}
+                  onSelect={() => handleSelectLoopTask(task.id)}
+                  onRename={(name) => handleRenameLoopTask(task.id, name)}
+                  onDelete={() => handleDeleteLoopTask(task.id)}
+                  isCollapsed={false}
+                />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* User avatar menu (expanded) */}

@@ -17,6 +17,7 @@ import * as configController from '../../controllers/config.controller'
 import { listArtifacts } from '../../services/artifact.service'
 import { getTempSpacePath } from '../../services/config.service'
 import { getSpace, getAllSpacePaths } from '../../services/space.service'
+import * as loopTaskService from '../../services/loop-task.service'
 
 // Helper: get working directory for a space
 function getWorkingDir(spaceId: string): string {
@@ -369,6 +370,123 @@ export function registerApiRoutes(app: Express, mainWindow: BrowserWindow | null
     } catch (error) {
       console.error('[Download All] Error:', error)
       res.status(500).json({ success: false, error: (error as Error).message })
+    }
+  })
+
+  // ===== Loop Task Routes =====
+  // List tasks for a space
+  app.get('/api/spaces/:spaceId/loop-tasks', async (req: Request, res: Response) => {
+    try {
+      const tasks = loopTaskService.listTasks(req.params.spaceId)
+      res.json({ success: true, data: tasks })
+    } catch (error) {
+      res.json({ success: false, error: (error as Error).message })
+    }
+  })
+
+  // Create a new task
+  app.post('/api/spaces/:spaceId/loop-tasks', async (req: Request, res: Response) => {
+    try {
+      const task = loopTaskService.createTask(req.params.spaceId, req.body)
+      res.json({ success: true, data: task })
+    } catch (error) {
+      res.json({ success: false, error: (error as Error).message })
+    }
+  })
+
+  // Get a specific task
+  app.get('/api/spaces/:spaceId/loop-tasks/:taskId', async (req: Request, res: Response) => {
+    try {
+      const task = loopTaskService.getTask(req.params.spaceId, req.params.taskId)
+      res.json({ success: true, data: task })
+    } catch (error) {
+      res.json({ success: false, error: (error as Error).message })
+    }
+  })
+
+  // Update a task
+  app.put('/api/spaces/:spaceId/loop-tasks/:taskId', async (req: Request, res: Response) => {
+    try {
+      const task = loopTaskService.updateTask(req.params.spaceId, req.params.taskId, req.body)
+      res.json({ success: true, data: task })
+    } catch (error) {
+      res.json({ success: false, error: (error as Error).message })
+    }
+  })
+
+  // Rename a task
+  app.post('/api/spaces/:spaceId/loop-tasks/:taskId/rename', async (req: Request, res: Response) => {
+    try {
+      const { name } = req.body
+      const task = loopTaskService.renameTask(req.params.spaceId, req.params.taskId, name)
+      res.json({ success: true, data: task })
+    } catch (error) {
+      res.json({ success: false, error: (error as Error).message })
+    }
+  })
+
+  // Delete a task
+  app.delete('/api/spaces/:spaceId/loop-tasks/:taskId', async (req: Request, res: Response) => {
+    try {
+      const success = loopTaskService.deleteTask(req.params.spaceId, req.params.taskId)
+      res.json({ success })
+    } catch (error) {
+      res.json({ success: false, error: (error as Error).message })
+    }
+  })
+
+  // Add a story to a task
+  app.post('/api/spaces/:spaceId/loop-tasks/:taskId/stories', async (req: Request, res: Response) => {
+    try {
+      const story = loopTaskService.addStory(req.params.spaceId, req.params.taskId, req.body)
+      res.json({ success: true, data: story })
+    } catch (error) {
+      res.json({ success: false, error: (error as Error).message })
+    }
+  })
+
+  // Update a story
+  app.put('/api/spaces/:spaceId/loop-tasks/:taskId/stories/:storyId', async (req: Request, res: Response) => {
+    try {
+      const success = loopTaskService.updateStory(
+        req.params.spaceId,
+        req.params.taskId,
+        req.params.storyId,
+        req.body
+      )
+      res.json({ success })
+    } catch (error) {
+      res.json({ success: false, error: (error as Error).message })
+    }
+  })
+
+  // Remove a story
+  app.delete('/api/spaces/:spaceId/loop-tasks/:taskId/stories/:storyId', async (req: Request, res: Response) => {
+    try {
+      const success = loopTaskService.removeStory(
+        req.params.spaceId,
+        req.params.taskId,
+        req.params.storyId
+      )
+      res.json({ success })
+    } catch (error) {
+      res.json({ success: false, error: (error as Error).message })
+    }
+  })
+
+  // Reorder stories
+  app.post('/api/spaces/:spaceId/loop-tasks/:taskId/stories/reorder', async (req: Request, res: Response) => {
+    try {
+      const { fromIndex, toIndex } = req.body
+      const success = loopTaskService.reorderStories(
+        req.params.spaceId,
+        req.params.taskId,
+        fromIndex,
+        toIndex
+      )
+      res.json({ success })
+    } catch (error) {
+      res.json({ success: false, error: (error as Error).message })
     }
   })
 

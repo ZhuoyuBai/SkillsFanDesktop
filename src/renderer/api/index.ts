@@ -1163,11 +1163,11 @@ export const api = {
     return window.skillsfan.ralphCreateTask(config)
   },
 
-  ralphStart: async (taskId: string): Promise<ApiResponse> => {
+  ralphStart: async (spaceId: string | null, taskId: string): Promise<ApiResponse> => {
     if (!isElectron()) {
       return { success: false, error: 'Only available in desktop app' }
     }
-    return window.skillsfan.ralphStart(taskId)
+    return window.skillsfan.ralphStart(spaceId, taskId)
   },
 
   ralphStop: async (taskId: string): Promise<ApiResponse> => {
@@ -1227,6 +1227,120 @@ export const api = {
       return () => {}
     }
     return window.skillsfan.onRalphStoryLog(callback)
+  },
+
+  // ===== Loop Task (persistent storage) =====
+  loopTaskList: async (spaceId: string): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.skillsfan.loopTaskList(spaceId)
+    }
+    return httpRequest('GET', `/api/spaces/${spaceId}/loop-tasks`)
+  },
+
+  loopTaskCreate: async (
+    spaceId: string,
+    config: {
+      name?: string
+      projectDir: string
+      description: string
+      source: 'import' | 'generate' | 'manual'
+      stories: Array<{
+        id: string
+        title: string
+        description: string
+        acceptanceCriteria: string[]
+        priority: number
+        status: string
+        notes: string
+      }>
+      maxIterations: number
+      branchName?: string
+    }
+  ): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.skillsfan.loopTaskCreate(spaceId, config)
+    }
+    return httpRequest('POST', `/api/spaces/${spaceId}/loop-tasks`, config)
+  },
+
+  loopTaskGet: async (spaceId: string, taskId: string): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.skillsfan.loopTaskGet(spaceId, taskId)
+    }
+    return httpRequest('GET', `/api/spaces/${spaceId}/loop-tasks/${taskId}`)
+  },
+
+  loopTaskUpdate: async (
+    spaceId: string,
+    taskId: string,
+    updates: Record<string, unknown>
+  ): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.skillsfan.loopTaskUpdate(spaceId, taskId, updates)
+    }
+    return httpRequest('PUT', `/api/spaces/${spaceId}/loop-tasks/${taskId}`, updates)
+  },
+
+  loopTaskRename: async (spaceId: string, taskId: string, name: string): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.skillsfan.loopTaskRename(spaceId, taskId, name)
+    }
+    return httpRequest('POST', `/api/spaces/${spaceId}/loop-tasks/${taskId}/rename`, { name })
+  },
+
+  loopTaskDelete: async (spaceId: string, taskId: string): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.skillsfan.loopTaskDelete(spaceId, taskId)
+    }
+    return httpRequest('DELETE', `/api/spaces/${spaceId}/loop-tasks/${taskId}`)
+  },
+
+  loopTaskAddStory: async (
+    spaceId: string,
+    taskId: string,
+    story: {
+      title: string
+      description: string
+      acceptanceCriteria: string[]
+      priority: number
+      notes: string
+    }
+  ): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.skillsfan.loopTaskAddStory(spaceId, taskId, story)
+    }
+    return httpRequest('POST', `/api/spaces/${spaceId}/loop-tasks/${taskId}/stories`, story)
+  },
+
+  loopTaskUpdateStory: async (
+    spaceId: string,
+    taskId: string,
+    storyId: string,
+    updates: Record<string, unknown>
+  ): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.skillsfan.loopTaskUpdateStory(spaceId, taskId, storyId, updates)
+    }
+    return httpRequest('PUT', `/api/spaces/${spaceId}/loop-tasks/${taskId}/stories/${storyId}`, updates)
+  },
+
+  loopTaskRemoveStory: async (spaceId: string, taskId: string, storyId: string): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.skillsfan.loopTaskRemoveStory(spaceId, taskId, storyId)
+    }
+    return httpRequest('DELETE', `/api/spaces/${spaceId}/loop-tasks/${taskId}/stories/${storyId}`)
+  },
+
+  loopTaskReorderStories: async (
+    spaceId: string,
+    taskId: string,
+    fromIndex: number,
+    toIndex: number
+  ): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.skillsfan.loopTaskReorderStories(spaceId, taskId, fromIndex, toIndex)
+    }
+    return httpRequest('POST', `/api/spaces/${spaceId}/loop-tasks/${taskId}/stories/reorder`, { fromIndex, toIndex })
   },
 
   // ===== SkillsFan Account Auth (Electron only) =====

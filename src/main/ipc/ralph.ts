@@ -16,7 +16,8 @@ import {
   importFromPrd,
   prdExists
 } from '../services/ralph'
-import type { CreateTaskConfig, UserStory } from '../services/ralph/types'
+import { getTask as getLoopTask } from '../services/loop-task.service'
+import type { CreateTaskConfig, RalphTask, UserStory } from '../services/ralph/types'
 
 export function registerRalphHandlers(window: BrowserWindow | null): void {
   // Set main window for event broadcasting
@@ -43,8 +44,36 @@ export function registerRalphHandlers(window: BrowserWindow | null): void {
   )
 
   // Start a task
-  ipcMain.handle('ralph:start', async (_event, taskId: string) => {
+  ipcMain.handle('ralph:start', async (_event, spaceId: string | null, taskId: string) => {
     try {
+      // If spaceId is provided, load from Loop Task persistence
+      if (spaceId) {
+        const loopTask = getLoopTask(spaceId, taskId)
+        if (!loopTask) {
+          return { success: false, error: `Task ${taskId} not found in space ${spaceId}` }
+        }
+
+        // Convert LoopTask to RalphTask format
+        const ralphTask: RalphTask = {
+          id: loopTask.id,
+          projectDir: loopTask.projectDir,
+          branchName: loopTask.branchName,
+          description: loopTask.description,
+          stories: loopTask.stories,
+          status: loopTask.status,
+          currentStoryIndex: loopTask.currentStoryIndex,
+          iteration: loopTask.iteration,
+          maxIterations: loopTask.maxIterations,
+          createdAt: loopTask.createdAt,
+          startedAt: loopTask.startedAt,
+          completedAt: loopTask.completedAt
+        }
+
+        // Set as current task before starting
+        setCurrentTask(ralphTask)
+      }
+      // If no spaceId, assume task was created via ralph:create-task and is already in memory
+
       await startTask(taskId)
       return { success: true }
     } catch (error: unknown) {

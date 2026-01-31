@@ -296,7 +296,7 @@ export interface HaloAPI {
     maxIterations: number
     branchName?: string
   }) => Promise<IpcResponse>
-  ralphStart: (taskId: string) => Promise<IpcResponse>
+  ralphStart: (spaceId: string | null, taskId: string) => Promise<IpcResponse>
   ralphStop: (taskId: string) => Promise<IpcResponse>
   ralphGetTask: (taskId: string) => Promise<IpcResponse>
   ralphGetCurrent: () => Promise<IpcResponse>
@@ -305,6 +305,40 @@ export interface HaloAPI {
   ralphPrdExists: (projectDir: string) => Promise<IpcResponse>
   onRalphTaskUpdate: (callback: (data: { task: unknown }) => void) => () => void
   onRalphStoryLog: (callback: (data: { taskId: string; storyId: string; log: string }) => void) => () => void
+
+  // Loop Task (persistent storage)
+  loopTaskList: (spaceId: string) => Promise<IpcResponse>
+  loopTaskCreate: (spaceId: string, config: {
+    name?: string
+    projectDir: string
+    description: string
+    source: 'import' | 'generate' | 'manual'
+    stories: Array<{
+      id: string
+      title: string
+      description: string
+      acceptanceCriteria: string[]
+      priority: number
+      status: string
+      notes: string
+    }>
+    maxIterations: number
+    branchName?: string
+  }) => Promise<IpcResponse>
+  loopTaskGet: (spaceId: string, taskId: string) => Promise<IpcResponse>
+  loopTaskUpdate: (spaceId: string, taskId: string, updates: Record<string, unknown>) => Promise<IpcResponse>
+  loopTaskRename: (spaceId: string, taskId: string, name: string) => Promise<IpcResponse>
+  loopTaskDelete: (spaceId: string, taskId: string) => Promise<IpcResponse>
+  loopTaskAddStory: (spaceId: string, taskId: string, story: {
+    title: string
+    description: string
+    acceptanceCriteria: string[]
+    priority: number
+    notes: string
+  }) => Promise<IpcResponse>
+  loopTaskUpdateStory: (spaceId: string, taskId: string, storyId: string, updates: Record<string, unknown>) => Promise<IpcResponse>
+  loopTaskRemoveStory: (spaceId: string, taskId: string, storyId: string) => Promise<IpcResponse>
+  loopTaskReorderStories: (spaceId: string, taskId: string, fromIndex: number, toIndex: number) => Promise<IpcResponse>
 
   // SkillsFan Account Auth
   skillsfanStartLogin: () => Promise<IpcResponse>
@@ -551,7 +585,7 @@ const api: HaloAPI = {
 
   // Ralph (Loop Task)
   ralphCreateTask: (config) => ipcRenderer.invoke('ralph:create-task', config),
-  ralphStart: (taskId) => ipcRenderer.invoke('ralph:start', taskId),
+  ralphStart: (spaceId, taskId) => ipcRenderer.invoke('ralph:start', spaceId, taskId),
   ralphStop: (taskId) => ipcRenderer.invoke('ralph:stop', taskId),
   ralphGetTask: (taskId) => ipcRenderer.invoke('ralph:get-task', taskId),
   ralphGetCurrent: () => ipcRenderer.invoke('ralph:get-current'),
@@ -560,6 +594,18 @@ const api: HaloAPI = {
   ralphPrdExists: (projectDir) => ipcRenderer.invoke('ralph:prd-exists', projectDir),
   onRalphTaskUpdate: (callback) => createEventListener('ralph:task-update', callback as (data: unknown) => void),
   onRalphStoryLog: (callback) => createEventListener('ralph:story-log', callback as (data: unknown) => void),
+
+  // Loop Task (persistent storage)
+  loopTaskList: (spaceId) => ipcRenderer.invoke('loop-task:list', spaceId),
+  loopTaskCreate: (spaceId, config) => ipcRenderer.invoke('loop-task:create', spaceId, config),
+  loopTaskGet: (spaceId, taskId) => ipcRenderer.invoke('loop-task:get', spaceId, taskId),
+  loopTaskUpdate: (spaceId, taskId, updates) => ipcRenderer.invoke('loop-task:update', spaceId, taskId, updates),
+  loopTaskRename: (spaceId, taskId, name) => ipcRenderer.invoke('loop-task:rename', spaceId, taskId, name),
+  loopTaskDelete: (spaceId, taskId) => ipcRenderer.invoke('loop-task:delete', spaceId, taskId),
+  loopTaskAddStory: (spaceId, taskId, story) => ipcRenderer.invoke('loop-task:add-story', spaceId, taskId, story),
+  loopTaskUpdateStory: (spaceId, taskId, storyId, updates) => ipcRenderer.invoke('loop-task:update-story', spaceId, taskId, storyId, updates),
+  loopTaskRemoveStory: (spaceId, taskId, storyId) => ipcRenderer.invoke('loop-task:remove-story', spaceId, taskId, storyId),
+  loopTaskReorderStories: (spaceId, taskId, fromIndex, toIndex) => ipcRenderer.invoke('loop-task:reorder-stories', spaceId, taskId, fromIndex, toIndex),
 
   // SkillsFan Account Auth
   skillsfanStartLogin: () => ipcRenderer.invoke('skillsfan:start-login'),

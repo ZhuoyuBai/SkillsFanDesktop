@@ -98,8 +98,8 @@ export function RalphStoryEditor() {
 
       setCurrentTask(createResult.data)
 
-      // Start task
-      const startResult = await api.ralphStart(createResult.data.id)
+      // Start task (null spaceId since task is already in memory via ralph:create-task)
+      const startResult = await api.ralphStart(null, createResult.data.id)
       if (!startResult.success) {
         setError(startResult.error || t('Failed to start task'))
         setIsStarting(false)

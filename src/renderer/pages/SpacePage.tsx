@@ -23,6 +23,7 @@ import { useSearchStore } from '../stores/search.store'
 import { ChatView } from '../components/chat/ChatView'
 import { ArtifactRail } from '../components/artifact/ArtifactRail'
 import { ConversationList } from '../components/chat/ConversationList'
+import { LoopTaskPanel } from '../components/loop-task/LoopTaskPanel'
 import { SpaceIcon } from '../components/icons/ToolIcons'
 import { Header, usePlatform } from '../components/layout/Header'
 import { HaloLogo } from '../components/brand/HaloLogo'
@@ -67,6 +68,8 @@ export function SpacePage() {
     getConversations,
     getCurrentConversation,
     getCurrentConversationId,
+    getSelectionType,
+    setSelectionType,
     isLoading,
     loadConversations,
     createConversation,
@@ -80,6 +83,7 @@ export function SpacePage() {
   const conversations = getConversations()
   const currentConversation = getCurrentConversation()
   const currentConversationId = getCurrentConversationId()
+  const selectionType = getSelectionType()
 
   // Conversation list collapse state (default: expanded = not collapsed)
   const [isConversationListCollapsed, setIsConversationListCollapsed] = useState(false)
@@ -448,6 +452,7 @@ export function SpacePage() {
             onClearAll={handleClearAllClick}
             isCollapsed={isConversationListCollapsed}
             onToggleCollapse={() => setIsConversationListCollapsed(!isConversationListCollapsed)}
+            spaceId={currentSpace.id}
           />
         )}
 
@@ -476,7 +481,12 @@ export function SpacePage() {
                   willChange: isCanvasTransitioning ? 'width, flex' : 'auto',
                 }}
               >
-                <ChatView isCompact={isCanvasOpen} />
+                {/* Conditional rendering based on selection type */}
+                {selectionType === 'loopTask' ? (
+                  <LoopTaskPanel spaceId={currentSpace.id} />
+                ) : (
+                  <ChatView isCompact={isCanvasOpen} />
+                )}
 
                 {/* Drag handle for chat width - only when canvas is open */}
                 {isCanvasOpen && (
@@ -518,7 +528,11 @@ export function SpacePage() {
         {/* Mobile Layout */}
         {isMobile && (
           <div className="flex-1 flex flex-col min-w-0">
-            <ChatView isCompact={false} />
+            {selectionType === 'loopTask' ? (
+              <LoopTaskPanel spaceId={currentSpace.id} />
+            ) : (
+              <ChatView isCompact={false} />
+            )}
           </div>
         )}
 
@@ -596,6 +610,7 @@ export function SpacePage() {
             onClearAll={handleClearAllClick}
             isCollapsed={false}
             isMobileOverlay={true}
+            spaceId={currentSpace.id}
           />
         </div>
       )}

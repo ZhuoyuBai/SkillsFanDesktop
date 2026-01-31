@@ -7,3 +7,6 @@
 
 // AI Sources types
 export * from './ai-sources'
+
+// Loop Task types
+export * from './loop-task'
