@@ -25,6 +25,7 @@ import { hasAnyAISource } from './types'
 // These pages contain complex components (chat, markdown, code highlighting, etc.)
 const SpacePage = lazy(() => import('./pages/SpacePage').then(m => ({ default: m.SpacePage })))
 const SettingsPage = lazy(() => import('./pages/SettingsPage').then(m => ({ default: m.SettingsPage })))
+const RalphPage = lazy(() => import('./pages/RalphPage').then(m => ({ default: m.RalphPage })))
 
 // Page loading fallback - minimal spinner that matches app style
 function PageLoader() {
@@ -501,6 +502,12 @@ export default function App() {
         return (
           <Suspense fallback={<PageLoader />}>
             <SettingsPage />
+          </Suspense>
+        )
+      case 'ralph':
+        return (
+          <Suspense fallback={<PageLoader />}>
+            <RalphPage />
           </Suspense>
         )
       default:

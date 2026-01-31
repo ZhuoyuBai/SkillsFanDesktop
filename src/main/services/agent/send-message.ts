@@ -84,13 +84,15 @@ export async function sendMessage(
     images,
     aiBrowserEnabled,
     thinkingEnabled,
-    canvasContext
+    canvasContext,
+    ralphMode
   } = request
 
-  console.log(`[Agent] sendMessage: conv=${conversationId}${images && images.length > 0 ? `, images=${images.length}` : ''}${aiBrowserEnabled ? ', AI Browser enabled' : ''}${thinkingEnabled ? ', thinking=ON' : ''}${canvasContext?.isOpen ? `, canvas tabs=${canvasContext.tabCount}` : ''}`)
+  console.log(`[Agent] sendMessage: conv=${conversationId}${images && images.length > 0 ? `, images=${images.length}` : ''}${aiBrowserEnabled ? ', AI Browser enabled' : ''}${thinkingEnabled ? ', thinking=ON' : ''}${canvasContext?.isOpen ? `, canvas tabs=${canvasContext.tabCount}` : ''}${ralphMode?.enabled ? ', Ralph mode' : ''}`)
 
   const config = getConfig()
-  const workDir = getWorkingDir(spaceId)
+  // Ralph mode uses projectDir as working directory
+  const workDir = ralphMode?.enabled ? ralphMode.projectDir : getWorkingDir(spaceId)
 
   // Get API credentials based on current aiSources configuration
   const credentials = await getApiCredentials(config)
@@ -122,9 +124,12 @@ export async function sendMessage(
     console.log(`[Agent] ${credentials.provider} provider enabled: routing via ${anthropicBaseUrl}, apiType=${apiType}`)
   }
 
-  // Get conversation for session resumption
-  const conversation = getConversation(spaceId, conversationId)
-  const sessionId = resumeSessionId || conversation?.sessionId
+  // Get conversation for session resumption (skip for Ralph mode - no conversation history needed)
+  let sessionId = resumeSessionId
+  if (!ralphMode?.enabled) {
+    const conversation = getConversation(spaceId, conversationId)
+    sessionId = sessionId || conversation?.sessionId
+  }
 
   // Create abort controller for this session
   const abortController = new AbortController()
@@ -136,19 +141,21 @@ export async function sendMessage(
   const sessionState = createSessionState(spaceId, conversationId, abortController)
   registerActiveSession(conversationId, sessionState)
 
-  // Add user message to conversation (with images if provided)
-  addMessage(spaceId, conversationId, {
-    role: 'user',
-    content: message,
-    images: images  // Include images in the saved message
-  })
+  // Add user message to conversation (skip for Ralph mode - no conversation history needed)
+  if (!ralphMode?.enabled) {
+    addMessage(spaceId, conversationId, {
+      role: 'user',
+      content: message,
+      images: images  // Include images in the saved message
+    })
 
-  // Add placeholder for assistant response
-  addMessage(spaceId, conversationId, {
-    role: 'assistant',
-    content: '',
-    toolCalls: []
-  })
+    // Add placeholder for assistant response
+    addMessage(spaceId, conversationId, {
+      role: 'assistant',
+      content: '',
+      toolCalls: []
+    })
+  }
 
   try {
     // Use headless Electron binary (outside .app bundle on macOS to prevent Dock icon)
@@ -194,7 +201,10 @@ export async function sendMessage(
         preset: 'claude_code' as const,
         // Append AI Browser system prompt if enabled
         // Pass actual model name so AI knows what model it's running on
-        append: buildSystemPromptAppend(workDir, credentials.model) + (aiBrowserEnabled ? AI_BROWSER_SYSTEM_PROMPT : '')
+        // Ralph mode appends custom system prompt for autonomous loop tasks
+        append: buildSystemPromptAppend(workDir, credentials.model)
+          + (aiBrowserEnabled ? AI_BROWSER_SYSTEM_PROMPT : '')
+          + (ralphMode?.systemPromptAppend || '')
       },
       maxTurns: 50,
       allowedTools: ['Read', 'Write', 'Edit', 'Grep', 'Glob', 'Bash'],
@@ -286,7 +296,8 @@ export async function sendMessage(
       canvasContext,
       credentials.model,
       abortController,
-      t0
+      t0,
+      ralphMode
     )
 
   } catch (error: unknown) {
@@ -343,6 +354,11 @@ export async function sendMessage(
       error: errorMessage
     })
 
+    // Ralph mode: call onError callback
+    if (ralphMode?.onError) {
+      ralphMode.onError(errorMessage)
+    }
+
     // Close V2 session on error (it may be in a bad state)
     closeV2Session(conversationId)
   } finally {
@@ -369,7 +385,8 @@ async function processMessageStream(
   canvasContext: AgentRequest['canvasContext'],
   displayModel: string,
   abortController: AbortController,
-  t0: number
+  t0: number,
+  ralphMode?: AgentRequest['ralphMode']
 ): Promise<void> {
   // Accumulate ALL text blocks (separated by double newlines) for complete output
   let accumulatedTextContent = ''
@@ -472,6 +489,11 @@ async function processMessageStream(
 
         // Update session state for inject feature
         sessionState.currentStreamingContent = accumulatedTextContent + currentStreamingText
+
+        // Ralph mode: call onOutput callback with full accumulated content
+        if (ralphMode?.onOutput) {
+          ralphMode.onOutput(accumulatedTextContent + currentStreamingText)
+        }
 
         // Send full accumulated content (not just delta) for proper display
         sendToRenderer('agent:message', spaceId, conversationId, {
@@ -664,8 +686,8 @@ async function processMessageStream(
     }
   }
 
-  // Save session ID for future resumption
-  if (capturedSessionId) {
+  // Save session ID for future resumption (skip for Ralph mode - no conversation history needed)
+  if (capturedSessionId && !ralphMode?.enabled) {
     saveSessionId(spaceId, conversationId, capturedSessionId)
     console.log(`[Agent][${conversationId}] Session ID saved:`, capturedSessionId)
   }
@@ -674,12 +696,15 @@ async function processMessageStream(
   if (accumulatedTextContent) {
     console.log(`[Agent][${conversationId}] Sending final complete event with accumulated text (${textBlockCount} blocks)`)
     // Backend saves complete message with thoughts and tokenUsage (Single Source of Truth)
-    updateLastMessage(spaceId, conversationId, {
-      content: accumulatedTextContent,
-      thoughts: sessionState.thoughts.length > 0 ? [...sessionState.thoughts] : undefined,
-      tokenUsage: tokenUsage || undefined  // Include token usage if available
-    })
-    console.log(`[Agent][${conversationId}] Saved ${sessionState.thoughts.length} thoughts${tokenUsage ? ' with tokenUsage' : ''} to backend`)
+    // Skip for Ralph mode - no conversation history needed
+    if (!ralphMode?.enabled) {
+      updateLastMessage(spaceId, conversationId, {
+        content: accumulatedTextContent,
+        thoughts: sessionState.thoughts.length > 0 ? [...sessionState.thoughts] : undefined,
+        tokenUsage: tokenUsage || undefined  // Include token usage if available
+      })
+      console.log(`[Agent][${conversationId}] Saved ${sessionState.thoughts.length} thoughts${tokenUsage ? ' with tokenUsage' : ''} to backend`)
+    }
     sendToRenderer('agent:complete', spaceId, conversationId, {
       type: 'complete',
       duration: 0,
@@ -692,7 +717,7 @@ async function processMessageStream(
 
     // Fallback: Try to use currentStreamingText if available (content_block_stop was missed)
     const fallbackContent = currentStreamingText || ''
-    if (fallbackContent) {
+    if (fallbackContent && !ralphMode?.enabled) {
       console.log(`[Agent][${conversationId}] Using fallback content from currentStreamingText: ${fallbackContent.length} chars`)
       updateLastMessage(spaceId, conversationId, {
         content: fallbackContent,
@@ -706,5 +731,10 @@ async function processMessageStream(
       duration: 0,
       tokenUsage  // Include token usage data
     })
+  }
+
+  // Ralph mode: call onComplete callback
+  if (ralphMode?.onComplete) {
+    ralphMode.onComplete()
   }
 }

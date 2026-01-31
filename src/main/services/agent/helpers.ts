@@ -127,6 +127,13 @@ export function getHeadlessElectronPath(): string {
 export function getWorkingDir(spaceId: string): string {
   console.log(`[Agent] getWorkingDir called with spaceId: ${spaceId}`)
 
+  // Ralph mode uses special spaceId, actual working dir is set via ralphMode.projectDir
+  // Return temp path as fallback (will be overridden by ralphMode.projectDir in send-message.ts)
+  if (spaceId === '__ralph__') {
+    console.log(`[Agent] Ralph mode detected, returning temp path (will be overridden by projectDir)`)
+    return getTempSpacePath()
+  }
+
   if (spaceId === 'halo-temp') {
     const artifactsDir = join(getTempSpacePath(), 'artifacts')
     if (!existsSync(artifactsDir)) {

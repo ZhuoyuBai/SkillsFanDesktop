@@ -280,6 +280,32 @@ export interface HaloAPI {
   // Bootstrap lifecycle events
   onBootstrapExtendedReady: (callback: (data: { timestamp: number; duration: number }) => void) => () => void
 
+  // Ralph (Loop Task)
+  ralphCreateTask: (config: {
+    projectDir: string
+    description: string
+    stories: Array<{
+      id: string
+      title: string
+      description: string
+      acceptanceCriteria: string[]
+      priority: number
+      status: string
+      notes: string
+    }>
+    maxIterations: number
+    branchName?: string
+  }) => Promise<IpcResponse>
+  ralphStart: (taskId: string) => Promise<IpcResponse>
+  ralphStop: (taskId: string) => Promise<IpcResponse>
+  ralphGetTask: (taskId: string) => Promise<IpcResponse>
+  ralphGetCurrent: () => Promise<IpcResponse>
+  ralphGenerateStories: (config: { projectDir: string; description: string }) => Promise<IpcResponse>
+  ralphImportPrd: (config: { projectDir: string }) => Promise<IpcResponse>
+  ralphPrdExists: (projectDir: string) => Promise<IpcResponse>
+  onRalphTaskUpdate: (callback: (data: { task: unknown }) => void) => () => void
+  onRalphStoryLog: (callback: (data: { taskId: string; storyId: string; log: string }) => void) => () => void
+
   // SkillsFan Account Auth
   skillsfanStartLogin: () => Promise<IpcResponse>
   skillsfanLogout: () => Promise<IpcResponse>
@@ -522,6 +548,18 @@ const api: HaloAPI = {
 
   // Bootstrap lifecycle events
   onBootstrapExtendedReady: (callback) => createEventListener('bootstrap:extended-ready', callback as (data: unknown) => void),
+
+  // Ralph (Loop Task)
+  ralphCreateTask: (config) => ipcRenderer.invoke('ralph:create-task', config),
+  ralphStart: (taskId) => ipcRenderer.invoke('ralph:start', taskId),
+  ralphStop: (taskId) => ipcRenderer.invoke('ralph:stop', taskId),
+  ralphGetTask: (taskId) => ipcRenderer.invoke('ralph:get-task', taskId),
+  ralphGetCurrent: () => ipcRenderer.invoke('ralph:get-current'),
+  ralphGenerateStories: (config) => ipcRenderer.invoke('ralph:generate-stories', config),
+  ralphImportPrd: (config) => ipcRenderer.invoke('ralph:import-prd', config),
+  ralphPrdExists: (projectDir) => ipcRenderer.invoke('ralph:prd-exists', projectDir),
+  onRalphTaskUpdate: (callback) => createEventListener('ralph:task-update', callback as (data: unknown) => void),
+  onRalphStoryLog: (callback) => createEventListener('ralph:story-log', callback as (data: unknown) => void),
 
   // SkillsFan Account Auth
   skillsfanStartLogin: () => ipcRenderer.invoke('skillsfan:start-login'),

@@ -71,6 +71,18 @@ export interface CanvasContext {
 // Agent Request
 // ============================================
 
+/**
+ * Ralph mode configuration for autonomous loop tasks
+ */
+export interface RalphModeConfig {
+  enabled: boolean
+  projectDir: string                      // Working directory override
+  systemPromptAppend?: string             // Custom system prompt append
+  onOutput?: (content: string) => void    // Output callback for completion signal detection
+  onComplete?: () => void                 // Completion callback
+  onError?: (error: string) => void       // Error callback
+}
+
 export interface AgentRequest {
   spaceId: string
   conversationId: string
@@ -81,6 +93,7 @@ export interface AgentRequest {
   thinkingEnabled?: boolean   // Enable extended thinking mode (maxThinkingTokens: 10240)
   model?: string              // Model to use (for future model switching)
   canvasContext?: CanvasContext  // Current canvas state for AI awareness
+  ralphMode?: RalphModeConfig    // Ralph autonomous loop mode
 }
 
 // ============================================

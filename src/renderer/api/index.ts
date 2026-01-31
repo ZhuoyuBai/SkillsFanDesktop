@@ -1141,6 +1141,94 @@ export const api = {
     return window.skillsfan.onBootstrapExtendedReady(callback)
   },
 
+  // ===== Ralph (Loop Task) =====
+  ralphCreateTask: async (config: {
+    projectDir: string
+    description: string
+    stories: Array<{
+      id: string
+      title: string
+      description: string
+      acceptanceCriteria: string[]
+      priority: number
+      status: string
+      notes: string
+    }>
+    maxIterations: number
+    branchName?: string
+  }): Promise<ApiResponse> => {
+    if (!isElectron()) {
+      return { success: false, error: 'Only available in desktop app' }
+    }
+    return window.skillsfan.ralphCreateTask(config)
+  },
+
+  ralphStart: async (taskId: string): Promise<ApiResponse> => {
+    if (!isElectron()) {
+      return { success: false, error: 'Only available in desktop app' }
+    }
+    return window.skillsfan.ralphStart(taskId)
+  },
+
+  ralphStop: async (taskId: string): Promise<ApiResponse> => {
+    if (!isElectron()) {
+      return { success: false, error: 'Only available in desktop app' }
+    }
+    return window.skillsfan.ralphStop(taskId)
+  },
+
+  ralphGetTask: async (taskId: string): Promise<ApiResponse> => {
+    if (!isElectron()) {
+      return { success: false, error: 'Only available in desktop app' }
+    }
+    return window.skillsfan.ralphGetTask(taskId)
+  },
+
+  ralphGetCurrent: async (): Promise<ApiResponse> => {
+    if (!isElectron()) {
+      return { success: false, error: 'Only available in desktop app' }
+    }
+    return window.skillsfan.ralphGetCurrent()
+  },
+
+  ralphGenerateStories: async (config: {
+    projectDir: string
+    description: string
+  }): Promise<ApiResponse> => {
+    if (!isElectron()) {
+      return { success: false, error: 'Only available in desktop app' }
+    }
+    return window.skillsfan.ralphGenerateStories(config)
+  },
+
+  ralphImportPrd: async (config: { projectDir: string }): Promise<ApiResponse> => {
+    if (!isElectron()) {
+      return { success: false, error: 'Only available in desktop app' }
+    }
+    return window.skillsfan.ralphImportPrd(config)
+  },
+
+  ralphPrdExists: async (projectDir: string): Promise<ApiResponse> => {
+    if (!isElectron()) {
+      return { success: false, error: 'Only available in desktop app' }
+    }
+    return window.skillsfan.ralphPrdExists(projectDir)
+  },
+
+  onRalphTaskUpdate: (callback: (data: { task: unknown }) => void) => {
+    if (!isElectron()) {
+      return () => {}
+    }
+    return window.skillsfan.onRalphTaskUpdate(callback)
+  },
+
+  onRalphStoryLog: (callback: (data: { taskId: string; storyId: string; log: string }) => void) => {
+    if (!isElectron()) {
+      return () => {}
+    }
+    return window.skillsfan.onRalphStoryLog(callback)
+  },
+
   // ===== SkillsFan Account Auth (Electron only) =====
   skillsfanStartLogin: async (): Promise<ApiResponse> => {
     if (!isElectron()) {

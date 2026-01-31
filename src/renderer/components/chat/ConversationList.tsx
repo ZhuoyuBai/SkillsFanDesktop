@@ -7,11 +7,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import type { ConversationMeta } from '../../types'
 import { MessageSquare } from '../icons/ToolIcons'
-import { PanelLeftClose, PanelLeft, Search, SquarePen } from 'lucide-react'
+import { PanelLeftClose, PanelLeft, Search, SquarePen, RefreshCw } from 'lucide-react'
 import { useSearchStore } from '../../stores/search.store'
 import { SpaceSwitcher } from '../space/SpaceSwitcher'
 import { useTranslation } from '../../i18n'
 import { UserAvatarMenu } from './UserAvatarMenu'
+import { useAppStore } from '../../stores/app.store'
 
 // Width constraints (in pixels)
 const MIN_WIDTH = 160 // Allow smaller width
@@ -166,6 +167,9 @@ export function ConversationList({
   // Get search store
   const { openSearch } = useSearchStore()
 
+  // Get app store for navigation
+  const { setView } = useAppStore()
+
   // Collapsed view - show only icons
   if (isCollapsed) {
     return (
@@ -202,7 +206,7 @@ export function ConversationList({
           )}
         </div>
 
-        {/* New conversation button (icon only) */}
+        {/* New conversation + Loop Task + Search buttons (icon only) */}
         <div className="px-2 py-2 flex flex-col items-center gap-1">
           <button
             onClick={onNew}
@@ -210,6 +214,13 @@ export function ConversationList({
             title={t('New conversation')}
           >
             <SquarePen className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => setView('ralph')}
+            className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-md transition-colors"
+            title={t('Loop Task')}
+          >
+            <RefreshCw className="w-4 h-4" />
           </button>
           <button
             onClick={() => openSearch('global')}
@@ -298,7 +309,7 @@ export function ConversationList({
       </div>
       )}
 
-      {/* New conversation + Search buttons */}
+      {/* New conversation + Loop Task + Search buttons */}
       <div className="px-4 py-3 border-b border-border/50 space-y-2">
         <button
           onClick={onNew}
@@ -309,6 +320,15 @@ export function ConversationList({
         >
           <SquarePen className="w-4 h-4 text-foreground" />
           {t('New conversation')}
+        </button>
+        <button
+          onClick={() => setView('ralph')}
+          className="w-full flex items-center justify-start gap-2 px-2 py-1.5
+            text-sm text-foreground hover:bg-muted/50
+            rounded transition-all duration-150"
+        >
+          <RefreshCw className="w-4 h-4 text-foreground" />
+          {t('Loop Task')}
         </button>
         <button
           onClick={() => openSearch('global')}

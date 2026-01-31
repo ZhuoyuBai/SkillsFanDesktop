@@ -64,7 +64,7 @@ describe('Config Service', () => {
       expect(config.api.apiKey).toBe('')
       expect(config.api.apiUrl).toBe('https://api.anthropic.com')
       expect(config.permissions.commandExecution).toBe('ask')
-      expect(config.appearance.theme).toBe('dark')
+      expect(config.appearance.theme).toBe('light')
       expect(config.isFirstLaunch).toBe(true)
     })
 

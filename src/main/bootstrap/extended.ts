@@ -30,6 +30,7 @@ import { initializeSearchHandlers, cleanupSearchHandlers } from '../ipc/search'
 import { registerPerfHandlers } from '../ipc/perf'
 import { registerGitBashHandlers, initializeGitBashOnStartup } from '../ipc/git-bash'
 import { initializeRegistry, startSkillWatcher, getSkillsDir } from '../services/skill'
+import { registerRalphHandlers } from '../ipc/ralph'
 
 /**
  * Initialize extended services after window is visible
@@ -74,6 +75,9 @@ export function initializeExtendedServices(mainWindow: BrowserWindow): void {
 
   // GitBash: Windows Git Bash detection and setup
   registerGitBashHandlers(mainWindow)
+
+  // Ralph: Loop task management (autonomous AI agent)
+  registerRalphHandlers(mainWindow)
 
   // Skill: Initialize skill registry and start file watcher
   // Skills are loaded from ~/.skillsfan-dev/skills or ~/.skillsfan/skills
