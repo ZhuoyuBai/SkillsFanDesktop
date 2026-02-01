@@ -396,6 +396,15 @@ export async function generateStories(config: GenerateStoriesConfig): Promise<Us
   const output = await generationPromise
   console.log(`[Ralph] AI output received, parsing stories...`)
 
+  // Close V2 session after generation completes
+  try {
+    const { closeV2Session } = await import('../agent')
+    console.log(`[Ralph] Closing V2 session for story generation`)
+    closeV2Session(sessionId)
+  } catch (e) {
+    console.debug(`[Ralph] Session cleanup for generation:`, e)
+  }
+
   // Parse stories from AI output
   return parseStoriesFromOutput(output)
 }
@@ -553,14 +562,18 @@ function parseStoriesFromOutput(output: string): UserStory[] {
     }
 
     // Validate and transform to UserStory format
+    // Note: requireTypecheck and requireTests default to false
+    // Users can enable them via story edit UI for quality gates
     const stories: UserStory[] = parsed.map((s: Record<string, unknown>, i: number) => ({
       id: (s.id as string) || `US-${String(i + 1).padStart(3, '0')}`,
       title: (s.title as string) || 'Untitled Story',
       description: (s.description as string) || '',
-      acceptanceCriteria: ensureTypecheckCriteria((s.acceptanceCriteria as string[]) || []),
+      acceptanceCriteria: (s.acceptanceCriteria as string[]) || [],
       priority: (s.priority as number) || i + 1,
       status: 'pending' as const,
-      notes: (s.notes as string) || ''
+      notes: (s.notes as string) || '',
+      requireTypecheck: false,
+      requireTests: false
     }))
 
     console.log(`[Ralph] Parsed ${stories.length} stories from AI output`)
@@ -585,18 +598,9 @@ function parseStoriesFromOutput(output: string): UserStory[] {
   }
 }
 
-/**
- * Ensure "Typecheck passes" criterion is present
- */
-function ensureTypecheckCriteria(criteria: string[]): string[] {
-  const hasTypecheck = criteria.some(
-    (c) => c.toLowerCase().includes('typecheck') || c.toLowerCase().includes('type check')
-  )
-  if (!hasTypecheck) {
-    return [...criteria, 'Typecheck passes']
-  }
-  return criteria
-}
+// Note: ensureTypecheckCriteria was removed
+// Quality gates are now controlled via story.requireTypecheck and story.requireTests
+// The prompts.ts buildIterationPrompt function handles adding criteria based on these flags
 
 // ============================================
 // PRD Import

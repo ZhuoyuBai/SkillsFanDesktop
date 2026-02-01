@@ -65,7 +65,7 @@ export function Step2PlanEdit() {
       id: '',
       title: '',
       description: '',
-      acceptanceCriteria: ['Typecheck passes'],
+      acceptanceCriteria: [],
       priority: localStories.length + 1,
       status: 'pending',
       notes: ''
@@ -202,6 +202,9 @@ export function Step2PlanEdit() {
                   onRemove={() => handleRemoveStory(story.id)}
                   onMoveUp={() => handleMoveStory(index, 'up')}
                   onMoveDown={() => handleMoveStory(index, 'down')}
+                  onUpdate={(updated) =>
+                    setLocalStories(localStories.map((s) => (s.id === updated.id ? updated : s)))
+                  }
                 />
               ))}
 
@@ -301,6 +304,7 @@ interface StoryCardProps {
   onRemove: () => void
   onMoveUp: () => void
   onMoveDown: () => void
+  onUpdate: (story: UserStory) => void
 }
 
 function StoryCard({
@@ -312,7 +316,8 @@ function StoryCard({
   onEdit,
   onRemove,
   onMoveUp,
-  onMoveDown
+  onMoveDown,
+  onUpdate
 }: StoryCardProps) {
   const { t } = useTranslation()
 
@@ -403,6 +408,40 @@ function StoryCard({
                 <p className="text-sm text-muted-foreground">{story.notes}</p>
               </div>
             )}
+
+            {/* Quality Gates */}
+            <div onClick={(e) => e.stopPropagation()}>
+              <div className="text-xs font-medium text-muted-foreground mb-1">
+                {t('Quality Gates')}
+              </div>
+              <div className="flex gap-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={story.requireTypecheck ?? false}
+                    onChange={(e) =>
+                      onUpdate({ ...story, requireTypecheck: e.target.checked })
+                    }
+                    className="rounded border-border"
+                  />
+                  <span className="text-sm text-foreground">{t('Typecheck')}</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={story.requireTests ?? false}
+                    onChange={(e) =>
+                      onUpdate({ ...story, requireTests: e.target.checked })
+                    }
+                    className="rounded border-border"
+                  />
+                  <span className="text-sm text-foreground">{t('Tests')}</span>
+                </label>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                💡 {t('Enable when writing code to ensure quality')}
+              </p>
+            </div>
           </div>
         </div>
       )}

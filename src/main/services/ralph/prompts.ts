@@ -157,7 +157,30 @@ export function buildIterationPrompt(task: RalphTask, story: UserStory, skills?:
     .map((s) => `- [${s.status === 'completed' ? 'x' : ' '}] ${s.id}: ${s.title}`)
     .join('\n')
 
-  const acceptanceCriteria = story.acceptanceCriteria
+  // Build acceptance criteria with quality gates
+  const criteria = [...story.acceptanceCriteria]
+
+  // Add typecheck requirement if enabled and not already present
+  if (story.requireTypecheck) {
+    const hasTypecheck = criteria.some(
+      (c) => c.toLowerCase().includes('typecheck') || c.toLowerCase().includes('type check')
+    )
+    if (!hasTypecheck) {
+      criteria.push('Typecheck passes')
+    }
+  }
+
+  // Add tests requirement if enabled and not already present
+  if (story.requireTests) {
+    const hasTests = criteria.some(
+      (c) => c.toLowerCase().includes('test') && c.toLowerCase().includes('pass')
+    )
+    if (!hasTests) {
+      criteria.push('Tests pass')
+    }
+  }
+
+  const acceptanceCriteria = criteria
     .map((c, i) => `${i + 1}. ${c}`)
     .join('\n')
 

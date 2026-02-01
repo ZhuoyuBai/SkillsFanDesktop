@@ -25,6 +25,9 @@ export interface UserStory {
   duration?: number // milliseconds
   commitHash?: string // commit hash after completion
   error?: string // error message if failed
+  // Quality gate toggles (default: false)
+  requireTypecheck?: boolean
+  requireTests?: boolean
 }
 
 /**
@@ -85,6 +88,9 @@ export interface PrdUserStory {
   priority: number
   passes: boolean // true = completed
   notes: string
+  // Quality gate toggles (optional, for backwards compatibility with old prd.json)
+  requireTypecheck?: boolean
+  requireTests?: boolean
 }
 
 /**

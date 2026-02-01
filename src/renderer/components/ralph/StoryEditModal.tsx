@@ -4,7 +4,8 @@
 
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { X, Plus, Trash2 } from 'lucide-react'
+import { X, Plus, Trash2, ChevronDown } from 'lucide-react'
+import { cn } from '../../lib/utils'
 import type { UserStory } from '../../stores/ralph.store'
 
 interface StoryEditModalProps {
@@ -21,6 +22,9 @@ export function StoryEditModal({ story, isNew, onSave, onClose }: StoryEditModal
   const [acceptanceCriteria, setAcceptanceCriteria] = useState<string[]>(story.acceptanceCriteria)
   const [notes, setNotes] = useState(story.notes)
   const [newCriterion, setNewCriterion] = useState('')
+  const [showAdvanced, setShowAdvanced] = useState(false)
+  const [requireTypecheck, setRequireTypecheck] = useState(story.requireTypecheck ?? false)
+  const [requireTests, setRequireTests] = useState(story.requireTests ?? false)
 
   const handleAddCriterion = () => {
     if (newCriterion.trim()) {
@@ -41,7 +45,9 @@ export function StoryEditModal({ story, isNew, onSave, onClose }: StoryEditModal
       title: title.trim(),
       description: description.trim(),
       acceptanceCriteria,
-      notes: notes.trim()
+      notes: notes.trim(),
+      requireTypecheck,
+      requireTests
     })
   }
 
@@ -141,7 +147,7 @@ export function StoryEditModal({ story, isNew, onSave, onClose }: StoryEditModal
               </div>
             </div>
             <p className="text-xs text-muted-foreground">
-              {t('Press Enter to add, always include "Typecheck passes"')}
+              {t('Press Enter to add')}
             </p>
           </div>
 
@@ -157,6 +163,50 @@ export function StoryEditModal({ story, isNew, onSave, onClose }: StoryEditModal
               rows={2}
               className="w-full px-3 py-2 bg-input border border-border rounded-md text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none"
             />
+          </div>
+
+          {/* Advanced Settings */}
+          <div className="space-y-2">
+            <button
+              type="button"
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <ChevronDown
+                size={16}
+                className={cn('transition-transform', showAdvanced && 'rotate-180')}
+              />
+              {t('Advanced Settings')}
+            </button>
+
+            {showAdvanced && (
+              <div className="space-y-3 p-3 bg-muted/30 rounded-md border border-border">
+                <div className="text-sm font-medium text-foreground">{t('Quality Gates')}</div>
+                <div className="flex gap-6">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={requireTypecheck}
+                      onChange={(e) => setRequireTypecheck(e.target.checked)}
+                      className="rounded border-border"
+                    />
+                    <span className="text-sm text-foreground">{t('Typecheck')}</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={requireTests}
+                      onChange={(e) => setRequireTests(e.target.checked)}
+                      className="rounded border-border"
+                    />
+                    <span className="text-sm text-foreground">{t('Tests')}</span>
+                  </label>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  💡 {t('Enable when writing code to ensure quality')}
+                </p>
+              </div>
+            )}
           </div>
         </div>
 

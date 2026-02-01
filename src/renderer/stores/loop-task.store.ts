@@ -342,35 +342,79 @@ export const useLoopTaskStore = create<LoopTaskState>((set, get) => ({
     }
   },
 
-  // Delete a task
+  // Delete a task (optimistic update - immediate UI removal, background API call)
   deleteTask: async (spaceId, taskId) => {
+    // Save current state for potential rollback
+    const previousStates = new Map(get().spaceStates)
+    const previousCache = new Map(get().taskCache)
+    const currentState = previousStates.get(spaceId)
+    const deletedTask = previousCache.get(taskId)
+    const deletedMeta = currentState?.tasks.find((t) => t.id === taskId)
+
+    // Optimistic update - immediately remove from UI
+    const newCache = new Map(get().taskCache)
+    newCache.delete(taskId)
+
+    const newStates = new Map(get().spaceStates)
+    if (currentState) {
+      const newTasks = currentState.tasks.filter((t) => t.id !== taskId)
+      const newCurrentId =
+        currentState.currentTaskId === taskId
+          ? newTasks[0]?.id || null
+          : currentState.currentTaskId
+      newStates.set(spaceId, {
+        tasks: newTasks,
+        currentTaskId: newCurrentId
+      })
+    }
+
+    set({ spaceStates: newStates, taskCache: newCache })
+
+    // Background API call
     try {
       const result = await api.loopTaskDelete(spaceId, taskId)
 
-      if (result.success) {
-        // Remove from cache
-        const newCache = new Map(get().taskCache)
-        newCache.delete(taskId)
-
-        // Remove from list
-        const newStates = new Map(get().spaceStates)
-        const currentState = newStates.get(spaceId)
-        if (currentState) {
-          const newTasks = currentState.tasks.filter((t) => t.id !== taskId)
-          const newCurrentId =
-            currentState.currentTaskId === taskId
-              ? newTasks[0]?.id || null
-              : currentState.currentTaskId
-          newStates.set(spaceId, {
-            tasks: newTasks,
-            currentTaskId: newCurrentId
+      if (!result.success) {
+        // Rollback on failure
+        console.error('[LoopTaskStore] Delete failed, rolling back:', result.error)
+        if (deletedMeta && deletedTask) {
+          const rollbackStates = new Map(get().spaceStates)
+          const rollbackState = rollbackStates.get(spaceId)
+          if (rollbackState) {
+            rollbackStates.set(spaceId, {
+              tasks: [deletedMeta, ...rollbackState.tasks],
+              currentTaskId: rollbackState.currentTaskId
+            })
+          }
+          const rollbackCache = new Map(get().taskCache)
+          rollbackCache.set(taskId, deletedTask)
+          set({
+            spaceStates: rollbackStates,
+            taskCache: rollbackCache,
+            error: result.error || 'Failed to delete task'
           })
         }
-
-        set({ spaceStates: newStates, taskCache: newCache })
       }
     } catch (error) {
-      set({ error: (error as Error).message })
+      // Rollback on error
+      console.error('[LoopTaskStore] Delete error, rolling back:', error)
+      if (deletedMeta && deletedTask) {
+        const rollbackStates = new Map(get().spaceStates)
+        const rollbackState = rollbackStates.get(spaceId)
+        if (rollbackState) {
+          rollbackStates.set(spaceId, {
+            tasks: [deletedMeta, ...rollbackState.tasks],
+            currentTaskId: rollbackState.currentTaskId
+          })
+        }
+        const rollbackCache = new Map(get().taskCache)
+        rollbackCache.set(taskId, deletedTask)
+        set({
+          spaceStates: rollbackStates,
+          taskCache: rollbackCache,
+          error: (error as Error).message
+        })
+      }
     }
   },
 

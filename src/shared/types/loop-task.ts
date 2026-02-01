@@ -34,6 +34,9 @@ export interface UserStory {
   duration?: number // milliseconds
   commitHash?: string
   error?: string
+  // Quality gate toggles (default: false)
+  requireTypecheck?: boolean
+  requireTests?: boolean
 }
 
 /**

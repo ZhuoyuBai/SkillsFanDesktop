@@ -139,7 +139,7 @@ export function RalphStoryEditor() {
       id: '', // Will be generated
       title: '',
       description: '',
-      acceptanceCriteria: ['Typecheck passes'],
+      acceptanceCriteria: [],
       priority: stories.length + 1,
       status: 'pending',
       notes: ''

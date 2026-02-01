@@ -81,7 +81,7 @@ export async function executeStory(
 
   try {
     // Dynamically import agent service to avoid circular dependencies
-    const { sendMessage } = await import('../agent')
+    const { sendMessage, closeV2Session } = await import('../agent')
 
     // Get available skills for the iteration prompt
     await ensureSkillsInitialized()
@@ -185,6 +185,17 @@ export async function executeStory(
   } finally {
     state.isRunning = false
     cleanupExecutionState(story.id)
+
+    // Close V2 session to ensure fresh instance for next iteration
+    // Matches ralph.sh semantics where each loop iteration is a new process
+    try {
+      const { closeV2Session } = await import('../agent')
+      console.log(`[Ralph] Closing V2 session for story ${story.id} to ensure fresh instance`)
+      closeV2Session(sessionId)
+    } catch (e) {
+      // Session may not exist or already closed, that's ok
+      console.debug(`[Ralph] Session cleanup for ${story.id}:`, e)
+    }
   }
 }
 

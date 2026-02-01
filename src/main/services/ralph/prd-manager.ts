@@ -64,7 +64,10 @@ export function prdStoryToUserStory(prdStory: PrdUserStory): UserStory {
     acceptanceCriteria: prdStory.acceptanceCriteria,
     priority: prdStory.priority,
     status: prdStory.passes ? 'completed' : 'pending',
-    notes: prdStory.notes || ''
+    notes: prdStory.notes || '',
+    // Preserve quality gate settings (undefined for old prd.json format, treated as false)
+    requireTypecheck: prdStory.requireTypecheck,
+    requireTests: prdStory.requireTests
   }
 }
 
@@ -79,7 +82,10 @@ export function userStoryToPrdStory(story: UserStory): PrdUserStory {
     acceptanceCriteria: story.acceptanceCriteria,
     priority: story.priority,
     passes: story.status === 'completed',
-    notes: story.notes || ''
+    notes: story.notes || '',
+    // Export quality gate settings
+    requireTypecheck: story.requireTypecheck,
+    requireTests: story.requireTests
   }
 }
 
