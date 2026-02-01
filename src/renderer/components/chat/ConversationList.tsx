@@ -27,37 +27,6 @@ type UnifiedTask = {
   loopTask?: LoopTaskMeta
 }
 
-// Time group for tasks
-type TimeGroup = 'today' | 'yesterday' | 'earlier'
-
-// Get time group for a date
-function getTimeGroup(dateStr: string): TimeGroup {
-  const date = new Date(dateStr)
-  const now = new Date()
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000)
-
-  if (date >= today) return 'today'
-  if (date >= yesterday) return 'yesterday'
-  return 'earlier'
-}
-
-// Group tasks by time
-function groupTasksByTime(tasks: UnifiedTask[]): Map<TimeGroup, UnifiedTask[]> {
-  const groups = new Map<TimeGroup, UnifiedTask[]>([
-    ['today', []],
-    ['yesterday', []],
-    ['earlier', []]
-  ])
-
-  for (const task of tasks) {
-    const group = getTimeGroup(task.updatedAt)
-    groups.get(group)!.push(task)
-  }
-
-  return groups
-}
-
 // Unified task item component
 interface UnifiedTaskItemProps {
   task: UnifiedTask
@@ -347,9 +316,6 @@ export function ConversationList({
     return tasks
   }, [conversations, loopTasks])
 
-  // Group tasks by time
-  const groupedTasks = useMemo(() => groupTasksByTime(unifiedTasks), [unifiedTasks])
-
   // Handle drag resize (disabled in mobile overlay mode)
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (isMobileOverlay) return  // Disable drag on mobile overlay
@@ -635,7 +601,7 @@ export function ConversationList({
         </div>
       </div>
 
-      {/* Unified task list grouped by time */}
+      {/* Unified task list */}
       <div className="flex-1 overflow-auto">
         {unifiedTasks.length === 0 ? (
           <div className="px-4 py-8 text-center text-sm text-muted-foreground">
@@ -643,179 +609,58 @@ export function ConversationList({
           </div>
         ) : (
           <>
-            {/* Today */}
-            {groupedTasks.get('today')!.length > 0 && (
-              <div>
-                <div className="px-4 py-1.5 text-xs text-muted-foreground font-medium">
-                  {t('Today')}
-                </div>
-                {groupedTasks.get('today')!.map((task) => (
-                  <UnifiedTaskItem
-                    key={task.id}
-                    task={task}
-                    isActive={
-                      (task.type === 'conversation' && task.id === currentConversationId && selectionType === 'conversation') ||
-                      (task.type === 'loopTask' && task.id === currentTaskId && selectionType === 'loopTask')
-                    }
-                    isEditing={editingId === task.id}
-                    editingTitle={editingTitle}
-                    onSelect={() => {
-                      if (task.type === 'conversation') {
-                        handleSelectConversation(task.id)
-                      } else {
-                        handleSelectLoopTask(task.id)
-                      }
-                    }}
-                    onStartEdit={(e) => {
-                      if (task.conversation) {
-                        handleStartEdit(e, task.conversation)
-                      } else if (task.loopTask) {
-                        setEditingId(task.id)
-                        setEditingTitle(task.loopTask.name)
-                      }
-                    }}
-                    onEditChange={setEditingTitle}
-                    onEditSave={() => {
-                      if (task.type === 'conversation' && onRename) {
-                        onRename(task.id, editingTitle.trim())
-                      } else if (task.type === 'loopTask') {
-                        handleRenameLoopTask(task.id, editingTitle.trim())
-                      }
-                      setEditingId(null)
-                      setEditingTitle('')
-                    }}
-                    onEditCancel={handleCancelEdit}
-                    onDelete={() => {
-                      if (task.type === 'conversation' && onDelete) {
-                        onDelete(task.id)
-                      } else if (task.type === 'loopTask') {
-                        handleDeleteLoopTask(task.id)
-                      }
-                    }}
-                    canRename={task.type === 'conversation' ? !!onRename : true}
-                    canDelete={task.type === 'conversation' ? !!onDelete : true}
-                    editInputRef={editInputRef}
-                    t={t}
-                  />
-                ))}
-              </div>
-            )}
-
-            {/* Yesterday */}
-            {groupedTasks.get('yesterday')!.length > 0 && (
-              <div>
-                <div className="px-4 py-1.5 text-xs text-muted-foreground font-medium">
-                  {t('Yesterday')}
-                </div>
-                {groupedTasks.get('yesterday')!.map((task) => (
-                  <UnifiedTaskItem
-                    key={task.id}
-                    task={task}
-                    isActive={
-                      (task.type === 'conversation' && task.id === currentConversationId && selectionType === 'conversation') ||
-                      (task.type === 'loopTask' && task.id === currentTaskId && selectionType === 'loopTask')
-                    }
-                    isEditing={editingId === task.id}
-                    editingTitle={editingTitle}
-                    onSelect={() => {
-                      if (task.type === 'conversation') {
-                        handleSelectConversation(task.id)
-                      } else {
-                        handleSelectLoopTask(task.id)
-                      }
-                    }}
-                    onStartEdit={(e) => {
-                      if (task.conversation) {
-                        handleStartEdit(e, task.conversation)
-                      } else if (task.loopTask) {
-                        setEditingId(task.id)
-                        setEditingTitle(task.loopTask.name)
-                      }
-                    }}
-                    onEditChange={setEditingTitle}
-                    onEditSave={() => {
-                      if (task.type === 'conversation' && onRename) {
-                        onRename(task.id, editingTitle.trim())
-                      } else if (task.type === 'loopTask') {
-                        handleRenameLoopTask(task.id, editingTitle.trim())
-                      }
-                      setEditingId(null)
-                      setEditingTitle('')
-                    }}
-                    onEditCancel={handleCancelEdit}
-                    onDelete={() => {
-                      if (task.type === 'conversation' && onDelete) {
-                        onDelete(task.id)
-                      } else if (task.type === 'loopTask') {
-                        handleDeleteLoopTask(task.id)
-                      }
-                    }}
-                    canRename={task.type === 'conversation' ? !!onRename : true}
-                    canDelete={task.type === 'conversation' ? !!onDelete : true}
-                    editInputRef={editInputRef}
-                    t={t}
-                  />
-                ))}
-              </div>
-            )}
-
-            {/* Earlier */}
-            {groupedTasks.get('earlier')!.length > 0 && (
-              <div>
-                <div className="px-4 py-1.5 text-xs text-muted-foreground font-medium">
-                  {t('Earlier')}
-                </div>
-                {groupedTasks.get('earlier')!.map((task) => (
-                  <UnifiedTaskItem
-                    key={task.id}
-                    task={task}
-                    isActive={
-                      (task.type === 'conversation' && task.id === currentConversationId && selectionType === 'conversation') ||
-                      (task.type === 'loopTask' && task.id === currentTaskId && selectionType === 'loopTask')
-                    }
-                    isEditing={editingId === task.id}
-                    editingTitle={editingTitle}
-                    onSelect={() => {
-                      if (task.type === 'conversation') {
-                        handleSelectConversation(task.id)
-                      } else {
-                        handleSelectLoopTask(task.id)
-                      }
-                    }}
-                    onStartEdit={(e) => {
-                      if (task.conversation) {
-                        handleStartEdit(e, task.conversation)
-                      } else if (task.loopTask) {
-                        setEditingId(task.id)
-                        setEditingTitle(task.loopTask.name)
-                      }
-                    }}
-                    onEditChange={setEditingTitle}
-                    onEditSave={() => {
-                      if (task.type === 'conversation' && onRename) {
-                        onRename(task.id, editingTitle.trim())
-                      } else if (task.type === 'loopTask') {
-                        handleRenameLoopTask(task.id, editingTitle.trim())
-                      }
-                      setEditingId(null)
-                      setEditingTitle('')
-                    }}
-                    onEditCancel={handleCancelEdit}
-                    onDelete={() => {
-                      if (task.type === 'conversation' && onDelete) {
-                        onDelete(task.id)
-                      } else if (task.type === 'loopTask') {
-                        handleDeleteLoopTask(task.id)
-                      }
-                    }}
-                    canRename={task.type === 'conversation' ? !!onRename : true}
-                    canDelete={task.type === 'conversation' ? !!onDelete : true}
-                    editInputRef={editInputRef}
-                    t={t}
-                  />
-                ))}
-              </div>
-            )}
+            <div className="px-4 py-1.5 text-xs text-muted-foreground font-medium">
+              {t('History')}
+            </div>
+            {unifiedTasks.map((task) => (
+              <UnifiedTaskItem
+                key={task.id}
+                task={task}
+                isActive={
+                  (task.type === 'conversation' && task.id === currentConversationId && selectionType === 'conversation') ||
+                  (task.type === 'loopTask' && task.id === currentTaskId && selectionType === 'loopTask')
+                }
+                isEditing={editingId === task.id}
+                editingTitle={editingTitle}
+                onSelect={() => {
+                  if (task.type === 'conversation') {
+                    handleSelectConversation(task.id)
+                  } else {
+                    handleSelectLoopTask(task.id)
+                  }
+                }}
+                onStartEdit={(e) => {
+                  if (task.conversation) {
+                    handleStartEdit(e, task.conversation)
+                  } else if (task.loopTask) {
+                    setEditingId(task.id)
+                    setEditingTitle(task.loopTask.name)
+                  }
+                }}
+                onEditChange={setEditingTitle}
+                onEditSave={() => {
+                  if (task.type === 'conversation' && onRename) {
+                    onRename(task.id, editingTitle.trim())
+                  } else if (task.type === 'loopTask') {
+                    handleRenameLoopTask(task.id, editingTitle.trim())
+                  }
+                  setEditingId(null)
+                  setEditingTitle('')
+                }}
+                onEditCancel={handleCancelEdit}
+                onDelete={() => {
+                  if (task.type === 'conversation' && onDelete) {
+                    onDelete(task.id)
+                  } else if (task.type === 'loopTask') {
+                    handleDeleteLoopTask(task.id)
+                  }
+                }}
+                canRename={task.type === 'conversation' ? !!onRename : true}
+                canDelete={task.type === 'conversation' ? !!onDelete : true}
+                editInputRef={editInputRef}
+                t={t}
+              />
+            ))}
           </>
         )}
       </div>

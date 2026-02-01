@@ -4,16 +4,16 @@
 
 /* MiSans Font */
 @font-face {
-  font-family: 'MiSans';
-  src: url('../fonts/MiSans-Normal.woff2') format('woff2');
+  font-family: "MiSans";
+  src: url("../fonts/MiSans-Normal.woff2") format("woff2");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
 
 @font-face {
-  font-family: 'MiSans';
-  src: url('../fonts/MiSans-Bold.woff2') format('woff2');
+  font-family: "MiSans";
+  src: url("../fonts/MiSans-Bold.woff2") format("woff2");
   font-weight: 700;
   font-style: normal;
   font-display: swap;
@@ -51,7 +51,7 @@
   --card-foreground: 0 0% 98%;
   --popover: 0 0% 7%;
   --popover-foreground: 0 0% 98%;
-  --primary: 24 90% 55%;
+  --primary: 23 68% 55%;
   --primary-foreground: 0 0% 100%;
   --secondary: 0 0% 15%;
   --secondary-foreground: 0 0% 98%;
@@ -66,11 +66,11 @@
   --ring: 0 0% 30%;
   --radius: 0.75rem;
 
-  /* SkillsFan brand colors */
-  --skillsfan-glow: 24 90% 55%;
-  --skillsfan-success: 0 0% 50%;
-  --skillsfan-warning: 0 0% 50%;
-  --skillsfan-error: 0 20% 50%;
+  /* SkillsFan brand colors - Monochrome */
+  --skillsfan-glow: 0 0% 100%;
+  --skillsfan-success: 0 0% 80%;
+  --skillsfan-warning: 0 0% 60%;
+  --skillsfan-error: 0 0% 40%;
   /* Legacy aliases */
   --halo-glow: var(--skillsfan-glow);
   --halo-success: var(--skillsfan-success);
@@ -79,32 +79,34 @@
 }
 
 /* Light theme */
+/* Light theme */
 .light {
-  --background: 0 0% 99%;
-  --foreground: 0 0% 9%;
-  --card: 0 0% 98%;
-  --card-foreground: 0 0% 9%;
+  --background: 0 0% 100%;
+  --foreground: 0 0% 20%;
+  --card: 0 0% 100%;
+  --card-foreground: 0 0% 20%;
   --popover: 0 0% 100%;
-  --popover-foreground: 0 0% 9%;
-  --primary: 24 90% 42%;
+  --popover-foreground: 0 0% 20%;
+  /* Restored SkillsFan Brand Color */
+  --primary: 23 68% 55%;
   --primary-foreground: 0 0% 100%;
-  --secondary: 0 0% 98%;
-  --secondary-foreground: 0 0% 20%;
-  --muted: 0 0% 94%;
-  --muted-foreground: 0 0% 45%;
-  --accent: 0 0% 92%;
-  --accent-foreground: 0 0% 15%;
-  --destructive: 0 72% 51%;
-  --destructive-foreground: 0 0% 100%;
-  --border: 0 0% 92%;
-  --input: 0 0% 94%;
-  --ring: 0 0% 70%;
+  --secondary: 0 0% 97%;
+  --secondary-foreground: 0 0% 25%;
+  --muted: 0 0% 97%;
+  --muted-foreground: 0 0% 55%;
+  --accent: 0 0% 97%;
+  --accent-foreground: 0 0% 25%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 98%;
+  --border: 0 0% 88%;
+  --input: 0 0% 92%;
+  --ring: 0 0% 80%;
 
   /* SkillsFan brand colors (adjusted for light) */
-  --skillsfan-glow: 24 90% 50%;
-  --skillsfan-success: 0 0% 45%;
-  --skillsfan-warning: 0 0% 45%;
-  --skillsfan-error: 0 25% 51%;
+  --skillsfan-glow: 0 0% 90%;
+  --skillsfan-success: 0 0% 60%;
+  --skillsfan-warning: 0 0% 70%;
+  --skillsfan-error: 0 0% 80%;
   /* Legacy aliases */
   --halo-glow: var(--skillsfan-glow);
   --halo-success: var(--skillsfan-success);
@@ -128,7 +130,15 @@ html.light {
 body {
   background-color: hsl(var(--background));
   color: hsl(var(--foreground));
-  font-family: 'MiSans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-family:
+    "MiSans",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    "Helvetica Neue",
+    Arial,
+    sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow: hidden;
@@ -184,7 +194,8 @@ body {
 
 /* Halo glow animation */
 @keyframes halo-pulse {
-  0%, 100% {
+  0%,
+  100% {
     box-shadow: 0 0 20px hsl(var(--halo-glow) / 0.3);
   }
   50% {
@@ -193,7 +204,8 @@ body {
 }
 
 @keyframes halo-breathe {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 0.6;
     transform: scale(1);
   }
@@ -226,7 +238,8 @@ body {
 
 /* SkillsFan logo pulse animation - stronger breathing effect */
 @keyframes skillsfan-pulse {
-  0%, 100% {
+  0%,
+  100% {
     transform: scale(1);
     opacity: 0.8;
     filter: brightness(1);
@@ -244,7 +257,10 @@ body {
 
 /* Hover-only pulse animation */
 .skillsfan-pulse-hover {
-  transition: transform 0.3s ease, opacity 0.3s ease, filter 0.3s ease;
+  transition:
+    transform 0.3s ease,
+    opacity 0.3s ease,
+    filter 0.3s ease;
 }
 
 .skillsfan-pulse-hover:hover {
@@ -401,7 +417,8 @@ body {
 
 /* Thinking pulse animation */
 @keyframes thinking-pulse {
-  0%, 100% {
+  0%,
+  100% {
     border-color: hsl(var(--primary) / 0.3);
     box-shadow: 0 0 0 0 hsl(var(--primary) / 0.1);
   }
@@ -417,7 +434,8 @@ body {
 
 /* Gentle pulse animation */
 @keyframes pulse-gentle {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 0.5;
     transform: scale(1);
   }
@@ -431,9 +449,36 @@ body {
   animation: pulse-gentle 2s ease-in-out infinite;
 }
 
+/* Card enter animation with stagger effect */
+@keyframes card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-card-enter {
+  animation: card-enter 0.4s ease-out forwards;
+}
+
+.animate-card-enter-delay-1 {
+  animation: card-enter 0.4s ease-out 0.1s forwards;
+  opacity: 0;
+}
+
+.animate-card-enter-delay-2 {
+  animation: card-enter 0.4s ease-out 0.2s forwards;
+  opacity: 0;
+}
+
 /* Skill gradient label animations (Claude Code ultrathink style) */
 @keyframes skill-breathe {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 0.9;
     box-shadow: 0 0 15px rgba(139, 92, 246, 0.3);
   }
@@ -468,7 +513,8 @@ body {
 
 /* Cursor blink for streaming */
 @keyframes cursor-blink {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 1;
   }
   50% {
@@ -506,7 +552,8 @@ body {
 
 /* Breathing glow */
 @keyframes breathing-glow {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 0.5;
   }
   50% {
@@ -677,7 +724,11 @@ body {
    ============================================ */
 
 .message-user {
-  background: linear-gradient(135deg, hsl(var(--foreground) / 0.08), hsl(var(--foreground) / 0.05));
+  background: linear-gradient(
+    135deg,
+    hsl(var(--foreground) / 0.08),
+    hsl(var(--foreground) / 0.05)
+  );
   border: 1px solid hsl(var(--border) / 0.5);
 }
 
@@ -693,13 +744,18 @@ body {
 }
 
 .streaming-message::after {
-  content: '';
+  content: "";
   position: absolute;
   bottom: 0;
   left: 0;
   right: 0;
   height: 1px;
-  background: linear-gradient(90deg, transparent, hsl(var(--muted-foreground) / 0.3), transparent);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    hsl(var(--muted-foreground) / 0.3),
+    transparent
+  );
   animation: shimmer 2s infinite;
 }
 
@@ -709,11 +765,13 @@ body {
   border-color: hsl(var(--muted-foreground) / 0.25);
   overflow-y: hidden;
   overflow-x: auto;
-  transition: border-color 0.5s ease-out, opacity 0.5s ease-out;
+  transition:
+    border-color 0.5s ease-out,
+    opacity 0.5s ease-out;
 }
 
 .message-working::before {
-  content: '';
+  content: "";
   position: absolute;
   inset: -1px;
   border-radius: inherit;
@@ -737,7 +795,11 @@ body {
 /* Working indicator fade */
 .working-indicator-fade {
   animation: fade-in 0.3s ease-out;
-  transition: opacity 0.5s ease-out, height 0.5s ease-out, margin 0.5s ease-out, padding 0.5s ease-out;
+  transition:
+    opacity 0.5s ease-out,
+    height 0.5s ease-out,
+    margin 0.5s ease-out,
+    padding 0.5s ease-out;
 }
 
 .message-assistant:not(.message-working) .working-indicator-fade {
@@ -751,16 +813,26 @@ body {
 
 /* Waiting dots animation */
 .waiting-dots::after {
-  content: '';
+  content: "";
   animation: waiting-dots 1.5s ease-in-out infinite;
 }
 
 @keyframes waiting-dots {
-  0% { content: ''; }
-  25% { content: '.'; }
-  50% { content: '..'; }
-  75% { content: '...'; }
-  100% { content: ''; }
+  0% {
+    content: "";
+  }
+  25% {
+    content: ".";
+  }
+  50% {
+    content: "..";
+  }
+  75% {
+    content: "...";
+  }
+  100% {
+    content: "";
+  }
 }
 
 /* Ghost absorb animation */
@@ -792,14 +864,16 @@ body {
   background: hsl(var(--background));
   border: 1px solid hsl(var(--border));
   border-radius: var(--radius);
-  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-family: "SF Mono", "Fira Code", monospace;
   font-size: 0.875rem;
   line-height: 1.5;
 }
 
 /* Artifact card hover effect - subtle, no movement to avoid jitter */
 .artifact-card {
-  transition: background-color 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .artifact-card:hover {
@@ -820,7 +894,11 @@ body {
 
 /* Button styles */
 .btn-primary {
-  background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary) / 0.8));
+  background: linear-gradient(
+    135deg,
+    hsl(var(--primary)),
+    hsl(var(--primary) / 0.8)
+  );
   transition: all 0.2s ease;
 }
 
@@ -912,7 +990,9 @@ body {
 }
 
 .message-image {
-  transition: transform 0.15s ease, opacity 0.15s ease;
+  transition:
+    transform 0.15s ease,
+    opacity 0.15s ease;
 }
 
 .message-image:hover {
@@ -941,9 +1021,10 @@ body {
 
 /* Chat area width transition */
 .chat-width-transition {
-  transition: width 0.3s cubic-bezier(0.16, 1, 0.3, 1),
-              flex 0.3s cubic-bezier(0.16, 1, 0.3, 1),
-              border-color 0.2s ease;
+  transition:
+    width 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+    flex 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 0.2s ease;
 }
 
 /* Tab drag handle cursor */

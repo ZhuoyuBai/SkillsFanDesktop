@@ -8,10 +8,7 @@
  * 4. Execute (run the task)
  */
 
-import { Fragment } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Check } from 'lucide-react'
-import { cn } from '../../../lib/utils'
 import type { WizardStep } from '../../../../shared/types/loop-task'
 
 interface StepIndicatorProps {
@@ -19,49 +16,34 @@ interface StepIndicatorProps {
 }
 
 const STEPS: { key: WizardStep; labelKey: string }[] = [
-  { key: 1, labelKey: 'Create Task' },
-  { key: 2, labelKey: 'Plan Edit' },
-  { key: 3, labelKey: 'Confirm' },
-  { key: 4, labelKey: 'Execute' }
+  { key: 1, labelKey: 'Step Create Task' },
+  { key: 2, labelKey: 'Step Plan Edit' },
+  { key: 3, labelKey: 'Step Confirm' },
+  { key: 4, labelKey: 'Step Execute' }
 ]
 
 export function StepIndicator({ currentStep }: StepIndicatorProps) {
   const { t } = useTranslation()
+  const progress = (currentStep / STEPS.length) * 100
 
   return (
-    <div className="flex items-center justify-center gap-2 py-4 border-b border-border px-4 shrink-0">
-      {STEPS.map((step, index) => (
-        <Fragment key={step.key}>
-          <div
-            className={cn(
-              'flex items-center gap-2 transition-colors',
-              step.key === currentStep && 'text-primary',
-              step.key < currentStep && 'text-green-600',
-              step.key > currentStep && 'text-muted-foreground'
-            )}
-          >
-            <span
-              className={cn(
-                'w-7 h-7 rounded-full flex items-center justify-center text-sm font-medium border-2 transition-colors',
-                step.key === currentStep && 'border-primary bg-primary/10 text-primary',
-                step.key < currentStep && 'border-green-600 bg-green-600 text-white',
-                step.key > currentStep && 'border-muted-foreground/30 text-muted-foreground'
-              )}
-            >
-              {step.key < currentStep ? <Check size={14} /> : step.key}
-            </span>
-            <span className="text-sm hidden sm:inline">{t(step.labelKey)}</span>
-          </div>
-          {index < STEPS.length - 1 && (
-            <div
-              className={cn(
-                'w-8 h-0.5 transition-colors',
-                step.key < currentStep ? 'bg-green-600' : 'bg-border'
-              )}
-            />
-          )}
-        </Fragment>
-      ))}
+    <div className="px-6 py-4 shrink-0">
+      {/* Progress bar */}
+      <div className="relative h-1 bg-border/50 rounded-full mb-3">
+        <div
+          className="absolute left-0 top-0 h-full bg-primary rounded-full transition-all duration-500"
+          style={{ width: `${progress}%` }}
+        />
+      </div>
+      {/* Current step text */}
+      <div className="flex items-center justify-between text-sm">
+        <span className="text-foreground font-medium">
+          {t(STEPS[currentStep - 1]?.labelKey || '')}
+        </span>
+        <span className="text-muted-foreground">
+          {currentStep} / {STEPS.length}
+        </span>
+      </div>
     </div>
   )
 }

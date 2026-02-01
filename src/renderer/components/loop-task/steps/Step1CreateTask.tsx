@@ -17,15 +17,15 @@ import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   FolderOpen,
-  Sparkles,
-  PenLine,
-  FileJson,
+  Wand2,
+  FileEdit,
+  Upload,
   Loader2,
   ChevronRight,
   ChevronDown,
   CheckCircle2,
   AlertCircle,
-  Settings2
+  FileJson
 } from 'lucide-react'
 import { useLoopTaskStore } from '../../../stores/loop-task.store'
 import { useSpaceStore } from '../../../stores/space.store'
@@ -41,7 +41,11 @@ interface ImportResult {
   error?: string
 }
 
-export function Step1CreateTask() {
+interface Step1CreateTaskProps {
+  onCancel?: () => void  // Kept for API compatibility, cancel is now in header
+}
+
+export function Step1CreateTask(_props: Step1CreateTaskProps) {
   const { t } = useTranslation()
   const { currentSpace } = useSpaceStore()
   const {
@@ -204,108 +208,105 @@ export function Step1CreateTask() {
       <div className="flex-1 overflow-auto p-4">
         <div className="max-w-2xl mx-auto space-y-6">
           {/* Creation Method - Horizontal Row */}
-          <div className="space-y-3">
-            <label className="block text-sm font-medium text-foreground">
-              {t('Creation Method')}
-            </label>
+          <div className="space-y-6">
+            <div className="text-center">
+              <h3 className="text-2xl font-semibold text-foreground">
+                {t('Choose the best way to create your automated task')}
+              </h3>
+            </div>
 
             <div className="grid grid-cols-3 gap-3">
               {/* AI Create */}
               <button
                 onClick={() => handleMethodSelect('ai')}
                 className={cn(
-                  'p-3 border rounded-lg transition-all text-left',
+                  'relative px-3 py-2.5 border rounded-lg transition-all duration-200 text-left flex items-center gap-2.5 group',
                   createMethod === 'ai'
-                    ? 'border-primary bg-primary/5 ring-1 ring-primary'
-                    : 'border-border hover:border-primary/50 hover:bg-accent/50'
+                    ? 'border-primary/30 bg-primary/5'
+                    : 'border-border hover:border-foreground/20 hover:bg-muted/30'
                 )}
               >
-                <div className="flex items-center gap-2">
-                  <Sparkles
-                    size={16}
-                    className={createMethod === 'ai' ? 'text-primary' : 'text-muted-foreground'}
-                  />
-                  <span
-                    className={cn(
-                      'text-sm font-medium',
-                      createMethod === 'ai' ? 'text-primary' : 'text-foreground'
-                    )}
-                  >
-                    {t('AI Generate')}
-                  </span>
+                <div
+                  className={cn(
+                    'w-8 h-8 rounded-md flex items-center justify-center transition-all duration-200 shrink-0',
+                    createMethod === 'ai'
+                      ? 'bg-primary/15 text-primary'
+                      : 'bg-muted/50 text-muted-foreground group-hover:bg-muted'
+                  )}
+                >
+                  <Wand2 size={16} strokeWidth={1.5} />
                 </div>
+                <span className="text-sm font-semibold text-foreground flex-1">
+                  {t('AI Generate')}
+                </span>
+                <span className="px-1.5 py-0.5 bg-primary text-primary-foreground text-[10px] font-medium rounded">
+                  {t('Recommended')}
+                </span>
               </button>
 
               {/* Manual Create */}
               <button
                 onClick={() => handleMethodSelect('manual')}
                 className={cn(
-                  'p-3 border rounded-lg transition-all text-left',
+                  'relative px-3 py-2.5 border rounded-lg transition-all duration-200 text-left flex items-center gap-2.5 group',
                   createMethod === 'manual'
-                    ? 'border-primary bg-primary/5 ring-1 ring-primary'
-                    : 'border-border hover:border-primary/50 hover:bg-accent/50'
+                    ? 'border-primary/30 bg-primary/5'
+                    : 'border-border hover:border-foreground/20 hover:bg-muted/30'
                 )}
               >
-                <div className="flex items-center gap-2">
-                  <PenLine
-                    size={16}
-                    className={createMethod === 'manual' ? 'text-primary' : 'text-muted-foreground'}
-                  />
-                  <span
-                    className={cn(
-                      'text-sm font-medium',
-                      createMethod === 'manual' ? 'text-primary' : 'text-foreground'
-                    )}
-                  >
-                    {t('Manual Create')}
-                  </span>
+                <div
+                  className={cn(
+                    'w-8 h-8 rounded-md flex items-center justify-center transition-all duration-200 shrink-0',
+                    createMethod === 'manual'
+                      ? 'bg-primary/15 text-primary'
+                      : 'bg-muted/50 text-muted-foreground group-hover:bg-muted'
+                  )}
+                >
+                  <FileEdit size={16} strokeWidth={1.5} />
                 </div>
+                <span className="text-sm font-semibold text-foreground">
+                  {t('Manual Create')}
+                </span>
               </button>
 
               {/* Import */}
               <button
                 onClick={() => handleMethodSelect('import')}
                 className={cn(
-                  'p-3 border rounded-lg transition-all text-left',
+                  'relative px-3 py-2.5 border rounded-lg transition-all duration-200 text-left flex items-center gap-2.5 group',
                   createMethod === 'import'
-                    ? 'border-primary bg-primary/5 ring-1 ring-primary'
-                    : 'border-border hover:border-primary/50 hover:bg-accent/50'
+                    ? 'border-primary/30 bg-primary/5'
+                    : 'border-border hover:border-foreground/20 hover:bg-muted/30'
                 )}
               >
-                <div className="flex items-center gap-2">
-                  <FileJson
-                    size={16}
-                    className={createMethod === 'import' ? 'text-primary' : 'text-muted-foreground'}
-                  />
-                  <span
-                    className={cn(
-                      'text-sm font-medium',
-                      createMethod === 'import' ? 'text-primary' : 'text-foreground'
-                    )}
-                  >
-                    {t('Import')}
-                  </span>
+                <div
+                  className={cn(
+                    'w-8 h-8 rounded-md flex items-center justify-center transition-all duration-200 shrink-0',
+                    createMethod === 'import'
+                      ? 'bg-primary/15 text-primary'
+                      : 'bg-muted/50 text-muted-foreground group-hover:bg-muted'
+                  )}
+                >
+                  <Upload size={16} strokeWidth={1.5} />
                 </div>
+                <span className="text-sm font-semibold text-foreground">
+                  {t('Import')}
+                </span>
               </button>
             </div>
           </div>
 
           {/* Content Area - Changes based on selection */}
-          <div className="min-h-[200px]">
+          <div>
             {/* AI Generate Content */}
             {createMethod === 'ai' && (
-              <div className="space-y-3">
-                <textarea
-                  value={aiDescription}
-                  onChange={(e) => setAiDescription(e.target.value)}
-                  placeholder={t('Describe the feature you want to implement...')}
-                  rows={6}
-                  className="w-full px-3 py-2 bg-input border border-border rounded-md text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none"
-                />
-                <p className="text-xs text-muted-foreground">
-                  {t('AI will generate user stories based on this description')}
-                </p>
-              </div>
+              <textarea
+                value={aiDescription}
+                onChange={(e) => setAiDescription(e.target.value)}
+                placeholder={t('Describe the feature you want to implement...')}
+                rows={5}
+                className="w-full px-4 py-3 border border-border bg-card/95 shadow-lg ring-1 ring-inset ring-white/5 rounded-2xl text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 resize-none transition-all"
+              />
             )}
 
             {/* Manual Create Content */}
@@ -313,7 +314,7 @@ export function Step1CreateTask() {
               <div className="p-6 border border-dashed border-border rounded-lg bg-muted/30">
                 <div className="flex flex-col items-center text-center gap-3">
                   <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                    <PenLine size={24} className="text-primary" />
+                    <FileEdit size={24} className="text-primary" />
                   </div>
                   <div>
                     <p className="font-medium text-foreground">{t('Manual Create')}</p>
@@ -404,20 +405,18 @@ export function Step1CreateTask() {
             )}
           </div>
 
-          {/* Advanced Settings (Collapsible) */}
-          <div className="border border-border rounded-lg overflow-hidden">
+          {/* Advanced Settings (Collapsible) - tight to content */}
+          <div className="-mt-3">
             <button
               onClick={() => setShowAdvanced(!showAdvanced)}
-              className="w-full px-4 py-3 flex items-center gap-2 text-sm text-muted-foreground hover:bg-accent/50 transition-colors"
+              className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
               {showAdvanced ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-              <Settings2 size={16} />
               <span>{t('Advanced Settings')}</span>
             </button>
 
             {showAdvanced && (
-              <div className="px-4 pb-4 pt-0 border-t border-border">
-                <div className="pt-3 space-y-2">
+              <div className="pl-8 pt-3 space-y-2">
                   <label className="block text-sm text-muted-foreground">
                     {t('Project Directory')}
                   </label>
@@ -440,7 +439,6 @@ export function Step1CreateTask() {
                   <p className="text-xs text-muted-foreground">
                     {t('Defaults to current space directory')}
                   </p>
-                </div>
               </div>
             )}
           </div>
@@ -451,21 +449,19 @@ export function Step1CreateTask() {
               {error}
             </div>
           )}
-        </div>
-      </div>
 
-      {/* Footer */}
-      <div className="px-4 py-3 border-t border-border shrink-0">
-        <div className="max-w-2xl mx-auto flex items-center justify-end">
-          <button
-            onClick={handleNext}
-            disabled={isLoading || !canProceed()}
-            className="px-6 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 transition-colors flex items-center gap-2"
-          >
-            {isLoading && <Loader2 size={16} className="animate-spin" />}
-            {t('Next')}
-            <ChevronRight size={16} />
-          </button>
+          {/* Next button - centered */}
+          <div className="flex justify-center pt-4">
+            <button
+              onClick={handleNext}
+              disabled={isLoading || !canProceed()}
+              className="px-6 py-2.5 bg-gradient-to-r from-primary to-primary/90 text-primary-foreground rounded-xl shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 disabled:opacity-50 disabled:shadow-none transition-all duration-200 flex items-center gap-2 font-medium"
+            >
+              {isLoading && <Loader2 size={16} className="animate-spin" />}
+              {t('Next')}
+              <ChevronRight size={18} />
+            </button>
+          </div>
         </div>
       </div>
     </div>

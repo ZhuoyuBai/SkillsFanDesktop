@@ -27,9 +27,10 @@ import type { WizardStep } from '../../../../shared/types/loop-task'
 
 interface Step3ConfirmProps {
   spaceId: string
+  onCancel: () => void
 }
 
-export function Step3Confirm({ spaceId }: Step3ConfirmProps) {
+export function Step3Confirm({ spaceId, onCancel }: Step3ConfirmProps) {
   const { t } = useTranslation()
   const {
     editingTask,
@@ -213,25 +214,33 @@ export function Step3Confirm({ spaceId }: Step3ConfirmProps) {
       <div className="px-4 py-3 border-t border-border shrink-0">
         <div className="max-w-2xl mx-auto flex items-center justify-between">
           <button
-            onClick={handlePrev}
-            disabled={isStarting}
-            className="px-4 py-2 text-muted-foreground hover:text-foreground disabled:opacity-50 transition-colors flex items-center gap-1"
+            onClick={onCancel}
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors px-2 py-1"
           >
-            <ChevronLeft size={16} />
-            {t('Return to Edit')}
+            {t('Cancel')}
           </button>
-          <button
-            onClick={handleStart}
-            disabled={isStarting}
-            className="px-6 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 transition-colors flex items-center gap-2"
-          >
-            {isStarting ? (
-              <Loader2 size={16} className="animate-spin" />
-            ) : (
-              <Play size={16} />
-            )}
-            {t('Start Execution')}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handlePrev}
+              disabled={isStarting}
+              className="px-4 py-2 text-muted-foreground hover:text-foreground disabled:opacity-50 transition-colors flex items-center gap-1"
+            >
+              <ChevronLeft size={16} />
+              {t('Return to Edit')}
+            </button>
+            <button
+              onClick={handleStart}
+              disabled={isStarting}
+              className="px-6 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 transition-colors flex items-center gap-2"
+            >
+              {isStarting ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <Play size={16} />
+              )}
+              {t('Start Execution')}
+            </button>
+          </div>
         </div>
       </div>
 

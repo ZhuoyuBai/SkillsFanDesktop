@@ -22,7 +22,8 @@ import {
   Circle,
   CheckCircle2,
   XCircle,
-  ChevronDown
+  ChevronDown,
+  X
 } from 'lucide-react'
 import { useLoopTaskStore } from '../../stores/loop-task.store'
 import { useChatStore } from '../../stores/chat.store'
@@ -102,19 +103,15 @@ export function LoopTaskPanel({ spaceId }: LoopTaskPanelProps) {
   if (isEditing) {
     return (
       <div className="flex flex-col h-full">
-        {/* Header */}
-        <div className="px-4 py-3 border-b border-border shrink-0">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-medium text-foreground">{t('New Loop Task')}</h2>
-            {wizardStep < 4 && (
-              <button
-                onClick={handleCancel}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                {t('Cancel')}
-              </button>
-            )}
-          </div>
+        {/* Header - Cancel button aligned with sidebar */}
+        <div className="px-4 pt-16 pb-3 shrink-0">
+          <button
+            onClick={handleCancel}
+            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <X size={18} />
+            <span>{t('Cancel')}</span>
+          </button>
         </div>
 
         {/* Step Indicator */}
@@ -122,9 +119,9 @@ export function LoopTaskPanel({ spaceId }: LoopTaskPanelProps) {
 
         {/* Step Content - flex-1 to take remaining space, overflow-hidden to enable child scrolling */}
         <div className="flex-1 overflow-hidden">
-          {wizardStep === 1 && <Step1CreateTask />}
-          {wizardStep === 2 && <Step2PlanEdit />}
-          {wizardStep === 3 && <Step3Confirm spaceId={spaceId} />}
+          {wizardStep === 1 && <Step1CreateTask onCancel={handleCancel} />}
+          {wizardStep === 2 && <Step2PlanEdit onCancel={handleCancel} />}
+          {wizardStep === 3 && <Step3Confirm spaceId={spaceId} onCancel={handleCancel} />}
           {wizardStep === 4 && <Step4Execute />}
         </div>
       </div>

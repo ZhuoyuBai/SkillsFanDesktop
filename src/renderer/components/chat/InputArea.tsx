@@ -494,10 +494,10 @@ export function InputArea({ onSend, onStop, onInject, isGenerating, isCompact = 
               }}
               className="h-8 flex items-center gap-1.5 px-2.5 rounded-lg text-xs
                 transition-all duration-200 border
-                text-muted-foreground border-border/60 hover:bg-muted hover:border-border hover:text-foreground"
+                text-foreground/70 border-border hover:bg-muted hover:text-foreground"
               title={t('Skill Management')}
             >
-              <Package size={14} />
+              <Package size={15} className="text-primary/80" />
               <span>{t('Skill Management')}</span>
             </button>
           </div>

@@ -27,9 +27,14 @@ import { StoryEditModal } from '../../ralph/StoryEditModal'
 import { cn } from '../../../lib/utils'
 import type { UserStory, WizardStep } from '../../../../shared/types/loop-task'
 
-export function Step2PlanEdit() {
+interface Step2PlanEditProps {
+  onCancel: () => void
+}
+
+export function Step2PlanEdit({ onCancel }: Step2PlanEditProps) {
   const { t } = useTranslation()
   const { editingTask, updateEditing, setWizardStep, setGeneratedPrdPath } = useLoopTaskStore()
+
 
   const [localStories, setLocalStories] = useState<UserStory[]>(editingTask?.stories || [])
   const [editingStory, setEditingStory] = useState<UserStory | null>(null)
@@ -179,10 +184,20 @@ export function Step2PlanEdit() {
 
           {/* Story List */}
           {localStories.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground border border-dashed border-border rounded-lg">
-              <p className="mb-2">{t('No stories yet')}</p>
-              <button onClick={handleAddStory} className="text-primary hover:underline">
-                {t('Add your first story')}
+            <div className="flex flex-col items-center justify-center py-16 text-center border border-dashed border-border/60 rounded-xl bg-muted/10">
+              <div className="w-16 h-16 rounded-full bg-muted/30 flex items-center justify-center mb-4 text-muted-foreground">
+                <Plus size={32} strokeWidth={1.5} />
+              </div>
+              <h3 className="text-lg font-medium text-foreground mb-1">{t('No stories yet')}</h3>
+              <p className="text-sm text-muted-foreground max-w-xs mb-6">
+                {t('Add your first user story to define what the task should accomplish.')}
+              </p>
+              <button
+                onClick={handleAddStory}
+                className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors flex items-center gap-2"
+              >
+                <Plus size={16} />
+                {t('Add User Story')}
               </button>
             </div>
           ) : (
@@ -208,10 +223,9 @@ export function Step2PlanEdit() {
                 />
               ))}
 
-              {/* Add Story Button */}
               <button
                 onClick={handleAddStory}
-                className="w-full p-4 border-2 border-dashed border-border rounded-lg text-muted-foreground hover:border-primary hover:text-primary transition-colors flex items-center justify-center gap-2"
+                className="w-full py-3 h-auto border border-dashed border-border hover:border-primary/50 hover:bg-accent/20 rounded-lg text-muted-foreground hover:text-primary transition-all flex items-center justify-center gap-2 text-sm"
               >
                 <Plus size={16} />
                 {t('Add Story')}
@@ -257,20 +271,28 @@ export function Step2PlanEdit() {
       <div className="px-4 py-3 border-t border-border shrink-0">
         <div className="max-w-2xl mx-auto flex items-center justify-between">
           <button
-            onClick={handlePrev}
-            className="px-4 py-2 text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+            onClick={onCancel}
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors px-2 py-1"
           >
-            <ChevronLeft size={16} />
-            {t('Previous')}
+            {t('Cancel')}
           </button>
-          <button
-            onClick={handleNext}
-            disabled={isLoading || localStories.length === 0}
-            className="px-6 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 transition-colors flex items-center gap-2"
-          >
-            {t('Next')}
-            <ChevronRight size={16} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handlePrev}
+              className="px-4 py-2 text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+            >
+              <ChevronLeft size={16} />
+              {t('Previous')}
+            </button>
+            <button
+              onClick={handleNext}
+              disabled={isLoading || localStories.length === 0}
+              className="px-6 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 transition-colors flex items-center gap-2"
+            >
+              {t('Next')}
+              <ChevronRight size={16} />
+            </button>
+          </div>
         </div>
       </div>
 

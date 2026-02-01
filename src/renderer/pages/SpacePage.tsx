@@ -115,6 +115,8 @@ export function SpacePage() {
   // Mobile detection
   const isMobile = useIsMobile()
 
+  const shouldShowHeader = isMobile || !platform.isMac
+
   // Window maximize state
   const { isMaximized } = useWindowMaximize()
 
@@ -411,47 +413,49 @@ export function SpacePage() {
           />
         )
       ) : (
-      <Header
-        className="bg-card backdrop-blur-sm border-b border-border/40"
-        left={
-          isMobile ? (
-            <button
-              onClick={() => setMobileSidebarOpen(true)}
-              className="p-1.5 hover:bg-secondary rounded-lg transition-colors"
-              aria-label={t('Open menu')}
-            >
-              <Menu className="w-5 h-5" />
-            </button>
-          ) : undefined
-        }
-        right={
-          isMobile ? (
-            <div className="flex items-center gap-1">
-              <button
-                onClick={handleOpenFolder}
-                className="p-1.5 hover:bg-secondary rounded-lg transition-colors"
-                aria-label={t('Open folder')}
-              >
-                <FolderOpen className="w-4 h-4 text-amber-500" />
-              </button>
-              <button
-                onClick={() => setView('settings')}
-                className="p-1.5 hover:bg-secondary rounded-lg transition-colors"
-                aria-label={t('Settings')}
-              >
-                <Settings className="w-4 h-4" />
-              </button>
-              <button
-                onClick={handleNewConversation}
-                className="p-1.5 text-primary hover:bg-primary/10 rounded-lg transition-colors"
-                aria-label={t('New conversation')}
-              >
-                <SquarePen className="w-4 h-4" />
-              </button>
-            </div>
-          ) : undefined
-        }
-      />
+        shouldShowHeader ? (
+          <Header
+            className="bg-card backdrop-blur-sm border-b border-border/40"
+            left={
+              isMobile ? (
+                <button
+                  onClick={() => setMobileSidebarOpen(true)}
+                  className="p-1.5 hover:bg-secondary rounded-lg transition-colors"
+                  aria-label={t('Open menu')}
+                >
+                  <Menu className="w-5 h-5" />
+                </button>
+              ) : undefined
+            }
+            right={
+              isMobile ? (
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={handleOpenFolder}
+                    className="p-1.5 hover:bg-secondary rounded-lg transition-colors"
+                    aria-label={t('Open folder')}
+                  >
+                    <FolderOpen className="w-4 h-4 text-amber-500" />
+                  </button>
+                  <button
+                    onClick={() => setView('settings')}
+                    className="p-1.5 hover:bg-secondary rounded-lg transition-colors"
+                    aria-label={t('Settings')}
+                  >
+                    <Settings className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={handleNewConversation}
+                    className="p-1.5 text-primary hover:bg-primary/10 rounded-lg transition-colors"
+                    aria-label={t('New conversation')}
+                  >
+                    <SquarePen className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : undefined
+            }
+          />
+        ) : null
       )}
 
       {/* Git Bash Warning Banner - Windows only, when in mock mode */}

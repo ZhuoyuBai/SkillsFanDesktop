@@ -2,15 +2,12 @@
  * BrowserTaskCard - AI Browser Operation Visualization Component
  *
  * When AI uses browser tools, displays below the message bubble:
- * - Sci-fi style operation animations
+ * - Modern clean style operation visualization
  * - Real-time operation steps
  * - [View Live] button → Opens browser view in Canvas
- *
- * Design Philosophy:
- * - Browser is a "heavy" tool, needs independent display form
- * - Sci-fi effects build user trust
- * - Supports user observation and intervention in AI operations
  */
+
+import { cn } from '../../lib/utils'
 
 import { useState, useEffect, useMemo } from 'react'
 import {
@@ -121,19 +118,6 @@ function getStepIcon(kind: string) {
 // Sub-components
 // ============================================
 
-/**
- * Scanline animation - indicates AI is "scanning" the page
- */
-function ScanlineAnimation() {
-  return (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none rounded-lg">
-      {/* Scanline */}
-      <div className="scanline-sweep" />
-      {/* Border glow */}
-      <div className="absolute inset-0 rounded-lg border border-primary/20 animate-border-glow" />
-    </div>
-  )
-}
 
 /**
  * Single step item
@@ -312,11 +296,15 @@ export function BrowserTaskCard({ browserToolCalls, isActive }: BrowserTaskCardP
 
   return (
     <div className="browser-task-card mt-3 relative">
-      {/* Sci-fi background */}
-      <div className="relative rounded-xl border border-primary/30 bg-gradient-to-br from-primary/5 via-background to-primary/10 overflow-hidden">
-        {/* Scanline animation (only when active) */}
-        {isActive && hasRunningStep && <ScanlineAnimation />}
-
+      {/* Clean container */}
+      <div
+        className={cn(
+          'relative rounded-xl border overflow-hidden transition-colors',
+          isActive && hasRunningStep
+            ? 'bg-primary/5 border-primary/30 animate-border-glow'
+            : 'bg-card border-border'
+        )}
+      >
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-primary/20">
           <div className="flex items-center gap-2">
