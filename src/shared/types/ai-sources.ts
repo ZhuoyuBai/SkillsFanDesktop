@@ -184,16 +184,25 @@ export interface OAuthCompleteResult {
  * Check if any AI source is configured and ready to use
  */
 export function hasAnyAISource(aiSources: AISourcesConfig): boolean {
-  const hasCustom = !!(aiSources.custom?.apiKey)
+  // Check legacy custom field
+  const hasLegacyCustom = !!(aiSources.custom?.apiKey)
 
-  // Check any OAuth provider dynamically (any key with loggedIn: true except 'current' and 'custom')
-  const hasOAuth = Object.keys(aiSources).some(key => {
-    if (key === 'current' || key === 'custom') return false
-    const source = aiSources[key as keyof typeof aiSources] as OAuthSourceConfig | undefined
-    return source?.loggedIn === true
+  // Check dynamic provider keys (both OAuth and custom API configs)
+  const hasProvider = Object.keys(aiSources).some(key => {
+    if (key === 'current' || key === 'custom' || key === 'oauth') return false
+    const source = aiSources[key as keyof typeof aiSources]
+    if (!source || typeof source !== 'object') return false
+
+    // OAuth provider check
+    if ('loggedIn' in source && (source as OAuthSourceConfig).loggedIn === true) return true
+
+    // Custom API provider check (has apiKey)
+    if ('apiKey' in source && (source as CustomSourceConfig).apiKey) return true
+
+    return false
   })
 
-  return hasOAuth || hasCustom
+  return hasProvider || hasLegacyCustom
 }
 
 /**
@@ -203,10 +212,17 @@ export function isSourceConfigured(aiSources: AISourcesConfig, source: AISourceT
   if (source === 'custom') {
     return !!(aiSources.custom?.apiKey)
   }
-  // Check dynamic provider (OAuth providers like 'google', etc.)
+
   const config = aiSources[source]
-  if (config && typeof config === 'object' && 'loggedIn' in config) {
-    return config.loggedIn === true
+  if (config && typeof config === 'object') {
+    // OAuth provider
+    if ('loggedIn' in config) {
+      return (config as OAuthSourceConfig).loggedIn === true
+    }
+    // Custom API provider (e.g., 'zhipu', 'deepseek', 'openai', 'claude')
+    if ('apiKey' in config) {
+      return !!(config as CustomSourceConfig).apiKey
+    }
   }
   return false
 }

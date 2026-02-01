@@ -194,7 +194,13 @@ export function SettingsPage() {
 
   // Selected provider in the grid - initialize based on current config
   const [selectedProviderId, setSelectedProviderId] = useState<string>(() => {
-    // Try to match current config to a provider preset
+    // First try to use current aiSources setting if it's a valid provider ID
+    const current = config?.aiSources?.current
+    if (current && current !== 'oauth' && PROVIDER_PRESETS.some(p => p.id === current)) {
+      return current
+    }
+
+    // Fallback: try to match current config to a provider preset by URL
     const currentApiUrl = config?.aiSources?.custom?.apiUrl || config?.api?.apiUrl || ''
     const matchedPreset = PROVIDER_PRESETS.find(p => p.apiUrl && currentApiUrl.includes(p.apiUrl.replace('https://', '').split('/')[0]))
     return matchedPreset?.id || 'claude'
@@ -591,34 +597,33 @@ export function SettingsPage() {
     setConfig({ ...config, ...newConfig } as HaloConfig)
   }
 
-  // Handle save Custom API - save both legacy api and aiSources.custom
+  // Handle save Custom API - use provider ID as storage key to support multiple APIs
   const handleSaveCustomApi = async () => {
     setIsValidating(true)
     setValidationResult(null)
 
     try {
-      // Save to both legacy api and aiSources.custom for compatibility
+      // Use provider ID as the storage key (e.g., 'zhipu', 'deepseek', 'openai', 'claude', 'custom')
+      const storageKey = selectedProviderId
+
+      const providerConfig = {
+        provider: provider as any,
+        apiKey,
+        apiUrl,
+        model
+      }
+
       const updates = {
-        api: {
-          provider: provider as any,
-          apiKey,
-          apiUrl,
-          model
-        },
+        api: providerConfig,  // Legacy field for backward compatibility
         aiSources: {
           ...config?.aiSources,
-          current: 'custom' as AISourceType,
-          custom: {
-            provider: provider as any,
-            apiKey,
-            apiUrl,
-            model
-          }
+          current: storageKey as AISourceType,
+          [storageKey]: providerConfig  // Store under provider ID key
         }
       }
       await api.setConfig(updates)
       setConfig({ ...config, ...updates } as HaloConfig)
-      setCurrentSource('custom')
+      setCurrentSource(storageKey as AISourceType)
       setValidationResult({ valid: true, message: t('Saved') })
       setShowCustomApiForm(false)
       goBack()  // Close the modal immediately after successful save
@@ -750,32 +755,28 @@ export function SettingsPage() {
                       type="button"
                       onClick={() => {
                         setSelectedProviderId(preset.id)
-                        // Update form values when switching providers
-                        if (!preset.isCustom) {
-                          // Check if the saved config matches this provider
-                          const savedApiUrl = config?.aiSources?.custom?.apiUrl || config?.api?.apiUrl || ''
-                          const savedApiKey = config?.aiSources?.custom?.apiKey || config?.api?.apiKey || ''
-                          const savedModel = config?.aiSources?.custom?.model || config?.api?.model || ''
+                        // Load saved configuration for this provider if exists
+                        const savedConfig = config?.aiSources?.[preset.id] as { provider?: string; apiKey?: string; apiUrl?: string; model?: string } | undefined
 
-                          const presetDomain = preset.apiUrl?.replace('https://', '').replace('http://', '').split('/')[0]
-                          const isMatchingProvider = presetDomain && savedApiUrl.includes(presetDomain)
-
-                          // Set API URL and Model
+                        if (savedConfig?.apiKey) {
+                          // Provider has saved config - load it
+                          setApiKey(savedConfig.apiKey)
+                          setApiUrl(savedConfig.apiUrl || preset.apiUrl || '')
+                          setModel(savedConfig.model || preset.defaultModel || '')
+                          setProvider(savedConfig.provider as any || (preset.apiType === 'openai' ? 'openai' : 'anthropic'))
+                        } else if (!preset.isCustom) {
+                          // No saved config - use preset defaults
                           setApiUrl(preset.apiUrl || '')
                           setModel(preset.defaultModel || '')
                           setProvider(preset.apiType === 'openai' ? 'openai' : 'anthropic')
-
-                          // Only keep API Key if it matches the current provider, otherwise clear it
-                          setApiKey(isMatchingProvider ? savedApiKey : '')
+                          setApiKey('')  // Clear API key for new provider
                         } else {
-                          // Custom provider - load saved configuration
-                          const savedApiKey = config?.aiSources?.custom?.apiKey || config?.api?.apiKey || ''
-                          const savedApiUrl = config?.aiSources?.custom?.apiUrl || config?.api?.apiUrl || ''
-                          const savedModel = config?.aiSources?.custom?.model || config?.api?.model || ''
-
-                          setApiKey(savedApiKey)
-                          setApiUrl(savedApiUrl)
-                          setModel(savedModel)
+                          // Custom provider - try legacy custom config or clear
+                          const customConfig = config?.aiSources?.custom
+                          setApiKey(customConfig?.apiKey || '')
+                          setApiUrl(customConfig?.apiUrl || '')
+                          setModel(customConfig?.model || '')
+                          setProvider(customConfig?.provider || 'anthropic')
                         }
                       }}
                       className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${

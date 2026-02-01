@@ -557,16 +557,26 @@ export function hasAnyAISource(config: HaloConfig): boolean {
   if (!aiSources) {
     return !!config.api?.apiKey;
   }
-  const hasCustom = !!(aiSources.custom?.apiKey);
 
-  // Check any OAuth provider dynamically (any key with loggedIn: true except 'current' and 'custom')
-  const hasOAuth = Object.keys(aiSources).some(key => {
-    if (key === 'current' || key === 'custom') return false;
-    const source = aiSources[key as keyof typeof aiSources] as OAuthSourceConfig | undefined;
-    return source?.loggedIn === true;
+  // Check legacy custom field
+  const hasLegacyCustom = !!(aiSources.custom?.apiKey);
+
+  // Check dynamic provider keys (both OAuth and custom API configs)
+  const hasProvider = Object.keys(aiSources).some(key => {
+    if (key === 'current' || key === 'custom' || key === 'oauth') return false;
+    const source = aiSources[key as keyof typeof aiSources];
+    if (!source || typeof source !== 'object') return false;
+
+    // OAuth provider check
+    if ('loggedIn' in source && (source as OAuthSourceConfig).loggedIn === true) return true;
+
+    // Custom API provider check (has apiKey)
+    if ('apiKey' in source && (source as CustomSourceConfig).apiKey) return true;
+
+    return false;
   });
 
-  return hasOAuth || hasCustom;
+  return hasProvider || hasLegacyCustom;
 }
 
 // Helper function to get current model display name

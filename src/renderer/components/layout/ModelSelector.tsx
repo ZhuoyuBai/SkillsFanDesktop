@@ -36,12 +36,40 @@ const PROVIDER_LOGOS: Record<string, string> = {
   'https://api.openai.com': openaiLogo,
 }
 
+// Provider logo mapping by provider ID
+const PROVIDER_LOGOS_BY_ID: Record<string, string> = {
+  'zhipu': zhipuLogo,
+  'minimax': minimaxLogo,
+  'kimi': kimiLogo,
+  'deepseek': deepseekLogo,
+  'claude': claudeLogo,
+  'openai': openaiLogo,
+}
+
+// Provider display names by ID
+const PROVIDER_NAMES: Record<string, string> = {
+  'zhipu': 'Zhipu GLM',
+  'minimax': 'MiniMax',
+  'kimi': 'Kimi',
+  'deepseek': 'DeepSeek',
+  'claude': 'Claude',
+  'openai': 'OpenAI',
+  'custom': 'Custom',
+}
+
 /**
  * Get provider logo by API URL
  */
 function getProviderLogo(apiUrl: string): string | null {
   const normalizedUrl = apiUrl.replace(/\/$/, '')
   return PROVIDER_LOGOS[normalizedUrl] || null
+}
+
+/**
+ * Get provider logo by provider ID
+ */
+function getProviderLogoById(providerId: string): string | null {
+  return PROVIDER_LOGOS_BY_ID[providerId] || null
 }
 
 /**
@@ -115,13 +143,34 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
 
   const aiSources = config.aiSources || { current: 'custom' as AISourceType }
   const currentSource = aiSources.current
-  const hasCustom = !!(aiSources.custom?.apiKey)
+
+  // Get all configured custom API providers (zhipu, kimi, deepseek, etc.)
+  // These are stored as aiSources[providerId] with apiKey field
+  // Exclude 'custom' key - it's legacy and should not be shown as a separate option
+  const configuredCustomProviders = Object.keys(aiSources)
+    .filter(key => {
+      if (key === 'current' || key === 'oauth' || key === 'custom') return false
+      const source = (aiSources as Record<string, any>)[key]
+      // Check if it's a custom API config (has apiKey but not loggedIn)
+      return source && typeof source === 'object' && 'apiKey' in source && source.apiKey && !('loggedIn' in source)
+    })
+    .map(key => {
+      const source = (aiSources as Record<string, any>)[key]
+      return {
+        id: key,
+        name: PROVIDER_NAMES[key] || key,
+        logo: getProviderLogoById(key),
+        model: source.model || '',
+        apiUrl: source.apiUrl || '',
+        config: source
+      }
+    })
 
   // Get logged-in OAuth providers dynamically
   const loggedInOAuthProviders = authProviders
     .filter(p => p.type !== 'custom' && p.enabled)
     .map(p => {
-      const providerConfig = aiSources[p.type] as OAuthSourceConfig | undefined
+      const providerConfig = (aiSources as Record<string, any>)[p.type] as OAuthSourceConfig | undefined
       return {
         type: p.type,
         displayName: getLocalizedText(p.displayName),
@@ -174,6 +223,34 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
     setIsOpen(false)
   }
 
+  // Handle provider selection (for custom API providers like zhipu, kimi, etc.)
+  const handleSelectProvider = async (providerId: string) => {
+    const newAiSources = {
+      ...aiSources,
+      current: providerId
+    }
+
+    // Get provider config and update legacy api field for compatibility
+    const providerConfig = (aiSources as Record<string, any>)[providerId]
+    if (providerConfig) {
+      ;(config as any).api = {
+        provider: providerConfig.provider,
+        apiKey: providerConfig.apiKey,
+        apiUrl: providerConfig.apiUrl,
+        model: providerConfig.model
+      }
+    }
+
+    const newConfig = {
+      ...config,
+      aiSources: newAiSources
+    }
+
+    await api.setConfig(newConfig)
+    setConfig(newConfig as HaloConfig)
+    setIsOpen(false)
+  }
+
   // Handle add source - navigate to settings
   const handleAddSource = () => {
     setIsOpen(false)
@@ -196,8 +273,11 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
 
   const styles = styleConfig[variant]
 
-  // Get custom API provider logo
-  const customApiLogo = aiSources.custom?.apiUrl ? getProviderLogo(aiSources.custom.apiUrl) : null
+  // Get current provider logo - check by provider ID first, then by API URL
+  const currentProviderConfig = configuredCustomProviders.find(p => p.id === currentSource)
+  const currentProviderLogo = currentProviderConfig?.logo ||
+    (currentProviderConfig?.apiUrl ? getProviderLogo(currentProviderConfig.apiUrl) : null) ||
+    getProviderLogoById(currentSource)
 
   return (
     <div className="relative" ref={dropdownRef}>
@@ -222,8 +302,8 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
         `.trim().replace(/\s+/g, ' ')}
       >
         {/* Provider Logo */}
-        {customApiLogo ? (
-          <img src={customApiLogo} alt="" className="w-4 h-4 rounded object-cover flex-shrink-0" />
+        {currentProviderLogo ? (
+          <img src={currentProviderLogo} alt="" className="w-4 h-4 rounded object-cover flex-shrink-0" />
         ) : (
           <div className="w-4 h-4 rounded bg-muted flex items-center justify-center flex-shrink-0">
             <span className="text-[10px] text-muted-foreground">AI</span>
@@ -248,32 +328,36 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
             animate-in fade-in-0 slide-in-from-bottom-2 duration-200
           `.trim().replace(/\s+/g, ' ')}
         >
-          {/* Custom API - show only the configured model with logo */}
-          {hasCustom && aiSources.custom && (
-            <button
-              onClick={() => setIsOpen(false)}
-              className={`w-full px-3 py-2 text-left text-sm hover:bg-secondary/80 transition-colors flex items-center gap-2.5 ${
-                currentSource === 'custom' ? 'text-primary' : 'text-foreground'
-              }`}
-            >
-              {customApiLogo ? (
-                <img src={customApiLogo} alt="" className="w-5 h-5 rounded object-cover flex-shrink-0" />
-              ) : (
-                <div className="w-5 h-5 rounded bg-muted flex items-center justify-center flex-shrink-0">
-                  <span className="text-xs text-muted-foreground">AI</span>
-                </div>
-              )}
-              <span className="truncate">{aiSources.custom?.model || 'Custom Model'}</span>
-              {currentSource === 'custom' && (
-                <span className="ml-auto w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
-              )}
-            </button>
-          )}
+          {/* Custom API Providers - show all configured providers */}
+          {configuredCustomProviders.map((provider, index) => {
+            const isSelected = currentSource === provider.id
+            return (
+              <button
+                key={provider.id}
+                onClick={() => handleSelectProvider(provider.id)}
+                className={`w-full px-3 py-2 text-left text-sm hover:bg-secondary/80 transition-colors flex items-center gap-2.5 ${
+                  isSelected ? 'text-primary' : 'text-foreground'
+                }`}
+              >
+                {provider.logo ? (
+                  <img src={provider.logo} alt="" className="w-5 h-5 rounded object-cover flex-shrink-0" />
+                ) : (
+                  <div className="w-5 h-5 rounded bg-muted flex items-center justify-center flex-shrink-0">
+                    <span className="text-xs text-muted-foreground">AI</span>
+                  </div>
+                )}
+                <span className="truncate">{provider.model || provider.name}</span>
+                {isSelected && (
+                  <span className="ml-auto w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
+                )}
+              </button>
+            )
+          })}
 
           {/* OAuth Providers - Dynamic rendering */}
           {loggedInOAuthProviders.map((provider) => (
             <div key={provider.type}>
-              {hasCustom && <div className="my-1 border-t border-border" />}
+              {configuredCustomProviders.length > 0 && <div className="my-1 border-t border-border" />}
               {(provider.config?.availableModels || []).map((modelId) => {
                 const displayName = provider.config?.modelNames?.[modelId] || modelId
                 const isSelected = currentSource === provider.type && provider.config?.model === modelId
@@ -299,7 +383,7 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
           ))}
 
           {/* Divider */}
-          {(hasCustom || loggedInOAuthProviders.length > 0) && (
+          {(configuredCustomProviders.length > 0 || loggedInOAuthProviders.length > 0) && (
             <div className="my-1 border-t border-border" />
           )}
 

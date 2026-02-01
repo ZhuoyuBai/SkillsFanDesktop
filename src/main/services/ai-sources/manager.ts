@@ -144,8 +144,18 @@ class AISourceManager {
     const provider = this.providers.get(aiSources.current)
 
     if (!provider) {
-      console.warn(`[AISourceManager] No provider found for source: ${aiSources.current}`)
+      console.log(`[AISourceManager] No registered provider for source: ${aiSources.current}`)
       console.log('[AISourceManager] Available providers:', Array.from(this.providers.keys()))
+
+      // Check if current source is a dynamic custom API provider (e.g., 'zhipu', 'kimi', 'deepseek')
+      // These have 'apiKey' field but are not registered as providers
+      const currentConfig = (aiSources as Record<string, any>)[aiSources.current]
+      if (currentConfig && typeof currentConfig === 'object' && 'apiKey' in currentConfig && currentConfig.apiKey) {
+        console.log('[AISourceManager] Found dynamic custom API config for:', aiSources.current)
+        return this.getDynamicCustomBackendConfig(currentConfig)
+      }
+
+      console.warn(`[AISourceManager] No config found for source: ${aiSources.current}`)
       return null
     }
 
@@ -161,6 +171,24 @@ class AISourceManager {
     console.log('[AISourceManager] getBackendConfig result:', result ? { url: result.url, model: result.model, hasKey: !!result.key } : null)
 
     return result
+  }
+
+  /**
+   * Get backend config for dynamic custom API providers (zhipu, kimi, deepseek, etc.)
+   * These are stored by provider ID but use the same format as CustomSourceConfig
+   */
+  private getDynamicCustomBackendConfig(config: Record<string, any>): BackendRequestConfig | null {
+    if (!config.apiKey) return null
+
+    const isAnthropic = config.provider === 'anthropic'
+    const baseUrl = (config.apiUrl || 'https://api.anthropic.com').replace(/\/$/, '')
+
+    return {
+      url: baseUrl,
+      key: config.apiKey,
+      model: config.model,
+      apiType: isAnthropic ? undefined : (baseUrl.includes('/responses') ? 'responses' : 'chat_completions')
+    }
   }
 
   /**

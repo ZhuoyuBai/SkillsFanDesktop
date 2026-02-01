@@ -175,14 +175,21 @@ export async function getApiCredentials(config: ReturnType<typeof getConfig>): P
   const aiSources = (config as any).aiSources
   const currentSource = aiSources?.current || 'custom'
 
+  // Get current source config to determine if it's OAuth or custom API
+  const currentConfig = aiSources?.[currentSource]
+  // OAuth providers have 'loggedIn' field, custom API providers have 'apiKey' but no 'loggedIn'
+  const isOAuthProvider = currentConfig && typeof currentConfig === 'object' && 'loggedIn' in currentConfig
+
   console.log('[AgentService] currentSource:', currentSource)
+  console.log('[AgentService] isOAuthProvider:', isOAuthProvider)
   console.log('[AgentService] aiSources:', JSON.stringify({
     current: aiSources?.current,
-    hasCustom: !!aiSources?.custom?.apiKey
+    hasCustom: !!aiSources?.custom?.apiKey,
+    currentHasApiKey: currentConfig && 'apiKey' in currentConfig
   }, null, 2))
 
-  // Check if current source is an OAuth provider (not 'custom')
-  if (currentSource !== 'custom') {
+  // Only check OAuth token for actual OAuth providers (has 'loggedIn' field)
+  if (isOAuthProvider) {
     console.log('[AgentService] Checking OAuth token validity for:', currentSource)
     const tokenResult = await manager.ensureValidToken(currentSource)
     console.log('[AgentService] Token check result:', tokenResult.success)
@@ -203,13 +210,14 @@ export async function getApiCredentials(config: ReturnType<typeof getConfig>): P
   // Determine provider type
   let provider: 'anthropic' | 'openai' | 'oauth'
 
-  if (currentSource !== 'custom') {
+  if (isOAuthProvider) {
     provider = 'oauth'
     console.log(`[Agent] Using OAuth provider ${currentSource} via AISourceManager`)
   } else {
-    // Custom API - check provider from config
-    provider = aiSources?.custom?.provider === 'openai' ? 'openai' : 'anthropic'
-    console.log(`[Agent] Using custom API (${provider}) via AISourceManager`)
+    // Custom API - check provider from current config (could be 'zhipu', 'kimi', 'custom', etc.)
+    const providerType = currentConfig?.provider || aiSources?.custom?.provider
+    provider = providerType === 'openai' ? 'openai' : 'anthropic'
+    console.log(`[Agent] Using custom API (${provider}) for source ${currentSource} via AISourceManager`)
   }
 
   return {

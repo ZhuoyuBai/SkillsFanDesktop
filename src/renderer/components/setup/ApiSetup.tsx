@@ -175,8 +175,10 @@ export function ApiSetup({ onBack, showBack = false, initialProviderId }: ApiSet
     setError(null)
 
     try {
-      // Save config with new aiSources structure
-      const customConfig = {
+      // Use selected provider ID as storage key (e.g., 'zhipu', 'deepseek', 'claude', 'custom')
+      const storageKey = selectedProvider
+
+      const providerConfig = {
         provider: provider as 'anthropic' | 'openai',
         apiKey,
         apiUrl: apiUrl || 'https://api.anthropic.com',
@@ -186,11 +188,12 @@ export function ApiSetup({ onBack, showBack = false, initialProviderId }: ApiSet
       const newConfig = {
         ...config,
         // Legacy api field for backward compatibility
-        api: customConfig,
-        // New aiSources structure
+        api: providerConfig,
+        // New aiSources structure - use provider ID as key
         aiSources: {
-          current: 'custom' as const,
-          custom: customConfig
+          ...config?.aiSources,
+          current: storageKey as const,
+          [storageKey]: providerConfig  // Store under provider ID key
         },
         isFirstLaunch: false
       }

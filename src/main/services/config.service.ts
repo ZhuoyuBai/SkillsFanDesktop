@@ -231,25 +231,44 @@ function getAiSourcesSignature(aiSources?: AISourcesConfig): string {
 
   // Note: model is excluded from signature because V2 Session supports dynamic model switching
   // (via setModel method). Only changes to credentials/provider should invalidate sessions.
-  if (current === 'custom') {
+
+  // Get config for current source (could be provider ID like 'zhipu', 'deepseek', etc.)
+  const currentConfig = aiSources[current] as Record<string, any> | undefined
+
+  if (currentConfig && typeof currentConfig === 'object') {
+    // Check if it's an OAuth config (has accessToken)
+    if ('accessToken' in currentConfig) {
+      return [
+        'oauth',
+        current,
+        currentConfig.accessToken || '',
+        currentConfig.refreshToken || '',
+        currentConfig.tokenExpires || ''
+        // model excluded: dynamic switching supported
+      ].join('|')
+    }
+
+    // Custom API config (has apiKey) - includes provider IDs like 'zhipu', 'deepseek', etc.
+    if ('apiKey' in currentConfig) {
+      return [
+        'custom',
+        current,
+        currentConfig.provider || '',
+        currentConfig.apiUrl || '',
+        currentConfig.apiKey || ''
+        // model excluded: dynamic switching supported
+      ].join('|')
+    }
+  }
+
+  // Fallback to legacy custom field
+  if (current === 'custom' || !currentConfig) {
     const custom = aiSources.custom
     return [
       'custom',
       custom?.provider || '',
       custom?.apiUrl || '',
       custom?.apiKey || ''
-      // model excluded: dynamic switching supported
-    ].join('|')
-  }
-
-  const currentConfig = aiSources[current] as Record<string, any> | undefined
-  if (currentConfig && typeof currentConfig === 'object') {
-    return [
-      'oauth',
-      current,
-      currentConfig.accessToken || '',
-      currentConfig.refreshToken || '',
-      currentConfig.tokenExpires || ''
       // model excluded: dynamic switching supported
     ].join('|')
   }
