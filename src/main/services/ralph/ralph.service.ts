@@ -427,8 +427,8 @@ function normalizeJsonString(str: string): string {
 }
 
 /**
- * Sanitize JSON by escaping newlines within string values
- * This handles cases where AI generates multi-line strings without proper escaping
+ * Sanitize JSON by escaping control characters within string values
+ * This handles cases where AI generates strings with unescaped control characters
  */
 function sanitizeJsonStringValues(jsonStr: string): string {
   let result = ''
@@ -437,6 +437,7 @@ function sanitizeJsonStringValues(jsonStr: string): string {
 
   for (let i = 0; i < jsonStr.length; i++) {
     const char = jsonStr[i]
+    const charCode = char.charCodeAt(0)
 
     if (escapeNext) {
       result += char
@@ -456,15 +457,20 @@ function sanitizeJsonStringValues(jsonStr: string): string {
       continue
     }
 
-    // Escape literal newlines inside string values
-    if (inString) {
+    // Escape control characters (0x00-0x1F) inside string values
+    // These are not allowed unescaped in JSON strings
+    if (inString && charCode < 32) {
       if (char === '\n') {
         result += '\\n'
-        continue
+      } else if (char === '\r') {
+        // Skip carriage returns
+      } else if (char === '\t') {
+        result += '\\t'
+      } else {
+        // Escape other control characters as \uXXXX
+        result += '\\u' + charCode.toString(16).padStart(4, '0')
       }
-      if (char === '\r') {
-        continue // Skip carriage returns
-      }
+      continue
     }
 
     result += char
