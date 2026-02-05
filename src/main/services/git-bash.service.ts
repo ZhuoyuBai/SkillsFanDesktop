@@ -37,11 +37,20 @@ export function detectGitBash(): GitBashDetectionResult {
     return { found: true, path: envPath, source: 'env-var' }
   }
 
-  // 2. Check app-local installation (managed by Halo)
-  const localGitBash = join(app.getPath('userData'), 'git-bash', 'bin', 'bash.exe')
-  if (existsSync(localGitBash)) {
-    console.log('[GitBash] Found app-local installation:', localGitBash)
-    return { found: true, path: localGitBash, source: 'app-local' }
+  // 2. Check app-local installation (managed by SkillsFan)
+  // On Windows, check ProgramData first (new location), then AppData (legacy)
+  const appLocalPaths = process.platform === 'win32'
+    ? [
+        join(process.env.PROGRAMDATA || 'C:\\ProgramData', 'skillsfan', 'git-bash', 'bin', 'bash.exe'),
+        join(app.getPath('userData'), 'git-bash', 'bin', 'bash.exe')  // Legacy location
+      ]
+    : [join(app.getPath('userData'), 'git-bash', 'bin', 'bash.exe')]
+
+  for (const localGitBash of appLocalPaths) {
+    if (existsSync(localGitBash)) {
+      console.log('[GitBash] Found app-local installation:', localGitBash)
+      return { found: true, path: localGitBash, source: 'app-local' }
+    }
   }
 
   // 3. Check system installation paths
@@ -94,8 +103,18 @@ function findGitInPath(): string | null {
 
 /**
  * Get the path to the app-local Git Bash installation directory
+ *
+ * On Windows, uses C:\ProgramData\skillsfan\git-bash to avoid issues
+ * with non-ASCII characters (like Chinese) in username paths.
+ * On other platforms, uses the standard userData directory.
  */
 export function getAppLocalGitBashDir(): string {
+  if (process.platform === 'win32') {
+    // Use ProgramData to avoid non-ASCII characters in user paths
+    // e.g., C:\Users\孙杨军\... would cause issues with 7z extraction
+    const programData = process.env.PROGRAMDATA || 'C:\\ProgramData'
+    return join(programData, 'skillsfan', 'git-bash')
+  }
   return join(app.getPath('userData'), 'git-bash')
 }
 

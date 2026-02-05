@@ -13,6 +13,30 @@ import http from 'http'
 import { execSync } from 'child_process'
 import { getAppLocalGitBashDir } from './git-bash.service'
 
+/**
+ * Get Windows short path (8.3 format) to handle non-ASCII characters
+ * Example: C:\Users\孙杨军\... -> C:\Users\SUNYA~1\...
+ *
+ * This is necessary because 7z self-extracting archives may fail to parse
+ * paths containing non-ASCII characters (like Chinese usernames).
+ */
+function getShortPath(longPath: string): string {
+  if (process.platform !== 'win32') return longPath
+
+  try {
+    // Use cmd /c for command to get short path
+    // %~sA expands to short path format
+    const result = execSync(`cmd /c for %A in ("${longPath}") do @echo %~sA`, {
+      encoding: 'utf8',
+      windowsHide: true
+    }).trim()
+    return result || longPath
+  } catch {
+    // If short path conversion fails, return original path
+    return longPath
+  }
+}
+
 // Portable Git version to download
 const PORTABLE_GIT_VERSION = '2.47.1'
 
@@ -98,8 +122,12 @@ export async function downloadAndInstallGitBash(
 
     // Silent extraction (-y auto confirm, -o output directory)
     // PortableGit-*.7z.exe is a self-extracting archive
+    // Use short paths to handle non-ASCII characters in Windows usernames
+    const shortTempFile = getShortPath(tempFile)
+    const shortInstallDir = getShortPath(installDir)
     console.log(`[GitBash] Extracting to: ${installDir}`)
-    execSync(`"${tempFile}" -y -o"${installDir}"`, {
+    console.log(`[GitBash] Using short paths - temp: ${shortTempFile}, install: ${shortInstallDir}`)
+    execSync(`"${shortTempFile}" -y -o"${shortInstallDir}"`, {
       windowsHide: true,
       timeout: 180000  // 3 minutes timeout for extraction
     })

@@ -213,27 +213,45 @@ export function GitBashSetup({ onComplete }: GitBashSetupProps) {
     return (
       <div className="fixed inset-0 bg-background flex items-center justify-center">
         <div className="w-[520px] p-8 rounded-2xl bg-card border border-border shadow-xl">
-          <div className="text-center mb-6">
-            <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-red-500/10 flex items-center justify-center">
-              <X className="w-10 h-10 text-red-500" />
+          <div className="text-center mb-4">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-500/10 flex items-center justify-center">
+              <X className="w-8 h-8 text-red-500" />
             </div>
             <h3 className="text-lg font-medium mb-2">{t('Initialization failed')}</h3>
-            <p className="text-sm text-muted-foreground break-words">{error}</p>
+            <p className="text-xs text-muted-foreground break-words max-h-16 overflow-auto">{error}</p>
+          </div>
+
+          {/* Possible reasons */}
+          <div className="bg-muted/50 rounded-lg p-4 mb-4 text-sm text-left">
+            <p className="font-medium mb-2">{t('Possible reasons:')}</p>
+            <ul className="list-disc list-inside text-muted-foreground space-y-1 text-xs">
+              <li>{t('Username contains special characters (Chinese, etc.)')}</li>
+              <li>{t('Network connection issues')}</li>
+              <li>{t('Antivirus software blocking')}</li>
+            </ul>
+          </div>
+
+          {/* Recommended solution */}
+          <div className="bg-blue-500/10 rounded-lg p-4 mb-4 text-sm text-left">
+            <p className="font-medium text-blue-600 dark:text-blue-400 mb-2">{t('Recommended solution:')}</p>
+            <p className="text-muted-foreground text-xs">
+              {t('Install Git for Windows from the official website, then restart the application. SkillsFan will automatically detect it.')}
+            </p>
           </div>
 
           <div className="space-y-3">
             <button
-              onClick={handleRetry}
-              className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-medium hover:opacity-90 transition-opacity"
-            >
-              {t('Retry')}
-            </button>
-            <button
               onClick={handleManualInstall}
-              className="w-full py-3 rounded-xl border border-border font-medium hover:bg-accent transition-colors flex items-center justify-center gap-2"
+              className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-medium hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
             >
               <ExternalLink className="w-4 h-4" />
               {t('Download and install manually')}
+            </button>
+            <button
+              onClick={handleRetry}
+              className="w-full py-3 rounded-xl border border-border font-medium hover:bg-accent transition-colors"
+            >
+              {t('Retry')}
             </button>
             <button
               onClick={() => onComplete(false)}
