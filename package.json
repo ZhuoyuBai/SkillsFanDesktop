@@ -117,10 +117,9 @@
       "node_modules/cloudflared/**/*"
     ],
     "publish": {
-      "provider": "github",
-      "owner": "skillsfan",
-      "repo": "skillsfan-app",
-      "releaseType": "release"
+      "provider": "generic",
+      "url": "https://bloomskills.work/app-releases",
+      "useMultipleRangeRequest": true
     },
     "mac": {
       "category": "public.app-category.productivity",

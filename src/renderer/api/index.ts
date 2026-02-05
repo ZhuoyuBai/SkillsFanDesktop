@@ -969,6 +969,13 @@ export const api = {
     return window.skillsfan.installUpdate()
   },
 
+  downloadUpdate: async (): Promise<ApiResponse> => {
+    if (!isElectron()) {
+      return { success: false, error: 'Only available in desktop app' }
+    }
+    return window.skillsfan.downloadUpdate()
+  },
+
   getVersion: async (): Promise<ApiResponse<string>> => {
     if (!isElectron()) {
       return { success: false, error: 'Only available in desktop app' }
@@ -991,13 +998,17 @@ export const api = {
   },
 
   onUpdaterStatus: (callback: (data: {
-    status: 'idle' | 'checking' | 'available' | 'not-available' | 'error'
+    status: 'idle' | 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'error'
     currentVersion?: string
     latestVersion?: string | null
     releaseDate?: string | null
     releaseNotes?: string | null
-    downloadUrl?: string | null
-    downloadPageUrl?: string | null
+    downloadProgress?: {
+      percent: number
+      bytesPerSecond: number
+      transferred: number
+      total: number
+    } | null
     errorMessage?: string | null
     lastChecked?: string | null
   }) => void) => {
@@ -1005,6 +1016,18 @@ export const api = {
       return () => { } // No-op in remote mode
     }
     return window.skillsfan.onUpdaterStatus(callback)
+  },
+
+  onDownloadProgress: (callback: (data: {
+    percent: number
+    bytesPerSecond: number
+    transferred: number
+    total: number
+  }) => void) => {
+    if (!isElectron()) {
+      return () => { } // No-op in remote mode
+    }
+    return window.skillsfan.onDownloadProgress(callback)
   },
 
   // ===== Overlay (Electron only) =====

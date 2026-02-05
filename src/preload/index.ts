@@ -192,11 +192,18 @@ export interface HaloAPI {
 
   // Updater
   checkForUpdates: () => Promise<IpcResponse>
+  downloadUpdate: () => Promise<IpcResponse>
   installUpdate: () => Promise<IpcResponse>
   getVersion: () => Promise<IpcResponse>
   getUpdateInfo: () => Promise<IpcResponse>
   openDownloadPage: () => Promise<IpcResponse>
   onUpdaterStatus: (callback: (data: unknown) => void) => () => void
+  onDownloadProgress: (callback: (data: {
+    percent: number
+    bytesPerSecond: number
+    transferred: number
+    total: number
+  }) => void) => () => void
 
   // Browser (embedded browser for Content Canvas)
   createBrowserView: (viewId: string, url?: string) => Promise<IpcResponse>
@@ -525,11 +532,13 @@ const api: HaloAPI = {
 
   // Updater
   checkForUpdates: () => ipcRenderer.invoke('updater:check'),
+  downloadUpdate: () => ipcRenderer.invoke('updater:download'),
   installUpdate: () => ipcRenderer.invoke('updater:install'),
   getVersion: () => ipcRenderer.invoke('updater:get-version'),
   getUpdateInfo: () => ipcRenderer.invoke('updater:get-info'),
   openDownloadPage: () => ipcRenderer.invoke('updater:open-download'),
   onUpdaterStatus: (callback) => createEventListener('updater:status', callback),
+  onDownloadProgress: (callback) => createEventListener('updater:download-progress', callback as (data: unknown) => void),
 
   // Browser (embedded browser for Content Canvas)
   createBrowserView: (viewId, url) => ipcRenderer.invoke('browser:create', { viewId, url }),

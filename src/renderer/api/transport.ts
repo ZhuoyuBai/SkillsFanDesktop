@@ -215,7 +215,9 @@ export function onEvent(channel: string, callback: (data: unknown) => void): () 
       'canvas:tab-action': 'onCanvasTabAction',
       'ai-browser:active-view-changed': 'onAIBrowserActiveViewChanged',
       'perf:snapshot': 'onPerfSnapshot',
-      'perf:warning': 'onPerfWarning'
+      'perf:warning': 'onPerfWarning',
+      'updater:status': 'onUpdaterStatus',
+      'updater:download-progress': 'onDownloadProgress'
     }
 
     const method = methodMap[channel]
