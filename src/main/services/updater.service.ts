@@ -6,8 +6,10 @@
  */
 
 import { app, BrowserWindow, ipcMain, shell } from 'electron'
-import { autoUpdater, UpdateInfo as ElectronUpdateInfo, ProgressInfo } from 'electron-updater'
+import electronUpdater, { type UpdateInfo as ElectronUpdateInfo, type ProgressInfo } from 'electron-updater'
 import { is } from '@electron-toolkit/utils'
+
+const { autoUpdater } = electronUpdater
 
 // ============================================================================
 // Types
