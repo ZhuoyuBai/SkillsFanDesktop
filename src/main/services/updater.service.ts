@@ -58,6 +58,9 @@ const UPDATER_CONFIG = {
   /** Delay before first check after startup (ms) */
   STARTUP_DELAY: 5000,
 
+  /** Timeout for update check (ms) */
+  CHECK_TIMEOUT: 15000,
+
   /** Fallback download page URL */
   DOWNLOAD_PAGE_URL: 'https://www.skills.fan/download'
 }
@@ -249,7 +252,13 @@ export async function checkForUpdates(): Promise<UpdaterState> {
   }
 
   try {
-    await autoUpdater.checkForUpdates()
+    // Create timeout promise to avoid hanging indefinitely
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Update check timed out')), UPDATER_CONFIG.CHECK_TIMEOUT)
+    )
+
+    // Race between actual check and timeout
+    await Promise.race([autoUpdater.checkForUpdates(), timeoutPromise])
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
     console.error('[Updater] Failed to check for updates:', errorMessage)

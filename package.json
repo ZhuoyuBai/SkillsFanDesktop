@@ -100,6 +100,7 @@
   "build": {
     "appId": "com.skillsfan.app",
     "productName": "技能范",
+    "artifactName": "SkillsFan-${version}-${arch}.${ext}",
     "releaseInfo": {
       "releaseNotesFile": ".release-notes-current.md"
     },
