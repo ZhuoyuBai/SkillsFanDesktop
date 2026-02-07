@@ -31,6 +31,7 @@ import type {
 import { getConfig, saveConfig } from '../config.service'
 import { getCustomProvider } from './providers/custom.provider'
 import { getGitHubCopilotProvider } from './providers/github-copilot.provider'
+import { getSkillsFanCreditsProvider } from './providers/skillsfan-credits.provider'
 import { loadAuthProvidersAsync, isOAuthProvider as isOAuthProviderCheck, type LoadedProvider } from './auth-loader'
 import { encryptString, decryptString, decryptTokens } from '../secure-storage.service'
 
@@ -58,6 +59,7 @@ class AISourceManager {
     // Register built-in providers immediately
     this.registerProvider(getCustomProvider())
     this.registerProvider(getGitHubCopilotProvider())
+    this.registerProvider(getSkillsFanCreditsProvider())
 
     // Start async initialization (optional providers + dynamic loading)
     this.initPromise = this.initializeAsync()
@@ -283,7 +285,7 @@ class AISourceManager {
     const defaultModel = data._defaultModel || ''
 
     // Generic OAuth config structure (with encrypted tokens)
-    const oauthConfig: OAuthSourceConfig = {
+    const oauthConfig: Record<string, unknown> = {
       loggedIn: true,
       user: {
         name: loginResult.user?.name || '',
@@ -296,6 +298,11 @@ class AISourceManager {
       accessToken: encryptString(tokenData?.accessToken || ''),
       refreshToken: encryptString(tokenData?.refreshToken || ''),
       tokenExpires: tokenData?.expiresAt
+    }
+
+    // Store provider-specific extra data (e.g., modelPricing from SkillsFan)
+    if (data._modelPricing) {
+      oauthConfig.modelPricing = data._modelPricing
     }
 
     // Store as the active OAuth source

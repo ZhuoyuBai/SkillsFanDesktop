@@ -2,16 +2,47 @@
  * SkillsFan OAuth Configuration Constants
  */
 
+import { app } from 'electron'
+
+// Build-time injected constants (from electron.vite.config.ts)
+declare const __SKILLSFAN_REGION__: string
+declare const __SKILLSFAN_API_URL__: string
+
+// ============================================================================
+// Region Detection
+// ============================================================================
+
+/**
+ * Get region based on build-time constant, environment variable, or locale
+ * Priority: build-time > env var > locale detection
+ */
+function getRegion(): 'cn' | 'overseas' {
+  if (__SKILLSFAN_REGION__) {
+    return __SKILLSFAN_REGION__ as 'cn' | 'overseas'
+  }
+  if (process.env.SKILLSFAN_REGION) {
+    return process.env.SKILLSFAN_REGION as 'cn' | 'overseas'
+  }
+  try {
+    const locale = app.getLocale()
+    return (locale === 'zh-CN' || locale === 'zh-TW') ? 'cn' : 'overseas'
+  } catch {
+    return 'cn'
+  }
+}
+
 // ============================================================================
 // Server URLs
 // ============================================================================
 
 /**
  * SkillsFan API base URL
- * Can be overridden via environment variable for development
+ * Priority: build-time API URL > env SKILLSFAN_API_URL > region detection
  */
 export const SKILLSFAN_BASE_URL =
-  process.env.SKILLSFAN_API_URL || 'https://www.skills.fan'
+  __SKILLSFAN_API_URL__ ||
+  process.env.SKILLSFAN_API_URL ||
+  (getRegion() === 'cn' ? 'https://www.skills.fan' : 'https://skillsfan.com')
 
 /**
  * OAuth authorization endpoint

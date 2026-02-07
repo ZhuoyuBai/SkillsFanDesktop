@@ -372,6 +372,8 @@ export interface HaloAPI {
   skillsfanRefreshToken: () => Promise<IpcResponse>
   skillsfanEnsureValidToken: () => Promise<IpcResponse>
   skillsfanGetAccessToken: () => Promise<IpcResponse>
+  skillsfanGetCredits: () => Promise<IpcResponse>
+  skillsfanRefreshCredits: () => Promise<IpcResponse>
   onSkillsFanLoginSuccess: (callback: (data: { user: unknown }) => void) => () => void
   onSkillsFanLoginError: (callback: (data: { error: string }) => void) => () => void
   onSkillsFanLogout: (callback: () => void) => () => void
@@ -645,6 +647,8 @@ const api: HaloAPI = {
   skillsfanRefreshToken: () => ipcRenderer.invoke('skillsfan:refresh-token'),
   skillsfanEnsureValidToken: () => ipcRenderer.invoke('skillsfan:ensure-valid-token'),
   skillsfanGetAccessToken: () => ipcRenderer.invoke('skillsfan:get-access-token'),
+  skillsfanGetCredits: () => ipcRenderer.invoke('skillsfan:get-credits'),
+  skillsfanRefreshCredits: () => ipcRenderer.invoke('skillsfan:refresh-credits'),
   onSkillsFanLoginSuccess: (callback) => createEventListener('skillsfan:login-success', callback as (data: unknown) => void),
   onSkillsFanLoginError: (callback) => createEventListener('skillsfan:login-error', callback as (data: unknown) => void),
   onSkillsFanLogout: (callback) => createEventListener('skillsfan:logout', callback as (data: unknown) => void),

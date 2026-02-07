@@ -30,6 +30,7 @@ import { Header, usePlatform } from '../components/layout/Header'
 import { HaloLogo } from '../components/brand/HaloLogo'
 import { ContentCanvas, CanvasToggleButton } from '../components/canvas'
 import { GitBashWarningBanner } from '../components/setup/GitBashWarningBanner'
+import { CreditsErrorDialog } from '../components/chat/CreditsErrorDialog'
 import { api } from '../api'
 import { useLayoutPreferences, LAYOUT_DEFAULTS } from '../hooks/useLayoutPreferences'
 import { useWindowMaximize } from '../components/canvas/viewers/useWindowMaximize'
@@ -77,7 +78,9 @@ export function SpacePage() {
     selectConversation,
     deleteConversation,
     clearAllConversations,
-    renameConversation
+    renameConversation,
+    showCreditsError,
+    setShowCreditsError
   } = useChatStore()
 
   // Get current data from store
@@ -721,6 +724,12 @@ export function SpacePage() {
           </div>
         </div>
       )}
+
+      {/* Credits Error Dialog */}
+      <CreditsErrorDialog
+        isOpen={showCreditsError}
+        onClose={() => setShowCreditsError(false)}
+      />
     </div>
   )
 }

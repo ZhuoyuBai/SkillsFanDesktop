@@ -349,9 +349,17 @@ export async function sendMessage(
       }
     }
 
+    // Parse HTTP error codes from error messages (e.g., "402", "401", "503")
+    let errorCode: number | undefined
+    const httpCodeMatch = errorMessage.match(/\b(4\d{2}|5\d{2})\b/)
+    if (httpCodeMatch) {
+      errorCode = parseInt(httpCodeMatch[1], 10)
+    }
+
     sendToRenderer('agent:error', spaceId, conversationId, {
       type: 'error',
-      error: errorMessage
+      error: errorMessage,
+      errorCode
     })
 
     // Ralph mode: call onError callback

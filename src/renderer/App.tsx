@@ -191,7 +191,7 @@ export default function App() {
 
     const unsubError = api.onAgentError((data) => {
       console.log('[App] Received agent:error event:', data)
-      handleAgentError(data as AgentEventBase & { error: string })
+      handleAgentError(data as AgentEventBase & { error: string; errorCode?: number })
     })
 
     const unsubComplete = api.onAgentComplete((data) => {
@@ -223,15 +223,25 @@ export default function App() {
       }
     })
 
-    // SkillsFan login success - go directly to chat (skip model config)
+    // SkillsFan login success - complete model setup then go to chat
     const unsubSkillsFanLogin = api.onSkillsFanLoginSuccess(async () => {
-      console.log('[App] SkillsFan login success, going to chat...')
-      // Mark first launch as complete
-      const currentConfig = useAppStore.getState().config
-      if (currentConfig) {
-        await api.setConfig({ ...currentConfig, isFirstLaunch: false })
+      console.log('[App] SkillsFan login success, completing model setup...')
+
+      // Complete login via AISourceManager - fetches models, saves tokens + models to config
+      const completeResult = await api.authCompleteLogin('skillsfan-credits', 'skillsfan-credits-login')
+      if (completeResult.success) {
+        console.log('[App] SkillsFan model setup complete')
+      } else {
+        console.warn('[App] Failed to complete model setup:', completeResult.error)
       }
-      // Load spaces and go directly to chat (skip setup)
+
+      // Reload config into store (now includes skillsfan-credits with models)
+      const configResult = await api.getConfig()
+      if (configResult.success && configResult.data) {
+        setConfig(configResult.data as HaloConfig)
+      }
+
+      // Load spaces and navigate to chat
       await useSpaceStore.getState().loadSpaces()
       const { haloSpace } = useSpaceStore.getState()
       if (haloSpace) {

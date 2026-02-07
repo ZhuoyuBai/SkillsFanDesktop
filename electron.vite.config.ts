@@ -47,12 +47,22 @@ const analyticsDefine = {
   '__HALO_BAIDU_SITE_ID__': JSON.stringify(envLocal.HALO_BAIDU_SITE_ID || ''),
 }
 
+/**
+ * Build-time region config
+ * Set via: cross-env SKILLSFAN_REGION=cn npm run build
+ * Empty string means "auto-detect at runtime via locale"
+ */
+const regionDefine = {
+  '__SKILLSFAN_REGION__': JSON.stringify(process.env.SKILLSFAN_REGION || ''),
+  '__SKILLSFAN_API_URL__': JSON.stringify(process.env.SKILLSFAN_API_URL || ''),
+}
+
 export default defineConfig({
   main: {
     plugins: [
       externalizeDepsPlugin()
     ],
-    define: analyticsDefine,
+    define: { ...analyticsDefine, ...regionDefine },
     build: {
       sourcemap: true,
       rollupOptions: {
@@ -82,6 +92,7 @@ export default defineConfig({
   },
   renderer: {
     root: resolve(__dirname, 'src/renderer'),
+    define: regionDefine,
     build: {
       rollupOptions: {
         input: {

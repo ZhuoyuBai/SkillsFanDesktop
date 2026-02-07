@@ -11,7 +11,7 @@
 
 import { join, dirname } from 'path'
 import { pathToFileURL } from 'url'
-import { existsSync } from 'fs'
+import { existsSync, readFileSync } from 'fs'
 import { app } from 'electron'
 import type { AISourceProvider, OAuthAISourceProvider } from '../../../shared/interfaces'
 import type { AISourceType } from '../../../shared/types'
@@ -106,9 +106,9 @@ export function loadProductConfig(): ProductConfig {
 
   try {
     if (existsSync(configPath)) {
-      // Use require for synchronous loading (config is needed at startup)
-      delete require.cache[require.resolve(configPath)]
-      productConfig = require(configPath) as ProductConfig
+      // Use readFileSync + JSON.parse (works reliably in both CJS and ESM)
+      const content = readFileSync(configPath, 'utf-8')
+      productConfig = JSON.parse(content) as ProductConfig
       console.log('[AuthLoader] Loaded product.json from:', configPath)
       console.log('[AuthLoader] Auth providers configured:', productConfig.authProviders.map(p => p.type).join(', '))
     } else {

@@ -7,7 +7,7 @@
  */
 
 import { useState, useRef, useEffect } from 'react'
-import { ChevronDown, Plus } from 'lucide-react'
+import { ChevronDown, Plus, BadgeCheck } from 'lucide-react'
 import { useAppStore } from '../../stores/app.store'
 import { api } from '../../api'
 import {
@@ -25,6 +25,7 @@ import kimiLogo from '../../assets/providers/kimi.jpg'
 import deepseekLogo from '../../assets/providers/deepseek.jpg'
 import claudeLogo from '../../assets/providers/claude.jpg'
 import openaiLogo from '../../assets/providers/openai.jpg'
+import skillsfanLogo from '../../assets/logo.png'
 
 // Provider logo mapping by API URL
 const PROVIDER_LOGOS: Record<string, string> = {
@@ -44,6 +45,7 @@ const PROVIDER_LOGOS_BY_ID: Record<string, string> = {
   'deepseek': deepseekLogo,
   'claude': claudeLogo,
   'openai': openaiLogo,
+  'skillsfan-credits': skillsfanLogo,
 }
 
 // Provider display names by ID
@@ -55,6 +57,7 @@ const PROVIDER_NAMES: Record<string, string> = {
   'claude': 'Claude',
   'openai': 'OpenAI',
   'custom': 'Custom',
+  'skillsfan-credits': 'SkillsFan',
 }
 
 /**
@@ -355,32 +358,49 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
           })}
 
           {/* OAuth Providers - Dynamic rendering */}
-          {loggedInOAuthProviders.map((provider) => (
-            <div key={provider.type}>
-              {configuredCustomProviders.length > 0 && <div className="my-1 border-t border-border" />}
-              {(provider.config?.availableModels || []).map((modelId) => {
-                const displayName = provider.config?.modelNames?.[modelId] || modelId
-                const isSelected = currentSource === provider.type && provider.config?.model === modelId
-                return (
-                  <button
-                    key={modelId}
-                    onClick={() => handleSelectModel(provider.type, modelId)}
-                    className={`w-full px-3 py-2 text-left text-sm hover:bg-secondary/80 transition-colors flex items-center gap-2.5 ${
-                      isSelected ? 'text-primary' : 'text-foreground'
-                    }`}
-                  >
-                    <div className="w-5 h-5 rounded bg-muted flex items-center justify-center flex-shrink-0">
-                      <span className="text-xs text-muted-foreground">O</span>
-                    </div>
-                    <span className="truncate">{displayName}</span>
-                    {isSelected && (
-                      <span className="ml-auto w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
-                    )}
-                  </button>
-                )
-              })}
-            </div>
-          ))}
+          {loggedInOAuthProviders.map((provider) => {
+            const providerLogo = getProviderLogoById(provider.type)
+            const pricing = (provider.config as any)?.modelPricing as Record<string, { input: number; output: number }> | undefined
+            return (
+              <div key={provider.type}>
+                {configuredCustomProviders.length > 0 && <div className="my-1 border-t border-border" />}
+                {(provider.config?.availableModels || []).map((modelId) => {
+                  const displayName = provider.config?.modelNames?.[modelId] || modelId
+                  const isSelected = currentSource === provider.type && provider.config?.model === modelId
+                  const modelPrice = pricing?.[modelId]
+                  return (
+                    <button
+                      key={modelId}
+                      onClick={() => handleSelectModel(provider.type, modelId)}
+                      className={`w-full px-3 py-2 text-left text-sm hover:bg-secondary/80 transition-colors flex items-center gap-2.5 ${
+                        isSelected ? 'text-primary' : 'text-foreground'
+                      }`}
+                    >
+                      {providerLogo ? (
+                        <img src={providerLogo} alt="" className="w-5 h-5 rounded object-cover flex-shrink-0" />
+                      ) : (
+                        <div className="w-5 h-5 rounded bg-muted flex items-center justify-center flex-shrink-0">
+                          <span className="text-xs text-muted-foreground">O</span>
+                        </div>
+                      )}
+                      <span className="truncate">{displayName}</span>
+                      {provider.type === 'skillsfan-credits' && (
+                        <BadgeCheck className="w-3.5 h-3.5 text-primary flex-shrink-0" />
+                      )}
+                      {modelPrice && (
+                        <span className="ml-auto text-[10px] text-muted-foreground flex-shrink-0 tabular-nums">
+                          {modelPrice.input}/{modelPrice.output}
+                        </span>
+                      )}
+                      {isSelected && (
+                        <span className={`${modelPrice ? '' : 'ml-auto'} w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0`} />
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            )
+          })}
 
           {/* Divider */}
           {(configuredCustomProviders.length > 0 || loggedInOAuthProviders.length > 0) && (

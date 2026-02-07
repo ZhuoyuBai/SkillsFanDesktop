@@ -264,6 +264,20 @@ export const useAppStore = create<AppState>((set, get) => ({
           }
           console.log('[Store] Config loaded, showing space')
           set({ view: 'space' })
+
+          // Refresh AI sources in background (fetch latest models from backend)
+          api.refreshAISourcesConfig().then((refreshResult) => {
+            if (refreshResult.success) {
+              console.log('[Store] AI sources refreshed on startup')
+              api.getConfig().then((configResult) => {
+                if (configResult.success && configResult.data) {
+                  set({ config: configResult.data as HaloConfig })
+                }
+              })
+            }
+          }).catch(() => {
+            // Non-critical, ignore errors
+          })
         }
       } else {
         console.error('[Store] Failed to load config:', response.error)

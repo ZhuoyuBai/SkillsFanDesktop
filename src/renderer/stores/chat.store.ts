@@ -127,6 +127,10 @@ interface ChatState {
   // App startup state - used to auto-create new conversation on first space entry
   freshStart: boolean
 
+  // Credits error dialog
+  showCreditsError: boolean
+  setShowCreditsError: (show: boolean) => void
+
   // Computed getters
   getCurrentSpaceState: () => SpaceState
   getSpaceState: (spaceId: string) => SpaceState
@@ -171,7 +175,7 @@ interface ChatState {
   handleAgentMessage: (data: AgentEventBase & { content: string; isComplete: boolean }) => void
   handleAgentToolCall: (data: AgentEventBase & ToolCall) => void
   handleAgentToolResult: (data: AgentEventBase & { toolId: string; result: string; isError: boolean }) => void
-  handleAgentError: (data: AgentEventBase & { error: string }) => void
+  handleAgentError: (data: AgentEventBase & { error: string; errorCode?: number }) => void
   handleAgentComplete: (data: AgentEventBase) => void
   handleAgentThought: (data: AgentEventBase & { thought: Thought }) => void
   handleAgentCompact: (data: AgentEventBase & { trigger: 'manual' | 'auto'; preTokens: number }) => void
@@ -198,6 +202,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
   isLoading: false,
   isLoadingConversation: false,
   freshStart: true,  // App just started - will auto-create new conversation on first space entry
+
+  showCreditsError: false,
+  setShowCreditsError: (show) => set({ showCreditsError: show }),
 
   // Get current space state
   getCurrentSpaceState: () => {
@@ -1057,8 +1064,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   // Handle error for a specific conversation
   handleAgentError: (data) => {
-    const { conversationId, error } = data
-    console.log(`[ChatStore] handleAgentError [${conversationId}]:`, error)
+    const { conversationId, error, errorCode } = data
+    console.log(`[ChatStore] handleAgentError [${conversationId}]:`, error, 'code:', errorCode)
+
+    // Show credits error dialog for 402 (insufficient credits)
+    if (errorCode === 402) {
+      set({ showCreditsError: true })
+    }
 
     // Add error thought to session
     const errorThought: Thought = {

@@ -229,8 +229,9 @@ function getAiSourcesSignature(aiSources?: AISourcesConfig): string {
   if (!aiSources) return ''
   const current = aiSources.current || 'custom'
 
-  // Note: model is excluded from signature because V2 Session supports dynamic model switching
-  // (via setModel method). Only changes to credentials/provider should invalidate sessions.
+  // Model is included in signature: for non-Anthropic providers (OAuth, custom API),
+  // the model is encoded inside ANTHROPIC_API_KEY via encodeBackendConfig().
+  // setModel() only sets a fake Claude model, so actual model changes require session rebuild.
 
   // Get config for current source (could be provider ID like 'zhipu', 'deepseek', etc.)
   const currentConfig = aiSources[current] as Record<string, any> | undefined
@@ -243,8 +244,8 @@ function getAiSourcesSignature(aiSources?: AISourcesConfig): string {
         current,
         currentConfig.accessToken || '',
         currentConfig.refreshToken || '',
-        currentConfig.tokenExpires || ''
-        // model excluded: dynamic switching supported
+        currentConfig.tokenExpires || '',
+        currentConfig.model || ''
       ].join('|')
     }
 
@@ -255,8 +256,8 @@ function getAiSourcesSignature(aiSources?: AISourcesConfig): string {
         current,
         currentConfig.provider || '',
         currentConfig.apiUrl || '',
-        currentConfig.apiKey || ''
-        // model excluded: dynamic switching supported
+        currentConfig.apiKey || '',
+        currentConfig.model || ''
       ].join('|')
     }
   }
@@ -268,8 +269,8 @@ function getAiSourcesSignature(aiSources?: AISourcesConfig): string {
       'custom',
       custom?.provider || '',
       custom?.apiUrl || '',
-      custom?.apiKey || ''
-      // model excluded: dynamic switching supported
+      custom?.apiKey || '',
+      custom?.model || ''
     ].join('|')
   }
 

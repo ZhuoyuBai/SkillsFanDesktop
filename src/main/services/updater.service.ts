@@ -61,8 +61,15 @@ const UPDATER_CONFIG = {
   /** Timeout for update check (ms) */
   CHECK_TIMEOUT: 15000,
 
-  /** Fallback download page URL */
-  DOWNLOAD_PAGE_URL: 'https://www.skills.fan/download'
+  /** Fallback download page URL (uses SKILLSFAN_BASE_URL for region awareness) */
+  get DOWNLOAD_PAGE_URL() {
+    try {
+      const { SKILLSFAN_BASE_URL } = require('./skillsfan/constants')
+      return `${SKILLSFAN_BASE_URL}/download`
+    } catch {
+      return 'https://www.skills.fan/download'
+    }
+  }
 }
 
 // ============================================================================

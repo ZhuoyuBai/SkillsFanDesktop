@@ -1449,6 +1449,20 @@ export const api = {
     return window.skillsfan.skillsfanRefreshToken()
   },
 
+  skillsfanGetCredits: async (): Promise<ApiResponse> => {
+    if (!isElectron()) {
+      return { success: false, error: 'Only available in desktop app' }
+    }
+    return window.skillsfan.skillsfanGetCredits()
+  },
+
+  skillsfanRefreshCredits: async (): Promise<ApiResponse> => {
+    if (!isElectron()) {
+      return { success: false, error: 'Only available in desktop app' }
+    }
+    return window.skillsfan.skillsfanRefreshCredits()
+  },
+
   onSkillsFanLoginSuccess: (callback: (data: { user: unknown }) => void) => {
     if (!isElectron()) {
       return () => {}

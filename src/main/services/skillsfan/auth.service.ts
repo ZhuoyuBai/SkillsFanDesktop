@@ -49,6 +49,26 @@ let authState: SkillsFanAuthState = {
 }
 
 // ============================================================================
+// Login Success Callbacks (for main-process consumers like SkillsFanCreditsProvider)
+// ============================================================================
+
+type LoginSuccessCallback = (user: SkillsFanUser) => void
+const loginSuccessCallbacks: LoginSuccessCallback[] = []
+
+/**
+ * Register a callback to be notified when login succeeds.
+ * Used by SkillsFanCreditsProvider to bridge deep-link OAuth with AISourceManager flow.
+ * @returns Cleanup function to remove the callback
+ */
+export function onLoginSuccess(callback: LoginSuccessCallback): () => void {
+  loginSuccessCallbacks.push(callback)
+  return () => {
+    const idx = loginSuccessCallbacks.indexOf(callback)
+    if (idx >= 0) loginSuccessCallbacks.splice(idx, 1)
+  }
+}
+
+// ============================================================================
 // Storage Paths
 // ============================================================================
 
@@ -95,7 +115,7 @@ export async function startLogin(): Promise<StartLoginResult> {
 
     const authUrl = `${SKILLSFAN_AUTHORIZE_URL}?${params.toString()}`
 
-    console.log('[SkillsFan] Opening browser for login')
+    console.log('[SkillsFan] Opening browser for login, authUrl:', authUrl)
 
     // Open system browser
     await shell.openExternal(authUrl)
@@ -211,6 +231,13 @@ export async function handleCallback(url: string): Promise<LoginResult> {
 
     // Notify renderer process
     notifyLoginSuccess(authState)
+
+    // Notify main-process consumers (e.g., SkillsFanCreditsProvider)
+    if (userResult.user) {
+      loginSuccessCallbacks.forEach(cb => {
+        try { cb(userResult.user!) } catch (e) { console.error('[SkillsFan] Login callback error:', e) }
+      })
+    }
 
     console.log('[SkillsFan] Login successful for user:', userResult.user?.name)
 
@@ -431,6 +458,9 @@ async function exchangeCodeForToken(
   error?: string
 }> {
   try {
+    console.log('[SkillsFan] Token exchange URL:', SKILLSFAN_TOKEN_URL)
+    console.log('[SkillsFan] Token exchange params:', { grant_type: 'authorization_code', code: code.substring(0, 8) + '...', redirect_uri: redirectUri, client_id: SKILLSFAN_CLIENT_ID })
+
     const response = await fetch(SKILLSFAN_TOKEN_URL, {
       method: 'POST',
       headers: {

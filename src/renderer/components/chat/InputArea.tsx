@@ -27,6 +27,7 @@ import { useAIBrowserStore } from '../../stores/ai-browser.store'
 import { getOnboardingPrompt } from '../onboarding/onboardingData'
 import { ImageAttachmentPreview } from './ImageAttachmentPreview'
 import { ModelSelector } from '../layout/ModelSelector'
+import { CreditsDisplay } from '../layout/CreditsDisplay'
 import { SpaceSelector } from '../layout/SpaceSelector'
 import { processImage, isValidImageType, formatFileSize } from '../../utils/imageProcessor'
 import type { ImageAttachment } from '../../types'
@@ -732,8 +733,10 @@ function InputToolbar({
 
       </div>
 
-      {/* Right section: action button only */}
-      <div className="flex items-center">
+      {/* Right section: credits + action button */}
+      <div className="flex items-center gap-1.5">
+        {/* Credits Display - only shown when using SkillsFan Credits */}
+        {!isOnboarding && <CreditsDisplay />}
         {isGenerating ? (
           <button
             onClick={onStop}
