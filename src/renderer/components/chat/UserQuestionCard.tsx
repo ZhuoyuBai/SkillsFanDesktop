@@ -10,7 +10,7 @@
  * - Auto-advance to next unanswered question
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { MessageSquare, Check } from 'lucide-react'
 import { cn } from '../../lib/utils'
@@ -39,9 +39,13 @@ export function UserQuestionCard({ questions, onAnswer, onSkip }: UserQuestionCa
   const [customInputs, setCustomInputs] = useState<Record<string, string>>({})
   const [showCustom, setShowCustom] = useState<Record<string, boolean>>({})
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
+  const justAnsweredRef = useRef(false)
 
   // Auto-advance to next unanswered question when current one is answered
   useEffect(() => {
+    if (!justAnsweredRef.current) return
+    justAnsweredRef.current = false
+
     const currentQ = questions[currentQuestionIndex]
     if (currentQ && answers[currentQ.question]) {
       // Find next unanswered question
@@ -59,6 +63,7 @@ export function UserQuestionCard({ questions, onAnswer, onSkip }: UserQuestionCa
   }, [answers, currentQuestionIndex, questions])
 
   const handleOptionSelect = (questionText: string, optionLabel: string) => {
+    justAnsweredRef.current = true
     setAnswers(prev => ({ ...prev, [questionText]: optionLabel }))
     setShowCustom(prev => ({ ...prev, [questionText]: false }))
   }

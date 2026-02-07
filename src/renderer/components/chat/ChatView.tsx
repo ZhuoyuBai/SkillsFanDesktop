@@ -449,6 +449,12 @@ const QUICK_CATEGORIES: { key: string; icon: LucideIcon; color: string }[] = [
 // t('E-commerce')
 
 // Quick prompt keys for each category - i18n keys resolved at render time
+// i18next-parser hint:
+// t('Create a "daily-plan.txt" file on desktop with today\'s date and a simple to-do template')
+// t('Create a "sales.csv" sample file on desktop with product name, sales, and price columns, generate 5 rows of mock data')
+// t('Create an "ideas.md" file on desktop with 3 fun short video ideas in Markdown format')
+// t('Create a "project-notes" folder on desktop containing "meeting-notes.md" and "todo.md" files')
+// t('Create a "product-copy.md" file on desktop, write a product title, 5 selling points, and detail page copy for wireless Bluetooth earbuds')
 const QUICK_PROMPT_KEYS: Record<string, string> = {
   'Writing & Documents': 'Create a "daily-plan.txt" file on desktop with today\'s date and a simple to-do template',
   'Data Analysis': 'Create a "sales.csv" sample file on desktop with product name, sales, and price columns, generate 5 rows of mock data',

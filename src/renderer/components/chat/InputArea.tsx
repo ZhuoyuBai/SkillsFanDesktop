@@ -68,6 +68,12 @@ function useIsMobile() {
 
 // Typewriter animation phrase keys - matches QUICK_PROMPTS in ChatView
 // These are i18n keys that get resolved at render time via getTypewriterPhrases()
+// i18next-parser hint:
+// t('Create a "daily-plan.txt" file on desktop...')
+// t('Create a "sales.csv" sample file on desktop...')
+// t('Create an "ideas.md" file on desktop...')
+// t('Create a "project-notes" folder on desktop...')
+// t('Create a "product-copy.md" file on desktop...')
 const TYPEWRITER_PHRASE_KEYS = [
   'Create a "daily-plan.txt" file on desktop...',
   'Create a "sales.csv" sample file on desktop...',
