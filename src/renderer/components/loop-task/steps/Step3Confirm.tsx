@@ -1,10 +1,11 @@
 /**
  * Step3Confirm - Third step of the wizard
  *
- * Shows:
- * - Task overview (project dir, method, story count, iterations)
+ * Enhanced review & configure step:
+ * - Editable task name and branch name
+ * - Task configuration summary (project dir, method, iterations)
  * - prd.json generation status
- * - Read-only story list preview
+ * - Compact story list preview
  *
  * When "Return to Edit" is clicked, deletes prd.json and goes back to step 2
  * When "Start Execution" is clicked, creates task and goes to step 4
@@ -18,11 +19,16 @@ import {
   CheckCircle2,
   FileJson,
   Loader2,
-  X
+  X,
+  FolderOpen,
+  GitBranch,
+  ListChecks,
+  Repeat
 } from 'lucide-react'
 import { useLoopTaskStore } from '../../../stores/loop-task.store'
 import { useChatStore } from '../../../stores/chat.store'
 import { api } from '../../../api'
+import { useToastStore } from '../../../stores/toast.store'
 import type { WizardStep } from '../../../../shared/types/loop-task'
 
 interface Step3ConfirmProps {
@@ -38,10 +44,12 @@ export function Step3Confirm({ spaceId, onCancel }: Step3ConfirmProps) {
     generatedPrdPath,
     setWizardStep,
     setGeneratedPrdPath,
+    updateEditing,
     createTask,
     clearLog
   } = useLoopTaskStore()
   const { setSelectionType } = useChatStore()
+  const { addToast } = useToastStore()
 
   const [isStarting, setIsStarting] = useState(false)
   const [showJson, setShowJson] = useState(false)
@@ -93,6 +101,7 @@ export function Step3Confirm({ spaceId, onCancel }: Step3ConfirmProps) {
       // Clear log and go to step 4
       clearLog()
       setWizardStep(4 as WizardStep)
+      addToast(t('Task created, execution started'), 'success')
 
       // Start execution
       const startResult = await api.ralphStart(spaceId, task.id)
@@ -123,33 +132,71 @@ export function Step3Confirm({ spaceId, onCancel }: Step3ConfirmProps) {
   return (
     <div className="flex flex-col h-full">
       <div className="flex-1 overflow-auto p-4">
-        <div className="max-w-2xl mx-auto space-y-6">
-          {/* Task Overview */}
+        <div className="max-w-2xl mx-auto space-y-5">
+          {/* Task Name */}
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-foreground">
+              {t('Task Name')}
+            </label>
+            <input
+              type="text"
+              value={editingTask?.name || ''}
+              onChange={(e) => updateEditing({ name: e.target.value })}
+              placeholder={t('New Loop Task')}
+              className="w-full px-3 py-2 bg-input border border-border rounded-md text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+            />
+          </div>
+
+          {/* Branch Name */}
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-foreground flex items-center gap-1.5">
+              <GitBranch size={14} className="text-muted-foreground" />
+              {t('Branch Name')}
+            </label>
+            <input
+              type="text"
+              value={editingTask?.branchName || ''}
+              onChange={(e) => updateEditing({ branchName: e.target.value })}
+              placeholder={t('auto-generated if empty')}
+              className="w-full px-3 py-2 bg-input border border-border rounded-md text-foreground font-mono text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+            />
+            <p className="text-xs text-muted-foreground">
+              {t('Leave empty to auto-generate from task name')}
+            </p>
+          </div>
+
+          {/* Task Configuration Summary */}
           <div className="p-4 border border-border rounded-lg space-y-3">
-            <h3 className="font-medium text-foreground">{t('Task Overview')}</h3>
-            <div className="grid grid-cols-2 gap-y-2 text-sm">
-              <span className="text-muted-foreground">{t('Project Directory')}:</span>
-              <span className="text-foreground truncate" title={editingTask?.projectDir}>
-                {editingTask?.projectDir}
-              </span>
-
-              <span className="text-muted-foreground">{t('Creation Method')}:</span>
-              <span className="text-foreground">
-                {methodLabels[createMethod || 'manual'] || createMethod}
-              </span>
-
-              <span className="text-muted-foreground">{t('Story Count')}:</span>
-              <span className="text-foreground">{editingTask?.stories?.length || 0}</span>
-
-              <span className="text-muted-foreground">{t('Max Iterations')}:</span>
-              <span className="text-foreground">{editingTask?.maxIterations || 10}</span>
+            <h3 className="text-sm font-medium text-foreground">{t('Configuration Summary')}</h3>
+            <div className="space-y-2.5">
+              <div className="flex items-center gap-2.5 text-sm">
+                <FolderOpen size={14} className="text-muted-foreground shrink-0" />
+                <span className="text-muted-foreground shrink-0">{t('Project')}:</span>
+                <span className="text-foreground truncate" title={editingTask?.projectDir}>
+                  {editingTask?.projectDir}
+                </span>
+              </div>
+              <div className="flex items-center gap-2.5 text-sm">
+                <ListChecks size={14} className="text-muted-foreground shrink-0" />
+                <span className="text-muted-foreground shrink-0">{t('Stories')}:</span>
+                <span className="text-foreground">
+                  {editingTask?.stories?.length || 0} {t('stories')}
+                  {' · '}
+                  {methodLabels[createMethod || 'manual'] || createMethod}
+                </span>
+              </div>
+              <div className="flex items-center gap-2.5 text-sm">
+                <Repeat size={14} className="text-muted-foreground shrink-0" />
+                <span className="text-muted-foreground shrink-0">{t('Max Iterations')}:</span>
+                <span className="text-foreground">{editingTask?.maxIterations || 10}</span>
+              </div>
             </div>
           </div>
 
           {/* prd.json Status */}
           {generatedPrdPath && (
-            <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-lg flex items-center gap-2">
-              <CheckCircle2 className="text-green-600 shrink-0" size={16} />
+            <div className="p-3 bg-success/10 border border-success/20 rounded-lg flex items-center gap-2">
+              <CheckCircle2 className="text-success shrink-0" size={16} />
               <span className="text-sm text-foreground flex-1">{t('prd.json generated')}</span>
               <button
                 onClick={handleViewJson}
@@ -161,43 +208,27 @@ export function Step3Confirm({ spaceId, onCancel }: Step3ConfirmProps) {
             </div>
           )}
 
-          {/* Story List Preview (Read-only) */}
-          <div className="space-y-3">
-            <h3 className="font-medium text-foreground">{t('Story List')}</h3>
-            <div className="space-y-2">
+          {/* Story List Preview (Compact) */}
+          <div className="space-y-2">
+            <h3 className="text-sm font-medium text-foreground">{t('Story List')}</h3>
+            <div className="border border-border rounded-lg divide-y divide-border overflow-hidden">
               {editingTask?.stories?.map((story, index) => (
-                <div key={story.id} className="p-3 border border-border rounded-lg bg-card">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="w-6 h-6 rounded bg-muted flex items-center justify-center text-xs font-medium text-muted-foreground">
-                      {index + 1}
-                    </span>
-                    <span className="font-mono text-xs text-muted-foreground">{story.id}</span>
-                    <span className="font-medium text-foreground">{story.title}</span>
-                  </div>
-                  <p className="text-sm text-muted-foreground mb-2">{story.description}</p>
-                  <div>
-                    <span className="text-xs text-muted-foreground">
-                      {t('Acceptance Criteria')}:
-                    </span>
-                    <ul className="list-disc list-inside text-sm text-foreground mt-1">
-                      {story.acceptanceCriteria.map((c, i) => (
-                        <li key={i}>{c}</li>
-                      ))}
-                    </ul>
-                  </div>
-                  {story.notes && (
-                    <div className="mt-2">
-                      <span className="text-xs text-muted-foreground">{t('Notes')}:</span>
-                      <p className="text-sm text-muted-foreground">{story.notes}</p>
-                    </div>
-                  )}
+                <div key={story.id} className="px-3 py-2.5 flex items-center gap-2.5">
+                  <span className="w-5 h-5 rounded bg-muted flex items-center justify-center text-[11px] font-medium text-muted-foreground shrink-0">
+                    {index + 1}
+                  </span>
+                  <span className="font-mono text-xs text-muted-foreground shrink-0">{story.id}</span>
+                  <span className="text-sm text-foreground truncate flex-1">{story.title}</span>
+                  <span className="text-xs text-muted-foreground shrink-0">
+                    {story.acceptanceCriteria.length} {t('criteria')}
+                  </span>
                 </div>
               ))}
             </div>
           </div>
 
           {/* Warning */}
-          <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg text-sm text-amber-700 dark:text-amber-400">
+          <div className="p-3 bg-warning/10 border border-warning/20 rounded-lg text-sm text-warning">
             {t('After starting, you cannot return to edit')}
           </div>
 

@@ -22,6 +22,7 @@ import {
   Circle
 } from 'lucide-react'
 import { useLoopTaskStore } from '../../../stores/loop-task.store'
+import { useToastStore } from '../../../stores/toast.store'
 import { api } from '../../../api'
 import { StoryEditModal } from '../../ralph/StoryEditModal'
 import { cn } from '../../../lib/utils'
@@ -34,7 +35,7 @@ interface Step2PlanEditProps {
 export function Step2PlanEdit({ onCancel }: Step2PlanEditProps) {
   const { t } = useTranslation()
   const { editingTask, updateEditing, setWizardStep, setGeneratedPrdPath } = useLoopTaskStore()
-
+  const { addToast } = useToastStore()
 
   const [localStories, setLocalStories] = useState<UserStory[]>(editingTask?.stories || [])
   const [editingStory, setEditingStory] = useState<UserStory | null>(null)
@@ -89,9 +90,11 @@ export function Step2PlanEdit({ onCancel }: Step2PlanEditProps) {
 
       const newStory = { ...story, id: newId }
       setLocalStories([...localStories, newStory])
+      addToast(t('Story added'), 'success')
     } else {
       // Update existing
       setLocalStories(localStories.map((s) => (s.id === story.id ? story : s)))
+      addToast(t('Story updated'), 'success')
     }
     setEditingStory(null)
     setIsCreating(false)
@@ -225,7 +228,7 @@ export function Step2PlanEdit({ onCancel }: Step2PlanEditProps) {
 
               <button
                 onClick={handleAddStory}
-                className="w-full py-3 h-auto border border-dashed border-border hover:border-primary/50 hover:bg-accent/20 rounded-lg text-muted-foreground hover:text-primary transition-all flex items-center justify-center gap-2 text-sm"
+                className="w-full py-3 h-auto border border-dashed border-border hover:border-primary/50 hover:bg-accent/30 rounded-lg text-muted-foreground hover:text-primary transition-all flex items-center justify-center gap-2 text-sm"
               >
                 <Plus size={16} />
                 {t('Add Story')}
@@ -248,7 +251,7 @@ export function Step2PlanEdit({ onCancel }: Step2PlanEditProps) {
                   }
                   min={1}
                   max={50}
-                  className="w-20 px-3 py-1.5 bg-input border border-border rounded-md text-foreground text-center focus:outline-none focus:ring-2 focus:ring-ring"
+                  className="w-20 px-3 py-1.5 bg-input border border-border rounded-md text-foreground text-center focus:outline-none focus:ring-2 focus:ring-primary/40"
                 />
                 <span className="text-sm text-muted-foreground">{t('iterations')}</span>
               </div>
@@ -347,7 +350,7 @@ function StoryCard({
     <div className="border border-border rounded-lg overflow-hidden bg-card">
       {/* Header */}
       <div
-        className="flex items-center gap-2 p-3 cursor-pointer hover:bg-accent/30 transition-colors"
+        className="flex items-center gap-2 p-3 cursor-pointer hover:bg-accent/50 transition-colors"
         onClick={onToggle}
       >
         <Circle className="text-muted-foreground" size={14} />
@@ -402,7 +405,7 @@ function StoryCard({
 
       {/* Details */}
       {isExpanded && (
-        <div className="px-4 pb-3 pt-0 border-t border-border/50">
+        <div className="px-4 pb-3 pt-0 border-t border-border">
           <div className="pt-3 space-y-2">
             <div>
               <div className="text-xs font-medium text-muted-foreground mb-1">

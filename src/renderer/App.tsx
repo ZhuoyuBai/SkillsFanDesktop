@@ -17,6 +17,7 @@ import { SearchPanel } from './components/search/SearchPanel'
 import { SearchHighlightBar } from './components/search/SearchHighlightBar'
 import { OnboardingOverlay, OnboardingFlow } from './components/onboarding'
 import { UpdateNotification } from './components/updater/UpdateNotification'
+import { Toaster } from './components/ui/Toaster'
 import { api } from './api'
 import type { AgentEventBase, Thought, ToolCall, HaloConfig } from './types'
 import { hasAnyAISource } from './types'
@@ -536,6 +537,8 @@ export default function App() {
       <OnboardingOverlay />
       {/* Update notification - shows when update is downloaded */}
       <UpdateNotification />
+      {/* Global toast notifications */}
+      <Toaster />
     </div>
   )
 }

@@ -17,7 +17,8 @@ import {
   XCircle,
   PauseCircle,
   Pencil,
-  Trash2
+  Trash2,
+  AlertTriangle
 } from 'lucide-react'
 import type { LoopTaskMeta, TaskStatus } from '../../stores/loop-task.store'
 
@@ -36,11 +37,11 @@ function StatusIcon({ status }: { status: TaskStatus }) {
     case 'running':
       return <Loader2 className="w-3.5 h-3.5 text-primary animate-spin" />
     case 'completed':
-      return <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
+      return <CheckCircle2 className="w-3.5 h-3.5 text-success" />
     case 'failed':
       return <XCircle className="w-3.5 h-3.5 text-destructive" />
     case 'paused':
-      return <PauseCircle className="w-3.5 h-3.5 text-yellow-500" />
+      return <PauseCircle className="w-3.5 h-3.5 text-warning" />
     default:
       return <Circle className="w-3.5 h-3.5 text-muted-foreground" />
   }
@@ -57,6 +58,7 @@ export function LoopTaskItem({
   const { t } = useTranslation()
   const [isEditing, setIsEditing] = useState(false)
   const [editingName, setEditingName] = useState(task.name)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   // Focus input when editing starts
@@ -96,10 +98,12 @@ export function LoopTaskItem({
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation()
-    // Confirm before deleting
-    if (window.confirm(t('Are you sure you want to delete this task?'))) {
-      onDelete()
-    }
+    setShowDeleteConfirm(true)
+  }
+
+  const handleDeleteConfirm = () => {
+    setShowDeleteConfirm(false)
+    onDelete()
   }
 
   // Extract project folder name from path
@@ -149,7 +153,7 @@ export function LoopTaskItem({
               onBlur={handleSaveEdit}
               onKeyDown={handleKeyDown}
               onClick={(e) => e.stopPropagation()}
-              className="w-full px-1 py-0 text-sm bg-input border border-border rounded focus:outline-none focus:ring-1 focus:ring-ring"
+              className="w-full px-1 py-0 text-sm bg-input border border-border rounded focus:outline-none focus:ring-1 focus:ring-primary/40"
             />
           ) : (
             <div className="flex items-center gap-1">
@@ -191,6 +195,46 @@ export function LoopTaskItem({
           </div>
         )}
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      {showDeleteConfirm && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="bg-background border border-border rounded-lg w-full max-w-sm shadow-lg">
+            <div className="p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <AlertTriangle size={18} className="text-destructive" />
+                <h3 className="font-medium text-foreground">{t('Delete task?')}</h3>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {t('Are you sure you want to delete this task?')}
+              </p>
+            </div>
+            <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-border">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setShowDeleteConfirm(false)
+                }}
+                className="px-4 py-2 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {t('Cancel')}
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleDeleteConfirm()
+                }}
+                className="px-4 py-2 bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90 transition-colors"
+              >
+                {t('Delete')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

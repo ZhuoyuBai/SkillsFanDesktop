@@ -147,6 +147,7 @@ function TaskViewMode({ task, spaceId }: TaskViewModeProps) {
 
   const [isLoading, setIsLoading] = useState(false)
   const [isStopping, setIsStopping] = useState(false)
+  const [showStopConfirm, setShowStopConfirm] = useState(false)
   const [expandedStories, setExpandedStories] = useState<Set<string>>(new Set())
   const [error, setError] = useState<string | null>(null)
 
@@ -195,8 +196,9 @@ function TaskViewMode({ task, spaceId }: TaskViewModeProps) {
     }
   }
 
-  // Stop execution
-  const handleStop = async () => {
+  // Stop execution (after confirmation)
+  const handleStopConfirm = async () => {
+    setShowStopConfirm(false)
     setIsStopping(true)
     try {
       await api.ralphStop(task.id)
@@ -228,7 +230,7 @@ function TaskViewMode({ task, spaceId }: TaskViewModeProps) {
           </div>
           {isRunning && (
             <button
-              onClick={handleStop}
+              onClick={() => setShowStopConfirm(true)}
               disabled={isStopping}
               className="px-3 py-1.5 bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90 disabled:opacity-50 transition-colors flex items-center gap-1.5"
             >
@@ -257,13 +259,13 @@ function TaskViewMode({ task, spaceId }: TaskViewModeProps) {
                 <div
                   className={cn(
                     'h-full transition-all duration-300',
-                    isFailed ? 'bg-destructive' : isCompleted ? 'bg-green-500' : 'bg-primary'
+                    isFailed ? 'bg-destructive' : isCompleted ? 'bg-success' : 'bg-primary'
                   )}
                   style={{ width: `${progress}%` }}
                 />
               </div>
               {isCompleted && (
-                <div className="flex items-center gap-2 text-green-600">
+                <div className="flex items-center gap-2 text-success">
                   <CheckCircle2 size={16} />
                   <span className="text-sm font-medium">{t('All tasks completed!')}</span>
                 </div>
@@ -296,7 +298,7 @@ function TaskViewMode({ task, spaceId }: TaskViewModeProps) {
           {(isRunning || executionLog) && (
             <div className="space-y-2">
               <label className="block text-sm font-medium text-foreground">{t('Execution Log')}</label>
-              <div className="h-48 p-3 bg-muted/30 border border-border rounded-lg overflow-auto font-mono text-xs text-muted-foreground whitespace-pre-wrap">
+              <div className="h-64 p-3 bg-muted/30 border border-border rounded-lg overflow-auto font-mono text-xs text-muted-foreground whitespace-pre-wrap">
                 {executionLog || t('Waiting for logs...')}
               </div>
             </div>
@@ -326,6 +328,34 @@ function TaskViewMode({ task, spaceId }: TaskViewModeProps) {
           </div>
         </div>
       )}
+
+      {/* Stop Confirmation Dialog */}
+      {showStopConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-background border border-border rounded-lg w-full max-w-sm shadow-lg">
+            <div className="p-4 space-y-3">
+              <h3 className="font-medium text-foreground">{t('Stop task?')}</h3>
+              <p className="text-sm text-muted-foreground">
+                {t('Stop task confirm message')}
+              </p>
+            </div>
+            <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-border">
+              <button
+                onClick={() => setShowStopConfirm(false)}
+                className="px-4 py-2 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {t('Cancel')}
+              </button>
+              <button
+                onClick={handleStopConfirm}
+                className="px-4 py-2 bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90 transition-colors"
+              >
+                {t('Stop')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -346,7 +376,7 @@ function StoryCard({ story, isExpanded, onToggle }: StoryCardProps) {
   const statusIcon = {
     pending: <Circle className="text-muted-foreground" size={14} />,
     running: <Loader2 className="text-primary animate-spin" size={14} />,
-    completed: <CheckCircle2 className="text-green-500" size={14} />,
+    completed: <CheckCircle2 className="text-success" size={14} />,
     failed: <XCircle className="text-destructive" size={14} />
   }[story.status]
 
@@ -355,16 +385,16 @@ function StoryCard({ story, isExpanded, onToggle }: StoryCardProps) {
       className={cn(
         'border rounded-lg overflow-hidden transition-colors',
         story.status === 'running'
-          ? 'border-primary bg-primary/5'
+          ? 'border-primary bg-primary/10'
           : story.status === 'completed'
-            ? 'border-green-500/30 bg-green-500/5'
+            ? 'border-success/30 bg-success/5'
             : story.status === 'failed'
-              ? 'border-destructive/30 bg-destructive/5'
+              ? 'border-destructive/30 bg-destructive/10'
               : 'border-border bg-card'
       )}
     >
       <div
-        className="flex items-center gap-2 p-3 cursor-pointer hover:bg-accent/30 transition-colors"
+        className="flex items-center gap-2 p-3 cursor-pointer hover:bg-accent/50 transition-colors"
         onClick={onToggle}
       >
         {statusIcon}
@@ -384,7 +414,7 @@ function StoryCard({ story, isExpanded, onToggle }: StoryCardProps) {
       </div>
 
       {isExpanded && (
-        <div className="px-4 pb-3 pt-0 border-t border-border/50">
+        <div className="px-4 pb-3 pt-0 border-t border-border">
           <div className="pt-3 space-y-2">
             <div>
               <div className="text-xs font-medium text-muted-foreground mb-1">{t('Description')}</div>

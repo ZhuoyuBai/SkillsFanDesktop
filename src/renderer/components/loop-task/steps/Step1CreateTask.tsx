@@ -114,12 +114,8 @@ export function Step1CreateTask(_props: Step1CreateTaskProps) {
           description: result.data.description,
           source: 'import'
         })
-        setImportResult({
-          success: true,
-          project: result.data.project || editingTask.projectDir.split('/').pop(),
-          storyCount: result.data.stories?.length || 0,
-          branchName: result.data.branchName
-        })
+        // Auto-advance to step 2 after successful import
+        setWizardStep(2 as WizardStep)
       } else {
         setImportResult({
           success: false,
@@ -207,6 +203,20 @@ export function Step1CreateTask(_props: Step1CreateTaskProps) {
     <div className="flex flex-col h-full">
       <div className="flex-1 overflow-auto p-4">
         <div className="max-w-2xl mx-auto space-y-6">
+          {/* Task Name */}
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-foreground">
+              {t('Title')}
+            </label>
+            <input
+              type="text"
+              value={editingTask?.name || ''}
+              onChange={(e) => updateEditing({ name: e.target.value })}
+              placeholder={t('Task title...')}
+              className="w-full px-3 py-2 bg-input border border-border rounded-md text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/50"
+            />
+          </div>
+
           {/* Creation Method - Horizontal Row */}
           <div className="space-y-6">
             <div className="text-center">
@@ -222,7 +232,7 @@ export function Step1CreateTask(_props: Step1CreateTaskProps) {
                 className={cn(
                   'relative px-3 py-2.5 border rounded-lg transition-all duration-200 text-left flex items-center gap-2.5 group',
                   createMethod === 'ai'
-                    ? 'border-primary/30 bg-primary/5'
+                    ? 'border-primary/40 bg-primary/10'
                     : 'border-border hover:border-foreground/20 hover:bg-muted/30'
                 )}
               >
@@ -250,7 +260,7 @@ export function Step1CreateTask(_props: Step1CreateTaskProps) {
                 className={cn(
                   'relative px-3 py-2.5 border rounded-lg transition-all duration-200 text-left flex items-center gap-2.5 group',
                   createMethod === 'manual'
-                    ? 'border-primary/30 bg-primary/5'
+                    ? 'border-primary/40 bg-primary/10'
                     : 'border-border hover:border-foreground/20 hover:bg-muted/30'
                 )}
               >
@@ -275,7 +285,7 @@ export function Step1CreateTask(_props: Step1CreateTaskProps) {
                 className={cn(
                   'relative px-3 py-2.5 border rounded-lg transition-all duration-200 text-left flex items-center gap-2.5 group',
                   createMethod === 'import'
-                    ? 'border-primary/30 bg-primary/5'
+                    ? 'border-primary/40 bg-primary/10'
                     : 'border-border hover:border-foreground/20 hover:bg-muted/30'
                 )}
               >
@@ -305,7 +315,7 @@ export function Step1CreateTask(_props: Step1CreateTaskProps) {
                 onChange={(e) => setAiDescription(e.target.value)}
                 placeholder={t('Describe the feature you want to implement...')}
                 rows={5}
-                className="w-full px-4 py-3 border border-border bg-card/95 shadow-lg ring-1 ring-inset ring-white/5 rounded-2xl text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 resize-none transition-all"
+                className="w-full px-4 py-3 border border-border bg-card/95 rounded-2xl text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/50 resize-none transition-all"
               />
             )}
 
@@ -354,9 +364,9 @@ export function Step1CreateTask(_props: Step1CreateTaskProps) {
 
                 {/* Import Success */}
                 {importResult?.success && (
-                  <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
+                  <div className="p-4 bg-success/10 border border-success/20 rounded-lg">
                     <div className="flex items-start gap-3">
-                      <CheckCircle2 className="text-green-600 shrink-0 mt-0.5" size={18} />
+                      <CheckCircle2 className="text-success shrink-0 mt-0.5" size={18} />
                       <div className="flex-1 space-y-1">
                         <p className="font-medium text-foreground">{t('Import successful')}</p>
                         <div className="text-sm text-muted-foreground space-y-0.5">
@@ -426,7 +436,7 @@ export function Step1CreateTask(_props: Step1CreateTaskProps) {
                       value={editingTask?.projectDir || ''}
                       onChange={(e) => updateEditing({ projectDir: e.target.value })}
                       placeholder="/path/to/your/project"
-                      className="flex-1 px-3 py-2 bg-input border border-border rounded-md text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                      className="flex-1 px-3 py-2 bg-input border border-border rounded-md text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
                     />
                     <button
                       onClick={handleSelectFolder}
@@ -449,19 +459,29 @@ export function Step1CreateTask(_props: Step1CreateTaskProps) {
               {error}
             </div>
           )}
+        </div>
+      </div>
 
-          {/* Next button - centered */}
-          <div className="flex justify-center pt-4">
-            <button
-              onClick={handleNext}
-              disabled={isLoading || !canProceed()}
-              className="px-6 py-2.5 bg-gradient-to-r from-primary to-primary/90 text-primary-foreground rounded-xl shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 disabled:opacity-50 disabled:shadow-none transition-all duration-200 flex items-center gap-2 font-medium"
-            >
-              {isLoading && <Loader2 size={16} className="animate-spin" />}
-              {t('Next')}
-              <ChevronRight size={18} />
-            </button>
-          </div>
+      {/* Footer - consistent with Step2/Step3 */}
+      <div className="px-4 py-3 border-t border-border shrink-0">
+        <div className="max-w-2xl mx-auto flex items-center justify-end">
+          <button
+            onClick={handleNext}
+            disabled={isLoading || !canProceed()}
+            className="px-6 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 transition-colors flex items-center gap-2"
+          >
+            {isLoading ? (
+              <>
+                <Loader2 size={16} className="animate-spin" />
+                {createMethod === 'ai' ? t('Generating...') : t('Next')}
+              </>
+            ) : (
+              <>
+                {t('Next')}
+                <ChevronRight size={16} />
+              </>
+            )}
+          </button>
         </div>
       </div>
     </div>

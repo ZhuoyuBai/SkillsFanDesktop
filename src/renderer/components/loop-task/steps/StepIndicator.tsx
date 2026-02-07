@@ -1,14 +1,18 @@
 /**
  * StepIndicator - Visual step progress indicator for the wizard flow
  *
- * Displays the 4 steps of the task creation wizard:
- * 1. Create Task (select directory + method)
- * 2. Plan Edit (edit story list)
- * 3. Confirm (review and confirm)
- * 4. Execute (run the task)
+ * Displays the 4 steps with connected dots:
+ * - Completed: primary dot with checkmark, clickable to go back
+ * - Current: primary dot with ring glow
+ * - Future: muted outlined dot
+ *
+ * Cannot click back from Step 4 (execution).
  */
 
 import { useTranslation } from 'react-i18next'
+import { Check } from 'lucide-react'
+import { useLoopTaskStore } from '../../../stores/loop-task.store'
+import { cn } from '../../../lib/utils'
 import type { WizardStep } from '../../../../shared/types/loop-task'
 
 interface StepIndicatorProps {
@@ -24,25 +28,68 @@ const STEPS: { key: WizardStep; labelKey: string }[] = [
 
 export function StepIndicator({ currentStep }: StepIndicatorProps) {
   const { t } = useTranslation()
-  const progress = (currentStep / STEPS.length) * 100
+  const { setWizardStep } = useLoopTaskStore()
+
+  const handleStepClick = (stepKey: WizardStep) => {
+    // Can only go back to completed steps, never forward
+    // Cannot go back once in Step 4 (execution started)
+    if (stepKey < currentStep && currentStep < 4) {
+      setWizardStep(stepKey)
+    }
+  }
+
+  // Progress line: percentage of the track that is filled
+  // Track spans from center of dot 1 to center of dot 4
+  const progressPercent = ((currentStep - 1) / (STEPS.length - 1)) * 100
 
   return (
-    <div className="px-6 py-4 shrink-0">
-      {/* Progress bar */}
-      <div className="relative h-1 bg-border/50 rounded-full mb-3">
-        <div
-          className="absolute left-0 top-0 h-full bg-primary rounded-full transition-all duration-500"
-          style={{ width: `${progress}%` }}
-        />
-      </div>
-      {/* Current step text */}
-      <div className="flex items-center justify-between text-sm">
-        <span className="text-foreground font-medium">
-          {t(STEPS[currentStep - 1]?.labelKey || '')}
-        </span>
-        <span className="text-muted-foreground">
-          {currentStep} / {STEPS.length}
-        </span>
+    <div className="px-6 py-5 shrink-0">
+      <div className="relative flex items-start">
+        {/* Track line (background) — spans between first and last dot centers */}
+        <div className="absolute top-[15px] left-[12.5%] right-[12.5%] h-[2px] bg-border rounded-full" />
+        {/* Active progress line */}
+        <div className="absolute top-[15px] left-[12.5%] right-[12.5%] h-[2px] rounded-full overflow-hidden">
+          <div
+            className="h-full bg-primary transition-all duration-500 ease-out"
+            style={{ width: `${progressPercent}%` }}
+          />
+        </div>
+
+        {/* Step dots */}
+        {STEPS.map((step) => {
+          const isCompleted = step.key < currentStep
+          const isCurrent = step.key === currentStep
+          const canClick = isCompleted && currentStep < 4
+
+          return (
+            <div key={step.key} className="flex-1 flex flex-col items-center relative z-10">
+              <button
+                onClick={() => handleStepClick(step.key)}
+                disabled={!canClick}
+                className={cn(
+                  'w-[30px] h-[30px] rounded-full flex items-center justify-center text-xs font-semibold transition-all duration-300',
+                  isCompleted && 'bg-primary text-primary-foreground shadow-sm',
+                  isCompleted && canClick && 'cursor-pointer hover:shadow-md hover:scale-105',
+                  isCurrent && 'bg-primary text-primary-foreground shadow-md ring-[3px] ring-primary/25',
+                  !isCompleted && !isCurrent && 'bg-background border-2 border-muted text-muted-foreground',
+                  !canClick && !isCurrent && 'cursor-default'
+                )}
+              >
+                {isCompleted ? <Check size={14} strokeWidth={2.5} /> : step.key}
+              </button>
+              <span
+                className={cn(
+                  'text-[11px] mt-2 text-center leading-tight transition-colors duration-300',
+                  isCurrent && 'text-foreground font-medium',
+                  isCompleted && 'text-foreground',
+                  !isCompleted && !isCurrent && 'text-muted-foreground'
+                )}
+              >
+                {t(step.labelKey)}
+              </span>
+            </div>
+          )
+        })}
       </div>
     </div>
   )

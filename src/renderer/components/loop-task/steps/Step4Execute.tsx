@@ -35,6 +35,7 @@ export function Step4Execute() {
   } = useLoopTaskStore()
 
   const [isStopping, setIsStopping] = useState(false)
+  const [showStopConfirm, setShowStopConfirm] = useState(false)
   const [expandedStories, setExpandedStories] = useState<Set<string>>(new Set())
   const logRef = useRef<HTMLDivElement>(null)
 
@@ -77,9 +78,10 @@ export function Step4Execute() {
   }
 
   // Stop execution
-  const handleStop = async () => {
+  const handleStopConfirm = async () => {
     if (!currentTask) return
 
+    setShowStopConfirm(false)
     setIsStopping(true)
     try {
       await api.ralphStop(currentTask.id)
@@ -121,7 +123,7 @@ export function Step4Execute() {
               <div
                 className={cn(
                   'h-full transition-all duration-300',
-                  isFailed ? 'bg-destructive' : isCompleted ? 'bg-green-500' : 'bg-primary'
+                  isFailed ? 'bg-destructive' : isCompleted ? 'bg-success' : 'bg-primary'
                 )}
                 style={{ width: `${progress}%` }}
               />
@@ -135,9 +137,9 @@ export function Step4Execute() {
 
           {/* Completion/Failure Status */}
           {isCompleted && (
-            <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-lg flex items-center gap-2">
-              <CheckCircle2 className="text-green-600" size={16} />
-              <span className="text-sm font-medium text-green-700 dark:text-green-400">
+            <div className="p-3 bg-success/10 border border-success/20 rounded-lg flex items-center gap-2">
+              <CheckCircle2 className="text-success" size={16} />
+              <span className="text-sm font-medium text-success">
                 {t('All tasks completed!')}
               </span>
             </div>
@@ -167,7 +169,7 @@ export function Step4Execute() {
             <h3 className="font-medium text-foreground text-sm">{t('Execution Log')}</h3>
             <div
               ref={logRef}
-              className="h-48 p-3 bg-muted/30 border border-border rounded-lg overflow-auto font-mono text-xs text-muted-foreground whitespace-pre-wrap"
+              className="h-64 p-3 bg-muted/30 border border-border rounded-lg overflow-auto font-mono text-xs text-muted-foreground whitespace-pre-wrap"
             >
               {executionLog || t('Waiting for logs...')}
             </div>
@@ -180,7 +182,7 @@ export function Step4Execute() {
         <div className="px-4 py-3 border-t border-border shrink-0">
           <div className="max-w-2xl mx-auto flex justify-end">
             <button
-              onClick={handleStop}
+              onClick={() => setShowStopConfirm(true)}
               disabled={isStopping}
               className="px-4 py-2 bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90 disabled:opacity-50 transition-colors flex items-center gap-2"
             >
@@ -191,6 +193,34 @@ export function Step4Execute() {
               )}
               {t('Stop')}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Stop Confirmation Dialog */}
+      {showStopConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-background border border-border rounded-lg w-full max-w-sm shadow-lg">
+            <div className="p-4 space-y-3">
+              <h3 className="font-medium text-foreground">{t('Stop task?')}</h3>
+              <p className="text-sm text-muted-foreground">
+                {t('Stop task confirm message')}
+              </p>
+            </div>
+            <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-border">
+              <button
+                onClick={() => setShowStopConfirm(false)}
+                className="px-4 py-2 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {t('Cancel')}
+              </button>
+              <button
+                onClick={handleStopConfirm}
+                className="px-4 py-2 bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90 transition-colors"
+              >
+                {t('Stop')}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -214,7 +244,7 @@ function StoryStatusCard({ story, isExpanded, onToggle }: StoryStatusCardProps) 
   const statusIcon = {
     pending: <Circle className="text-muted-foreground" size={14} />,
     running: <Loader2 className="text-primary animate-spin" size={14} />,
-    completed: <CheckCircle2 className="text-green-500" size={14} />,
+    completed: <CheckCircle2 className="text-success" size={14} />,
     failed: <XCircle className="text-destructive" size={14} />
   }[story.status]
 
@@ -230,16 +260,16 @@ function StoryStatusCard({ story, isExpanded, onToggle }: StoryStatusCardProps) 
       className={cn(
         'border rounded-lg overflow-hidden transition-colors',
         story.status === 'running'
-          ? 'border-primary bg-primary/5'
+          ? 'border-primary bg-primary/10'
           : story.status === 'completed'
-            ? 'border-green-500/30 bg-green-500/5'
+            ? 'border-success/30 bg-success/10'
             : story.status === 'failed'
-              ? 'border-destructive/30 bg-destructive/5'
+              ? 'border-destructive/30 bg-destructive/10'
               : 'border-border bg-card'
       )}
     >
       <div
-        className="flex items-center gap-2 p-3 cursor-pointer hover:bg-accent/20 transition-colors"
+        className="flex items-center gap-2 p-3 cursor-pointer hover:bg-accent/50 transition-colors"
         onClick={onToggle}
       >
         {statusIcon}
@@ -261,7 +291,7 @@ function StoryStatusCard({ story, isExpanded, onToggle }: StoryStatusCardProps) 
       </div>
 
       {isExpanded && (
-        <div className="px-4 pb-3 pt-0 border-t border-border/50 space-y-2">
+        <div className="px-4 pb-3 pt-0 border-t border-border space-y-2">
           <div className="pt-3">
             <div className="text-xs font-medium text-muted-foreground mb-1">
               {t('Description')}
