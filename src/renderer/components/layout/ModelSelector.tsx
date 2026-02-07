@@ -7,7 +7,7 @@
  */
 
 import { useState, useRef, useEffect } from 'react'
-import { ChevronDown, Plus, BadgeCheck } from 'lucide-react'
+import { ChevronDown, Plus } from 'lucide-react'
 import { useAppStore } from '../../stores/app.store'
 import { api } from '../../api'
 import {
@@ -73,6 +73,20 @@ function getProviderLogo(apiUrl: string): string | null {
  */
 function getProviderLogoById(providerId: string): string | null {
   return PROVIDER_LOGOS_BY_ID[providerId] || null
+}
+
+/**
+ * Get logo for a specific model by matching model ID or display name to a provider
+ */
+function getModelLogo(modelId: string, displayName: string, fallbackProviderType?: string): string | null {
+  const key = `${modelId} ${displayName}`.toLowerCase()
+  if (key.includes('glm') || key.includes('zhipu')) return zhipuLogo
+  if (key.includes('minimax')) return minimaxLogo
+  if (key.includes('kimi') || key.includes('moonshot')) return kimiLogo
+  if (key.includes('deepseek')) return deepseekLogo
+  if (key.includes('claude')) return claudeLogo
+  if (key.includes('gpt') || key.includes('openai')) return openaiLogo
+  return fallbackProviderType ? getProviderLogoById(fallbackProviderType) : null
 }
 
 /**
@@ -277,10 +291,19 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
   const styles = styleConfig[variant]
 
   // Get current provider logo - check by provider ID first, then by API URL
+  // For OAuth providers, use per-model logo matching
   const currentProviderConfig = configuredCustomProviders.find(p => p.id === currentSource)
+  const currentOAuthConfig = loggedInOAuthProviders.find(p => p.type === currentSource)
   const currentProviderLogo = currentProviderConfig?.logo ||
     (currentProviderConfig?.apiUrl ? getProviderLogo(currentProviderConfig.apiUrl) : null) ||
-    getProviderLogoById(currentSource)
+    (currentOAuthConfig?.config?.model
+      ? getModelLogo(
+          currentOAuthConfig.config.model,
+          currentOAuthConfig.config.modelNames?.[currentOAuthConfig.config.model] || '',
+          currentSource
+        )
+      : getProviderLogoById(currentSource)
+    )
 
   return (
     <div className="relative" ref={dropdownRef}>
@@ -327,7 +350,7 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
         <div
           className={`
             ${styles.dropdown}
-            w-56 bg-card border border-border rounded-xl shadow-lg z-50 py-1 overflow-hidden
+            w-48 bg-card border border-border rounded-xl shadow-lg z-50 py-1 overflow-hidden
             animate-in fade-in-0 slide-in-from-bottom-2 duration-200
           `.trim().replace(/\s+/g, ' ')}
         >
@@ -350,24 +373,19 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
                   </div>
                 )}
                 <span className="truncate">{provider.model || provider.name}</span>
-                {isSelected && (
-                  <span className="ml-auto w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
-                )}
               </button>
             )
           })}
 
           {/* OAuth Providers - Dynamic rendering */}
           {loggedInOAuthProviders.map((provider) => {
-            const providerLogo = getProviderLogoById(provider.type)
-            const pricing = (provider.config as any)?.modelPricing as Record<string, { input: number; output: number }> | undefined
             return (
               <div key={provider.type}>
                 {configuredCustomProviders.length > 0 && <div className="my-1 border-t border-border" />}
                 {(provider.config?.availableModels || []).map((modelId) => {
                   const displayName = provider.config?.modelNames?.[modelId] || modelId
                   const isSelected = currentSource === provider.type && provider.config?.model === modelId
-                  const modelPrice = pricing?.[modelId]
+                  const modelLogo = getModelLogo(modelId, displayName, provider.type)
                   return (
                     <button
                       key={modelId}
@@ -376,25 +394,15 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
                         isSelected ? 'text-primary' : 'text-foreground'
                       }`}
                     >
-                      {providerLogo ? (
-                        <img src={providerLogo} alt="" className="w-5 h-5 rounded object-cover flex-shrink-0" />
+                      {modelLogo ? (
+                        <img src={modelLogo} alt="" className="w-5 h-5 rounded object-cover flex-shrink-0" />
                       ) : (
                         <div className="w-5 h-5 rounded bg-muted flex items-center justify-center flex-shrink-0">
-                          <span className="text-xs text-muted-foreground">O</span>
+                          <span className="text-xs text-muted-foreground">AI</span>
                         </div>
                       )}
                       <span className="truncate">{displayName}</span>
-                      {provider.type === 'skillsfan-credits' && (
-                        <BadgeCheck className="w-3.5 h-3.5 text-primary flex-shrink-0" />
-                      )}
-                      {modelPrice && (
-                        <span className="ml-auto text-[10px] text-muted-foreground flex-shrink-0 tabular-nums">
-                          {modelPrice.input}/{modelPrice.output}
-                        </span>
-                      )}
-                      {isSelected && (
-                        <span className={`${modelPrice ? '' : 'ml-auto'} w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0`} />
-                      )}
+                      <span className="flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded font-medium text-white bg-primary/80">{t('Official')}</span>
                     </button>
                   )
                 })}

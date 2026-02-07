@@ -365,7 +365,7 @@ export function SpaceManagementSection() {
               <button
                 onClick={handleSaveEdit}
                 disabled={!editSpaceName.trim()}
-                className="px-5 py-2.5 bg-primary/90 hover:bg-primary text-primary-foreground rounded-xl shadow-sm hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-5 py-2.5 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl shadow-sm hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {t('Save')}
               </button>

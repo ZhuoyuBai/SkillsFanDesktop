@@ -66,13 +66,14 @@ function useIsMobile() {
   return isMobile
 }
 
-// Typewriter animation phrases - matches QUICK_PROMPTS in ChatView
-const TYPEWRITER_PHRASES = [
-  '帮我在桌面创建一个"每日计划.txt"文件...',
-  '在桌面创建一个"sales.csv"示例文件...',
-  '帮我在桌面创建一个"创意灵感.md"文件...',
-  '在桌面创建一个"项目笔记"文件夹...',
-  '帮我在桌面创建一个"商品文案.md"文件...',
+// Typewriter animation phrase keys - matches QUICK_PROMPTS in ChatView
+// These are i18n keys that get resolved at render time via getTypewriterPhrases()
+const TYPEWRITER_PHRASE_KEYS = [
+  'Create a "daily-plan.txt" file on desktop...',
+  'Create a "sales.csv" sample file on desktop...',
+  'Create an "ideas.md" file on desktop...',
+  'Create a "project-notes" folder on desktop...',
+  'Create a "product-copy.md" file on desktop...',
 ]
 
 // Hook for typewriter animation effect
@@ -173,8 +174,11 @@ export function InputArea({ onSend, onStop, onInject, isGenerating, isCompact = 
   // Settings navigation
   const { openSettingsWithSection } = useAppStore()
 
+  // Translate typewriter phrases
+  const typewriterPhrases = TYPEWRITER_PHRASE_KEYS.map(key => t(key))
+
   // Typewriter animation for placeholder
-  const typewriterText = useTypewriter(TYPEWRITER_PHRASES, {
+  const typewriterText = useTypewriter(typewriterPhrases, {
     typeSpeed: 40,
     deleteSpeed: 20,
     pauseAfterType: 4000,
@@ -370,13 +374,6 @@ export function InputArea({ onSend, onStop, onInject, isGenerating, isCompact = 
       textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`
     }
   }, [displayContent])
-
-  // Focus on mount
-  useEffect(() => {
-    if (!isGenerating && !isOnboardingSendStep) {
-      textareaRef.current?.focus()
-    }
-  }, [isGenerating, isOnboardingSendStep])
 
   // Handle send
   const handleSend = () => {

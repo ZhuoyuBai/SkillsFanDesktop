@@ -47,22 +47,22 @@
   /* Dark theme (default) */
   --background: 0 0% 4%;
   --foreground: 0 0% 98%;
-  --card: 0 0% 7%;
+  --card: 0 0% 9%;
   --card-foreground: 0 0% 98%;
   --popover: 0 0% 7%;
   --popover-foreground: 0 0% 98%;
-  --primary: 23 68% 55%;
+  --primary: 24 85% 42%;
   --primary-foreground: 0 0% 100%;
   --secondary: 0 0% 15%;
   --secondary-foreground: 0 0% 98%;
-  --muted: 0 0% 15%;
-  --muted-foreground: 0 0% 60%;
+  --muted: 0 0% 12%;
+  --muted-foreground: 0 0% 65%;
   --accent: 0 0% 15%;
   --accent-foreground: 0 0% 98%;
   --destructive: 0 62% 50%;
   --destructive-foreground: 0 0% 98%;
-  --border: 0 0% 10%;
-  --input: 0 0% 15%;
+  --border: 0 0% 14%;
+  --input: 0 0% 11%;
   --ring: 0 0% 30%;
   --radius: 0.75rem;
 
@@ -76,9 +76,13 @@
   --halo-success: var(--skillsfan-success);
   --halo-warning: var(--skillsfan-warning);
   --halo-error: var(--skillsfan-error);
+
+  /* VIP membership gold */
+  --vip-gold: 43 75% 70%;
+  --vip-gold-bg: 43 75% 70% / 0.12;
+  --vip-gold-border: 43 75% 70% / 0.25;
 }
 
-/* Light theme */
 /* Light theme */
 .light {
   --background: 0 0% 100%;
@@ -88,18 +92,18 @@
   --popover: 0 0% 100%;
   --popover-foreground: 0 0% 20%;
   /* Restored SkillsFan Brand Color */
-  --primary: 23 68% 55%;
+  --primary: 24 85% 42%;
   --primary-foreground: 0 0% 100%;
   --secondary: 0 0% 97%;
   --secondary-foreground: 0 0% 25%;
   --muted: 0 0% 97%;
-  --muted-foreground: 0 0% 55%;
+  --muted-foreground: 0 0% 45%;
   --accent: 0 0% 97%;
   --accent-foreground: 0 0% 25%;
   --destructive: 0 84% 60%;
   --destructive-foreground: 0 0% 98%;
   --border: 0 0% 88%;
-  --input: 0 0% 92%;
+  --input: 0 0% 95%;
   --ring: 0 0% 80%;
 
   /* SkillsFan brand colors (adjusted for light) */
@@ -112,6 +116,11 @@
   --halo-success: var(--skillsfan-success);
   --halo-warning: var(--skillsfan-warning);
   --halo-error: var(--skillsfan-error);
+
+  /* VIP membership gold */
+  --vip-gold: 43 80% 45%;
+  --vip-gold-bg: 43 80% 45% / 0.10;
+  --vip-gold-border: 43 80% 45% / 0.22;
 }
 
 * {
@@ -897,7 +906,7 @@ body {
   background: linear-gradient(
     135deg,
     hsl(var(--primary)),
-    hsl(var(--primary) / 0.8)
+    hsl(24 85% 36%)
   );
   transition: all 0.2s ease;
 }

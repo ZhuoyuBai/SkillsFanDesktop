@@ -350,7 +350,7 @@ export function SkillList() {
             onClick={() => {
               api.openExternal(`${getSkillsFanBaseUrl()}/market`)
             }}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-primary/90 hover:bg-primary text-primary-foreground rounded-lg transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg transition-colors"
             title={t('Discover Skills')}
           >
             <Compass className="w-4 h-4" />

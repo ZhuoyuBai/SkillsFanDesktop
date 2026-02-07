@@ -39,6 +39,19 @@ export interface SkillsFanAuthState {
   refreshToken?: string
   /** Token expiration timestamp (milliseconds) */
   tokenExpiresAt?: number
+  /** Last known credit balance (persisted for instant display on restart) */
+  lastKnownCredits?: number
+  /** When credits were last fetched (milliseconds) */
+  creditsFetchedAt?: number
+}
+
+/**
+ * Result from token refresh attempt
+ */
+export interface TokenRefreshResult {
+  success: boolean
+  /** Why refresh failed */
+  reason?: 'rejected' | 'network_error' | 'no_refresh_token'
 }
 
 /**

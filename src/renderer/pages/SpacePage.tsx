@@ -32,6 +32,7 @@ import { ContentCanvas, CanvasToggleButton } from '../components/canvas'
 import { GitBashWarningBanner } from '../components/setup/GitBashWarningBanner'
 import { CreditsErrorDialog } from '../components/chat/CreditsErrorDialog'
 import { api } from '../api'
+import { isElectron } from '../api/transport'
 import { useLayoutPreferences, LAYOUT_DEFAULTS } from '../hooks/useLayoutPreferences'
 import { useWindowMaximize } from '../components/canvas/viewers/useWindowMaximize'
 import { PanelLeftClose, PanelLeft, X, MessageSquare, Menu, SquarePen, Settings, FolderOpen } from 'lucide-react'
@@ -407,18 +408,16 @@ export function SpacePage() {
         Show/hide is controlled by api.showChatCapsuleOverlay() / api.hideChatCapsuleOverlay()
       */}
 
-      {/* Header - replaced with drag region spacer when maximized (for Windows/Linux) */}
+      {/* Header - replaced with drag region spacer when maximized */}
       {isCanvasMaximized ? (
-        platform.isMac ? null : (
-          <div
-            className="h-11 flex-shrink-0 bg-background"
-            style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
-          />
-        )
+        <div
+          className="h-11 flex-shrink-0 bg-background"
+          style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+        />
       ) : (
         shouldShowHeader ? (
           <Header
-            className="bg-card backdrop-blur-sm border-b border-border/40"
+            className="bg-card backdrop-blur-sm border-b border-border/50"
             left={
               isMobile ? (
                 <button
@@ -513,6 +512,10 @@ export function SpacePage() {
                   willChange: isCanvasTransitioning ? 'width, flex' : 'auto',
                 }}
               >
+                {/* Top drag bar - macOS needs this for window dragging */}
+                {!shouldShowHeader && (
+                  <div className="h-10 flex-shrink-0 bg-card drag-region" />
+                )}
                 {/* Conditional rendering based on selection type */}
                 {selectionType === 'loopTask' ? (
                   <LoopTaskPanel spaceId={currentSpace.id} />
@@ -615,7 +618,7 @@ export function SpacePage() {
           <div className="flex items-center justify-between px-4 py-3 border-b border-border/50 bg-card/80 backdrop-blur-sm">
             <div className="flex items-center gap-2">
               <HaloLogo size={22} hoverOnly={true} />
-              <span className="text-sm font-medium text-foreground/80">技能范</span>
+              <span className="text-sm font-medium text-foreground/80">{t('SkillsFan')}</span>
             </div>
             <button
               onClick={() => setMobileSidebarOpen(false)}

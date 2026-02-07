@@ -31,6 +31,7 @@ import type {
   SkillsFanAuthState,
   PendingAuth,
   TokenResponse,
+  TokenRefreshResult,
   LoginResult,
   StartLoginResult
 } from '../../../shared/types/skillsfan'
@@ -259,10 +260,13 @@ export async function handleCallback(url: string): Promise<LoginResult> {
 
 /**
  * Refresh access token using refresh token
+ *
+ * Returns a detailed result so callers can distinguish between
+ * server rejection (should logout) and network errors (should retry later).
  */
-export async function refreshToken(): Promise<boolean> {
+export async function refreshToken(): Promise<TokenRefreshResult> {
   if (!authState.refreshToken) {
-    return false
+    return { success: false, reason: 'no_refresh_token' }
   }
 
   try {
@@ -282,11 +286,8 @@ export async function refreshToken(): Promise<boolean> {
 
     if (!response.ok) {
       console.error('[SkillsFan] Token refresh failed:', response.status)
-      // Refresh token invalid/expired - need to re-login
-      if (response.status === 401 || response.status === 400) {
-        await logout()
-      }
-      return false
+      // Refresh token invalid/expired - caller decides whether to logout
+      return { success: false, reason: 'rejected' }
     }
 
     const data: TokenResponse = await response.json()
@@ -300,10 +301,10 @@ export async function refreshToken(): Promise<boolean> {
     await saveAuthState(authState)
 
     console.log('[SkillsFan] Token refreshed successfully')
-    return true
+    return { success: true }
   } catch (error) {
     console.error('[SkillsFan] Token refresh error:', error)
-    return false
+    return { success: false, reason: 'network_error' }
   }
 }
 
@@ -321,7 +322,12 @@ export async function ensureValidToken(): Promise<boolean> {
     authState.tokenExpiresAt < Date.now() + TOKEN_REFRESH_THRESHOLD_MS
 
   if (needsRefresh) {
-    return await refreshToken()
+    const result = await refreshToken()
+    if (!result.success && result.reason === 'rejected') {
+      // Server rejected the refresh token, force logout
+      await logout()
+    }
+    return result.success
   }
 
   return true
@@ -338,19 +344,13 @@ export function getUserInfo(): SkillsFanUser | null {
  * Get current auth state
  */
 export function getAuthState(): SkillsFanAuthState {
-  // Debug: 打印用户信息
-  console.log('[SkillsFan] getAuthState called, user:', {
-    isLoggedIn: authState.isLoggedIn,
-    name: authState.user?.name,
-    email: authState.user?.email,
-    avatar: authState.user?.avatar,
-    plan: authState.user?.plan
-  })
   // Return copy without sensitive tokens for renderer
   return {
     isLoggedIn: authState.isLoggedIn,
     user: authState.user,
-    tokenExpiresAt: authState.tokenExpiresAt
+    tokenExpiresAt: authState.tokenExpiresAt,
+    lastKnownCredits: authState.lastKnownCredits,
+    creditsFetchedAt: authState.creditsFetchedAt
   }
 }
 
@@ -424,18 +424,45 @@ export async function loadAuthState(): Promise<void> {
       authState = stored
       console.log('[SkillsFan] Loaded persisted auth state for user:', stored.user?.name)
 
+      // Seed in-memory credits cache from persisted state
+      if (stored.lastKnownCredits !== undefined) {
+        const { seedCreditsCache } = await import('./credits.service')
+        seedCreditsCache(stored.lastKnownCredits, stored.creditsFetchedAt)
+      }
+
       // Check if token needs refresh
       if (stored.tokenExpiresAt && stored.tokenExpiresAt < Date.now()) {
         console.log('[SkillsFan] Token expired, attempting refresh')
-        const refreshed = await refreshToken()
-        if (!refreshed) {
-          console.log('[SkillsFan] Token refresh failed, clearing auth state')
-          await logout()
+        const result = await refreshToken()
+        if (!result.success) {
+          if (result.reason === 'network_error') {
+            // Keep user logged in - ensureValidToken() will retry before API calls
+            console.log('[SkillsFan] Token refresh failed due to network error, keeping auth state for lazy retry')
+          } else {
+            // Server rejected token or no refresh token - must re-login
+            console.log('[SkillsFan] Token refresh rejected, clearing auth state')
+            await logout()
+          }
         }
       }
     }
   } catch (error) {
     console.error('[SkillsFan] Failed to load auth state:', error)
+  }
+}
+
+/**
+ * Update cached credits in auth state and persist to disk.
+ * Called by credits.service after successful fetch.
+ */
+export function updateCreditsInAuthState(
+  credits: number | undefined,
+  fetchedAt: number | undefined
+): void {
+  authState.lastKnownCredits = credits
+  authState.creditsFetchedAt = fetchedAt
+  if (authState.isLoggedIn) {
+    saveAuthState(authState)
   }
 }
 

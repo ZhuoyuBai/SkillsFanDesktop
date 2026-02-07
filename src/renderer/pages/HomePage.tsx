@@ -143,7 +143,7 @@ export function HomePage() {
           </div>
 
           {/* Brand name */}
-          <h1 className="text-3xl font-semibold mb-4 tracking-tight text-foreground/95 [letter-spacing:-0.02em]">技能范</h1>
+          <h1 className="text-3xl font-semibold mb-4 tracking-tight text-foreground/95 [letter-spacing:-0.02em]">{t('SkillsFan')}</h1>
 
           {/* Tagline */}
           <p className="text-muted-foreground text-center text-sm mb-8 max-w-md leading-relaxed">
@@ -155,7 +155,7 @@ export function HomePage() {
             data-onboarding="halo-space"
             onClick={() => haloSpace && handleSpaceClick(haloSpace)}
             disabled={!haloSpace}
-            className="px-8 py-3.5 bg-primary/90 hover:bg-primary text-primary-foreground rounded-xl text-sm font-medium transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-8 py-3.5 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl text-sm font-medium transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {t('Enter Halo')}
           </button>
@@ -168,13 +168,13 @@ export function HomePage() {
         <section className="p-8">
           <div className="max-w-5xl mx-auto">
             <div className="mb-5 flex items-center justify-between">
-              <h3 className="text-sm font-medium text-muted-foreground/80 tracking-wide">自定义空间</h3>
+              <h3 className="text-sm font-medium text-muted-foreground/80 tracking-wide">{t('Custom Spaces')}</h3>
               <button
                 onClick={() => setShowCreateDialog(true)}
                 className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-foreground/80 hover:text-foreground rounded-lg transition-all hover:bg-secondary/50"
               >
                 <Plus className="w-3.5 h-3.5" />
-                新建空间
+                {t('New Space')}
               </button>
             </div>
 
@@ -183,7 +183,7 @@ export function HomePage() {
 
             {spaces.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
-                <p className="text-sm">暂无自定义空间</p>
+                <p className="text-sm">{t('No custom spaces yet')}</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 lg:gap-6">
@@ -271,9 +271,9 @@ export function HomePage() {
                       ? 'bg-foreground/10 ring-2 ring-foreground/30'
                       : 'bg-secondary/40 hover:bg-secondary/60'
                   }`}
-                  title="无"
+                  title={t('None')}
                 >
-                  <span className="text-xs text-muted-foreground">无</span>
+                  <span className="text-xs text-muted-foreground">{t('None')}</span>
                 </button>
                 {SPACE_ICONS.map((iconId) => {
                   const colorConfig = SPACE_ICON_COLORS.find(c => c.id === editSpaceIconColor)
@@ -297,7 +297,7 @@ export function HomePage() {
 
             {/* Color picker */}
             <div className="mb-6">
-              <label className="block text-sm text-muted-foreground font-medium mb-2.5">颜色</label>
+              <label className="block text-sm text-muted-foreground font-medium mb-2.5">{t('Color')}</label>
               <div className="flex gap-2">
                 {SPACE_ICON_COLORS.map((color) => (
                   <button
@@ -329,7 +329,7 @@ export function HomePage() {
               <button
                 onClick={handleSaveEdit}
                 disabled={!editSpaceName.trim()}
-                className="px-5 py-2.5 bg-primary/90 hover:bg-primary text-primary-foreground rounded-xl shadow-sm hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-5 py-2.5 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl shadow-sm hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {t('Save')}
               </button>

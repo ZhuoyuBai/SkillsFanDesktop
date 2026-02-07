@@ -448,13 +448,13 @@ const QUICK_CATEGORIES: { key: string; icon: LucideIcon; color: string }[] = [
 // t('Research & Organization')
 // t('E-commerce')
 
-// Quick prompts for each category - simple desktop tasks for user experience
-const QUICK_PROMPTS: Record<string, string> = {
-  'Writing & Documents': '帮我在桌面创建一个"每日计划.txt"文件，里面写上今天的日期和一个简单的待办事项模板',
-  'Data Analysis': '在桌面创建一个"sales.csv"示例文件，包含产品名称、销量、价格三列，生成5条模拟数据',
-  'Content Creation': '帮我在桌面创建一个"创意灵感.md"文件，用Markdown格式写3个有趣的短视频创意点子',
-  'Research & Organization': '在桌面创建一个"项目笔记"文件夹，里面包含"会议记录.md"和"待办事项.md"两个文件',
-  'E-commerce': '帮我在桌面创建一个"商品文案.md"文件，为一款无线蓝牙耳机写淘宝标题、5个卖点和详情页文案',
+// Quick prompt keys for each category - i18n keys resolved at render time
+const QUICK_PROMPT_KEYS: Record<string, string> = {
+  'Writing & Documents': 'Create a "daily-plan.txt" file on desktop with today\'s date and a simple to-do template',
+  'Data Analysis': 'Create a "sales.csv" sample file on desktop with product name, sales, and price columns, generate 5 rows of mock data',
+  'Content Creation': 'Create an "ideas.md" file on desktop with 3 fun short video ideas in Markdown format',
+  'Research & Organization': 'Create a "project-notes" folder on desktop containing "meeting-notes.md" and "todo.md" files',
+  'E-commerce': 'Create a "product-copy.md" file on desktop, write a product title, 5 selling points, and detail page copy for wireless Bluetooth earbuds',
 }
 
 // Empty state component - adapts to compact mode and mobile
@@ -496,13 +496,13 @@ function EmptyState({
       ${isMobile ? 'pt-[8vh] px-4' : 'pt-[15vh] px-8'}`}>
       {/* Title - smaller on mobile */}
       <h1 className={`mt-8 font-semibold tracking-tight text-foreground/85
-        ${isMobile ? 'text-2xl' : 'text-4xl'}`}>
+        ${isMobile ? 'text-xl' : 'text-3xl'}`}>
         {t('Halo, not just chat, can help you get things done')}
       </h1>
 
       {/* Input area - shown in center when empty */}
       {inputArea && (
-        <div className={`mt-6 w-full ${isMobile ? 'max-w-full' : 'max-w-2xl'}`}>
+        <div className={`mt-8 w-full ${isMobile ? 'max-w-full' : 'max-w-3xl'}`}>
           {inputArea}
         </div>
       )}
@@ -514,7 +514,7 @@ function EmptyState({
           return (
             <button
               key={cat.key}
-              onClick={() => onSuggestionClick?.(QUICK_PROMPTS[cat.key])}
+              onClick={() => onSuggestionClick?.(t(QUICK_PROMPT_KEYS[cat.key]))}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-full
                 bg-secondary/60 text-sm text-muted-foreground
                 hover:bg-secondary hover:text-foreground

@@ -6,7 +6,7 @@ import { useState, useEffect, useRef } from 'react'
 import { api } from '../../api'
 import { useTranslation } from '../../i18n'
 import { useAppStore } from '../../stores/app.store'
-import { User, Settings, LogOut, Loader2, HelpCircle } from 'lucide-react'
+import { User, Settings, LogOut, Loader2, HelpCircle, Gem } from 'lucide-react'
 import { SpaceGuideDialog } from '../space/SpaceGuideDialog'
 import type { SkillsFanAuthState } from '../../../shared/types/skillsfan'
 
@@ -20,6 +20,7 @@ export function UserAvatarMenu({ collapsed = false }: UserAvatarMenuProps) {
   const { setView, openSettingsWithSection } = useAppStore()
 
   const [authState, setAuthState] = useState<SkillsFanAuthState | null>(null)
+  const [credits, setCredits] = useState<number | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isLoggingOut, setIsLoggingOut] = useState(false)
   const [avatarError, setAvatarError] = useState(false)
@@ -75,7 +76,11 @@ export function UserAvatarMenu({ collapsed = false }: UserAvatarMenuProps) {
       setAvatarError(false)
       const result = await api.skillsfanGetAuthState()
       if (result.success && result.data) {
-        setAuthState(result.data as SkillsFanAuthState)
+        const state = result.data as SkillsFanAuthState
+        setAuthState(state)
+        if (state.lastKnownCredits !== undefined) {
+          setCredits(state.lastKnownCredits)
+        }
       } else {
         setAuthState({ isLoggedIn: false })
       }
@@ -168,6 +173,17 @@ export function UserAvatarMenu({ collapsed = false }: UserAvatarMenuProps) {
               )}
             </div>
           </button>
+
+          {/* Credits - only show when logged in */}
+          {isLoggedIn && credits !== null && (
+            <>
+              <div className="border-t border-border/50" />
+              <div className="flex items-center gap-3 px-3 py-2.5 cursor-default">
+                <Gem className="w-4 h-4 text-primary/80" />
+                <span className="text-sm">{t('Credits')}: {Math.round(credits)}</span>
+              </div>
+            </>
+          )}
 
           <div className="border-t border-border/50" />
 

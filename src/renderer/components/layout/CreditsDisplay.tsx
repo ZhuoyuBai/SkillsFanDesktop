@@ -1,23 +1,41 @@
 /**
  * CreditsDisplay - Shows SkillsFan credit balance
  *
- * Only visible when current AI source is 'skillsfan-credits'.
+ * Always visible. Shows "--" when not using skillsfan-credits source.
  * Auto-refreshes after agent completes a conversation turn.
+ * Shows cached credits from disk immediately on startup, then refreshes in background.
  */
 
-import { useState, useEffect, useCallback } from 'react'
-import { Coins, RefreshCw } from 'lucide-react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { Gem } from 'lucide-react'
 import { useAppStore } from '../../stores/app.store'
 import { api } from '../../api'
-import { useTranslation } from '../../i18n'
+import type { SkillsFanAuthState } from '../../../shared/types/skillsfan'
 
 export function CreditsDisplay() {
-  const { t } = useTranslation()
   const config = useAppStore((s) => s.config)
   const [credits, setCredits] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
+  const initialized = useRef(false)
 
   const currentSource = config?.aiSources?.current
+
+  // On first mount, load cached credits from auth state for instant display
+  useEffect(() => {
+    if (currentSource !== 'skillsfan-credits' || initialized.current) return
+    initialized.current = true
+
+    api.skillsfanGetAuthState().then((res) => {
+      if (res.success && res.data) {
+        const state = res.data as SkillsFanAuthState
+        if (state.lastKnownCredits !== undefined) {
+          setCredits(state.lastKnownCredits)
+        }
+      }
+    }).catch(() => {
+      // Silently fail
+    })
+  }, [currentSource])
 
   const fetchCredits = useCallback(async () => {
     if (currentSource !== 'skillsfan-credits') return
@@ -68,33 +86,16 @@ export function CreditsDisplay() {
     return cleanup
   }, [currentSource, handleRefresh])
 
-  // Don't render if not using skillsfan-credits
-  if (currentSource !== 'skillsfan-credits') return null
-
   const formatCredits = (value: number): string => {
-    if (value >= 10000) {
-      return `${(value / 10000).toFixed(1)}w`
-    }
-    if (value >= 1000) {
-      return `${(value / 1000).toFixed(1)}k`
-    }
-    return value.toFixed(0)
+    return Math.round(value).toString()
   }
 
   return (
-    <div className="flex items-center gap-1 h-8 px-2 rounded-lg text-xs text-muted-foreground border border-border/60">
-      <Coins className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
+    <div className="flex items-center gap-1 h-8 px-2 rounded-lg text-xs text-muted-foreground cursor-default">
+      <Gem className="w-3.5 h-3.5 flex-shrink-0 text-primary/80" />
       <span className="tabular-nums">
         {credits !== null ? formatCredits(credits) : '--'}
       </span>
-      <button
-        onClick={handleRefresh}
-        disabled={loading}
-        className="p-0.5 hover:text-foreground transition-colors disabled:opacity-50"
-        title={t('Refresh credits')}
-      >
-        <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
-      </button>
     </div>
   )
 }

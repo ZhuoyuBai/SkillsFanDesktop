@@ -198,8 +198,8 @@ class SkillsFanCreditsProvider implements OAuthAISourceProvider {
    * Refresh token - delegates to SkillsFan auth
    */
   async refreshToken(): Promise<ProviderResult<void>> {
-    const success = await sfRefreshToken()
-    return success ? { success: true } : { success: false, error: 'Token refresh failed' }
+    const result = await sfRefreshToken()
+    return result.success ? { success: true } : { success: false, error: 'Token refresh failed' }
   }
 
   /**
@@ -247,8 +247,8 @@ class SkillsFanCreditsProvider implements OAuthAISourceProvider {
     refreshToken: string
     expiresAt: number
   }>> {
-    const success = await sfRefreshToken()
-    if (!success) {
+    const result = await sfRefreshToken()
+    if (!result.success) {
       return { success: false, error: 'Token refresh failed' }
     }
 

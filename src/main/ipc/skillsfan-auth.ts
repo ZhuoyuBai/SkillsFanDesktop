@@ -50,7 +50,7 @@ export function registerSkillsFanAuthHandlers(): void {
   // Refresh access token
   ipcMain.handle('skillsfan:refresh-token', async () => {
     const result = await refreshToken()
-    return { success: result, data: result }
+    return { success: result.success, data: result.success }
   })
 
   // Ensure token is valid (refresh if needed)

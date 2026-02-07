@@ -8,6 +8,8 @@
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft, RefreshCw } from 'lucide-react'
 import { useAppStore } from '../stores/app.store'
+import { usePlatform } from '../components/layout/Header'
+import { isElectron } from '../api/transport'
 import { useRalphStore } from '../stores/ralph.store'
 import { RalphSetup } from '../components/ralph/RalphSetup'
 import { RalphStoryEditor } from '../components/ralph/RalphStoryEditor'
@@ -15,6 +17,8 @@ import { RalphProgress } from '../components/ralph/RalphProgress'
 
 export function RalphPage() {
   const { t } = useTranslation()
+  const platform = usePlatform()
+  const isInElectron = isElectron()
   const { goBack } = useAppStore()
   const { view, reset, currentTask } = useRalphStore()
 
@@ -27,8 +31,8 @@ export function RalphPage() {
   return (
     <div className="flex flex-col h-full bg-background">
       {/* Header */}
-      <header className="flex items-center justify-between px-4 py-3 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="flex items-center gap-3">
+      <header className={`flex items-center justify-between px-4 py-3 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 ${isInElectron ? 'drag-region' : ''} ${isInElectron && platform.isMac ? 'pl-20' : ''}`}>
+        <div className="flex items-center gap-3 no-drag">
           <button
             onClick={handleClose}
             className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"

@@ -2,7 +2,7 @@
  * Header Component - Cross-platform title bar
  *
  * Handles platform-specific padding for window controls:
- * - macOS Electron: standard title bar, normal padding (pl-4)
+ * - macOS Electron: hiddenInset titlebar, traffic lights inset into content (pl-20)
  * - Windows/Linux Electron: titleBarOverlay buttons on the right (pr-36)
  * - Browser/Mobile: no extra padding needed (pl-4)
  *
@@ -40,12 +40,12 @@ export function Header({ left, right, className = '' }: HeaderProps) {
   const isInElectron = isElectron()
 
   // Platform-specific padding classes
-  // macOS: standard title bar, no overlay
+  // macOS: hiddenInset title bar, traffic lights inset ~70px from left
   // Windows/Linux: titleBarOverlay buttons overlay on the right
   // Browser/Mobile: no overlay, use normal padding
   const platformPadding = isInElectron
     ? platform.isMac
-      ? 'pl-4 pr-4'    // Electron macOS: normal padding (title bar is separate)
+      ? 'pl-20 pr-4'   // Electron macOS: 80px left padding for traffic lights (hiddenInset)
       : 'pl-4 pr-36'   // Electron Windows/Linux: 140px right for titleBarOverlay buttons
     : 'pl-4 pr-4'      // Browser/Mobile: normal padding
 
@@ -53,7 +53,7 @@ export function Header({ left, right, className = '' }: HeaderProps) {
     <header
       className={`
         flex items-center justify-between h-10
-        ${isInElectron && !platform.isMac ? 'drag-region' : ''}
+        ${isInElectron ? 'drag-region' : ''}
         ${platformPadding}
         ${className}
       `.trim().replace(/\s+/g, ' ')}

@@ -14,6 +14,8 @@ import { useTranslation } from '../../i18n'
 import { UserAvatarMenu } from './UserAvatarMenu'
 import { useLoopTaskStore } from '../../stores/loop-task.store'
 import { useChatStore } from '../../stores/chat.store'
+import { usePlatform } from '../layout/Header'
+import { isElectron } from '../../api/transport'
 
 // Unified task item for combined list
 type UnifiedTask = {
@@ -101,7 +103,7 @@ function UnifiedTaskItem({
         transition-all duration-200
         focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-inset
         ${isActive
-          ? 'bg-gradient-to-r from-primary/8 via-primary/5 to-transparent'
+          ? 'bg-gradient-to-r from-primary/15 via-primary/10 to-transparent border-l-2 border-primary'
           : 'hover:bg-secondary/40'
         }`}
     >
@@ -189,9 +191,9 @@ function UnifiedTaskItem({
 
 // Width constraints (in pixels)
 const MIN_WIDTH = 160 // Allow smaller width
-const MAX_WIDTH = 400
+const MAX_WIDTH = 320
 const COLLAPSED_WIDTH = 48 // Width when collapsed (icon only)
-const WIDTH_RATIO = 0.15 // 15% of window width
+const WIDTH_RATIO = 0.2 // 20% of window width
 
 // Calculate width based on window width (clamped to constraints)
 function calculateWidth(windowWidth: number): number {
@@ -234,6 +236,10 @@ export function ConversationList({
   spaceId
 }: ConversationListProps) {
   const { t } = useTranslation()
+  const platform = usePlatform()
+  const isInElectron = isElectron()
+  // macOS with hiddenInset: add padding for traffic lights
+  const macTrafficLightPadding = isInElectron && platform.isMac
   const [width, setWidth] = useState(getDefaultWidth)
   const [isDragging, setIsDragging] = useState(false)
   const [hasUserResized, setHasUserResized] = useState(false) // Track if user manually resized
@@ -414,14 +420,14 @@ export function ConversationList({
   if (isCollapsed) {
     return (
       <div
-        className="border-r border-border/40 flex flex-col bg-card relative"
+        className="border-r border-border/50 flex flex-col bg-card relative"
         style={{ width: COLLAPSED_WIDTH }}
       >
         {/* Space switcher and toggle button in collapsed state */}
-        <div className="px-2 py-3 border-b border-border/50 flex flex-col items-center gap-2">
-          <SpaceSwitcher collapsed={true} />
+        <div className={`px-2 py-3 border-b border-border flex flex-col items-center gap-2 ${macTrafficLightPadding ? 'pt-10 drag-region' : ''}`}>
+          <div className="no-drag"><SpaceSwitcher collapsed={true} /></div>
           {onToggleCollapse && (
-            <div className="relative">
+            <div className="relative no-drag">
               <button
                 onClick={() => {
                   setShowCollapseTooltip(false)
@@ -429,7 +435,7 @@ export function ConversationList({
                 }}
                 onMouseEnter={() => setShowCollapseTooltip(true)}
                 onMouseLeave={() => setShowCollapseTooltip(false)}
-                className="p-2 hover:bg-muted rounded-md transition-colors text-muted-foreground hover:text-foreground"
+                className="p-2 hover:bg-muted rounded-lg transition-colors text-muted-foreground hover:text-foreground"
                 aria-label={t('Expand sidebar')}
                 aria-expanded={false}
               >
@@ -447,21 +453,21 @@ export function ConversationList({
         </div>
 
         {/* New conversation + Advanced task buttons (icon only) */}
-        <div className="px-2 py-2 flex items-center justify-center gap-1">
+        <div className="px-2 py-2 flex flex-col items-center gap-1">
           <button
             onClick={() => {
               cancelEditing()
               setSelectionType('conversation')
               onNew()
             }}
-            className="p-1.5 text-primary hover:bg-primary/10 rounded-md transition-colors"
+            className="p-1.5 text-primary hover:bg-primary/10 rounded-lg transition-colors"
             title={t('New conversation')}
           >
             <SquarePen className="w-4 h-4" />
           </button>
           <button
             onClick={() => handleNewLoopTask()}
-            className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-md transition-colors"
+            className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-lg transition-colors"
             title={t('Auto task')}
           >
             <Zap className="w-4 h-4" />
@@ -526,7 +532,7 @@ export function ConversationList({
   return (
     <div
       ref={containerRef}
-      className={`flex flex-col relative ${isMobileOverlay ? 'bg-background flex-1' : 'border-r border-border/40 bg-card'}`}
+      className={`flex flex-col relative ${isMobileOverlay ? 'bg-background flex-1' : 'border-r border-border/50 bg-card'}`}
       style={isMobileOverlay ? undefined : {
         width,
         transition: isDragging ? 'none' : 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -535,10 +541,10 @@ export function ConversationList({
     >
       {/* Header with space switcher and toggle button - hidden in mobile overlay (header is provided by parent) */}
       {!isMobileOverlay && (
-      <div className="px-3 py-3 border-b border-border/50 flex items-center gap-2">
-        <SpaceSwitcher />
+      <div className={`px-3 py-3 border-b border-border flex items-center gap-2 ${macTrafficLightPadding ? 'pt-10 drag-region' : ''}`}>
+        <div className="no-drag"><SpaceSwitcher /></div>
         {onToggleCollapse && (
-          <div className="relative flex-shrink-0">
+          <div className="relative flex-shrink-0 no-drag">
             <button
               onClick={() => {
                 setShowCollapseTooltip(false)
@@ -546,7 +552,7 @@ export function ConversationList({
               }}
               onMouseEnter={() => setShowCollapseTooltip(true)}
               onMouseLeave={() => setShowCollapseTooltip(false)}
-              className="p-1 hover:bg-muted rounded-md transition-colors text-muted-foreground hover:text-foreground"
+              className="p-1 hover:bg-muted rounded-lg transition-colors text-muted-foreground hover:text-foreground"
               aria-label={t('Collapse sidebar')}
               aria-expanded={true}
             >
@@ -565,7 +571,7 @@ export function ConversationList({
       )}
 
       {/* New conversation + Advanced task buttons */}
-      <div className="px-4 py-3 border-b border-border/50">
+      <div className="px-4 py-3 border-b border-border">
         <div className="flex items-center gap-2">
           <button
             onClick={() => {
@@ -575,7 +581,7 @@ export function ConversationList({
             }}
             className="flex-1 flex items-center justify-start gap-2 px-3 py-1.5
               text-sm font-medium text-foreground bg-muted/40 hover:bg-muted/60
-              rounded-md transition-all duration-150
+              rounded-lg transition-all duration-150
               active:scale-[0.98]"
           >
             <SquarePen className="w-4 h-4 text-foreground" />
@@ -585,7 +591,7 @@ export function ConversationList({
             <button
               onClick={() => handleNewLoopTask()}
               className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted/50
-                rounded-md transition-all duration-150"
+                rounded-lg transition-all duration-150"
               aria-label={t('Auto task')}
             >
               <Zap className="w-4 h-4" />
@@ -593,7 +599,7 @@ export function ConversationList({
             {/* Tooltip */}
             <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1 z-50
               opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity">
-              <div className="bg-popover border border-border rounded-md shadow-lg px-2 py-1 whitespace-nowrap">
+              <div className="bg-popover border border-border rounded-lg shadow-lg px-2 py-1 whitespace-nowrap">
                 <span className="text-xs text-foreground">{t('Auto task')}</span>
               </div>
             </div>
@@ -650,9 +656,13 @@ export function ConversationList({
                 onEditCancel={handleCancelEdit}
                 onDelete={() => {
                   if (task.type === 'conversation' && onDelete) {
-                    onDelete(task.id)
+                    if (window.confirm(t('Are you sure you want to delete this conversation?'))) {
+                      onDelete(task.id)
+                    }
                   } else if (task.type === 'loopTask') {
-                    handleDeleteLoopTask(task.id)
+                    if (window.confirm(t('Are you sure you want to delete this task?'))) {
+                      handleDeleteLoopTask(task.id)
+                    }
                   }
                 }}
                 canRename={task.type === 'conversation' ? !!onRename : true}
