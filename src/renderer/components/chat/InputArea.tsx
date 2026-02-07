@@ -490,7 +490,7 @@ export function InputArea({ onSend, onStop, onInject, isGenerating, isCompact = 
                 }
                 openSettingsWithSection('skills')
               }}
-              className="h-8 flex items-center gap-1.5 px-2.5 rounded-lg text-xs
+              className="h-8 flex items-center gap-1.5 px-2.5 rounded-lg text-xs font-medium
                 transition-all duration-200 border
                 text-foreground/70 border-border hover:bg-muted hover:text-foreground"
               title={t('Skill Management')}

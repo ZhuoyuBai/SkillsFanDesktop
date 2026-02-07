@@ -143,7 +143,7 @@ export function HomePage() {
           </div>
 
           {/* Brand name */}
-          <h1 className="text-3xl font-semibold mb-4 tracking-tight text-foreground/95 [letter-spacing:-0.02em]">{t('SkillsFan')}</h1>
+          <h1 className="text-3xl font-bold mb-4 tracking-tight text-foreground/95 [letter-spacing:-0.02em]">{t('SkillsFan')}</h1>
 
           {/* Tagline */}
           <p className="text-muted-foreground text-center text-sm mb-8 max-w-md leading-relaxed">
@@ -155,7 +155,7 @@ export function HomePage() {
             data-onboarding="halo-space"
             onClick={() => haloSpace && handleSpaceClick(haloSpace)}
             disabled={!haloSpace}
-            className="px-8 py-3.5 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl text-sm font-medium transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-8 py-3.5 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl text-sm font-semibold transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {t('Enter Halo')}
           </button>

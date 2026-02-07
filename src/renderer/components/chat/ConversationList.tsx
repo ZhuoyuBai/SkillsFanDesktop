@@ -580,7 +580,7 @@ export function ConversationList({
               onNew()
             }}
             className="flex-1 flex items-center justify-start gap-2 px-3 py-1.5
-              text-sm font-medium text-foreground bg-muted/40 hover:bg-muted/60
+              text-sm font-semibold text-foreground bg-muted/40 hover:bg-muted/60
               rounded-lg transition-all duration-150
               active:scale-[0.98]"
           >

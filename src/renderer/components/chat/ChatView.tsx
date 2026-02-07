@@ -495,7 +495,7 @@ function EmptyState({
     <div className={`h-full flex flex-col items-center justify-start text-center pb-6
       ${isMobile ? 'pt-[8vh] px-4' : 'pt-[15vh] px-8'}`}>
       {/* Title - smaller on mobile */}
-      <h1 className={`mt-8 font-semibold tracking-tight text-foreground/85
+      <h1 className={`mt-8 font-bold tracking-tight text-foreground/85
         ${isMobile ? 'text-xl' : 'text-3xl'}`}>
         {t('Halo, not just chat, can help you get things done')}
       </h1>
@@ -516,7 +516,7 @@ function EmptyState({
               key={cat.key}
               onClick={() => onSuggestionClick?.(t(QUICK_PROMPT_KEYS[cat.key]))}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-full
-                bg-secondary/60 text-sm text-muted-foreground
+                bg-secondary/60 text-sm font-medium text-muted-foreground
                 hover:bg-secondary hover:text-foreground
                 transition-colors cursor-pointer"
             >
