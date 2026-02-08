@@ -29,9 +29,11 @@ import {
 } from 'lucide-react'
 import { useLoopTaskStore } from '../../../stores/loop-task.store'
 import { useSpaceStore } from '../../../stores/space.store'
+import { useToastStore } from '../../../stores/toast.store'
 import { api } from '../../../api'
 import { cn } from '../../../lib/utils'
 import type { CreateMethod, WizardStep } from '../../../../shared/types/loop-task'
+import type { SkillsFanAuthState } from '../../../../shared/types/skillsfan'
 
 interface ImportResult {
   success: boolean
@@ -57,11 +59,35 @@ export function Step1CreateTask(_props: Step1CreateTaskProps) {
     setAiDescription,
     setWizardStep
   } = useLoopTaskStore()
+  const { addToast } = useToastStore()
 
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [importResult, setImportResult] = useState<ImportResult | null>(null)
+  const [authState, setAuthState] = useState<SkillsFanAuthState | null>(null)
+
+  // Fetch auth state and listen for login/logout changes
+  useEffect(() => {
+    const loadAuthState = async () => {
+      try {
+        const result = await api.skillsfanGetAuthState()
+        if (result.success) {
+          setAuthState(result.data)
+        }
+      } catch {
+        // Ignore - treat as not logged in
+      }
+    }
+    loadAuthState()
+
+    const unsubLogin = api.onSkillsFanLoginSuccess(() => loadAuthState())
+    const unsubLogout = api.onSkillsFanLogout(() => setAuthState({ isLoggedIn: false }))
+    return () => {
+      unsubLogin()
+      unsubLogout()
+    }
+  }, [])
 
   // Default to AI method and set project directory
   useEffect(() => {
@@ -134,6 +160,12 @@ export function Step1CreateTask(_props: Step1CreateTaskProps) {
 
   // Handle Next button click
   const handleNext = async () => {
+    // Pro membership check
+    if (!authState?.user || authState.user.plan === 'free') {
+      addToast(t('This feature is only available for Pro members'), 'info')
+      return
+    }
+
     if (!editingTask?.projectDir) {
       setError(t('Please select a project directory'))
       setShowAdvanced(true)
