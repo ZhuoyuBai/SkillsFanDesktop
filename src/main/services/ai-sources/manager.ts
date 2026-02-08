@@ -33,7 +33,7 @@ import { getCustomProvider } from './providers/custom.provider'
 import { getGitHubCopilotProvider } from './providers/github-copilot.provider'
 import { getSkillsFanCreditsProvider } from './providers/skillsfan-credits.provider'
 import { loadAuthProvidersAsync, isOAuthProvider as isOAuthProviderCheck, type LoadedProvider } from './auth-loader'
-import { encryptString, decryptString, decryptTokens } from '../secure-storage.service'
+import { decryptString, decryptTokens } from '../secure-storage.service'
 
 /**
  * Extended OAuth provider interface for token management
@@ -284,7 +284,7 @@ class AISourceManager {
     const modelNames = data._modelNames || {}
     const defaultModel = data._defaultModel || ''
 
-    // Generic OAuth config structure (with encrypted tokens)
+    // Generic OAuth config structure
     const oauthConfig: Record<string, unknown> = {
       loggedIn: true,
       user: {
@@ -294,9 +294,8 @@ class AISourceManager {
       model: defaultModel,
       availableModels,
       modelNames,  // Store model display names mapping
-      // Encrypt tokens before storing
-      accessToken: encryptString(tokenData?.accessToken || ''),
-      refreshToken: encryptString(tokenData?.refreshToken || ''),
+      accessToken: tokenData?.accessToken || '',
+      refreshToken: tokenData?.refreshToken || '',
       tokenExpires: tokenData?.expiresAt
     }
 
@@ -395,12 +394,12 @@ class AISourceManager {
         const freshAiSources: AISourcesConfig = freshConfig.aiSources || { current: 'custom' }
         const providerConfig = freshAiSources[type] as any
         if (providerConfig) {
-          providerConfig.accessToken = encryptString(refreshResult.data.accessToken)
-          providerConfig.refreshToken = encryptString(refreshResult.data.refreshToken)
+          providerConfig.accessToken = refreshResult.data.accessToken
+          providerConfig.refreshToken = refreshResult.data.refreshToken
           providerConfig.tokenExpires = refreshResult.data.expiresAt
 
           saveConfig({ aiSources: freshAiSources } as any)
-          console.log('[AISourceManager] Token refreshed and saved (encrypted)')
+          console.log('[AISourceManager] Token refreshed and saved')
         }
       } else {
         console.error(`[AISourceManager] Token refresh failed for ${type}:`, refreshResult.error)
@@ -480,33 +479,60 @@ class AISourceManager {
   }
 
   /**
-   * Get AISourcesConfig with decrypted tokens and API keys
-   * Use this when passing config to providers that need to read tokens
+   * Get AISourcesConfig with all tokens/keys in plaintext.
+   *
+   * Detects legacy 'enc:' prefixed values from the old encryption scheme,
+   * decrypts them via safeStorage (may trigger Keychain prompt on macOS),
+   * and persists plaintext back to config.json so subsequent calls never
+   * touch Keychain again.
    */
   private getDecryptedAiSources(): AISourcesConfig {
     const config = getConfig() as any
     const aiSources: AISourcesConfig = config.aiSources || { current: 'custom' }
 
-    // Decrypt tokens for each OAuth provider
-    const decrypted: AISourcesConfig = { ...aiSources }
-    for (const key of Object.keys(decrypted)) {
+    let needsMigration = false
+    const result: AISourcesConfig = { ...aiSources }
+
+    for (const key of Object.keys(result)) {
       if (key === 'current') continue
-      const providerConfig = decrypted[key]
-      if (providerConfig && typeof providerConfig === 'object') {
-        if (key === 'custom' && 'apiKey' in providerConfig) {
-          // Decrypt custom API key
-          decrypted.custom = {
+      const providerConfig = result[key]
+      if (!providerConfig || typeof providerConfig !== 'object') continue
+
+      // Case 1: API-key based configs (custom, anthropic, openai, zhipu, deepseek, etc.)
+      if ('apiKey' in providerConfig) {
+        const apiKey = (providerConfig as any).apiKey || ''
+        if (typeof apiKey === 'string' && apiKey.startsWith('enc:')) {
+          needsMigration = true
+          ;(result as any)[key] = {
             ...providerConfig,
-            apiKey: decryptString((providerConfig as any).apiKey || '')
-          } as any
-        } else if ('accessToken' in providerConfig) {
-          // Decrypt OAuth tokens
-          decrypted[key] = decryptTokens(providerConfig as any)
+            apiKey: decryptString(apiKey)
+          }
+        }
+      }
+
+      // Case 2: OAuth configs (accessToken / refreshToken)
+      if ('accessToken' in providerConfig) {
+        const pc = (result as any)[key] || providerConfig
+        const atEncrypted = typeof pc.accessToken === 'string' && pc.accessToken.startsWith('enc:')
+        const rtEncrypted = typeof pc.refreshToken === 'string' && pc.refreshToken.startsWith('enc:')
+        if (atEncrypted || rtEncrypted) {
+          needsMigration = true
+          ;(result as any)[key] = {
+            ...pc,
+            ...(atEncrypted ? { accessToken: decryptString(pc.accessToken) } : {}),
+            ...(rtEncrypted ? { refreshToken: decryptString(pc.refreshToken) } : {})
+          }
         }
       }
     }
 
-    return decrypted
+    // Lazy migration: persist plaintext so Keychain is never needed again
+    if (needsMigration) {
+      console.log('[AISourceManager] Migrated encrypted values to plaintext in config')
+      saveConfig({ aiSources: result } as any)
+    }
+
+    return result
   }
 }
 

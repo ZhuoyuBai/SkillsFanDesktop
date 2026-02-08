@@ -5,63 +5,9 @@
 import { ipcMain, BrowserWindow } from 'electron'
 import { getConfig, saveConfig, validateApiConnection } from '../services/config.service'
 import { getAISourceManager } from '../services/ai-sources'
-import { decryptString } from '../services/secure-storage.service'
 import { setIsQuitting } from '../services/tray.service'
 
-/**
- * Migrate encrypted config to plaintext (one-time migration)
- * This will trigger keychain prompt once on first run after update
- */
-function migrateEncryptedConfig(): void {
-  try {
-    const config = getConfig() as any
-    let needsSave = false
-
-    // Check if any field is encrypted (starts with 'enc:')
-    const decryptIfNeeded = (value: string): string => {
-      if (value && typeof value === 'string' && value.startsWith('enc:')) {
-        try {
-          needsSave = true
-          return decryptString(value) // One-time decryption
-        } catch (err) {
-          console.error('[Config Migration] Failed to decrypt:', err)
-          return ''
-        }
-      }
-      return value
-    }
-
-    // Migrate AI source API keys
-    if (config.aiSources) {
-      if (config.aiSources.custom?.apiKey) {
-        config.aiSources.custom.apiKey = decryptIfNeeded(config.aiSources.custom.apiKey)
-      }
-      if (config.aiSources.anthropic?.apiKey) {
-        config.aiSources.anthropic.apiKey = decryptIfNeeded(config.aiSources.anthropic.apiKey)
-      }
-      if (config.aiSources.openai?.apiKey) {
-        config.aiSources.openai.apiKey = decryptIfNeeded(config.aiSources.openai.apiKey)
-      }
-    }
-
-    // Migrate legacy api.apiKey
-    if (config.api?.apiKey) {
-      config.api.apiKey = decryptIfNeeded(config.api.apiKey)
-    }
-
-    // Save the migrated config if any field was decrypted
-    if (needsSave) {
-      console.log('[Config Migration] Migrated encrypted config to plaintext')
-      saveConfig(config)
-    }
-  } catch (err) {
-    console.error('[Config Migration] Migration failed:', err)
-  }
-}
-
 export function registerConfigHandlers(): void {
-  // Run migration once when handlers are registered
-  migrateEncryptedConfig()
   // Get configuration
   ipcMain.handle('config:get', async () => {
     try {
