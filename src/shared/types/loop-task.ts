@@ -37,6 +37,9 @@ export interface UserStory {
   // Quality gate toggles (default: false)
   requireTypecheck?: boolean
   requireTests?: boolean
+  // Per-story model override (falls back to task-level model)
+  model?: string
+  modelSource?: string
 }
 
 /**
@@ -52,6 +55,8 @@ export interface LoopTaskMeta {
   completedCount: number
   createdAt: string
   updatedAt: string
+  model?: string // AI model override for this task (e.g. 'claude-sonnet-4-5-20250929')
+  modelSource?: string // AI source/provider for this task (e.g. 'skillsfan-credits', 'deepseek')
 }
 
 /**
@@ -80,6 +85,8 @@ export interface CreateLoopTaskConfig {
   stories: UserStory[]
   maxIterations: number
   branchName?: string
+  model?: string // AI model override for this task
+  modelSource?: string // AI source/provider for this task
 }
 
 /**

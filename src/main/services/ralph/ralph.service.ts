@@ -15,6 +15,8 @@ import type {
 } from './types'
 import {
   importPrdJson,
+  readPrdJsonFromFile,
+  prdStoryToUserStory,
   createPrdJson,
   syncTaskToPrd,
   generateBranchName,
@@ -621,6 +623,25 @@ export async function importFromPrd(projectDir: string): Promise<{
   stories: UserStory[]
 }> {
   const { prd, stories } = await importPrdJson(projectDir)
+
+  return {
+    description: prd.description,
+    branchName: prd.branchName,
+    stories
+  }
+}
+
+/**
+ * Import stories from a user-selected prd.json file path
+ */
+export async function importFromPrdFile(filePath: string): Promise<{
+  description: string
+  branchName: string
+  stories: UserStory[]
+}> {
+  const prd = await readPrdJsonFromFile(filePath)
+  const stories = prd.userStories.map(prdStoryToUserStory)
+  stories.sort((a, b) => a.priority - b.priority)
 
   return {
     description: prd.description,

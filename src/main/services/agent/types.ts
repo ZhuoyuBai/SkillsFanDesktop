@@ -92,6 +92,7 @@ export interface AgentRequest {
   aiBrowserEnabled?: boolean  // Enable AI Browser tools for this request
   thinkingEnabled?: boolean   // Enable extended thinking mode (maxThinkingTokens: 10240)
   model?: string              // Model to use (for future model switching)
+  modelSource?: string        // AI source/provider override (e.g. 'skillsfan-credits', 'deepseek')
   canvasContext?: CanvasContext  // Current canvas state for AI awareness
   ralphMode?: RalphModeConfig    // Ralph autonomous loop mode
 }

@@ -143,6 +143,8 @@ export async function executeStory(
       spaceId: '__ralph__',           // Special Ralph spaceId
       conversationId: sessionId,
       message: prompt,
+      model: story.model || task.model,              // Story-level override > task-level
+      modelSource: story.modelSource || task.modelSource,  // Story-level override > task-level
       ralphMode: {
         enabled: true,
         projectDir: task.projectDir,

@@ -13,23 +13,27 @@ export interface ModelOption {
   id: string;
   name: string;
   description: string;
+  estimatedCreditsPerStory?: number; // Rough estimate of credits per story for Loop Tasks
 }
 
 export const AVAILABLE_MODELS: ModelOption[] = [
   {
     id: 'claude-opus-4-5-20251101',
     name: 'Claude Opus 4.5',
-    description: 'Most powerful model, great for complex reasoning and architecture decisions'
+    description: 'Most powerful model, great for complex reasoning and architecture decisions',
+    estimatedCreditsPerStory: 15
   },
   {
     id: 'claude-sonnet-4-5-20250929',
     name: 'Claude Sonnet 4.5',
-    description: 'Balanced performance and cost, suitable for most tasks'
+    description: 'Balanced performance and cost, suitable for most tasks',
+    estimatedCreditsPerStory: 8
   },
   {
     id: 'claude-haiku-4-5-20251001',
     name: 'Claude Haiku 4.5',
-    description: 'Fast and lightweight, ideal for simple tasks'
+    description: 'Fast and lightweight, ideal for simple tasks',
+    estimatedCreditsPerStory: 2
   }
 ];
 

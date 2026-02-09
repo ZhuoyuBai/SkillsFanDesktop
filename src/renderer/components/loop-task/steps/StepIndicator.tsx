@@ -19,16 +19,19 @@ interface StepIndicatorProps {
   currentStep: WizardStep
 }
 
-const STEPS: { key: WizardStep; labelKey: string }[] = [
-  { key: 1, labelKey: 'Step Create Task' },
-  { key: 2, labelKey: 'Step Plan Edit' },
-  { key: 3, labelKey: 'Step Confirm' },
-  { key: 4, labelKey: 'Step Execute' }
-]
+const STEP_KEYS: WizardStep[] = [1, 2, 3, 4]
 
 export function StepIndicator({ currentStep }: StepIndicatorProps) {
   const { t } = useTranslation()
   const { setWizardStep } = useLoopTaskStore()
+
+  // Use static t() calls so i18n scanner can extract keys
+  const stepLabels: Record<WizardStep, string> = {
+    1: t('Step Create Task'),
+    2: t('Step Plan Edit'),
+    3: t('Step Confirm'),
+    4: t('Step Execute')
+  }
 
   const handleStepClick = (stepKey: WizardStep) => {
     // Can only go back to completed steps, never forward
@@ -40,7 +43,7 @@ export function StepIndicator({ currentStep }: StepIndicatorProps) {
 
   // Progress line: percentage of the track that is filled
   // Track spans from center of dot 1 to center of dot 4
-  const progressPercent = ((currentStep - 1) / (STEPS.length - 1)) * 100
+  const progressPercent = ((currentStep - 1) / (STEP_KEYS.length - 1)) * 100
 
   return (
     <div className="px-6 py-5 shrink-0">
@@ -56,15 +59,15 @@ export function StepIndicator({ currentStep }: StepIndicatorProps) {
         </div>
 
         {/* Step dots */}
-        {STEPS.map((step) => {
-          const isCompleted = step.key < currentStep
-          const isCurrent = step.key === currentStep
+        {STEP_KEYS.map((step) => {
+          const isCompleted = step < currentStep
+          const isCurrent = step === currentStep
           const canClick = isCompleted && currentStep < 4
 
           return (
-            <div key={step.key} className="flex-1 flex flex-col items-center relative z-10">
+            <div key={step} className="flex-1 flex flex-col items-center relative z-10">
               <button
-                onClick={() => handleStepClick(step.key)}
+                onClick={() => handleStepClick(step)}
                 disabled={!canClick}
                 className={cn(
                   'w-[30px] h-[30px] rounded-full flex items-center justify-center text-xs font-semibold transition-all duration-300',
@@ -75,7 +78,7 @@ export function StepIndicator({ currentStep }: StepIndicatorProps) {
                   !canClick && !isCurrent && 'cursor-default'
                 )}
               >
-                {isCompleted ? <Check size={14} strokeWidth={2.5} /> : step.key}
+                {isCompleted ? <Check size={14} strokeWidth={2.5} /> : step}
               </button>
               <span
                 className={cn(
@@ -85,7 +88,7 @@ export function StepIndicator({ currentStep }: StepIndicatorProps) {
                   !isCompleted && !isCurrent && 'text-muted-foreground'
                 )}
               >
-                {t(step.labelKey)}
+                {stepLabels[step]}
               </span>
             </div>
           )

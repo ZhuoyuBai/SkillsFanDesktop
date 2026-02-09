@@ -8,7 +8,8 @@
  * - When complete: indicator fades out smoothly
  */
 
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import {
   Lightbulb,
   Wrench,
@@ -166,6 +167,42 @@ export function MessageItem({ message, previousCost = 0, hideThoughts = false, i
     }
   }, [message.content])
 
+  // Right-click context menu state
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
+
+  // Right-click context menu for selected text
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    const selection = window.getSelection()?.toString()
+    if (selection && selection.trim()) {
+      e.preventDefault()
+      setContextMenu({ x: e.clientX, y: e.clientY })
+    }
+  }, [])
+
+  // Copy selected text from context menu
+  const handleCopySelection = useCallback(async () => {
+    const selection = window.getSelection()?.toString()
+    if (!selection) return
+    try {
+      await navigator.clipboard.writeText(selection)
+      setContextMenu(null)
+    } catch (err) {
+      console.error('Failed to copy selection:', err)
+    }
+  }, [])
+
+  // Close context menu on click outside or scroll
+  useEffect(() => {
+    if (!contextMenu) return
+    const handleClose = () => setContextMenu(null)
+    document.addEventListener('mousedown', handleClose)
+    document.addEventListener('scroll', handleClose, true)
+    return () => {
+      document.removeEventListener('mousedown', handleClose)
+      document.removeEventListener('scroll', handleClose, true)
+    }
+  }, [contextMenu])
+
   // Extract browser tools from thoughts (tool_use type with browser tool names)
   // Note: Tool calls are stored in thoughts, not in message.toolCalls
   const browserToolCalls = useMemo(() => {
@@ -186,9 +223,10 @@ export function MessageItem({ message, previousCost = 0, hideThoughts = false, i
   // Message bubble content
   const bubble = (
     <div
-      className={`rounded-2xl px-4 py-3 overflow-y-hidden overflow-x-auto ${
+      onContextMenu={handleContextMenu}
+      className={`rounded-2xl px-4 py-3 overflow-y-hidden overflow-x-auto w-full ${
         isUser ? 'message-user' : 'message-assistant'
-      } ${isStreaming ? 'streaming-message' : ''} ${isWorking ? 'message-working' : ''} ${!isInContainer ? 'max-w-[85%]' : 'w-full'}`}
+      } ${isStreaming ? 'streaming-message' : ''} ${isWorking ? 'message-working' : ''}`}
     >
       {/* Working indicator - shows when AI is working */}
       {isWorking && !isUser && (
@@ -246,39 +284,55 @@ export function MessageItem({ message, previousCost = 0, hideThoughts = false, i
         <FileChangesFooter thoughts={message.thoughts} />
       )}
 
-      {/* Token usage indicator + copy button - only for completed assistant messages with tokenUsage */}
+      {/* Token usage indicator - only for completed assistant messages with tokenUsage */}
       {!isUser && !isWorking && message.tokenUsage && (
         <div className="flex justify-end items-center gap-2 mt-2 pt-1">
-          {/* Token usage indicator */}
           <TokenUsageIndicator tokenUsage={message.tokenUsage} previousCost={previousCost} />
-
-          {/* Copy button */}
-          <button
-            onClick={handleCopyMessage}
-            className="flex items-center gap-1.5 px-2 py-1 text-xs text-muted-foreground/60
-              hover:text-foreground hover:bg-white/5 rounded-md transition-all"
-            title={t('Copy message')}
-          >
-            {copied ? (
-              <>
-                <Check size={14} className="text-green-400" />
-                <span className="text-green-400">{t('Copied')}</span>
-              </>
-            ) : (
-              <Copy size={14} />
-            )}
-          </button>
         </div>
       )}
     </div>
   )
 
+  // Hover copy button - shown on all messages with content
+  const copyButton = message.content ? (
+    <button
+      onClick={handleCopyMessage}
+      className="absolute -top-2 -right-2 opacity-0 group-hover:opacity-100
+        p-1.5 rounded-lg bg-background border border-border shadow-sm
+        text-muted-foreground hover:text-foreground transition-all z-10"
+      title={t('Copy message')}
+    >
+      {copied ? <Check size={14} className="text-green-400" /> : <Copy size={14} />}
+    </button>
+  ) : null
+
+  // Right-click context menu portal
+  const contextMenuPortal = contextMenu ? createPortal(
+    <div
+      className="fixed z-50 bg-popover border border-border rounded-lg shadow-lg py-1 min-w-[120px]"
+      style={{ top: contextMenu.y, left: contextMenu.x }}
+      onMouseDown={(e) => e.stopPropagation()}
+    >
+      <button
+        onClick={handleCopySelection}
+        className="flex items-center gap-2 w-full px-3 py-1.5 text-sm text-popover-foreground hover:bg-accent rounded transition-colors"
+      >
+        <Copy size={14} />
+        <span>{t('Copy')}</span>
+      </button>
+    </div>,
+    document.body
+  ) : null
+
   // When in container, just return the bubble without wrapper
   if (isInContainer) {
-    // Even in container, we need data-message-id for search navigation
     return (
       <div data-message-id={message.id}>
-        {bubble}
+        <div className="relative group">
+          {bubble}
+          {copyButton}
+        </div>
+        {contextMenuPortal}
       </div>
     )
   }
@@ -289,7 +343,11 @@ export function MessageItem({ message, previousCost = 0, hideThoughts = false, i
       className={`flex ${isUser ? 'justify-end' : 'justify-start'} animate-fade-in`}
       data-message-id={message.id}
     >
-      {bubble}
+      <div className="relative group max-w-[85%]">
+        {bubble}
+        {copyButton}
+      </div>
+      {contextMenuPortal}
     </div>
   )
 }

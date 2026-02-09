@@ -231,7 +231,8 @@ export function SkillList() {
       const installResult = await api.installSkill(archivePath)
 
       if (installResult.success) {
-        // Success - reload skills
+        // Success - reset button immediately, then reload skills in background
+        setIsInstalling(false)
         await loadSkills()
         setToast({ message: t('Skill installed successfully'), type: 'success' })
       } else if (installResult.conflict) {

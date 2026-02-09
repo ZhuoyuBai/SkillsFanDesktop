@@ -25,13 +25,24 @@ import {
   ChevronDown,
   CheckCircle2,
   AlertCircle,
-  FileJson
+  FileJson,
+  Sparkles
 } from 'lucide-react'
 import { useLoopTaskStore } from '../../../stores/loop-task.store'
 import { useSpaceStore } from '../../../stores/space.store'
+import { useAppStore } from '../../../stores/app.store'
 import { useToastStore } from '../../../stores/toast.store'
 import { api } from '../../../api'
 import { cn } from '../../../lib/utils'
+import { AVAILABLE_MODELS, DEFAULT_MODEL } from '../../../types'
+import type { AISourceType, OAuthSourceConfig } from '../../../types'
+import {
+  PROVIDER_LOGOS_BY_ID,
+  PROVIDER_NAMES,
+  getProviderLogoById,
+  getModelLogo
+} from '../../layout/ModelSelector'
+import { getCurrentLanguage } from '../../../i18n'
 import type { CreateMethod, WizardStep } from '../../../../shared/types/loop-task'
 import type { SkillsFanAuthState } from '../../../../shared/types/skillsfan'
 
@@ -41,6 +52,21 @@ interface ImportResult {
   storyCount?: number
   branchName?: string
   error?: string
+}
+
+// Localized text type from auth providers
+type LocalizedText = string | Record<string, string>
+
+interface AuthProviderConfig {
+  type: string
+  displayName: LocalizedText
+  enabled: boolean
+}
+
+function getLocalizedText(value: LocalizedText): string {
+  if (typeof value === 'string') return value
+  const lang = getCurrentLanguage()
+  return value[lang] || value['en'] || Object.values(value)[0] || ''
 }
 
 interface Step1CreateTaskProps {
@@ -61,11 +87,58 @@ export function Step1CreateTask(_props: Step1CreateTaskProps) {
   } = useLoopTaskStore()
   const { addToast } = useToastStore()
 
+  const config = useAppStore((s) => s.config)
+  const isSkillsFanCredits = config?.aiSources?.current === 'skillsfan-credits'
+
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [importResult, setImportResult] = useState<ImportResult | null>(null)
   const [authState, setAuthState] = useState<SkillsFanAuthState | null>(null)
+  const [showModelDropdown, setShowModelDropdown] = useState(false)
+  const [authProviders, setAuthProviders] = useState<AuthProviderConfig[]>([])
+
+  // Load auth providers for model selector
+  useEffect(() => {
+    api.authGetProviders().then((result) => {
+      if (result.success && result.data) {
+        setAuthProviders(result.data as AuthProviderConfig[])
+      }
+    })
+  }, [])
+
+  // Compute available providers from config (matching ModelSelector.tsx logic)
+  const aiSources = config?.aiSources || { current: 'custom' as AISourceType }
+
+  const configuredCustomProviders = Object.keys(aiSources)
+    .filter(key => {
+      if (key === 'current' || key === 'oauth' || key === 'custom') return false
+      const source = (aiSources as Record<string, any>)[key]
+      return source && typeof source === 'object' && 'apiKey' in source && source.apiKey && !('loggedIn' in source)
+    })
+    .map(key => {
+      const source = (aiSources as Record<string, any>)[key]
+      return {
+        id: key,
+        name: PROVIDER_NAMES[key] || key,
+        logo: getProviderLogoById(key),
+        model: source.model || '',
+        config: source
+      }
+    })
+
+  const loggedInOAuthProviders = authProviders
+    .filter(p => p.type !== 'custom' && p.enabled)
+    .map(p => {
+      const providerConfig = (aiSources as Record<string, any>)[p.type] as OAuthSourceConfig | undefined
+      return {
+        type: p.type,
+        displayName: getLocalizedText(p.displayName),
+        config: providerConfig,
+        isLoggedIn: providerConfig?.loggedIn === true
+      }
+    })
+    .filter(p => p.isLoggedIn)
 
   // Fetch auth state and listen for login/logout changes
   useEffect(() => {
@@ -88,6 +161,64 @@ export function Step1CreateTask(_props: Step1CreateTaskProps) {
       unsubLogout()
     }
   }, [])
+
+  // Selected model info - resolve display name from dynamic providers
+  const selectedModelId = editingTask?.model || ''
+  const selectedModelSource = editingTask?.modelSource || ''
+
+  // Resolve display name for current selection
+  const getSelectedModelDisplayName = (): string => {
+    if (!selectedModelId && !selectedModelSource) {
+      // No selection yet - show current config model
+      const currentSource = aiSources.current || 'custom'
+      const currentConfig = (aiSources as Record<string, any>)[currentSource]
+      if (currentConfig?.model) {
+        // Check if it's an OAuth model with display names
+        if (currentConfig.modelNames?.[currentConfig.model]) {
+          return currentConfig.modelNames[currentConfig.model]
+        }
+        return currentConfig.model
+      }
+      return t('Model')
+    }
+    // Check OAuth providers
+    for (const provider of loggedInOAuthProviders) {
+      if (provider.type === selectedModelSource && provider.config?.modelNames?.[selectedModelId]) {
+        return provider.config.modelNames[selectedModelId]
+      }
+    }
+    // Check custom providers
+    const customProvider = configuredCustomProviders.find(p => p.id === selectedModelSource)
+    if (customProvider) {
+      return customProvider.model || customProvider.name
+    }
+    // Fallback to model ID
+    return selectedModelId || t('Model')
+  }
+
+  // Resolve logo for current selection
+  const getSelectedModelLogo = (): string | null => {
+    if (selectedModelSource) {
+      // OAuth model - use model-specific logo
+      for (const provider of loggedInOAuthProviders) {
+        if (provider.type === selectedModelSource) {
+          return getModelLogo(selectedModelId, getSelectedModelDisplayName(), provider.type)
+        }
+      }
+      // Custom provider - use provider logo
+      const customProvider = configuredCustomProviders.find(p => p.id === selectedModelSource)
+      if (customProvider) return customProvider.logo
+    }
+    // Fallback: check current config - prefer model-specific logo over provider logo
+    const currentSource = (aiSources.current || 'custom') as string
+    const currentConfig = (aiSources as Record<string, any>)[currentSource]
+    if (currentConfig?.model) {
+      const modelName = currentConfig.modelNames?.[currentConfig.model] || currentConfig.model
+      const modelLogo = getModelLogo(currentConfig.model, modelName, currentSource)
+      if (modelLogo) return modelLogo
+    }
+    return getProviderLogoById(currentSource)
+  }
 
   // Default to AI method and set project directory
   useEffect(() => {
@@ -119,19 +250,14 @@ export function Step1CreateTask(_props: Step1CreateTaskProps) {
     setImportResult(null)
   }
 
-  // Handle file import (validate only, don't go to next step)
+  // Handle file import - opens file picker, validates, shows result
   const handleImport = async () => {
-    if (!editingTask?.projectDir) {
-      setError(t('Please select a project directory'))
-      return
-    }
-
     setIsLoading(true)
     setError(null)
     setImportResult(null)
 
     try {
-      const result = await api.ralphImportPrd({ projectDir: editingTask.projectDir })
+      const result = await api.ralphImportPrd({ projectDir: editingTask?.projectDir || '' })
 
       if (result.success && result.data) {
         updateEditing({
@@ -140,8 +266,14 @@ export function Step1CreateTask(_props: Step1CreateTaskProps) {
           description: result.data.description,
           source: 'import'
         })
-        // Auto-advance to step 2 after successful import
-        setWizardStep(2 as WizardStep)
+        setImportResult({
+          success: true,
+          project: result.data.description,
+          storyCount: result.data.stories.length,
+          branchName: result.data.branchName
+        })
+      } else if (result.success && !result.data) {
+        // User cancelled the file picker
       } else {
         setImportResult({
           success: false,
@@ -232,8 +364,8 @@ export function Step1CreateTask(_props: Step1CreateTaskProps) {
   }
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex-1 overflow-auto p-4">
+    <div className="flex flex-col h-full min-h-0">
+      <div className="flex-1 overflow-auto p-4 min-h-0">
         <div className="max-w-2xl mx-auto space-y-6">
           {/* Task Name */}
           <div className="space-y-2">
@@ -458,29 +590,142 @@ export function Step1CreateTask(_props: Step1CreateTaskProps) {
             </button>
 
             {showAdvanced && (
-              <div className="pl-8 pt-3 space-y-2">
-                  <label className="block text-sm text-muted-foreground">
-                    {t('Project Directory')}
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={editingTask?.projectDir || ''}
-                      onChange={(e) => updateEditing({ projectDir: e.target.value })}
-                      placeholder="/path/to/your/project"
-                      className="flex-1 px-3 py-2 bg-input border border-border rounded-md text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
-                    />
-                    <button
-                      onClick={handleSelectFolder}
-                      className="px-3 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 transition-colors flex items-center gap-2 text-sm"
-                    >
-                      <FolderOpen size={14} />
-                      {t('Browse')}
-                    </button>
+              <div className="pl-8 pt-3 space-y-4">
+                  {/* Model Selector - matches ModelSelector.tsx with official first, custom below */}
+                  <div className="space-y-2">
+                    <label className="block text-sm text-muted-foreground flex items-center gap-1.5">
+                      <Sparkles size={14} />
+                      {t('Model Selection')}
+                    </label>
+                    <div className="relative">
+                      <button
+                        onClick={() => setShowModelDropdown(!showModelDropdown)}
+                        className="w-full px-3 py-2 bg-input border border-border rounded-md text-foreground text-sm text-left flex items-center justify-between hover:border-foreground/20 transition-colors"
+                      >
+                        <div className="flex items-center gap-2">
+                          {getSelectedModelLogo() ? (
+                            <img src={getSelectedModelLogo()!} alt="" className="w-4 h-4 rounded object-cover flex-shrink-0" />
+                          ) : (
+                            <div className="w-4 h-4 rounded bg-muted flex items-center justify-center flex-shrink-0">
+                              <span className="text-[10px] text-muted-foreground">AI</span>
+                            </div>
+                          )}
+                          <span className="truncate">{getSelectedModelDisplayName()}</span>
+                        </div>
+                        <ChevronDown size={14} className={cn('text-muted-foreground transition-transform flex-shrink-0', showModelDropdown && 'rotate-180')} />
+                      </button>
+
+                      {showModelDropdown && (
+                        <div className="absolute z-10 mt-1 w-full bg-card border border-border rounded-lg shadow-lg overflow-hidden max-h-64 overflow-y-auto">
+                          {/* Official / OAuth Models (on top) */}
+                          {loggedInOAuthProviders.map((provider) => (
+                            (provider.config?.availableModels || []).map((modelId) => {
+                              const displayName = provider.config?.modelNames?.[modelId] || modelId
+                              const isSelected = selectedModelSource === provider.type && selectedModelId === modelId
+                              const modelLogo = getModelLogo(modelId, displayName, provider.type)
+                              const creditInfo = AVAILABLE_MODELS.find(m => m.id === modelId)
+                              return (
+                                <button
+                                  key={`${provider.type}-${modelId}`}
+                                  onClick={() => {
+                                    updateEditing({ model: modelId, modelSource: provider.type })
+                                    setShowModelDropdown(false)
+                                  }}
+                                  className={cn(
+                                    'w-full px-3 py-2.5 text-left hover:bg-muted/50 transition-colors flex items-center gap-2.5',
+                                    isSelected && 'bg-primary/10'
+                                  )}
+                                >
+                                  {modelLogo ? (
+                                    <img src={modelLogo} alt="" className="w-5 h-5 rounded object-cover flex-shrink-0" />
+                                  ) : (
+                                    <div className="w-5 h-5 rounded bg-muted flex items-center justify-center flex-shrink-0">
+                                      <span className="text-xs text-muted-foreground">AI</span>
+                                    </div>
+                                  )}
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-sm font-medium text-foreground truncate">{displayName}</span>
+                                      <span className="flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded font-medium text-white bg-primary/80">{t('Official')}</span>
+                                    </div>
+                                    {creditInfo?.estimatedCreditsPerStory && (
+                                      <p className="text-xs text-muted-foreground mt-0.5">~{creditInfo.estimatedCreditsPerStory} {t('credits/story')}</p>
+                                    )}
+                                  </div>
+                                  {isSelected && <CheckCircle2 size={14} className="text-primary flex-shrink-0" />}
+                                </button>
+                              )
+                            })
+                          ))}
+
+                          {/* Divider between official and custom */}
+                          {loggedInOAuthProviders.length > 0 && configuredCustomProviders.length > 0 && (
+                            <div className="my-1 border-t border-border" />
+                          )}
+
+                          {/* Custom API Models (below) */}
+                          {configuredCustomProviders.map((provider) => {
+                            const isSelected = selectedModelSource === provider.id
+                            return (
+                              <button
+                                key={provider.id}
+                                onClick={() => {
+                                  updateEditing({ model: provider.model, modelSource: provider.id })
+                                  setShowModelDropdown(false)
+                                }}
+                                className={cn(
+                                  'w-full px-3 py-2.5 text-left hover:bg-muted/50 transition-colors flex items-center gap-2.5',
+                                  isSelected && 'bg-primary/10'
+                                )}
+                              >
+                                {provider.logo ? (
+                                  <img src={provider.logo} alt="" className="w-5 h-5 rounded object-cover flex-shrink-0" />
+                                ) : (
+                                  <div className="w-5 h-5 rounded bg-muted flex items-center justify-center flex-shrink-0">
+                                    <span className="text-xs text-muted-foreground">AI</span>
+                                  </div>
+                                )}
+                                <span className="text-sm font-medium text-foreground truncate flex-1">{provider.model || provider.name}</span>
+                                {isSelected && <CheckCircle2 size={14} className="text-primary flex-shrink-0" />}
+                              </button>
+                            )
+                          })}
+
+                          {/* Empty state */}
+                          {loggedInOAuthProviders.length === 0 && configuredCustomProviders.length === 0 && (
+                            <div className="px-3 py-4 text-sm text-muted-foreground text-center">
+                              {t('Configure API')}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    {t('Defaults to current space directory')}
-                  </p>
+
+                  <div className="space-y-2">
+                    <label className="block text-sm text-muted-foreground">
+                      {t('Project Directory')}
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={editingTask?.projectDir || ''}
+                        onChange={(e) => updateEditing({ projectDir: e.target.value })}
+                        placeholder="/path/to/your/project"
+                        className="flex-1 px-3 py-2 bg-input border border-border rounded-md text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                      />
+                      <button
+                        onClick={handleSelectFolder}
+                        className="px-3 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 transition-colors flex items-center gap-2 text-sm"
+                      >
+                        <FolderOpen size={14} />
+                        {t('Browse')}
+                      </button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {t('Defaults to current space directory')}
+                    </p>
+                  </div>
               </div>
             )}
           </div>
@@ -496,7 +741,9 @@ export function Step1CreateTask(_props: Step1CreateTaskProps) {
 
       {/* Footer - consistent with Step2/Step3 */}
       <div className="px-4 py-3 border-t border-border shrink-0">
-        <div className="max-w-2xl mx-auto flex items-center justify-end">
+        <div className="max-w-2xl mx-auto flex items-center justify-between">
+          <div />
+
           <button
             onClick={handleNext}
             disabled={isLoading || !canProceed()}

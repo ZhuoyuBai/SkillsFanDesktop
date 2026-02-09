@@ -43,6 +43,8 @@ export interface RalphTask {
   currentStoryIndex: number // index of currently executing story
   iteration: number // current iteration count
   maxIterations: number // maximum iterations allowed
+  model?: string // AI model override for this task
+  modelSource?: string // AI source/provider for this task
   createdAt: string
   startedAt?: string
   completedAt?: string

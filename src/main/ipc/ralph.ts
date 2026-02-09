@@ -3,7 +3,7 @@
  * Handles IPC communication for loop task management
  */
 
-import { ipcMain, BrowserWindow } from 'electron'
+import { ipcMain, BrowserWindow, dialog } from 'electron'
 import {
   createTask,
   startTask,
@@ -14,6 +14,7 @@ import {
   setMainWindow,
   generateStories,
   importFromPrd,
+  importFromPrdFile,
   prdExists
 } from '../services/ralph'
 import { getTask as getLoopTask } from '../services/loop-task.service'
@@ -64,6 +65,8 @@ export function registerRalphHandlers(window: BrowserWindow | null): void {
           currentStoryIndex: loopTask.currentStoryIndex,
           iteration: loopTask.iteration,
           maxIterations: loopTask.maxIterations,
+          model: loopTask.model,
+          modelSource: loopTask.modelSource,
           createdAt: loopTask.createdAt,
           startedAt: loopTask.startedAt,
           completedAt: loopTask.completedAt
@@ -137,21 +140,24 @@ export function registerRalphHandlers(window: BrowserWindow | null): void {
     }
   )
 
-  // Import from prd.json
+  // Import from prd.json - opens file picker dialog
   ipcMain.handle(
     'ralph:import-prd',
-    async (_event, config: { projectDir: string }) => {
+    async () => {
       try {
-        // Check if prd.json exists
-        const exists = await prdExists(config.projectDir)
-        if (!exists) {
-          return {
-            success: false,
-            error: 'prd.json not found in the specified directory'
-          }
+        const dialogResult = await dialog.showOpenDialog({
+          title: 'Select prd.json',
+          properties: ['openFile'],
+          filters: [
+            { name: 'JSON Files', extensions: ['json'] }
+          ]
+        })
+
+        if (dialogResult.canceled || dialogResult.filePaths.length === 0) {
+          return { success: true, data: null }
         }
 
-        const result = await importFromPrd(config.projectDir)
+        const result = await importFromPrdFile(dialogResult.filePaths[0])
         return { success: true, data: result }
       } catch (error: unknown) {
         const err = error as Error

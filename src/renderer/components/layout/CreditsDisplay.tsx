@@ -16,6 +16,7 @@ export function CreditsDisplay() {
   const config = useAppStore((s) => s.config)
   const [credits, setCredits] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
   const initialized = useRef(false)
 
   const currentSource = config?.aiSources?.current
@@ -28,6 +29,7 @@ export function CreditsDisplay() {
     api.skillsfanGetAuthState().then((res) => {
       if (res.success && res.data) {
         const state = res.data as SkillsFanAuthState
+        setIsLoggedIn(state.isLoggedIn)
         if (state.lastKnownCredits !== undefined) {
           setCredits(state.lastKnownCredits)
         }
@@ -89,6 +91,8 @@ export function CreditsDisplay() {
   const formatCredits = (value: number): string => {
     return Math.round(value).toString()
   }
+
+  if (!isLoggedIn) return null
 
   return (
     <div className="flex items-center gap-1 h-8 px-2 rounded-lg text-xs text-muted-foreground cursor-default">

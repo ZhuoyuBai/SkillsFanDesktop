@@ -51,6 +51,7 @@ export {
   // Story generation and import
   generateStories,
   importFromPrd,
+  importFromPrdFile,
 
   // Story manipulation
   addStoryToTask,

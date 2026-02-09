@@ -45,6 +45,21 @@ export async function readPrdJson(projectDir: string): Promise<PrdJson> {
 }
 
 /**
+ * Read and parse prd.json from an absolute file path
+ */
+export async function readPrdJsonFromFile(filePath: string): Promise<PrdJson> {
+  const content = await fs.readFile(filePath, 'utf-8')
+  const prd = JSON.parse(content) as PrdJson
+
+  // Validate required fields
+  if (!prd.project || !prd.branchName || !prd.userStories) {
+    throw new Error('Invalid prd.json: missing required fields (project, branchName, userStories)')
+  }
+
+  return prd
+}
+
+/**
  * Write prd.json to a project directory
  */
 export async function writePrdJson(projectDir: string, prd: PrdJson): Promise<void> {

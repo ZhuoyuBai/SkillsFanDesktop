@@ -4,12 +4,13 @@
  * Allows user to:
  * - View and edit story list
  * - Add, edit, delete, reorder stories
+ * - Override model per story
  * - Configure max iterations
  *
  * When "Next" is clicked, generates prd.json and goes to step 3
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Plus,
@@ -19,14 +20,55 @@ import {
   ChevronUp,
   Pencil,
   Trash2,
-  Circle
+  Circle,
+  Sparkles,
+  CheckCircle2,
+  RotateCcw
 } from 'lucide-react'
 import { useLoopTaskStore } from '../../../stores/loop-task.store'
 import { useToastStore } from '../../../stores/toast.store'
+import { useAppStore } from '../../../stores/app.store'
 import { api } from '../../../api'
 import { StoryEditModal } from '../../ralph/StoryEditModal'
 import { cn } from '../../../lib/utils'
+import {
+  PROVIDER_NAMES,
+  getProviderLogoById,
+  getModelLogo
+} from '../../layout/ModelSelector'
+import { getCurrentLanguage } from '../../../i18n'
+import type { AISourceType, OAuthSourceConfig } from '../../../types'
 import type { UserStory, WizardStep } from '../../../../shared/types/loop-task'
+
+// Localized text type from auth providers
+type LocalizedText = string | Record<string, string>
+
+interface AuthProviderConfig {
+  type: string
+  displayName: LocalizedText
+  enabled: boolean
+}
+
+function getLocalizedText(value: LocalizedText): string {
+  if (typeof value === 'string') return value
+  const lang = getCurrentLanguage()
+  return value[lang] || value['en'] || Object.values(value)[0] || ''
+}
+
+// Provider info types for StoryCard
+interface OAuthProviderInfo {
+  type: string
+  displayName: string
+  config?: OAuthSourceConfig
+  isLoggedIn: boolean
+}
+
+interface CustomProviderInfo {
+  id: string
+  name: string
+  logo: string | null
+  model: string
+}
 
 interface Step2PlanEditProps {
   onCancel: () => void
@@ -36,6 +78,7 @@ export function Step2PlanEdit({ onCancel }: Step2PlanEditProps) {
   const { t } = useTranslation()
   const { editingTask, updateEditing, setWizardStep, setGeneratedPrdPath } = useLoopTaskStore()
   const { addToast } = useToastStore()
+  const config = useAppStore((s) => s.config)
 
   const [localStories, setLocalStories] = useState<UserStory[]>(editingTask?.stories || [])
   const [editingStory, setEditingStory] = useState<UserStory | null>(null)
@@ -43,6 +86,48 @@ export function Step2PlanEdit({ onCancel }: Step2PlanEditProps) {
   const [expandedStories, setExpandedStories] = useState<Set<string>>(new Set())
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [authProviders, setAuthProviders] = useState<AuthProviderConfig[]>([])
+
+  // Load auth providers for model selector
+  useEffect(() => {
+    api.authGetProviders().then((result) => {
+      if (result.success && result.data) {
+        setAuthProviders(result.data as AuthProviderConfig[])
+      }
+    })
+  }, [])
+
+  // Compute available providers from config (matching ModelSelector.tsx logic)
+  const aiSources = config?.aiSources || { current: 'custom' as AISourceType }
+
+  const configuredCustomProviders: CustomProviderInfo[] = Object.keys(aiSources)
+    .filter(key => {
+      if (key === 'current' || key === 'oauth' || key === 'custom') return false
+      const source = (aiSources as Record<string, any>)[key]
+      return source && typeof source === 'object' && 'apiKey' in source && source.apiKey && !('loggedIn' in source)
+    })
+    .map(key => {
+      const source = (aiSources as Record<string, any>)[key]
+      return {
+        id: key,
+        name: PROVIDER_NAMES[key] || key,
+        logo: getProviderLogoById(key),
+        model: source.model || ''
+      }
+    })
+
+  const loggedInOAuthProviders: OAuthProviderInfo[] = authProviders
+    .filter(p => p.type !== 'custom' && p.enabled)
+    .map(p => {
+      const providerConfig = (aiSources as Record<string, any>)[p.type] as OAuthSourceConfig | undefined
+      return {
+        type: p.type,
+        displayName: getLocalizedText(p.displayName),
+        config: providerConfig,
+        isLoggedIn: providerConfig?.loggedIn === true
+      }
+    })
+    .filter(p => p.isLoggedIn)
 
   // Sync local stories with editing task
   useEffect(() => {
@@ -223,6 +308,9 @@ export function Step2PlanEdit({ onCancel }: Step2PlanEditProps) {
                   onUpdate={(updated) =>
                     setLocalStories(localStories.map((s) => (s.id === updated.id ? updated : s)))
                   }
+                  loggedInOAuthProviders={loggedInOAuthProviders}
+                  configuredCustomProviders={configuredCustomProviders}
+                  aiSources={aiSources}
                 />
               ))}
 
@@ -330,6 +418,9 @@ interface StoryCardProps {
   onMoveUp: () => void
   onMoveDown: () => void
   onUpdate: (story: UserStory) => void
+  loggedInOAuthProviders: OAuthProviderInfo[]
+  configuredCustomProviders: CustomProviderInfo[]
+  aiSources: Record<string, any>
 }
 
 function StoryCard({
@@ -342,9 +433,58 @@ function StoryCard({
   onRemove,
   onMoveUp,
   onMoveDown,
-  onUpdate
+  onUpdate,
+  loggedInOAuthProviders,
+  configuredCustomProviders,
+  aiSources
 }: StoryCardProps) {
   const { t } = useTranslation()
+  const [showModelDropdown, setShowModelDropdown] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    if (!showModelDropdown) return
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setShowModelDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showModelDropdown])
+
+  const hasCustomModel = !!(story.model || story.modelSource)
+
+  // Get logo for the story's model
+  const getStoryModelLogo = (): string | null => {
+    if (!hasCustomModel) return null
+    // Check OAuth providers
+    for (const provider of loggedInOAuthProviders) {
+      if (provider.type === story.modelSource) {
+        return getModelLogo(story.model || '', story.model || '', provider.type)
+      }
+    }
+    // Check custom providers
+    const customProvider = configuredCustomProviders.find(p => p.id === story.modelSource)
+    if (customProvider) return customProvider.logo
+    return null
+  }
+
+  // Get display name for the story's model
+  const getStoryModelName = (): string => {
+    if (!hasCustomModel) return ''
+    for (const provider of loggedInOAuthProviders) {
+      if (provider.type === story.modelSource && provider.config?.modelNames?.[story.model || '']) {
+        return provider.config.modelNames[story.model || '']
+      }
+    }
+    const customProvider = configuredCustomProviders.find(p => p.id === story.modelSource)
+    if (customProvider) return customProvider.model || customProvider.name
+    return story.model || ''
+  }
+
+  const storyModelLogo = getStoryModelLogo()
 
   return (
     <div className="border border-border rounded-lg overflow-hidden bg-card">
@@ -362,6 +502,119 @@ function StoryCard({
 
         {/* Actions */}
         <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+          {/* Model selector button */}
+          <div className="relative" ref={dropdownRef}>
+            <button
+              onClick={() => setShowModelDropdown(!showModelDropdown)}
+              className={cn(
+                'p-1 rounded hover:bg-accent transition-colors',
+                hasCustomModel ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+              )}
+              title={hasCustomModel ? getStoryModelName() : t('Model Selection')}
+            >
+              {storyModelLogo ? (
+                <img src={storyModelLogo} alt="" className="w-[14px] h-[14px] rounded object-cover" />
+              ) : (
+                <Sparkles size={14} />
+              )}
+            </button>
+
+            {/* Model dropdown */}
+            {showModelDropdown && (
+              <div className="absolute z-20 right-0 mt-1 w-56 bg-card border border-border rounded-lg shadow-lg overflow-hidden max-h-64 overflow-y-auto">
+                {/* Use Default option */}
+                <button
+                  onClick={() => {
+                    onUpdate({ ...story, model: undefined, modelSource: undefined })
+                    setShowModelDropdown(false)
+                  }}
+                  className={cn(
+                    'w-full px-3 py-2 text-left hover:bg-muted/50 transition-colors flex items-center gap-2.5',
+                    !hasCustomModel && 'bg-primary/10'
+                  )}
+                >
+                  <RotateCcw size={14} className="text-muted-foreground flex-shrink-0" />
+                  <span className="text-sm text-foreground">{t('Use Default')}</span>
+                  {!hasCustomModel && <CheckCircle2 size={14} className="text-primary flex-shrink-0 ml-auto" />}
+                </button>
+
+                <div className="my-0.5 border-t border-border" />
+
+                {/* Official / OAuth Models */}
+                {loggedInOAuthProviders.map((provider) => (
+                  (provider.config?.availableModels || []).map((modelId) => {
+                    const displayName = provider.config?.modelNames?.[modelId] || modelId
+                    const isSelected = story.modelSource === provider.type && story.model === modelId
+                    const modelLogo = getModelLogo(modelId, displayName, provider.type)
+                    return (
+                      <button
+                        key={`${provider.type}-${modelId}`}
+                        onClick={() => {
+                          onUpdate({ ...story, model: modelId, modelSource: provider.type })
+                          setShowModelDropdown(false)
+                        }}
+                        className={cn(
+                          'w-full px-3 py-2 text-left hover:bg-muted/50 transition-colors flex items-center gap-2.5',
+                          isSelected && 'bg-primary/10'
+                        )}
+                      >
+                        {modelLogo ? (
+                          <img src={modelLogo} alt="" className="w-4 h-4 rounded object-cover flex-shrink-0" />
+                        ) : (
+                          <div className="w-4 h-4 rounded bg-muted flex items-center justify-center flex-shrink-0">
+                            <span className="text-[10px] text-muted-foreground">AI</span>
+                          </div>
+                        )}
+                        <span className="text-sm text-foreground truncate flex-1">{displayName}</span>
+                        {isSelected && <CheckCircle2 size={14} className="text-primary flex-shrink-0" />}
+                      </button>
+                    )
+                  })
+                ))}
+
+                {/* Divider between official and custom */}
+                {loggedInOAuthProviders.length > 0 && configuredCustomProviders.length > 0 && (
+                  <div className="my-0.5 border-t border-border" />
+                )}
+
+                {/* Custom API Models */}
+                {configuredCustomProviders.map((provider) => {
+                  const isSelected = story.modelSource === provider.id
+                  return (
+                    <button
+                      key={provider.id}
+                      onClick={() => {
+                        onUpdate({ ...story, model: provider.model, modelSource: provider.id })
+                        setShowModelDropdown(false)
+                      }}
+                      className={cn(
+                        'w-full px-3 py-2 text-left hover:bg-muted/50 transition-colors flex items-center gap-2.5',
+                        isSelected && 'bg-primary/10'
+                      )}
+                    >
+                      {provider.logo ? (
+                        <img src={provider.logo} alt="" className="w-4 h-4 rounded object-cover flex-shrink-0" />
+                      ) : (
+                        <div className="w-4 h-4 rounded bg-muted flex items-center justify-center flex-shrink-0">
+                          <span className="text-[10px] text-muted-foreground">AI</span>
+                        </div>
+                      )}
+                      <span className="text-sm text-foreground truncate flex-1">{provider.model || provider.name}</span>
+                      {isSelected && <CheckCircle2 size={14} className="text-primary flex-shrink-0" />}
+                    </button>
+                  )
+                })}
+
+                {/* Empty state */}
+                {loggedInOAuthProviders.length === 0 && configuredCustomProviders.length === 0 && (
+                  <div className="px-3 py-4 text-sm text-muted-foreground text-center">
+                    {t('Configure API')}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           <button
             onClick={onMoveUp}
             disabled={index === 0}

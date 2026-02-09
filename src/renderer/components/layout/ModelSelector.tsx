@@ -37,8 +37,8 @@ const PROVIDER_LOGOS: Record<string, string> = {
   'https://api.openai.com': openaiLogo,
 }
 
-// Provider logo mapping by provider ID
-const PROVIDER_LOGOS_BY_ID: Record<string, string> = {
+// Provider logo mapping by provider ID (exported for reuse in Loop Task model selector)
+export const PROVIDER_LOGOS_BY_ID: Record<string, string> = {
   'zhipu': zhipuLogo,
   'minimax': minimaxLogo,
   'kimi': kimiLogo,
@@ -48,8 +48,8 @@ const PROVIDER_LOGOS_BY_ID: Record<string, string> = {
   'skillsfan-credits': skillsfanLogo,
 }
 
-// Provider display names by ID
-const PROVIDER_NAMES: Record<string, string> = {
+// Provider display names by ID (exported for reuse)
+export const PROVIDER_NAMES: Record<string, string> = {
   'zhipu': 'Zhipu GLM',
   'minimax': 'MiniMax',
   'kimi': 'Kimi',
@@ -69,16 +69,16 @@ function getProviderLogo(apiUrl: string): string | null {
 }
 
 /**
- * Get provider logo by provider ID
+ * Get provider logo by provider ID (exported for reuse)
  */
-function getProviderLogoById(providerId: string): string | null {
+export function getProviderLogoById(providerId: string): string | null {
   return PROVIDER_LOGOS_BY_ID[providerId] || null
 }
 
 /**
- * Get logo for a specific model by matching model ID or display name to a provider
+ * Get logo for a specific model by matching model ID or display name to a provider (exported for reuse)
  */
-function getModelLogo(modelId: string, displayName: string, fallbackProviderType?: string): string | null {
+export function getModelLogo(modelId: string, displayName: string, fallbackProviderType?: string): string | null {
   const key = `${modelId} ${displayName}`.toLowerCase()
   if (key.includes('glm') || key.includes('zhipu')) return zhipuLogo
   if (key.includes('minimax')) return minimaxLogo
@@ -354,34 +354,10 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
             animate-in fade-in-0 slide-in-from-bottom-2 duration-200
           `.trim().replace(/\s+/g, ' ')}
         >
-          {/* Custom API Providers - show all configured providers */}
-          {configuredCustomProviders.map((provider, index) => {
-            const isSelected = currentSource === provider.id
-            return (
-              <button
-                key={provider.id}
-                onClick={() => handleSelectProvider(provider.id)}
-                className={`w-full px-3 py-2 text-left text-sm hover:bg-secondary/80 transition-colors flex items-center gap-2.5 ${
-                  isSelected ? 'text-primary' : 'text-foreground'
-                }`}
-              >
-                {provider.logo ? (
-                  <img src={provider.logo} alt="" className="w-5 h-5 rounded object-cover flex-shrink-0" />
-                ) : (
-                  <div className="w-5 h-5 rounded bg-muted flex items-center justify-center flex-shrink-0">
-                    <span className="text-xs text-muted-foreground">AI</span>
-                  </div>
-                )}
-                <span className="truncate">{provider.model || provider.name}</span>
-              </button>
-            )
-          })}
-
-          {/* OAuth Providers - Dynamic rendering */}
+          {/* OAuth Providers (Official) - shown first */}
           {loggedInOAuthProviders.map((provider) => {
             return (
               <div key={provider.type}>
-                {configuredCustomProviders.length > 0 && <div className="my-1 border-t border-border" />}
                 {(provider.config?.availableModels || []).map((modelId) => {
                   const displayName = provider.config?.modelNames?.[modelId] || modelId
                   const isSelected = currentSource === provider.type && provider.config?.model === modelId
@@ -407,6 +383,34 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
                   )
                 })}
               </div>
+            )
+          })}
+
+          {/* Separator between official and custom providers */}
+          {loggedInOAuthProviders.length > 0 && configuredCustomProviders.length > 0 && (
+            <div className="my-1 border-t border-border" />
+          )}
+
+          {/* Custom API Providers - shown after official */}
+          {configuredCustomProviders.map((provider, index) => {
+            const isSelected = currentSource === provider.id
+            return (
+              <button
+                key={provider.id}
+                onClick={() => handleSelectProvider(provider.id)}
+                className={`w-full px-3 py-2 text-left text-sm hover:bg-secondary/80 transition-colors flex items-center gap-2.5 ${
+                  isSelected ? 'text-primary' : 'text-foreground'
+                }`}
+              >
+                {provider.logo ? (
+                  <img src={provider.logo} alt="" className="w-5 h-5 rounded object-cover flex-shrink-0" />
+                ) : (
+                  <div className="w-5 h-5 rounded bg-muted flex items-center justify-center flex-shrink-0">
+                    <span className="text-xs text-muted-foreground">AI</span>
+                  </div>
+                )}
+                <span className="truncate">{provider.model || provider.name}</span>
+              </button>
             )
           })}
 

@@ -233,6 +233,8 @@ export function createTask(spaceId: string, config: CreateLoopTaskConfig): LoopT
     currentStoryIndex: -1,
     iteration: 0,
     maxIterations: config.maxIterations,
+    model: config.model,
+    modelSource: config.modelSource,
     createdAt: now,
     updatedAt: now
   }

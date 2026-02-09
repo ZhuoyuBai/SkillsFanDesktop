@@ -95,8 +95,39 @@ export async function sendMessage(
   const workDir = ralphMode?.enabled ? ralphMode.projectDir : getWorkingDir(spaceId)
 
   // Get API credentials based on current aiSources configuration
-  const credentials = await getApiCredentials(config)
-  console.log(`[Agent] sendMessage using: ${credentials.provider}, model: ${credentials.model}`)
+  let credentials = await getApiCredentials(config)
+
+  // Allow request-level source/provider override (used by Loop Tasks for cross-provider model switching)
+  if (request.modelSource) {
+    const aiSources = (config as any).aiSources || {}
+    const currentSource = aiSources.current || 'custom'
+
+    if (request.modelSource !== currentSource) {
+      const targetConfig = aiSources[request.modelSource]
+      if (targetConfig) {
+        const isOAuth = targetConfig && typeof targetConfig === 'object' && 'loggedIn' in targetConfig
+        if (!isOAuth && targetConfig.apiKey) {
+          // Custom API provider - construct credentials directly
+          credentials = {
+            baseUrl: targetConfig.apiUrl || 'https://api.anthropic.com',
+            apiKey: targetConfig.apiKey,
+            model: request.model || targetConfig.model || 'claude-opus-4-5-20251101',
+            provider: targetConfig.provider === 'openai' ? 'openai' : 'anthropic',
+            customHeaders: targetConfig.customHeaders,
+            apiType: targetConfig.apiType
+          }
+          console.log(`[Agent] Source override: ${request.modelSource} (custom API)`)
+        }
+        // For OAuth targets different from current, model override below handles it
+      }
+    }
+  }
+
+  // Allow request-level model override (used by Loop Tasks)
+  if (request.model) {
+    credentials.model = request.model
+  }
+  console.log(`[Agent] sendMessage using: ${credentials.provider}, model: ${credentials.model}${request.model ? ' (task override)' : ''}${request.modelSource ? ` source: ${request.modelSource}` : ''}`)
 
   // Route through OpenAI compat router for non-Anthropic providers
   let anthropicBaseUrl = credentials.baseUrl

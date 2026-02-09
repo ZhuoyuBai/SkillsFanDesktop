@@ -118,7 +118,7 @@ export function LoopTaskPanel({ spaceId }: LoopTaskPanelProps) {
         <StepIndicator currentStep={wizardStep} />
 
         {/* Step Content - flex-1 to take remaining space, overflow-hidden to enable child scrolling */}
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 overflow-hidden min-h-0">
           {wizardStep === 1 && <Step1CreateTask onCancel={handleCancel} />}
           {wizardStep === 2 && <Step2PlanEdit onCancel={handleCancel} />}
           {wizardStep === 3 && <Step3Confirm spaceId={spaceId} onCancel={handleCancel} />}
