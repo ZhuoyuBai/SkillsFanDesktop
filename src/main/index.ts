@@ -86,7 +86,7 @@ import {
   initializeExtendedServices,
   cleanupExtendedServices
 } from './bootstrap'
-import { initializeApp, getMinimizeToTray } from './services/config.service'
+import { initializeApp, getConfig, getMinimizeToTray } from './services/config.service'
 import { disableRemoteAccess } from './services/remote.service'
 import { stopOpenAICompatRouter } from './openai-compat-router'
 import {
