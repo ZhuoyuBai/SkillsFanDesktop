@@ -16,6 +16,7 @@ import { useLoopTaskStore } from '../../stores/loop-task.store'
 import { useChatStore } from '../../stores/chat.store'
 import { usePlatform } from '../layout/Header'
 import { isElectron } from '../../api/transport'
+import { ConfirmDialog } from '../ui/ConfirmDialog'
 
 // Unified task item for combined list
 type UnifiedTask = {
@@ -286,6 +287,7 @@ export function ConversationList({
   }, [hasUserResized])
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingTitle, setEditingTitle] = useState('')
+  const [deleteConfirm, setDeleteConfirm] = useState<{ taskId: string; taskType: 'conversation' | 'loopTask' } | null>(null)
   const [showCollapseTooltip, setShowCollapseTooltip] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const editInputRef = useRef<HTMLInputElement>(null)
@@ -655,15 +657,7 @@ export function ConversationList({
                 }}
                 onEditCancel={handleCancelEdit}
                 onDelete={() => {
-                  if (task.type === 'conversation' && onDelete) {
-                    if (window.confirm(t('Are you sure you want to delete this conversation?'))) {
-                      onDelete(task.id)
-                    }
-                  } else if (task.type === 'loopTask') {
-                    if (window.confirm(t('Are you sure you want to delete this task?'))) {
-                      handleDeleteLoopTask(task.id)
-                    }
-                  }
+                  setDeleteConfirm({ taskId: task.id, taskType: task.type })
                 }}
                 canRename={task.type === 'conversation' ? !!onRename : true}
                 canDelete={task.type === 'conversation' ? !!onDelete : true}
@@ -691,6 +685,28 @@ export function ConversationList({
           <div className="absolute inset-y-1/3 left-1/2 -translate-x-1/2 w-0.5 bg-border/60 rounded-full opacity-0 group-hover/handle:opacity-100 transition-opacity" />
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={!!deleteConfirm}
+        title={deleteConfirm?.taskType === 'loopTask' ? t('Delete task?') : t('Delete conversation?')}
+        message={deleteConfirm?.taskType === 'loopTask'
+          ? t('Are you sure you want to delete this task?')
+          : t('Are you sure you want to delete this conversation?')}
+        confirmLabel={t('Delete')}
+        variant="danger"
+        onConfirm={() => {
+          if (deleteConfirm) {
+            if (deleteConfirm.taskType === 'conversation' && onDelete) {
+              onDelete(deleteConfirm.taskId)
+            } else if (deleteConfirm.taskType === 'loopTask') {
+              handleDeleteLoopTask(deleteConfirm.taskId)
+            }
+            setDeleteConfirm(null)
+          }
+        }}
+        onCancel={() => setDeleteConfirm(null)}
+      />
     </div>
   )
 }

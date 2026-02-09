@@ -1373,6 +1373,20 @@ export const api = {
     return httpRequest('POST', `/api/spaces/${spaceId}/loop-tasks/${taskId}/stories/reorder`, { fromIndex, toIndex })
   },
 
+  loopTaskRetryStory: async (spaceId: string, taskId: string, storyId: string): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.skillsfan.loopTaskRetryStory(spaceId, taskId, storyId)
+    }
+    return httpRequest('POST', `/api/spaces/${spaceId}/loop-tasks/${taskId}/stories/${storyId}/retry`)
+  },
+
+  loopTaskRetryFailed: async (spaceId: string, taskId: string): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.skillsfan.loopTaskRetryFailed(spaceId, taskId)
+    }
+    return httpRequest('POST', `/api/spaces/${spaceId}/loop-tasks/${taskId}/retry-failed`)
+  },
+
   loopTaskExportPrd: async (config: {
     projectDir: string
     description: string

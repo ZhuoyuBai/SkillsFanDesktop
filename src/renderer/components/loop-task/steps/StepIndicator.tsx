@@ -1,12 +1,12 @@
 /**
  * StepIndicator - Visual step progress indicator for the wizard flow
  *
- * Displays the 4 steps with connected dots:
+ * Displays the 3 steps with connected dots:
  * - Completed: primary dot with checkmark, clickable to go back
  * - Current: primary dot with ring glow
  * - Future: muted outlined dot
  *
- * Cannot click back from Step 4 (execution).
+ * Cannot click back from Step 3 (execution).
  */
 
 import { useTranslation } from 'react-i18next'
@@ -19,7 +19,7 @@ interface StepIndicatorProps {
   currentStep: WizardStep
 }
 
-const STEP_KEYS: WizardStep[] = [1, 2, 3, 4]
+const STEP_KEYS: WizardStep[] = [1, 2, 3]
 
 export function StepIndicator({ currentStep }: StepIndicatorProps) {
   const { t } = useTranslation()
@@ -29,29 +29,28 @@ export function StepIndicator({ currentStep }: StepIndicatorProps) {
   const stepLabels: Record<WizardStep, string> = {
     1: t('Step Create Task'),
     2: t('Step Plan Edit'),
-    3: t('Step Confirm'),
-    4: t('Step Execute')
+    3: t('Step Execute')
   }
 
   const handleStepClick = (stepKey: WizardStep) => {
     // Can only go back to completed steps, never forward
-    // Cannot go back once in Step 4 (execution started)
-    if (stepKey < currentStep && currentStep < 4) {
+    // Cannot go back once in Step 3 (execution started)
+    if (stepKey < currentStep && currentStep < 3) {
       setWizardStep(stepKey)
     }
   }
 
   // Progress line: percentage of the track that is filled
-  // Track spans from center of dot 1 to center of dot 4
+  // Track spans from center of dot 1 to center of dot 3
   const progressPercent = ((currentStep - 1) / (STEP_KEYS.length - 1)) * 100
 
   return (
     <div className="px-6 py-5 shrink-0">
       <div className="relative flex items-start">
         {/* Track line (background) — spans between first and last dot centers */}
-        <div className="absolute top-[15px] left-[12.5%] right-[12.5%] h-[2px] bg-border rounded-full" />
+        <div className="absolute top-[15px] left-[16.67%] right-[16.67%] h-[2px] bg-border rounded-full" />
         {/* Active progress line */}
-        <div className="absolute top-[15px] left-[12.5%] right-[12.5%] h-[2px] rounded-full overflow-hidden">
+        <div className="absolute top-[15px] left-[16.67%] right-[16.67%] h-[2px] rounded-full overflow-hidden">
           <div
             className="h-full bg-primary transition-all duration-500 ease-out"
             style={{ width: `${progressPercent}%` }}
@@ -62,7 +61,7 @@ export function StepIndicator({ currentStep }: StepIndicatorProps) {
         {STEP_KEYS.map((step) => {
           const isCompleted = step < currentStep
           const isCurrent = step === currentStep
-          const canClick = isCompleted && currentStep < 4
+          const canClick = isCompleted && currentStep < 3
 
           return (
             <div key={step} className="flex-1 flex flex-col items-center relative z-10">

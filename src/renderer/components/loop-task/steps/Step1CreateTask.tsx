@@ -26,23 +26,15 @@ import {
   CheckCircle2,
   AlertCircle,
   FileJson,
-  Sparkles
 } from 'lucide-react'
 import { useLoopTaskStore } from '../../../stores/loop-task.store'
 import { useSpaceStore } from '../../../stores/space.store'
-import { useAppStore } from '../../../stores/app.store'
 import { useToastStore } from '../../../stores/toast.store'
 import { api } from '../../../api'
 import { cn } from '../../../lib/utils'
-import { AVAILABLE_MODELS, DEFAULT_MODEL } from '../../../types'
-import type { AISourceType, OAuthSourceConfig } from '../../../types'
-import {
-  PROVIDER_LOGOS_BY_ID,
-  PROVIDER_NAMES,
-  getProviderLogoById,
-  getModelLogo
-} from '../../layout/ModelSelector'
-import { getCurrentLanguage } from '../../../i18n'
+import { useModelProviders } from '../../../hooks/useModelProviders'
+import { getModelLogo } from '../../layout/ModelSelector'
+import { AVAILABLE_MODELS } from '../../../types'
 import type { CreateMethod, WizardStep } from '../../../../shared/types/loop-task'
 import type { SkillsFanAuthState } from '../../../../shared/types/skillsfan'
 
@@ -54,20 +46,6 @@ interface ImportResult {
   error?: string
 }
 
-// Localized text type from auth providers
-type LocalizedText = string | Record<string, string>
-
-interface AuthProviderConfig {
-  type: string
-  displayName: LocalizedText
-  enabled: boolean
-}
-
-function getLocalizedText(value: LocalizedText): string {
-  if (typeof value === 'string') return value
-  const lang = getCurrentLanguage()
-  return value[lang] || value['en'] || Object.values(value)[0] || ''
-}
 
 interface Step1CreateTaskProps {
   onCancel?: () => void  // Kept for API compatibility, cancel is now in header
@@ -87,8 +65,17 @@ export function Step1CreateTask(_props: Step1CreateTaskProps) {
   } = useLoopTaskStore()
   const { addToast } = useToastStore()
 
-  const config = useAppStore((s) => s.config)
-  const isSkillsFanCredits = config?.aiSources?.current === 'skillsfan-credits'
+  const {
+    loggedInOAuthProviders,
+    configuredCustomProviders,
+    getModelDisplayName: getSelectedModelDisplayName,
+    getModelLogo: getSelectedModelLogo,
+    isSkillsFanCredits,
+    aiSources
+  } = useModelProviders({
+    selectedModelId: editingTask?.model,
+    selectedModelSource: editingTask?.modelSource
+  })
 
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -96,49 +83,7 @@ export function Step1CreateTask(_props: Step1CreateTaskProps) {
   const [importResult, setImportResult] = useState<ImportResult | null>(null)
   const [authState, setAuthState] = useState<SkillsFanAuthState | null>(null)
   const [showModelDropdown, setShowModelDropdown] = useState(false)
-  const [authProviders, setAuthProviders] = useState<AuthProviderConfig[]>([])
 
-  // Load auth providers for model selector
-  useEffect(() => {
-    api.authGetProviders().then((result) => {
-      if (result.success && result.data) {
-        setAuthProviders(result.data as AuthProviderConfig[])
-      }
-    })
-  }, [])
-
-  // Compute available providers from config (matching ModelSelector.tsx logic)
-  const aiSources = config?.aiSources || { current: 'custom' as AISourceType }
-
-  const configuredCustomProviders = Object.keys(aiSources)
-    .filter(key => {
-      if (key === 'current' || key === 'oauth' || key === 'custom') return false
-      const source = (aiSources as Record<string, any>)[key]
-      return source && typeof source === 'object' && 'apiKey' in source && source.apiKey && !('loggedIn' in source)
-    })
-    .map(key => {
-      const source = (aiSources as Record<string, any>)[key]
-      return {
-        id: key,
-        name: PROVIDER_NAMES[key] || key,
-        logo: getProviderLogoById(key),
-        model: source.model || '',
-        config: source
-      }
-    })
-
-  const loggedInOAuthProviders = authProviders
-    .filter(p => p.type !== 'custom' && p.enabled)
-    .map(p => {
-      const providerConfig = (aiSources as Record<string, any>)[p.type] as OAuthSourceConfig | undefined
-      return {
-        type: p.type,
-        displayName: getLocalizedText(p.displayName),
-        config: providerConfig,
-        isLoggedIn: providerConfig?.loggedIn === true
-      }
-    })
-    .filter(p => p.isLoggedIn)
 
   // Fetch auth state and listen for login/logout changes
   useEffect(() => {
@@ -161,64 +106,6 @@ export function Step1CreateTask(_props: Step1CreateTaskProps) {
       unsubLogout()
     }
   }, [])
-
-  // Selected model info - resolve display name from dynamic providers
-  const selectedModelId = editingTask?.model || ''
-  const selectedModelSource = editingTask?.modelSource || ''
-
-  // Resolve display name for current selection
-  const getSelectedModelDisplayName = (): string => {
-    if (!selectedModelId && !selectedModelSource) {
-      // No selection yet - show current config model
-      const currentSource = aiSources.current || 'custom'
-      const currentConfig = (aiSources as Record<string, any>)[currentSource]
-      if (currentConfig?.model) {
-        // Check if it's an OAuth model with display names
-        if (currentConfig.modelNames?.[currentConfig.model]) {
-          return currentConfig.modelNames[currentConfig.model]
-        }
-        return currentConfig.model
-      }
-      return t('Model')
-    }
-    // Check OAuth providers
-    for (const provider of loggedInOAuthProviders) {
-      if (provider.type === selectedModelSource && provider.config?.modelNames?.[selectedModelId]) {
-        return provider.config.modelNames[selectedModelId]
-      }
-    }
-    // Check custom providers
-    const customProvider = configuredCustomProviders.find(p => p.id === selectedModelSource)
-    if (customProvider) {
-      return customProvider.model || customProvider.name
-    }
-    // Fallback to model ID
-    return selectedModelId || t('Model')
-  }
-
-  // Resolve logo for current selection
-  const getSelectedModelLogo = (): string | null => {
-    if (selectedModelSource) {
-      // OAuth model - use model-specific logo
-      for (const provider of loggedInOAuthProviders) {
-        if (provider.type === selectedModelSource) {
-          return getModelLogo(selectedModelId, getSelectedModelDisplayName(), provider.type)
-        }
-      }
-      // Custom provider - use provider logo
-      const customProvider = configuredCustomProviders.find(p => p.id === selectedModelSource)
-      if (customProvider) return customProvider.logo
-    }
-    // Fallback: check current config - prefer model-specific logo over provider logo
-    const currentSource = (aiSources.current || 'custom') as string
-    const currentConfig = (aiSources as Record<string, any>)[currentSource]
-    if (currentConfig?.model) {
-      const modelName = currentConfig.modelNames?.[currentConfig.model] || currentConfig.model
-      const modelLogo = getModelLogo(currentConfig.model, modelName, currentSource)
-      if (modelLogo) return modelLogo
-    }
-    return getProviderLogoById(currentSource)
-  }
 
   // Default to AI method and set project directory
   useEffect(() => {
@@ -328,7 +215,7 @@ export function Step1CreateTask(_props: Step1CreateTaskProps) {
           })
           setWizardStep(2 as WizardStep)
         } else {
-          setError(result.error || t('Failed to generate stories'))
+          setError(result.error || t('Failed to generate sub-tasks'))
         }
       } catch (err) {
         setError((err as Error).message)
@@ -363,24 +250,22 @@ export function Step1CreateTask(_props: Step1CreateTaskProps) {
     return false
   }
 
+  // Keyboard shortcut: Cmd/Ctrl+Enter to proceed
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && !isLoading && canProceed()) {
+        e.preventDefault()
+        handleNext()
+      }
+    }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  })
+
   return (
     <div className="flex flex-col h-full min-h-0">
       <div className="flex-1 overflow-auto p-4 min-h-0">
         <div className="max-w-2xl mx-auto space-y-6">
-          {/* Task Name */}
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-foreground">
-              {t('Title')}
-            </label>
-            <input
-              type="text"
-              value={editingTask?.name || ''}
-              onChange={(e) => updateEditing({ name: e.target.value })}
-              placeholder={t('Task title...')}
-              className="w-full px-3 py-2 bg-input border border-border rounded-md text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/50"
-            />
-          </div>
-
           {/* Creation Method - Horizontal Row */}
           <div className="space-y-6">
             <div className="text-center">
@@ -474,13 +359,15 @@ export function Step1CreateTask(_props: Step1CreateTaskProps) {
           <div>
             {/* AI Generate Content */}
             {createMethod === 'ai' && (
-              <textarea
-                value={aiDescription}
-                onChange={(e) => setAiDescription(e.target.value)}
-                placeholder={t('Describe the feature you want to implement...')}
-                rows={5}
-                className="w-full px-4 py-3 border border-border bg-card/95 rounded-2xl text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/50 resize-none transition-all"
-              />
+              <div className="space-y-2">
+                <textarea
+                  value={aiDescription}
+                  onChange={(e) => setAiDescription(e.target.value)}
+                  placeholder={t('Describe the feature you want to implement...')}
+                  rows={5}
+                  className="w-full px-4 py-3 border border-border bg-card/95 rounded-2xl text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/50 resize-none transition-all"
+                />
+              </div>
             )}
 
             {/* Manual Create Content */}
@@ -493,7 +380,7 @@ export function Step1CreateTask(_props: Step1CreateTaskProps) {
                   <div>
                     <p className="font-medium text-foreground">{t('Manual Create')}</p>
                     <p className="text-sm text-muted-foreground mt-1">
-                      {t('You will be able to add user stories one by one in the next step')}
+                      {t('You will be able to add sub-tasks one by one in the next step')}
                     </p>
                   </div>
                 </div>
@@ -520,7 +407,7 @@ export function Step1CreateTask(_props: Step1CreateTaskProps) {
                         {t('Select prd.json file')}
                       </button>
                       <p className="text-xs text-muted-foreground">
-                        {t('Load existing stories from prd.json file')}
+                        {t('Load existing sub-tasks from prd.json file')}
                       </p>
                     </div>
                   </div>
@@ -538,7 +425,7 @@ export function Step1CreateTask(_props: Step1CreateTaskProps) {
                             {t('Project')}: {importResult.project}
                           </p>
                           <p>
-                            {t('Story Count')}: {importResult.storyCount}
+                            {t('Sub-task Count')}: {importResult.storyCount}
                           </p>
                           {importResult.branchName && (
                             <p>
@@ -590,11 +477,11 @@ export function Step1CreateTask(_props: Step1CreateTaskProps) {
             </button>
 
             {showAdvanced && (
-              <div className="pl-8 pt-3 space-y-4">
+              <div className="pl-8 pt-3">
+                <div className="grid grid-cols-2 gap-4">
                   {/* Model Selector - matches ModelSelector.tsx with official first, custom below */}
                   <div className="space-y-2">
-                    <label className="block text-sm text-muted-foreground flex items-center gap-1.5">
-                      <Sparkles size={14} />
+                    <label className="block text-sm text-muted-foreground">
                       {t('Model Selection')}
                     </label>
                     <div className="relative">
@@ -621,7 +508,7 @@ export function Step1CreateTask(_props: Step1CreateTaskProps) {
                           {loggedInOAuthProviders.map((provider) => (
                             (provider.config?.availableModels || []).map((modelId) => {
                               const displayName = provider.config?.modelNames?.[modelId] || modelId
-                              const isSelected = selectedModelSource === provider.type && selectedModelId === modelId
+                              const isSelected = editingTask?.modelSource === provider.type && editingTask?.model === modelId
                               const modelLogo = getModelLogo(modelId, displayName, provider.type)
                               const creditInfo = AVAILABLE_MODELS.find(m => m.id === modelId)
                               return (
@@ -649,7 +536,7 @@ export function Step1CreateTask(_props: Step1CreateTaskProps) {
                                       <span className="flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded font-medium text-white bg-primary/80">{t('Official')}</span>
                                     </div>
                                     {creditInfo?.estimatedCreditsPerStory && (
-                                      <p className="text-xs text-muted-foreground mt-0.5">~{creditInfo.estimatedCreditsPerStory} {t('credits/story')}</p>
+                                      <p className="text-xs text-muted-foreground mt-0.5">~{creditInfo.estimatedCreditsPerStory} {t('credits/sub-task')}</p>
                                     )}
                                   </div>
                                   {isSelected && <CheckCircle2 size={14} className="text-primary flex-shrink-0" />}
@@ -665,7 +552,7 @@ export function Step1CreateTask(_props: Step1CreateTaskProps) {
 
                           {/* Custom API Models (below) */}
                           {configuredCustomProviders.map((provider) => {
-                            const isSelected = selectedModelSource === provider.id
+                            const isSelected = editingTask?.modelSource === provider.id
                             return (
                               <button
                                 key={provider.id}
@@ -726,6 +613,7 @@ export function Step1CreateTask(_props: Step1CreateTaskProps) {
                       {t('Defaults to current space directory')}
                     </p>
                   </div>
+                </div>
               </div>
             )}
           </div>
@@ -757,6 +645,7 @@ export function Step1CreateTask(_props: Step1CreateTaskProps) {
             ) : (
               <>
                 {t('Next')}
+                <span className="text-xs opacity-60 ml-1 hidden sm:inline">&#8984;&#9166;</span>
                 <ChevronRight size={16} />
               </>
             )}

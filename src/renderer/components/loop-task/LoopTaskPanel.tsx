@@ -12,7 +12,7 @@
  * 4. Execute - Run the task (no going back)
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Play,
@@ -23,7 +23,9 @@ import {
   CheckCircle2,
   XCircle,
   ChevronDown,
-  X
+  X,
+  Sparkles,
+  AlertCircle
 } from 'lucide-react'
 import { useLoopTaskStore } from '../../stores/loop-task.store'
 import { useChatStore } from '../../stores/chat.store'
@@ -33,9 +35,9 @@ import {
   StepIndicator,
   Step1CreateTask,
   Step2PlanEdit,
-  Step3Confirm,
   Step4Execute
 } from './steps'
+import { ConfirmDialog } from '../ui/ConfirmDialog'
 import type { LoopTask, UserStory } from '../../../shared/types/loop-task'
 
 interface LoopTaskPanelProps {
@@ -60,21 +62,27 @@ export function LoopTaskPanel({ spaceId }: LoopTaskPanelProps) {
   const currentTask = getCurrentTask()
   const isNewTask = isEditing && !editingTask?.id
 
-  // Listen for task updates (for view mode)
+  // Use refs to avoid re-subscribing when store callbacks change
+  const handleTaskUpdateRef = useRef(handleTaskUpdate)
+  const appendLogRef = useRef(appendLog)
+  handleTaskUpdateRef.current = handleTaskUpdate
+  appendLogRef.current = appendLog
+
+  // Listen for task updates (for view mode) - subscribe once on mount
   useEffect(() => {
     const unsubTask = api.onRalphTaskUpdate?.((data: { task: LoopTask }) => {
-      handleTaskUpdate(data.task)
+      handleTaskUpdateRef.current(data.task)
     })
 
     const unsubLog = api.onRalphStoryLog?.((data: { taskId: string; storyId: string; log: string }) => {
-      appendLog(data.log)
+      appendLogRef.current(data.log)
     })
 
     return () => {
       unsubTask?.()
       unsubLog?.()
     }
-  }, [handleTaskUpdate, appendLog])
+  }, [])
 
   // Handle cancel
   const handleCancel = async () => {
@@ -91,9 +99,11 @@ export function LoopTaskPanel({ spaceId }: LoopTaskPanelProps) {
   // Empty state - no task selected and not editing
   if (!currentTask && !isEditing) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-        <RefreshCw className="w-12 h-12 mb-4 opacity-50" />
-        <p className="text-lg mb-2">{t('No loop task selected')}</p>
+      <div className="flex flex-col items-center justify-center flex-1 min-h-0 text-muted-foreground">
+        <div className="w-16 h-16 mb-4 rounded-full bg-muted/50 flex items-center justify-center">
+          <Sparkles className="w-8 h-8 opacity-60" />
+        </div>
+        <p className="text-lg font-medium mb-1 text-foreground">{t('No loop task selected')}</p>
         <p className="text-sm">{t('Select a task from the sidebar or create a new one')}</p>
       </div>
     )
@@ -102,7 +112,7 @@ export function LoopTaskPanel({ spaceId }: LoopTaskPanelProps) {
   // Wizard Mode
   if (isEditing) {
     return (
-      <div className="flex flex-col h-full">
+      <div className="flex flex-col flex-1 min-h-0">
         {/* Header - Cancel button aligned with sidebar */}
         <div className="px-4 pt-16 pb-3 shrink-0">
           <button
@@ -120,9 +130,8 @@ export function LoopTaskPanel({ spaceId }: LoopTaskPanelProps) {
         {/* Step Content - flex-1 to take remaining space, overflow-hidden to enable child scrolling */}
         <div className="flex-1 overflow-hidden min-h-0">
           {wizardStep === 1 && <Step1CreateTask onCancel={handleCancel} />}
-          {wizardStep === 2 && <Step2PlanEdit onCancel={handleCancel} />}
-          {wizardStep === 3 && <Step3Confirm spaceId={spaceId} onCancel={handleCancel} />}
-          {wizardStep === 4 && <Step4Execute />}
+          {wizardStep === 2 && <Step2PlanEdit spaceId={spaceId} onCancel={handleCancel} />}
+          {wizardStep === 3 && <Step4Execute />}
         </div>
       </div>
     )
@@ -151,14 +160,44 @@ function TaskViewMode({ task, spaceId }: TaskViewModeProps) {
   const [expandedStories, setExpandedStories] = useState<Set<string>>(new Set())
   const [error, setError] = useState<string | null>(null)
 
+  const [isRetrying, setIsRetrying] = useState(false)
+
   const isRunning = task.status === 'running'
   const isCompleted = task.status === 'completed'
   const isFailed = task.status === 'failed'
   const isIdle = task.status === 'idle'
 
   const completedCount = task.stories.filter((s) => s.status === 'completed').length
+  const failedCount = task.stories.filter((s) => s.status === 'failed').length
   const totalCount = task.stories.length
   const progress = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
+
+  // Retry a single failed story
+  const handleRetryStory = async (storyId: string) => {
+    try {
+      const result = await api.loopTaskRetryStory(spaceId, task.id, storyId)
+      if (result.success && result.data) {
+        handleTaskUpdate(result.data)
+      }
+    } catch (err) {
+      console.error('Failed to retry story:', err)
+    }
+  }
+
+  // Retry all failed stories
+  const handleRetryAllFailed = async () => {
+    setIsRetrying(true)
+    try {
+      const result = await api.loopTaskRetryFailed(spaceId, task.id)
+      if (result.success && result.data) {
+        handleTaskUpdate(result.data)
+      }
+    } catch (err) {
+      console.error('Failed to retry all failed:', err)
+    } finally {
+      setIsRetrying(false)
+    }
+  }
 
   // Toggle story expand
   const toggleExpand = (storyId: string) => {
@@ -176,7 +215,7 @@ function TaskViewMode({ task, spaceId }: TaskViewModeProps) {
   // Start execution
   const handleStart = async () => {
     if (task.stories.length === 0) {
-      setError(t('Please add at least one story'))
+      setError(t('Please add at least one sub-task'))
       return
     }
 
@@ -212,7 +251,7 @@ function TaskViewMode({ task, spaceId }: TaskViewModeProps) {
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col flex-1 min-h-0">
       {/* Header */}
       <div className="px-4 py-3 border-b border-border shrink-0">
         <div className="flex items-center justify-between">
@@ -249,7 +288,7 @@ function TaskViewMode({ task, spaceId }: TaskViewModeProps) {
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">
-                  {completedCount}/{totalCount} {t('stories')} ({progress}%)
+                  {completedCount}/{totalCount} {t('sub-tasks')} ({progress}%)
                 </span>
                 <span className="text-muted-foreground">
                   {t('Iteration')}: {task.iteration}/{task.maxIterations}
@@ -271,9 +310,21 @@ function TaskViewMode({ task, spaceId }: TaskViewModeProps) {
                 </div>
               )}
               {isFailed && (
-                <div className="flex items-center gap-2 text-destructive">
-                  <XCircle size={16} />
-                  <span className="text-sm font-medium">{t('Task failed')}</span>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-destructive">
+                    <XCircle size={16} />
+                    <span className="text-sm font-medium">{t('Task failed')}</span>
+                  </div>
+                  {failedCount > 0 && (
+                    <button
+                      onClick={handleRetryAllFailed}
+                      disabled={isRetrying}
+                      className="px-3 py-1 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 transition-colors flex items-center gap-1.5"
+                    >
+                      {isRetrying ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                      {t('Retry All Failed')} ({failedCount})
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -282,7 +333,7 @@ function TaskViewMode({ task, spaceId }: TaskViewModeProps) {
           {/* Story List */}
           <div className="space-y-2">
             <label className="block text-sm font-medium text-foreground">
-              {t('User Stories')} ({task.stories.length})
+              {t('Sub-tasks')} ({task.stories.length})
             </label>
             {task.stories.map((story) => (
               <StoryCard
@@ -290,6 +341,7 @@ function TaskViewMode({ task, spaceId }: TaskViewModeProps) {
                 story={story}
                 isExpanded={expandedStories.has(story.id)}
                 onToggle={() => toggleExpand(story.id)}
+                onRetry={story.status === 'failed' ? () => handleRetryStory(story.id) : undefined}
               />
             ))}
           </div>
@@ -299,15 +351,28 @@ function TaskViewMode({ task, spaceId }: TaskViewModeProps) {
             <div className="space-y-2">
               <label className="block text-sm font-medium text-foreground">{t('Execution Log')}</label>
               <div className="h-64 p-3 bg-muted/30 border border-border rounded-lg overflow-auto font-mono text-xs text-muted-foreground whitespace-pre-wrap">
-                {executionLog || t('Waiting for logs...')}
+                {executionLog || (
+                  <div className="flex items-center gap-2 animate-pulse">
+                    <Loader2 size={12} className="animate-spin" />
+                    <span>{t('Waiting for logs...')}</span>
+                  </div>
+                )}
               </div>
             </div>
           )}
 
           {/* Error */}
           {error && (
-            <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-md text-destructive text-sm">
-              {error}
+            <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-md text-sm flex items-start gap-2">
+              <AlertCircle size={16} className="text-destructive shrink-0 mt-0.5" />
+              <div>
+                <p className="text-destructive font-medium">{error}</p>
+                {isIdle && (
+                  <p className="text-muted-foreground text-xs mt-1">
+                    {t('Check your settings and try again')}
+                  </p>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -330,32 +395,15 @@ function TaskViewMode({ task, spaceId }: TaskViewModeProps) {
       )}
 
       {/* Stop Confirmation Dialog */}
-      {showStopConfirm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-background border border-border rounded-lg w-full max-w-sm shadow-lg">
-            <div className="p-4 space-y-3">
-              <h3 className="font-medium text-foreground">{t('Stop task?')}</h3>
-              <p className="text-sm text-muted-foreground">
-                {t('Stop task confirm message')}
-              </p>
-            </div>
-            <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-border">
-              <button
-                onClick={() => setShowStopConfirm(false)}
-                className="px-4 py-2 text-muted-foreground hover:text-foreground transition-colors"
-              >
-                {t('Cancel')}
-              </button>
-              <button
-                onClick={handleStopConfirm}
-                className="px-4 py-2 bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90 transition-colors"
-              >
-                {t('Stop')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        isOpen={showStopConfirm}
+        title={t('Stop task?')}
+        message={t('Stop task confirm message')}
+        confirmLabel={t('Stop')}
+        variant="danger"
+        onConfirm={handleStopConfirm}
+        onCancel={() => setShowStopConfirm(false)}
+      />
     </div>
   )
 }
@@ -368,9 +416,10 @@ interface StoryCardProps {
   story: UserStory
   isExpanded: boolean
   onToggle: () => void
+  onRetry?: () => void
 }
 
-function StoryCard({ story, isExpanded, onToggle }: StoryCardProps) {
+function StoryCard({ story, isExpanded, onToggle, onRetry }: StoryCardProps) {
   const { t } = useTranslation()
 
   const statusIcon = {
@@ -402,10 +451,25 @@ function StoryCard({ story, isExpanded, onToggle }: StoryCardProps) {
           {story.priority}
         </span>
         <span className="flex-1 font-medium text-foreground text-sm truncate">{story.title}</span>
+        {story.retryCount && story.retryCount > 0 && (
+          <span className="text-xs text-muted-foreground">
+            {t('Retry')} #{story.retryCount}
+          </span>
+        )}
         {story.duration && (
           <span className="text-xs text-muted-foreground">
             {Math.round(story.duration / 1000)}s
           </span>
+        )}
+        {story.status === 'failed' && onRetry && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onRetry() }}
+            className="h-8 w-8 flex items-center justify-center rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+            title={t('Retry this sub-task')}
+            aria-label={t('Retry this sub-task')}
+          >
+            <RefreshCw size={14} />
+          </button>
         )}
         <ChevronDown
           size={14}

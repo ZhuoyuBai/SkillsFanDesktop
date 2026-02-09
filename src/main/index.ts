@@ -230,9 +230,14 @@ function createWindow(): void {
   // Platform-specific window options
   const isMac = process.platform === 'darwin'
 
-  // Detect system theme for initial window colors
-  // This ensures the window background matches system preference on first launch
-  const isDarkMode = nativeTheme.shouldUseDarkColors
+  // Detect theme for initial window colors
+  // Read user's app theme setting; fall back to system theme for 'system' mode
+  const configTheme = getConfig().appearance.theme
+  const isDarkMode = configTheme === 'dark'
+    ? true
+    : configTheme === 'system'
+      ? nativeTheme.shouldUseDarkColors
+      : false
   const backgroundColor = isDarkMode ? '#0a0a0a' : '#ffffff'
 
   // Create the browser window

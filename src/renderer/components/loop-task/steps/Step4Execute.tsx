@@ -23,6 +23,7 @@ import {
 import { useLoopTaskStore } from '../../../stores/loop-task.store'
 import { api } from '../../../api'
 import { cn } from '../../../lib/utils'
+import { ConfirmDialog } from '../../ui/ConfirmDialog'
 import type { UserStory, LoopTask } from '../../../../shared/types/loop-task'
 
 export function Step4Execute() {
@@ -113,7 +114,7 @@ export function Step4Execute() {
           <div className="space-y-2">
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">
-                {completedCount}/{totalCount} {t('stories')} ({progress}%)
+                {completedCount}/{totalCount} {t('sub-tasks')} ({progress}%)
               </span>
               <span className="text-muted-foreground">
                 {t('Iteration')}: {currentTask?.iteration || 0}/{currentTask?.maxIterations || 10}
@@ -153,7 +154,7 @@ export function Step4Execute() {
 
           {/* Story Status List */}
           <div className="space-y-2">
-            <h3 className="font-medium text-foreground text-sm">{t('Story Status')}</h3>
+            <h3 className="font-medium text-foreground text-sm">{t('Sub-task Status')}</h3>
             {stories.map((story) => (
               <StoryStatusCard
                 key={story.id}
@@ -198,32 +199,15 @@ export function Step4Execute() {
       )}
 
       {/* Stop Confirmation Dialog */}
-      {showStopConfirm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-background border border-border rounded-lg w-full max-w-sm shadow-lg">
-            <div className="p-4 space-y-3">
-              <h3 className="font-medium text-foreground">{t('Stop task?')}</h3>
-              <p className="text-sm text-muted-foreground">
-                {t('Stop task confirm message')}
-              </p>
-            </div>
-            <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-border">
-              <button
-                onClick={() => setShowStopConfirm(false)}
-                className="px-4 py-2 text-muted-foreground hover:text-foreground transition-colors"
-              >
-                {t('Cancel')}
-              </button>
-              <button
-                onClick={handleStopConfirm}
-                className="px-4 py-2 bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90 transition-colors"
-              >
-                {t('Stop')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        isOpen={showStopConfirm}
+        title={t('Stop task?')}
+        message={t('Stop task confirm message')}
+        confirmLabel={t('Stop')}
+        variant="danger"
+        onConfirm={handleStopConfirm}
+        onCancel={() => setShowStopConfirm(false)}
+      />
     </div>
   )
 }

@@ -96,6 +96,7 @@ function writeIndex(tasksDir: string, tasks: LoopTaskMeta[]): void {
 
 function toMeta(task: LoopTask): LoopTaskMeta {
   const completedCount = task.stories.filter((s) => s.status === 'completed').length
+  const failedCount = task.stories.filter((s) => s.status === 'failed').length
 
   return {
     id: task.id,
@@ -106,7 +107,10 @@ function toMeta(task: LoopTask): LoopTaskMeta {
     storyCount: task.stories.length,
     completedCount,
     createdAt: task.createdAt,
-    updatedAt: task.updatedAt
+    updatedAt: task.updatedAt,
+    ...(failedCount > 0 && { failedCount }),
+    ...(task.model && { model: task.model }),
+    ...(task.modelSource && { modelSource: task.modelSource })
   }
 }
 
@@ -426,6 +430,63 @@ export function reorderStories(
 
   updateTask(spaceId, taskId, { stories: task.stories })
   return true
+}
+
+/**
+ * Retry a single failed story - reset to pending
+ */
+export function retryStory(spaceId: string, taskId: string, storyId: string): LoopTask | null {
+  const task = getTask(spaceId, taskId)
+  if (!task) return null
+
+  const story = task.stories.find((s) => s.id === storyId)
+  if (!story || story.status !== 'failed') return null
+
+  story.status = 'pending'
+  story.error = undefined
+  story.startedAt = undefined
+  story.completedAt = undefined
+  story.duration = undefined
+  story.retryCount = (story.retryCount || 0) + 1
+  story.lastRetryAt = new Date().toISOString()
+
+  // If task was failed, set back to idle so it can be restarted
+  if (task.status === 'failed') {
+    task.status = 'idle'
+  }
+
+  return updateTask(spaceId, taskId, { stories: task.stories, status: task.status })
+}
+
+/**
+ * Retry all failed stories in a task
+ */
+export function retryFailed(spaceId: string, taskId: string): LoopTask | null {
+  const task = getTask(spaceId, taskId)
+  if (!task) return null
+
+  let anyRetried = false
+  for (const story of task.stories) {
+    if (story.status === 'failed') {
+      story.status = 'pending'
+      story.error = undefined
+      story.startedAt = undefined
+      story.completedAt = undefined
+      story.duration = undefined
+      story.retryCount = (story.retryCount || 0) + 1
+      story.lastRetryAt = new Date().toISOString()
+      anyRetried = true
+    }
+  }
+
+  if (!anyRetried) return task
+
+  // If task was failed, set back to idle
+  if (task.status === 'failed') {
+    task.status = 'idle'
+  }
+
+  return updateTask(spaceId, taskId, { stories: task.stories, status: task.status })
 }
 
 // ============================================================================

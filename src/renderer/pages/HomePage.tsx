@@ -18,6 +18,7 @@ import { Header } from '../components/layout/Header'
 import { SpaceGuide } from '../components/space/SpaceGuide'
 import { CreateSpaceDialog } from '../components/space/CreateSpaceDialog'
 import { HaloLogo } from '../components/brand/HaloLogo'
+import { ConfirmDialog } from '../components/ui/ConfirmDialog'
 import { useTranslation } from '../i18n'
 
 export function HomePage() {
@@ -27,6 +28,9 @@ export function HomePage() {
 
   // Dialog state
   const [showCreateDialog, setShowCreateDialog] = useState(false)
+
+  // Delete confirm state
+  const [deletingSpaceId, setDeletingSpaceId] = useState<string | null>(null)
 
   // Edit dialog state
   const [editingSpace, setEditingSpace] = useState<Space | null>(null)
@@ -46,23 +50,27 @@ export function HomePage() {
   }
 
   // Handle delete space
-  const handleDeleteSpace = async (e: React.MouseEvent, spaceId: string) => {
+  const handleDeleteSpace = (e: React.MouseEvent, spaceId: string) => {
     e.stopPropagation()
+    setDeletingSpaceId(spaceId)
+  }
 
-    // Find the space to check if it's a custom path
-    const space = spaces.find(s => s.id === spaceId)
-    if (!space) return
+  const handleConfirmDeleteSpace = async () => {
+    if (deletingSpaceId) {
+      await deleteSpace(deletingSpaceId)
+      setDeletingSpaceId(null)
+    }
+  }
 
-    // Check if it's a custom path (not under default spaces directory)
+  // Get delete confirmation message based on space type
+  const getDeleteMessage = () => {
+    if (!deletingSpaceId) return ''
+    const space = spaces.find(s => s.id === deletingSpaceId)
+    if (!space) return ''
     const isCustomPath = !space.path.includes('/.skillsfan/spaces/')
-
-    const message = isCustomPath
+    return isCustomPath
       ? t('Are you sure you want to delete this space?\n\nOnly Halo data (conversation history) will be deleted, your project files will be kept.')
       : t('Are you sure you want to delete this space?\n\nAll conversations and files in the space will be deleted.')
-
-    if (confirm(message)) {
-      await deleteSpace(spaceId)
-    }
   }
 
   // Handle edit space - open dialog
@@ -232,6 +240,17 @@ export function HomePage() {
       <CreateSpaceDialog
         isOpen={showCreateDialog}
         onClose={() => setShowCreateDialog(false)}
+      />
+
+      {/* Delete Space Confirmation */}
+      <ConfirmDialog
+        isOpen={!!deletingSpaceId}
+        title={t('Delete space?')}
+        message={getDeleteMessage()}
+        confirmLabel={t('Delete')}
+        variant="danger"
+        onConfirm={handleConfirmDeleteSpace}
+        onCancel={() => setDeletingSpaceId(null)}
       />
 
       {/* Edit Space Dialog */}

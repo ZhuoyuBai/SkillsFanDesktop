@@ -12,8 +12,8 @@ export type TaskStatus = 'idle' | 'running' | 'paused' | 'completed' | 'failed'
 // Task source
 export type TaskSource = 'import' | 'generate' | 'manual'
 
-// Wizard step for task creation flow
-export type WizardStep = 1 | 2 | 3 | 4
+// Wizard step for task creation flow (3-step: Create → Plan → Execute)
+export type WizardStep = 1 | 2 | 3
 
 // Creation method for wizard step 1
 export type CreateMethod = 'ai' | 'manual' | 'import'
@@ -34,6 +34,8 @@ export interface UserStory {
   duration?: number // milliseconds
   commitHash?: string
   error?: string
+  retryCount?: number
+  lastRetryAt?: string
   // Quality gate toggles (default: false)
   requireTypecheck?: boolean
   requireTests?: boolean
@@ -55,6 +57,7 @@ export interface LoopTaskMeta {
   completedCount: number
   createdAt: string
   updatedAt: string
+  failedCount?: number
   model?: string // AI model override for this task (e.g. 'claude-sonnet-4-5-20250929')
   modelSource?: string // AI source/provider for this task (e.g. 'skillsfan-credits', 'deepseek')
 }

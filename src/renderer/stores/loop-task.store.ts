@@ -244,7 +244,9 @@ export const useLoopTaskStore = create<LoopTaskState>((set, get) => ({
           storyCount: task.storyCount,
           completedCount: task.completedCount,
           createdAt: task.createdAt,
-          updatedAt: task.updatedAt
+          updatedAt: task.updatedAt,
+          ...(task.model && { model: task.model }),
+          ...(task.modelSource && { modelSource: task.modelSource })
         }
         newStates.set(spaceId, {
           tasks: [meta, ...currentState.tasks],
@@ -298,7 +300,9 @@ export const useLoopTaskStore = create<LoopTaskState>((set, get) => ({
             storyCount: task.storyCount,
             completedCount: task.completedCount,
             createdAt: task.createdAt,
-            updatedAt: task.updatedAt
+            updatedAt: task.updatedAt,
+            ...(task.model && { model: task.model }),
+            ...(task.modelSource && { modelSource: task.modelSource })
           }
           newStates.set(spaceId, {
             ...currentState,
@@ -370,41 +374,25 @@ export const useLoopTaskStore = create<LoopTaskState>((set, get) => ({
 
     set({ spaceStates: newStates, taskCache: newCache })
 
-    // Background API call
-    try {
-      const result = await api.loopTaskDelete(spaceId, taskId)
-
-      if (!result.success) {
-        // Rollback on failure
-        console.error('[LoopTaskStore] Delete failed, rolling back:', result.error)
-        if (deletedMeta && deletedTask) {
-          const rollbackStates = new Map(get().spaceStates)
-          const rollbackState = rollbackStates.get(spaceId)
-          if (rollbackState) {
+    // Helper to rollback using the captured spaceId (not current space which may have changed)
+    const rollback = (errorMsg: string) => {
+      if (deletedMeta && deletedTask) {
+        const rollbackStates = new Map(get().spaceStates)
+        const rollbackState = rollbackStates.get(spaceId)
+        if (rollbackState) {
+          // Only rollback if the task isn't already back in the list
+          const alreadyExists = rollbackState.tasks.some((t) => t.id === taskId)
+          if (!alreadyExists) {
             rollbackStates.set(spaceId, {
               tasks: [deletedMeta, ...rollbackState.tasks],
               currentTaskId: rollbackState.currentTaskId
             })
           }
-          const rollbackCache = new Map(get().taskCache)
-          rollbackCache.set(taskId, deletedTask)
-          set({
-            spaceStates: rollbackStates,
-            taskCache: rollbackCache,
-            error: result.error || 'Failed to delete task'
-          })
-        }
-      }
-    } catch (error) {
-      // Rollback on error
-      console.error('[LoopTaskStore] Delete error, rolling back:', error)
-      if (deletedMeta && deletedTask) {
-        const rollbackStates = new Map(get().spaceStates)
-        const rollbackState = rollbackStates.get(spaceId)
-        if (rollbackState) {
+        } else {
+          // Space state was removed (e.g., user switched spaces) — recreate it
           rollbackStates.set(spaceId, {
-            tasks: [deletedMeta, ...rollbackState.tasks],
-            currentTaskId: rollbackState.currentTaskId
+            tasks: [deletedMeta],
+            currentTaskId: null
           })
         }
         const rollbackCache = new Map(get().taskCache)
@@ -412,9 +400,22 @@ export const useLoopTaskStore = create<LoopTaskState>((set, get) => ({
         set({
           spaceStates: rollbackStates,
           taskCache: rollbackCache,
-          error: (error as Error).message
+          error: errorMsg
         })
       }
+    }
+
+    // Background API call
+    try {
+      const result = await api.loopTaskDelete(spaceId, taskId)
+
+      if (!result.success) {
+        console.error('[LoopTaskStore] Delete failed, rolling back:', result.error)
+        rollback(result.error || 'Failed to delete task')
+      }
+    } catch (error) {
+      console.error('[LoopTaskStore] Delete error, rolling back:', error)
+      rollback((error as Error).message)
     }
   },
 
@@ -605,7 +606,9 @@ export const useLoopTaskStore = create<LoopTaskState>((set, get) => ({
         storyCount: task.storyCount,
         completedCount: task.completedCount,
         createdAt: task.createdAt,
-        updatedAt: task.updatedAt
+        updatedAt: task.updatedAt,
+        ...(task.model && { model: task.model }),
+        ...(task.modelSource && { modelSource: task.modelSource })
       }
       const taskExists = currentState.tasks.some((t) => t.id === task.id)
       if (taskExists) {

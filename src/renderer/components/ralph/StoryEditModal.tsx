@@ -64,7 +64,7 @@ export function StoryEditModal({ story, isNew, onSave, onClose }: StoryEditModal
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <h2 className="text-lg font-semibold text-foreground">
-            {isNew ? t('Add Story') : t('Edit Story')}
+            {isNew ? t('Add Sub-task') : t('Edit Sub-task')}
           </h2>
           <button
             onClick={onClose}

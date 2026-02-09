@@ -16,7 +16,9 @@ import {
   addStory,
   updateStory,
   removeStory,
-  reorderStories
+  reorderStories,
+  retryStory,
+  retryFailed
 } from '../services/loop-task.service'
 import type { CreateLoopTaskConfig, LoopTask, UserStory } from '../../shared/types/loop-task'
 
@@ -168,6 +170,42 @@ export function registerLoopTaskHandlers(window: BrowserWindow | null): void {
       } catch (error: unknown) {
         const err = error as Error
         console.error('[LoopTask IPC] reorder-stories error:', err)
+        return { success: false, error: err.message }
+      }
+    }
+  )
+
+  // Retry a single failed story
+  ipcMain.handle(
+    'loop-task:retry-story',
+    async (_event, spaceId: string, taskId: string, storyId: string) => {
+      try {
+        const task = retryStory(spaceId, taskId, storyId)
+        if (task) {
+          return { success: true, data: task }
+        }
+        return { success: false, error: 'Story not found or not in failed state' }
+      } catch (error: unknown) {
+        const err = error as Error
+        console.error('[LoopTask IPC] retry-story error:', err)
+        return { success: false, error: err.message }
+      }
+    }
+  )
+
+  // Retry all failed stories in a task
+  ipcMain.handle(
+    'loop-task:retry-failed',
+    async (_event, spaceId: string, taskId: string) => {
+      try {
+        const task = retryFailed(spaceId, taskId)
+        if (task) {
+          return { success: true, data: task }
+        }
+        return { success: false, error: 'Task not found' }
+      } catch (error: unknown) {
+        const err = error as Error
+        console.error('[LoopTask IPC] retry-failed error:', err)
         return { success: false, error: err.message }
       }
     }

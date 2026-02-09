@@ -23,62 +23,34 @@ import {
   Circle,
   Sparkles,
   CheckCircle2,
-  RotateCcw
+  RotateCcw,
+  Loader2
 } from 'lucide-react'
 import { useLoopTaskStore } from '../../../stores/loop-task.store'
 import { useToastStore } from '../../../stores/toast.store'
-import { useAppStore } from '../../../stores/app.store'
 import { api } from '../../../api'
 import { StoryEditModal } from '../../ralph/StoryEditModal'
 import { cn } from '../../../lib/utils'
-import {
-  PROVIDER_NAMES,
-  getProviderLogoById,
-  getModelLogo
-} from '../../layout/ModelSelector'
-import { getCurrentLanguage } from '../../../i18n'
-import type { AISourceType, OAuthSourceConfig } from '../../../types'
+import { getModelLogo } from '../../layout/ModelSelector'
+import { useModelProviders } from '../../../hooks/useModelProviders'
+import type { OAuthProviderInfo, CustomProviderInfo } from '../../../hooks/useModelProviders'
 import type { UserStory, WizardStep } from '../../../../shared/types/loop-task'
 
-// Localized text type from auth providers
-type LocalizedText = string | Record<string, string>
-
-interface AuthProviderConfig {
-  type: string
-  displayName: LocalizedText
-  enabled: boolean
-}
-
-function getLocalizedText(value: LocalizedText): string {
-  if (typeof value === 'string') return value
-  const lang = getCurrentLanguage()
-  return value[lang] || value['en'] || Object.values(value)[0] || ''
-}
-
-// Provider info types for StoryCard
-interface OAuthProviderInfo {
-  type: string
-  displayName: string
-  config?: OAuthSourceConfig
-  isLoggedIn: boolean
-}
-
-interface CustomProviderInfo {
-  id: string
-  name: string
-  logo: string | null
-  model: string
-}
 
 interface Step2PlanEditProps {
+  spaceId: string
   onCancel: () => void
 }
 
-export function Step2PlanEdit({ onCancel }: Step2PlanEditProps) {
+export function Step2PlanEdit({ spaceId, onCancel }: Step2PlanEditProps) {
   const { t } = useTranslation()
-  const { editingTask, updateEditing, setWizardStep, setGeneratedPrdPath } = useLoopTaskStore()
+  const { editingTask, updateEditing, setWizardStep, setGeneratedPrdPath, createTask, clearLog } = useLoopTaskStore()
   const { addToast } = useToastStore()
-  const config = useAppStore((s) => s.config)
+
+  const {
+    loggedInOAuthProviders,
+    configuredCustomProviders
+  } = useModelProviders()
 
   const [localStories, setLocalStories] = useState<UserStory[]>(editingTask?.stories || [])
   const [editingStory, setEditingStory] = useState<UserStory | null>(null)
@@ -86,48 +58,6 @@ export function Step2PlanEdit({ onCancel }: Step2PlanEditProps) {
   const [expandedStories, setExpandedStories] = useState<Set<string>>(new Set())
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
-  const [authProviders, setAuthProviders] = useState<AuthProviderConfig[]>([])
-
-  // Load auth providers for model selector
-  useEffect(() => {
-    api.authGetProviders().then((result) => {
-      if (result.success && result.data) {
-        setAuthProviders(result.data as AuthProviderConfig[])
-      }
-    })
-  }, [])
-
-  // Compute available providers from config (matching ModelSelector.tsx logic)
-  const aiSources = config?.aiSources || { current: 'custom' as AISourceType }
-
-  const configuredCustomProviders: CustomProviderInfo[] = Object.keys(aiSources)
-    .filter(key => {
-      if (key === 'current' || key === 'oauth' || key === 'custom') return false
-      const source = (aiSources as Record<string, any>)[key]
-      return source && typeof source === 'object' && 'apiKey' in source && source.apiKey && !('loggedIn' in source)
-    })
-    .map(key => {
-      const source = (aiSources as Record<string, any>)[key]
-      return {
-        id: key,
-        name: PROVIDER_NAMES[key] || key,
-        logo: getProviderLogoById(key),
-        model: source.model || ''
-      }
-    })
-
-  const loggedInOAuthProviders: OAuthProviderInfo[] = authProviders
-    .filter(p => p.type !== 'custom' && p.enabled)
-    .map(p => {
-      const providerConfig = (aiSources as Record<string, any>)[p.type] as OAuthSourceConfig | undefined
-      return {
-        type: p.type,
-        displayName: getLocalizedText(p.displayName),
-        config: providerConfig,
-        isLoggedIn: providerConfig?.loggedIn === true
-      }
-    })
-    .filter(p => p.isLoggedIn)
 
   // Sync local stories with editing task
   useEffect(() => {
@@ -175,11 +105,11 @@ export function Step2PlanEdit({ onCancel }: Step2PlanEditProps) {
 
       const newStory = { ...story, id: newId }
       setLocalStories([...localStories, newStory])
-      addToast(t('Story added'), 'success')
+      addToast(t('Sub-task added'), 'success')
     } else {
       // Update existing
       setLocalStories(localStories.map((s) => (s.id === story.id ? story : s)))
-      addToast(t('Story updated'), 'success')
+      addToast(t('Sub-task updated'), 'success')
     }
     setEditingStory(null)
     setIsCreating(false)
@@ -220,7 +150,7 @@ export function Step2PlanEdit({ onCancel }: Step2PlanEditProps) {
   // Go to next step - generate prd.json
   const handleNext = async () => {
     if (localStories.length === 0) {
-      setError(t('Please add at least one story'))
+      setError(t('Please add at least one sub-task'))
       return
     }
 
@@ -232,18 +162,42 @@ export function Step2PlanEdit({ onCancel }: Step2PlanEditProps) {
       updateEditing({ stories: localStories })
 
       // Generate prd.json
-      const result = await api.loopTaskExportPrd({
+      const prdResult = await api.loopTaskExportPrd({
         projectDir: editingTask?.projectDir || '',
         description: editingTask?.description || '',
         stories: localStories,
         branchName: editingTask?.branchName
       })
 
-      if (result.success && result.data) {
-        setGeneratedPrdPath(result.data.path)
-        setWizardStep(3 as WizardStep)
+      if (prdResult.success && prdResult.data) {
+        setGeneratedPrdPath(prdResult.data.path)
       } else {
-        setError(result.error || t('Failed to generate prd.json'))
+        setError(prdResult.error || t('Failed to generate prd.json'))
+        return
+      }
+
+      // Create the task
+      const task = await createTask(spaceId, {
+        name: editingTask?.name || (editingTask?.description || '').slice(0, 30).trim() || t('New Loop Task'),
+        projectDir: editingTask?.projectDir || '',
+        description: editingTask?.description || '',
+        source: editingTask?.source || 'manual',
+        stories: localStories,
+        maxIterations: editingTask?.maxIterations || 10,
+        branchName: editingTask?.branchName,
+        model: editingTask?.model,
+        modelSource: editingTask?.modelSource
+      })
+
+      // Clear log and go to step 3 (execute)
+      clearLog()
+      setWizardStep(3 as WizardStep)
+      addToast(t('Task created, execution started'), 'success')
+
+      // Start execution
+      const startResult = await api.ralphStart(spaceId, task.id)
+      if (!startResult.success) {
+        setError(startResult.error || t('Failed to start task'))
       }
     } catch (err) {
       setError((err as Error).message)
@@ -252,6 +206,18 @@ export function Step2PlanEdit({ onCancel }: Step2PlanEditProps) {
     }
   }
 
+  // Keyboard shortcut: Cmd/Ctrl+Enter to proceed
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && !isLoading && localStories.length > 0) {
+        e.preventDefault()
+        handleNext()
+      }
+    }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  })
+
   return (
     <div className="flex flex-col h-full">
       <div className="flex-1 overflow-auto p-4">
@@ -259,7 +225,7 @@ export function Step2PlanEdit({ onCancel }: Step2PlanEditProps) {
           {/* Story List Header */}
           <div className="flex items-center justify-between">
             <label className="block text-sm font-medium text-foreground">
-              {t('User Stories')} ({localStories.length})
+              {t('Sub-tasks')} ({localStories.length})
             </label>
             <button
               onClick={handleAddStory}
@@ -276,16 +242,16 @@ export function Step2PlanEdit({ onCancel }: Step2PlanEditProps) {
               <div className="w-16 h-16 rounded-full bg-muted/30 flex items-center justify-center mb-4 text-muted-foreground">
                 <Plus size={32} strokeWidth={1.5} />
               </div>
-              <h3 className="text-lg font-medium text-foreground mb-1">{t('No stories yet')}</h3>
+              <h3 className="text-lg font-medium text-foreground mb-1">{t('No sub-tasks yet')}</h3>
               <p className="text-sm text-muted-foreground max-w-xs mb-6">
-                {t('Add your first user story to define what the task should accomplish.')}
+                {t('Add your first sub-task to define what the task should accomplish.')}
               </p>
               <button
                 onClick={handleAddStory}
                 className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors flex items-center gap-2"
               >
                 <Plus size={16} />
-                {t('Add User Story')}
+                {t('Add Sub-task')}
               </button>
             </div>
           ) : (
@@ -310,7 +276,6 @@ export function Step2PlanEdit({ onCancel }: Step2PlanEditProps) {
                   }
                   loggedInOAuthProviders={loggedInOAuthProviders}
                   configuredCustomProviders={configuredCustomProviders}
-                  aiSources={aiSources}
                 />
               ))}
 
@@ -319,7 +284,7 @@ export function Step2PlanEdit({ onCancel }: Step2PlanEditProps) {
                 className="w-full py-3 h-auto border border-dashed border-border hover:border-primary/50 hover:bg-accent/30 rounded-lg text-muted-foreground hover:text-primary transition-all flex items-center justify-center gap-2 text-sm"
               >
                 <Plus size={16} />
-                {t('Add Story')}
+                {t('Add Sub-task')}
               </button>
             </div>
           )}
@@ -345,7 +310,7 @@ export function Step2PlanEdit({ onCancel }: Step2PlanEditProps) {
               </div>
             </div>
             <p className="text-xs text-muted-foreground">
-              {t('Maximum number of iterations per story before marking as failed')}
+              {t('Maximum number of iterations per sub-task before marking as failed')}
             </p>
           </div>
 
@@ -380,8 +345,18 @@ export function Step2PlanEdit({ onCancel }: Step2PlanEditProps) {
               disabled={isLoading || localStories.length === 0}
               className="px-6 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 transition-colors flex items-center gap-2"
             >
-              {t('Next')}
-              <ChevronRight size={16} />
+              {isLoading ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  {t('Creating...')}
+                </>
+              ) : (
+                <>
+                  {t('Start Execution')}
+                  <span className="text-xs opacity-60 ml-1 hidden sm:inline">&#8984;&#9166;</span>
+                  <ChevronRight size={16} />
+                </>
+              )}
             </button>
           </div>
         </div>
@@ -420,7 +395,6 @@ interface StoryCardProps {
   onUpdate: (story: UserStory) => void
   loggedInOAuthProviders: OAuthProviderInfo[]
   configuredCustomProviders: CustomProviderInfo[]
-  aiSources: Record<string, any>
 }
 
 function StoryCard({
@@ -435,8 +409,7 @@ function StoryCard({
   onMoveDown,
   onUpdate,
   loggedInOAuthProviders,
-  configuredCustomProviders,
-  aiSources
+  configuredCustomProviders
 }: StoryCardProps) {
   const { t } = useTranslation()
   const [showModelDropdown, setShowModelDropdown] = useState(false)
