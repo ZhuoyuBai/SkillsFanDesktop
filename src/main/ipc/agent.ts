@@ -28,6 +28,16 @@ export function registerAgentHandlers(window: BrowserWindow | null): void {
           name?: string
           size?: number
         }>
+        attachments?: Array<{
+          id: string
+          type: 'image' | 'pdf' | 'text'
+          mediaType: string
+          data?: string
+          content?: string
+          name?: string
+          size?: number
+          language?: string
+        }>
         thinkingEnabled?: boolean  // Enable extended thinking mode
       }
     ) => {
@@ -68,6 +78,16 @@ export function registerAgentHandlers(window: BrowserWindow | null): void {
           data: string
           name?: string
           size?: number
+        }>
+        attachments?: Array<{
+          id: string
+          type: 'image' | 'pdf' | 'text'
+          mediaType: string
+          data?: string
+          content?: string
+          name?: string
+          size?: number
+          language?: string
         }>
       }
     ) => {

@@ -21,7 +21,7 @@
 
 import { create } from 'zustand'
 import { api } from '../api'
-import type { Conversation, ConversationMeta, Message, ToolCall, Artifact, Thought, AgentEventBase, ImageAttachment, CompactInfo, CanvasContext, TextSegment } from '../types'
+import type { Conversation, ConversationMeta, Message, ToolCall, Artifact, Thought, AgentEventBase, ImageAttachment, Attachment, CompactInfo, CanvasContext, TextSegment } from '../types'
 import { hasAnyAISource } from '../types'
 import { canvasLifecycle } from '../services/canvas-lifecycle'
 import { useAppStore } from './app.store'
@@ -158,9 +158,9 @@ interface ChatState {
   touchConversation: (spaceId: string, conversationId: string) => Promise<boolean>
 
   // Messaging
-  sendMessage: (content: string, images?: ImageAttachment[], aiBrowserEnabled?: boolean, thinkingEnabled?: boolean) => Promise<void>
+  sendMessage: (content: string, attachments?: Attachment[], aiBrowserEnabled?: boolean, thinkingEnabled?: boolean) => Promise<void>
   stopGeneration: (conversationId?: string) => Promise<void>
-  injectMessage: (content: string, images?: ImageAttachment[]) => Promise<void>
+  injectMessage: (content: string, attachments?: Attachment[]) => Promise<void>
 
   // Tool approval
   approveTool: (conversationId: string) => Promise<void>
@@ -669,8 +669,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
 
-  // Send message (with optional images for multi-modal, optional AI Browser and thinking mode)
-  sendMessage: async (content, images, aiBrowserEnabled, thinkingEnabled) => {
+  // Send message (with optional attachments for multi-modal, optional AI Browser and thinking mode)
+  sendMessage: async (content, attachments, aiBrowserEnabled, thinkingEnabled) => {
     let conversation = get().getCurrentConversation()
     let conversationMeta = get().getCurrentConversationMeta()
     const { currentSpaceId } = get()
@@ -741,12 +741,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
       })
 
       // Add user message to UI immediately (update cache if exists)
+      // Extract image attachments for backward-compatible display
+      const imageAtts = attachments?.filter(a => a.type === 'image') as ImageAttachment[] | undefined
       const userMessage: Message = {
         id: `msg-${Date.now()}`,
         role: 'user',
         content,
         timestamp: new Date().toISOString(),
-        images: images  // Include images in message for display
+        images: imageAtts && imageAtts.length > 0 ? imageAtts : undefined,
+        attachments: attachments  // Include all attachments
       }
 
       set((state) => {
@@ -807,12 +810,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
         }
       }
 
-      // Send to agent (with images, AI Browser state, thinking mode, and canvas context)
+      // Send to agent (with attachments, AI Browser state, thinking mode, and canvas context)
       const response = await api.sendMessage({
         spaceId: currentSpaceId,
         conversationId,
         message: content,
-        images: images,  // Pass images to API
+        images: imageAtts && imageAtts.length > 0 ? imageAtts : undefined,  // Legacy images for backward compat
+        attachments: attachments,  // Pass all attachments to API
         aiBrowserEnabled,  // Pass AI Browser state to API
         thinkingEnabled,  // Pass thinking mode to API
         canvasContext: buildCanvasContext()  // Pass canvas context for AI awareness
@@ -884,7 +888,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   // Inject message during generation (pause current, add user message, continue)
-  injectMessage: async (content: string, images?: ImageAttachment[]) => {
+  injectMessage: async (content: string, attachments?: Attachment[]) => {
     const { currentSpaceId } = get()
     const conversation = get().getCurrentConversation()
 
@@ -896,13 +900,17 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const conversationId = conversation.id
     console.log(`[ChatStore] Injecting message into conversation: ${conversationId}`)
 
+    // Extract image attachments for backward-compatible display
+    const imageAtts = attachments?.filter(a => a.type === 'image') as ImageAttachment[] | undefined
+
     // Add user message to UI immediately
     const userMessage: Message = {
       id: `msg-${Date.now()}`,
       role: 'user',
       content,
       timestamp: new Date().toISOString(),
-      images
+      images: imageAtts && imageAtts.length > 0 ? imageAtts : undefined,
+      attachments
     }
 
     // Update cache with user message
@@ -925,7 +933,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
         spaceId: currentSpaceId,
         conversationId,
         message: content,
-        images
+        images: imageAtts && imageAtts.length > 0 ? imageAtts : undefined,
+        attachments
       })
     } catch (error) {
       console.error('Failed to inject message:', error)

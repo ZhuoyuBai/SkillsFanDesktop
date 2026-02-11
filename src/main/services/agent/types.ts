@@ -42,6 +42,31 @@ export interface ImageAttachment {
 }
 
 // ============================================
+// PDF & Text Attachments
+// ============================================
+
+export interface PdfAttachment {
+  id: string
+  type: 'pdf'
+  mediaType: 'application/pdf'
+  data: string  // Base64 encoded
+  name: string
+  size: number
+}
+
+export interface TextAttachment {
+  id: string
+  type: 'text'
+  mediaType: string
+  content: string  // Raw text content
+  name: string
+  size: number
+  language?: string
+}
+
+export type Attachment = ImageAttachment | PdfAttachment | TextAttachment
+
+// ============================================
 // Canvas Context
 // ============================================
 
@@ -89,6 +114,7 @@ export interface AgentRequest {
   message: string
   resumeSessionId?: string
   images?: ImageAttachment[]  // Optional images for multi-modal messages
+  attachments?: Attachment[]  // General attachments (PDF, text, code files)
   aiBrowserEnabled?: boolean  // Enable AI Browser tools for this request
   thinkingEnabled?: boolean   // Enable extended thinking mode (maxThinkingTokens: 10240)
   model?: string              // Model to use (for future model switching)

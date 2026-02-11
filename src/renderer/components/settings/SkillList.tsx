@@ -1,6 +1,10 @@
 /**
  * Skill List Component
- * Displays list of installed skills from ~/.skillsfan/skills directory
+ * Displays list of installed skills from all sources:
+ * - SkillsFan installed skills
+ * - Claude Code commands (project/global)
+ * - Claude skills (~/.claude/skills/)
+ * - Agent skills (~/.agents/skills/)
  */
 
 import { useState, useEffect } from 'react'
@@ -26,12 +30,28 @@ import { SkillConflictDialog } from './SkillConflictDialog'
 import { SkillDeleteDialog } from './SkillDeleteDialog'
 
 // Skill info type from backend
+interface SkillSource {
+  kind: 'skillsfan' | 'project-commands' | 'global-commands' | 'claude-skills' | 'agents-skills'
+  projectDir?: string
+}
+
 interface SkillInfo {
   name: string
   displayName: string
   description: string
   location: string
   baseDir: string
+  source: SkillSource
+  readonly: boolean
+}
+
+// Source label config
+const SOURCE_CONFIG: Record<string, { label: string; icon: string; colorClass: string }> = {
+  'skillsfan':        { label: 'SkillsFan',   icon: '\u26a1', colorClass: 'text-primary bg-primary/10' },
+  'project-commands': { label: 'Project',     icon: '\ud83d\udccc', colorClass: 'text-blue-400 bg-blue-400/10' },
+  'global-commands':  { label: 'Global',      icon: '\ud83c\udf10', colorClass: 'text-green-400 bg-green-400/10' },
+  'claude-skills':    { label: 'Claude',      icon: '\ud83e\udd16', colorClass: 'text-purple-400 bg-purple-400/10' },
+  'agents-skills':    { label: 'Agent',       icon: '\ud83d\udd27', colorClass: 'text-orange-400 bg-orange-400/10' },
 }
 
 // Get icon based on skill name (simple heuristic)
@@ -68,6 +88,19 @@ function formatDescription(description: string): string {
   return formatted
 }
 
+// Source badge component
+function SourceBadge({ source }: { source: SkillSource }) {
+  const config = SOURCE_CONFIG[source.kind]
+  if (!config) return null
+
+  return (
+    <span className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full font-medium ${config.colorClass}`}>
+      <span>{config.icon}</span>
+      <span>{config.label}</span>
+    </span>
+  )
+}
+
 // Skill card component
 function SkillCard({
   skill,
@@ -82,10 +115,11 @@ function SkillCard({
 
   return (
     <div className="bg-card border border-border rounded-xl p-5 hover:shadow-md transition-all">
-      {/* First row: Icon + Chinese Name */}
+      {/* First row: Icon + Chinese Name + Source badge */}
       <div className="flex items-center gap-2 mb-2">
         <div className="text-primary flex-shrink-0">{getSkillIcon(skill.name)}</div>
         <h4 className="font-semibold text-foreground truncate">{skill.displayName}</h4>
+        <SourceBadge source={skill.source} />
       </div>
 
       {/* Second row: English Name */}
@@ -104,17 +138,27 @@ function SkillCard({
           title={t('Open in file manager')}
         >
           <FolderOpen className="w-3.5 h-3.5" />
-          文件
+          {t('Files')}
         </button>
 
-        <button
-          onClick={() => onDelete(skill)}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-destructive/80 hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors ml-auto"
-          title={t('Delete skill')}
-        >
-          <Trash2 className="w-3.5 h-3.5" />
-          {t('Delete')}
-        </button>
+        {/* Only show delete for non-readonly (SkillsFan) skills */}
+        {!skill.readonly && (
+          <button
+            onClick={() => onDelete(skill)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-destructive/80 hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors ml-auto"
+            title={t('Delete skill')}
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            {t('Delete')}
+          </button>
+        )}
+
+        {/* Show readonly badge for external skills */}
+        {skill.readonly && (
+          <span className="ml-auto text-[10px] text-muted-foreground/50 px-2 py-1">
+            {t('Read-only')}
+          </span>
+        )}
       </div>
     </div>
   )
@@ -327,6 +371,10 @@ export function SkillList() {
     }
   }
 
+  // Count skills by source
+  const sfCount = skills.filter(s => s.source?.kind === 'skillsfan').length
+  const extCount = skills.length - sfCount
+
   // Shorten skills dir for display
   const shortSkillsDir = skillsDir.replace(/^\/Users\/[^/]+/, '~')
 
@@ -342,6 +390,11 @@ export function SkillList() {
           {skills.length > 0 && (
             <span className="px-2 py-0.5 text-xs bg-primary/10 text-primary rounded-full">
               {skills.length}
+              {extCount > 0 && (
+                <span className="text-muted-foreground/70 ml-1">
+                  ({sfCount} + {extCount})
+                </span>
+              )}
             </span>
           )}
         </div>
@@ -426,7 +479,7 @@ export function SkillList() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {skills.map((skill) => (
             <SkillCard
-              key={skill.name}
+              key={`${skill.source?.kind || 'unknown'}-${skill.name}`}
               skill={skill}
               onOpenFolder={handleOpenFolder}
               onDelete={handleDeleteClick}

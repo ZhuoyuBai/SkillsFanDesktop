@@ -288,6 +288,39 @@ export interface ImageAttachment {
   size?: number;  // File size in bytes
 }
 
+// ============================================
+// PDF Attachment Types (for document messages)
+// ============================================
+
+export interface PdfAttachment {
+  id: string;
+  type: 'pdf';
+  mediaType: 'application/pdf';
+  data: string;  // Base64 encoded PDF data
+  name: string;
+  size: number;
+}
+
+// ============================================
+// Text/Code Attachment Types (for text-based files)
+// ============================================
+
+export interface TextAttachment {
+  id: string;
+  type: 'text';
+  mediaType: string;  // text/plain, text/typescript, etc.
+  content: string;    // Raw text content (not Base64)
+  name: string;
+  size: number;
+  language?: string;  // Programming language hint
+}
+
+// ============================================
+// Union Attachment Type
+// ============================================
+
+export type Attachment = ImageAttachment | PdfAttachment | TextAttachment;
+
 // Content block types for multi-modal messages (matches Claude API)
 export interface TextContentBlock {
   type: 'text';
@@ -313,7 +346,8 @@ export interface Message {
   toolCalls?: ToolCall[];
   thoughts?: Thought[];  // Agent's reasoning process for this message
   isStreaming?: boolean;
-  images?: ImageAttachment[];  // Attached images
+  images?: ImageAttachment[];  // Attached images (legacy, for display)
+  attachments?: Attachment[];  // All file attachments (images, PDFs, text/code)
   tokenUsage?: TokenUsage;  // Token usage for this assistant message
 }
 

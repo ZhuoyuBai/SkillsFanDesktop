@@ -20,7 +20,7 @@ import {
   Sparkles,
 } from 'lucide-react'
 import { getToolIcon } from '../icons/ToolIcons'
-import { MarkdownRenderer } from './MarkdownRenderer'
+import { StreamdownRenderer } from './StreamdownRenderer'
 import { TodoCard, parseTodoInput } from '../tool/TodoCard'
 import { HaloLogo } from '../brand/HaloLogo'
 import type { Thought, TimelineItem, TextSegment, TodoItem } from '../../types'
@@ -360,6 +360,7 @@ const SkillItem = memo(function SkillItem({
 })
 
 // Text block - prominent display
+// Uses Streamdown for incremental rendering (O(n) vs O(n²) with react-markdown)
 const TextBlock = memo(function TextBlock({
   content,
   isStreaming,
@@ -371,10 +372,15 @@ const TextBlock = memo(function TextBlock({
 }) {
   if (!content.trim()) return null
 
+  const isCurrentlyStreaming = isStreaming && isLast
+
   return (
     <div className="py-2 text-foreground break-words leading-relaxed">
-      <MarkdownRenderer content={content} />
-      {isStreaming && isLast && (
+      <StreamdownRenderer
+        content={content}
+        isStreaming={isCurrentlyStreaming}
+      />
+      {isCurrentlyStreaming && (
         <span className="inline-flex items-center ml-1 align-middle">
           <HaloLogo size={16} animated={true} />
         </span>

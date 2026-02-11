@@ -82,13 +82,15 @@ export async function sendMessage(
     message,
     resumeSessionId,
     images,
+    attachments,
     aiBrowserEnabled,
     thinkingEnabled,
     canvasContext,
     ralphMode
   } = request
 
-  console.log(`[Agent] sendMessage: conv=${conversationId}${images && images.length > 0 ? `, images=${images.length}` : ''}${aiBrowserEnabled ? ', AI Browser enabled' : ''}${thinkingEnabled ? ', thinking=ON' : ''}${canvasContext?.isOpen ? `, canvas tabs=${canvasContext.tabCount}` : ''}${ralphMode?.enabled ? ', Ralph mode' : ''}`)
+  const attCount = (images?.length || 0) + (attachments?.length || 0)
+  console.log(`[Agent] sendMessage: conv=${conversationId}${attCount > 0 ? `, attachments=${attCount}` : ''}${aiBrowserEnabled ? ', AI Browser enabled' : ''}${thinkingEnabled ? ', thinking=ON' : ''}${canvasContext?.isOpen ? `, canvas tabs=${canvasContext.tabCount}` : ''}${ralphMode?.enabled ? ', Ralph mode' : ''}`)
 
   const config = getConfig()
   // Ralph mode uses projectDir as working directory
@@ -324,6 +326,7 @@ export async function sendMessage(
       conversationId,
       message,
       images,
+      attachments,
       canvasContext,
       credentials.model,
       abortController,
@@ -421,6 +424,7 @@ async function processMessageStream(
   conversationId: string,
   message: string,
   images: AgentRequest['images'],
+  attachments: AgentRequest['attachments'],
   canvasContext: AgentRequest['canvasContext'],
   displayModel: string,
   abortController: AbortController,
@@ -461,8 +465,8 @@ async function processMessageStream(
   const canvasPrefix = formatCanvasContext(canvasContext)
   const messageWithContext = canvasPrefix + message
 
-  // Build message content (text-only or multi-modal with images)
-  const messageContent = buildMessageContent(messageWithContext, images)
+  // Build message content (text-only or multi-modal with images/PDFs/text)
+  const messageContent = buildMessageContent(messageWithContext, images, attachments)
 
   // Send message to V2 session and stream response
   // For multi-modal messages, we need to send as SDKUserMessage

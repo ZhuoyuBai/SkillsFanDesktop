@@ -11,6 +11,33 @@ import { z } from 'zod'
 import { tool, createSdkMcpServer } from '@anthropic-ai/claude-agent-sdk'
 import { getAllSkills, getSkill, getSkillsDir } from './skill-registry'
 import { getSkillContent } from './skill-loader'
+import type { SkillInfo } from './types'
+
+/**
+ * Group skills by source for display
+ */
+function groupBySource(skills: SkillInfo[]): [string, SkillInfo[]][] {
+  const groups = new Map<string, SkillInfo[]>()
+  const order = ['project-commands', 'skillsfan', 'global-commands', 'claude-skills', 'agents-skills']
+
+  for (const skill of skills) {
+    const kind = skill.source.kind
+    if (!groups.has(kind)) groups.set(kind, [])
+    groups.get(kind)!.push(skill)
+  }
+
+  const labels: Record<string, string> = {
+    'project-commands': 'Project Commands (.claude/commands/)',
+    'skillsfan': 'SkillsFan Installed Skills',
+    'global-commands': 'Global Commands (~/.claude/commands/)',
+    'claude-skills': 'Claude Skills (~/.claude/skills/)',
+    'agents-skills': 'Agent Skills (~/.agents/skills/)'
+  }
+
+  return order
+    .filter(kind => groups.has(kind))
+    .map(kind => [labels[kind] || kind, groups.get(kind)!] as [string, SkillInfo[]])
+}
 
 /**
  * 生成 Skill Tool 描述
@@ -32,7 +59,7 @@ async function generateDescription(): Promise<string> {
     ].join('\n')
   }
 
-  return [
+  const sections: string[] = [
     // ========== Skill 调用规则 ==========
     '## Skill 调用规则（必读）',
     '',
@@ -52,7 +79,7 @@ async function generateDescription(): Promise<string> {
     '3. 执行到该任务时，调用对应 Skill',
     '4. 将上一步的关键输出传递给下一步',
     '',
-    // ========== 原有内容 ==========
+    // ========== 技能列表 ==========
     '## Available Skills',
     '',
     'IMPORTANT: The complete list of available skills is shown below.',
@@ -66,14 +93,26 @@ async function generateDescription(): Promise<string> {
     'This is allowed - just follow the skill instructions and request permissions as needed.',
     '',
     '<available_skills>',
-    ...skills.flatMap(s => [
-      '  <skill>',
-      `    <name>${s.name}</name>`,
-      `    <description>${s.description}</description>`,
-      '  </skill>'
-    ]),
-    '</available_skills>'
-  ].join('\n')
+  ]
+
+  // Group by source for organized display
+  const grouped = groupBySource(skills)
+  for (const [sourceLabel, sourceSkills] of grouped) {
+    sections.push(`  <!-- ${sourceLabel} -->`)
+    for (const s of sourceSkills) {
+      sections.push(
+        '  <skill>',
+        `    <name>${s.name}</name>`,
+        `    <description>${s.description}</description>`,
+        `    <source>${s.source.kind}</source>`,
+        '  </skill>'
+      )
+    }
+  }
+
+  sections.push('</available_skills>')
+
+  return sections.join('\n')
 }
 
 /**
@@ -111,6 +150,7 @@ async function createSkillTool() {
             `## Skill: ${skill.name}`,
             '',
             `**技能目录**: ${skill.baseDir}`,
+            `**来源**: ${skill.source.kind}`,
             '',
             content
           ].join('\n')

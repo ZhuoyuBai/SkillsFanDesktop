@@ -29,7 +29,7 @@ import { registerOverlayHandlers, cleanupOverlayHandlers } from '../ipc/overlay'
 import { initializeSearchHandlers, cleanupSearchHandlers } from '../ipc/search'
 import { registerPerfHandlers } from '../ipc/perf'
 import { registerGitBashHandlers, initializeGitBashOnStartup } from '../ipc/git-bash'
-import { initializeRegistry, startSkillWatcher, getSkillsDir } from '../services/skill'
+import { initializeRegistry, startSkillWatcher } from '../services/skill'
 import { registerRalphHandlers } from '../ipc/ralph'
 import { registerLoopTaskHandlers } from '../ipc/loop-task'
 
@@ -84,10 +84,10 @@ export function initializeExtendedServices(mainWindow: BrowserWindow): void {
   registerLoopTaskHandlers(mainWindow)
 
   // Skill: Initialize skill registry and start file watcher
-  // Skills are loaded from ~/.skillsfan-dev/skills or ~/.skillsfan/skills
+  // Skills are loaded from 5 sources: project commands, SkillsFan, global commands, Claude skills, Agent skills
   initializeRegistry()
     .then(() => {
-      startSkillWatcher(getSkillsDir())
+      startSkillWatcher()
       console.log('[Bootstrap] Skill system initialized')
     })
     .catch((err) => {

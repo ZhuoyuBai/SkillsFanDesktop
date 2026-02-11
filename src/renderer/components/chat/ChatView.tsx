@@ -28,7 +28,7 @@ import {
   getOnboardingPrompt,
 } from '../onboarding/onboardingData'
 import { api } from '../../api'
-import type { ImageAttachment } from '../../types'
+import type { Attachment } from '../../types'
 import { useTranslation } from '../../i18n'
 
 // Mobile breakpoint (matches Tailwind sm: 640px)
@@ -255,19 +255,19 @@ export function ChatView({ isCompact = false }: ChatViewProps) {
   // AI Browser state
   const { enabled: aiBrowserEnabled } = useAIBrowserStore()
 
-  // Handle send (with optional images for multi-modal messages, optional thinking mode)
-  const handleSend = async (content: string, images?: ImageAttachment[], thinkingEnabled?: boolean) => {
+  // Handle send (with optional attachments for multi-modal messages, optional thinking mode)
+  const handleSend = async (content: string, attachments?: Attachment[], thinkingEnabled?: boolean) => {
     // In onboarding mode, intercept and play mock response
     if (isOnboarding && currentStep === 'send-message') {
       handleOnboardingSend()
       return
     }
 
-    // Can send if has text OR has images
-    if ((!content.trim() && (!images || images.length === 0)) || isGenerating) return
+    // Can send if has text OR has attachments
+    if ((!content.trim() && (!attachments || attachments.length === 0)) || isGenerating) return
 
     // Pass both AI Browser and thinking state to sendMessage
-    await sendMessage(content, images, aiBrowserEnabled, thinkingEnabled)
+    await sendMessage(content, attachments, aiBrowserEnabled, thinkingEnabled)
   }
 
   // Handle stop - stops the current conversation's generation
@@ -278,9 +278,9 @@ export function ChatView({ isCompact = false }: ChatViewProps) {
   }
 
   // Handle inject message during generation
-  const handleInject = useCallback(async (content: string, images?: ImageAttachment[]) => {
+  const handleInject = useCallback(async (content: string, attachments?: Attachment[]) => {
     if (!isGenerating) return
-    await injectMessage(content, images)
+    await injectMessage(content, attachments)
   }, [isGenerating, injectMessage])
 
   // Combine real messages with mock onboarding messages

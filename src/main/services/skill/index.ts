@@ -2,7 +2,7 @@
  * Skill 模块公共 API
  */
 
-export type { SkillInfo } from './types'
+export type { SkillInfo, SkillSource } from './types'
 
 export {
   initializeRegistry,
@@ -11,10 +11,11 @@ export {
   hasSkills,
   getSkillsDir,
   reloadSkills,
+  updateSpaceWorkDir,
   ensureSkillsInitialized
 } from './skill-registry'
 
-export { startSkillWatcher } from './skill-watcher'
+export { startSkillWatcher, stopSkillWatcher } from './skill-watcher'
 
 export { createSkillMcpServer } from './skill-mcp-server'
 

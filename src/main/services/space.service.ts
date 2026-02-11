@@ -3,8 +3,9 @@
  */
 
 import { shell } from 'electron'
-import { join, basename } from 'path'
+import { join, basename, extname } from 'path'
 import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, statSync, rmSync } from 'fs'
+import * as fs from 'fs/promises'
 import { getHaloDir, getTempSpacePath, getSpacesDir } from './config.service'
 import { v4 as uuidv4 } from 'uuid'
 
@@ -607,4 +608,115 @@ export function saveOnboardingConversation(
     console.error(`[Space] saveOnboardingConversation failed:`, error)
     return null
   }
+}
+
+// ========== File listing for @ file reference ==========
+
+export interface FileItem {
+  name: string        // File name (e.g. "index.ts")
+  path: string        // Relative path (e.g. "src/main/index.ts")
+  isDirectory: boolean
+  extension?: string  // File extension without dot
+}
+
+interface ListFilesOptions {
+  maxDepth?: number    // Max scan depth, default 5
+  maxResults?: number  // Max returned items, default 50
+  query?: string       // Fuzzy search keyword
+}
+
+const IGNORED_DIRS = new Set([
+  'node_modules', '.git', 'dist', '.next', '__pycache__',
+  '.cache', '.turbo', 'coverage', '.output', 'build',
+  '.DS_Store', '.env', 'out', '.nuxt', '.svelte-kit',
+  'target', '.skillsfan', '.halo'
+])
+
+const IGNORED_FILES = new Set([
+  '.DS_Store', 'Thumbs.db', '.gitkeep'
+])
+
+const ALLOWED_DOT_DIRS = new Set([
+  '.claude', '.github', '.vscode', '.husky'
+])
+
+export async function listWorkspaceFiles(
+  spaceId: string,
+  options: ListFilesOptions = {}
+): Promise<FileItem[]> {
+  const { maxDepth = 5, maxResults = 50, query = '' } = options
+
+  const space = getSpace(spaceId)
+  if (!space?.path) {
+    return []
+  }
+
+  // For temp space, use path; for regular spaces, use path as working directory
+  const baseDir = space.path
+  if (!existsSync(baseDir)) {
+    return []
+  }
+
+  const results: FileItem[] = []
+
+  async function scan(dir: string, depth: number, relativePath: string): Promise<void> {
+    if (depth > maxDepth || results.length >= maxResults * 2) return
+
+    let entries: import('fs').Dirent[]
+    try {
+      entries = await fs.readdir(dir, { withFileTypes: true })
+    } catch {
+      return
+    }
+
+    // Sort: directories first, then alphabetical
+    entries.sort((a, b) => {
+      if (a.isDirectory() !== b.isDirectory()) {
+        return a.isDirectory() ? -1 : 1
+      }
+      return a.name.localeCompare(b.name)
+    })
+
+    for (const entry of entries) {
+      const name = entry.name
+
+      // Skip hidden files (except allowed dot dirs)
+      if (name.startsWith('.') && !ALLOWED_DOT_DIRS.has(name)) continue
+
+      // Skip ignored directories
+      if (entry.isDirectory() && IGNORED_DIRS.has(name)) continue
+
+      // Skip ignored files
+      if (!entry.isDirectory() && IGNORED_FILES.has(name)) continue
+
+      const itemPath = relativePath ? `${relativePath}/${name}` : name
+      const fullPath = join(dir, name)
+
+      results.push({
+        name,
+        path: itemPath,
+        isDirectory: entry.isDirectory(),
+        extension: entry.isDirectory() ? undefined : extname(name).slice(1) || undefined
+      })
+
+      // Recurse into subdirectories
+      if (entry.isDirectory()) {
+        await scan(fullPath, depth + 1, itemPath)
+      }
+    }
+  }
+
+  await scan(baseDir, 0, '')
+
+  // Filter by query
+  let filtered = results
+  if (query) {
+    const lowerQuery = query.toLowerCase()
+    filtered = results.filter(item =>
+      item.path.toLowerCase().includes(lowerQuery) ||
+      item.name.toLowerCase().includes(lowerQuery)
+    )
+  }
+
+  return filtered.slice(0, maxResults)
 }

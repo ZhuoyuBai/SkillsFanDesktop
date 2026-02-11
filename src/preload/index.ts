@@ -39,6 +39,7 @@ export interface HaloAPI {
     }
   }) => Promise<IpcResponse>
   getSpacePreferences: (spaceId: string) => Promise<IpcResponse>
+  spaceListFiles: (spaceId: string, query?: string) => Promise<IpcResponse>
 
   // Conversation
   listConversations: (spaceId: string) => Promise<IpcResponse>
@@ -77,6 +78,16 @@ export interface HaloAPI {
       name?: string
       size?: number
     }>
+    attachments?: Array<{
+      id: string
+      type: 'image' | 'pdf' | 'text'
+      mediaType: string
+      data?: string
+      content?: string
+      name?: string
+      size?: number
+      language?: string
+    }>
     aiBrowserEnabled?: boolean  // Enable AI Browser tools
     thinkingEnabled?: boolean  // Enable extended thinking mode
     canvasContext?: {  // Canvas context for AI awareness
@@ -109,6 +120,16 @@ export interface HaloAPI {
       data: string
       name?: string
       size?: number
+    }>
+    attachments?: Array<{
+      id: string
+      type: 'image' | 'pdf' | 'text'
+      mediaType: string
+      data?: string
+      content?: string
+      name?: string
+      size?: number
+      language?: string
     }>
   }) => Promise<IpcResponse>
   approveTool: (conversationId: string) => Promise<IpcResponse>
@@ -149,6 +170,7 @@ export interface HaloAPI {
   ) => Promise<IpcResponse>
   deleteSkill: (skillName: string) => Promise<IpcResponse>
   openSkillFolder: (skillName: string) => Promise<IpcResponse>
+  listSlashCommands: (spaceId?: string) => Promise<IpcResponse>
 
   // Onboarding
   writeOnboardingArtifact: (spaceId: string, filename: string, content: string) => Promise<IpcResponse>
@@ -436,6 +458,7 @@ const api: HaloAPI = {
   updateSpacePreferences: (spaceId, preferences) =>
     ipcRenderer.invoke('space:update-preferences', spaceId, preferences),
   getSpacePreferences: (spaceId) => ipcRenderer.invoke('space:get-preferences', spaceId),
+  spaceListFiles: (spaceId, query) => ipcRenderer.invoke('space:list-files', spaceId, query),
 
   // Conversation
   listConversations: (spaceId) => ipcRenderer.invoke('conversation:list', spaceId),
@@ -495,6 +518,7 @@ const api: HaloAPI = {
     ipcRenderer.invoke('skill:install', archivePath, conflictResolution),
   deleteSkill: (skillName) => ipcRenderer.invoke('skill:delete', skillName),
   openSkillFolder: (skillName) => ipcRenderer.invoke('skill:open-folder', skillName),
+  listSlashCommands: (spaceId) => ipcRenderer.invoke('skill:list-slash-commands', spaceId),
 
   // Onboarding
   writeOnboardingArtifact: (spaceId, filename, content) =>

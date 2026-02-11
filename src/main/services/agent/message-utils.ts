@@ -7,7 +7,7 @@
  * - SDK message parsing into Thought objects
  */
 
-import type { Thought, ImageAttachment, CanvasContext } from './types'
+import type { Thought, ImageAttachment, CanvasContext, Attachment, PdfAttachment, TextAttachment } from './types'
 
 // ============================================
 // Canvas Context Formatting
@@ -50,38 +50,105 @@ ${tabsSummary}
 /**
  * Build multi-modal message content for Claude API
  *
+ * Supports three types of attachments:
+ * - Images → Claude `image` content block (base64)
+ * - PDFs → Claude `document` content block (base64)
+ * - Text/Code → Prepended to message text with XML tags
+ *
  * @param text - Text content of the message
- * @param images - Optional image attachments
+ * @param images - Optional image attachments (legacy, backward compatible)
+ * @param attachments - Optional general attachments (PDF, text, code)
  * @returns Plain text string or array of content blocks for multi-modal
  */
 export function buildMessageContent(
   text: string,
-  images?: ImageAttachment[]
+  images?: ImageAttachment[],
+  attachments?: Attachment[]
 ): string | Array<{ type: string; [key: string]: unknown }> {
-  // If no images, just return plain text
-  if (!images || images.length === 0) {
+  const hasImages = images && images.length > 0
+  const hasAttachments = attachments && attachments.length > 0
+
+  // Case 1: No attachments at all → plain text
+  if (!hasImages && !hasAttachments) {
     return text
   }
 
-  // Build content blocks array for multi-modal message
-  const contentBlocks: Array<{ type: string; [key: string]: unknown }> = []
-
-  // Add text block first (if there's text)
-  if (text.trim()) {
-    contentBlocks.push({
-      type: 'text',
-      text: text
-    })
+  // Case 2: Only legacy images, no general attachments → existing behavior
+  if (!hasAttachments && hasImages) {
+    const contentBlocks: Array<{ type: string; [key: string]: unknown }> = []
+    if (text.trim()) {
+      contentBlocks.push({ type: 'text', text })
+    }
+    for (const image of images!) {
+      contentBlocks.push({
+        type: 'image',
+        source: {
+          type: 'base64',
+          media_type: image.mediaType,
+          data: image.data
+        }
+      })
+    }
+    return contentBlocks
   }
 
-  // Add image blocks
-  for (const image of images) {
+  // Case 3: General attachments (may include images, PDFs, text files)
+  const allAttachments = attachments || []
+
+  // Separate by type
+  const imageAtts = allAttachments.filter(a => a.type === 'image') as ImageAttachment[]
+  const pdfAtts = allAttachments.filter(a => a.type === 'pdf') as PdfAttachment[]
+  const textAtts = allAttachments.filter(a => a.type === 'text') as TextAttachment[]
+
+  // Also include legacy images
+  if (hasImages) {
+    for (const img of images!) {
+      if (!imageAtts.some(a => a.id === img.id)) {
+        imageAtts.push(img)
+      }
+    }
+  }
+
+  // Prepend text file contents as XML tags
+  let enhancedText = text
+  if (textAtts.length > 0) {
+    const fileContents = textAtts.map(att => {
+      const lang = att.language || ''
+      return `<file name="${att.name}">\n\`\`\`${lang}\n${att.content}\n\`\`\`\n</file>`
+    }).join('\n\n')
+    enhancedText = `${fileContents}\n\n${text}`
+  }
+
+  // If only text attachments and no binary attachments, return as plain text
+  if (imageAtts.length === 0 && pdfAtts.length === 0) {
+    return enhancedText
+  }
+
+  // Build content blocks for multi-modal
+  const contentBlocks: Array<{ type: string; [key: string]: unknown }> = []
+
+  if (enhancedText.trim()) {
+    contentBlocks.push({ type: 'text', text: enhancedText })
+  }
+
+  for (const img of imageAtts) {
     contentBlocks.push({
       type: 'image',
       source: {
         type: 'base64',
-        media_type: image.mediaType,
-        data: image.data
+        media_type: img.mediaType,
+        data: img.data
+      }
+    })
+  }
+
+  for (const pdf of pdfAtts) {
+    contentBlocks.push({
+      type: 'document',
+      source: {
+        type: 'base64',
+        media_type: 'application/pdf',
+        data: pdf.data
       }
     })
   }

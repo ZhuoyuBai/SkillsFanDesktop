@@ -15,7 +15,7 @@ import {
   clearAuthToken,
   getAuthToken
 } from './transport'
-import type { ImageAttachment } from '../types'
+import type { ImageAttachment, Attachment } from '../types'
 
 // Response type
 interface ApiResponse<T = unknown> {
@@ -237,6 +237,14 @@ export const api = {
     return httpRequest('GET', `/api/spaces/${spaceId}/preferences`)
   },
 
+  // List workspace files (for @ file reference)
+  spaceListFiles: async (spaceId: string, query?: string): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.skillsfan.spaceListFiles(spaceId, query)
+    }
+    return httpRequest('GET', `/api/spaces/${spaceId}/files${query ? `?q=${encodeURIComponent(query)}` : ''}`)
+  },
+
   // ===== Conversation =====
   listConversations: async (spaceId: string): Promise<ApiResponse> => {
     if (isElectron()) {
@@ -354,6 +362,7 @@ export const api = {
       name?: string
       size?: number
     }>
+    attachments?: Attachment[]  // General file attachments (PDF, text, code, images)
     aiBrowserEnabled?: boolean  // Enable AI Browser tools
     thinkingEnabled?: boolean  // Enable extended thinking mode
     canvasContext?: {  // Canvas context for AI awareness
@@ -397,6 +406,7 @@ export const api = {
     conversationId: string
     message: string
     images?: ImageAttachment[]
+    attachments?: Attachment[]
   }): Promise<ApiResponse> => {
     if (isElectron()) {
       return window.skillsfan.injectMessage(request)
@@ -574,6 +584,14 @@ export const api = {
       return window.skillsfan.openSkillFolder(skillName)
     }
     return { success: false, error: 'Only available in desktop app' }
+  },
+
+  // List slash commands (built-in + skills)
+  listSlashCommands: async (spaceId?: string): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.skillsfan.listSlashCommands(spaceId)
+    }
+    return httpRequest('GET', `/api/skills/slash-commands${spaceId ? `?spaceId=${encodeURIComponent(spaceId)}` : ''}`)
   },
 
   // ===== Onboarding =====

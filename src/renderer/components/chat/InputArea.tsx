@@ -19,24 +19,29 @@
  * - Bottom toolbar for future extensibility
  */
 
-import { useState, useRef, useEffect, KeyboardEvent, ClipboardEvent, DragEvent } from 'react'
-import { Plus, ImagePlus, Loader2, AlertCircle, Globe, Package } from 'lucide-react'
+import { useState, useRef, useEffect, useMemo, useCallback, KeyboardEvent, ClipboardEvent, DragEvent } from 'react'
+import { Plus, Paperclip, Loader2, AlertCircle, Globe, Package } from 'lucide-react'
 import { useAppStore } from '../../stores/app.store'
+import { useSpaceStore } from '../../stores/space.store'
 import { useOnboardingStore } from '../../stores/onboarding.store'
 import { useAIBrowserStore } from '../../stores/ai-browser.store'
 import { getOnboardingPrompt } from '../onboarding/onboardingData'
-import { ImageAttachmentPreview } from './ImageAttachmentPreview'
+import { AttachmentPreview } from './AttachmentPreview'
+import { FilePopover } from './FilePopover'
+import { CommandPopover } from './CommandPopover'
+import type { SlashCommand } from './CommandPopover'
 import { ModelSelector } from '../layout/ModelSelector'
 import { CreditsDisplay } from '../layout/CreditsDisplay'
 import { SpaceSelector } from '../layout/SpaceSelector'
-import { processImage, isValidImageType, formatFileSize } from '../../utils/imageProcessor'
-import type { ImageAttachment } from '../../types'
+import { processFile, isSupportedFile, checkFileSize, getAcceptedExtensions } from '../../utils/fileProcessor'
+import { api } from '../../api'
+import type { Attachment } from '../../types'
 import { useTranslation } from '../../i18n'
 
 interface InputAreaProps {
-  onSend: (content: string, images?: ImageAttachment[], thinkingEnabled?: boolean) => void
+  onSend: (content: string, attachments?: Attachment[], thinkingEnabled?: boolean) => void
   onStop: () => void
-  onInject?: (content: string, images?: ImageAttachment[]) => void  // Inject message during generation
+  onInject?: (content: string, attachments?: Attachment[]) => void  // Inject message during generation
   isGenerating: boolean
   isCompact?: boolean
   noBorder?: boolean  // Hide top border (used in empty state centered layout)
@@ -148,12 +153,11 @@ function useTypewriter(phrases: string[], options?: {
   return displayText
 }
 
-// Image constraints
-const MAX_IMAGE_SIZE = 20 * 1024 * 1024  // 20MB max per image (before compression)
-const MAX_IMAGES = 10  // Max images per message
+// Attachment constraints
+const MAX_ATTACHMENTS = 10  // Max attachments per message
 
 // Error message type
-interface ImageError {
+interface AttachmentError {
   id: string
   message: string
 }
@@ -163,10 +167,10 @@ export function InputArea({ onSend, onStop, onInject, isGenerating, isCompact = 
   const [content, setContent] = useState('')
   const [isFocused, setIsFocused] = useState(false)
   const [isHovered, setIsHovered] = useState(false)
-  const [images, setImages] = useState<ImageAttachment[]>([])
+  const [attachments, setAttachments] = useState<Attachment[]>([])
   const [isDragOver, setIsDragOver] = useState(false)
-  const [isProcessingImages, setIsProcessingImages] = useState(false)
-  const [imageError, setImageError] = useState<ImageError | null>(null)
+  const [isProcessingFiles, setIsProcessingFiles] = useState(false)
+  const [fileError, setFileError] = useState<AttachmentError | null>(null)
   const [infoToast, setInfoToast] = useState<string | null>(null)  // Info toast message
   const [thinkingEnabled, setThinkingEnabled] = useState(false)  // Extended thinking mode
   const [showAttachMenu, setShowAttachMenu] = useState(false)  // Attachment menu visibility
@@ -179,6 +183,33 @@ export function InputArea({ onSend, onStop, onInject, isGenerating, isCompact = 
 
   // Settings navigation
   const { openSettingsWithSection } = useAppStore()
+
+  // Current space for @ file reference
+  const { currentSpace } = useSpaceStore()
+
+  // === @ File reference state ===
+  const [filePopoverVisible, setFilePopoverVisible] = useState(false)
+  const [filePopoverFilter, setFilePopoverFilter] = useState('')
+  const [filePopoverItems, setFilePopoverItems] = useState<Array<{ name: string; path: string; isDirectory: boolean; extension?: string }>>([])
+  const [filePopoverIndex, setFilePopoverIndex] = useState(0)
+  const [fileTriggerPosition, setFileTriggerPosition] = useState(0) // Position of @ in text
+
+  // === / Command popover state ===
+  const [cmdPopoverVisible, setCmdPopoverVisible] = useState(false)
+  const [cmdPopoverFilter, setCmdPopoverFilter] = useState('')
+  const [cmdPopoverIndex, setCmdPopoverIndex] = useState(0)
+  const [cmdTriggerPosition, setCmdTriggerPosition] = useState(0) // Position of / in text
+  const [cachedCommands, setCachedCommands] = useState<SlashCommand[]>([])
+  const [activeSkillBadge, setActiveSkillBadge] = useState<{ name: string; content: string } | null>(null)
+
+  // Preload slash commands when space changes
+  useEffect(() => {
+    api.listSlashCommands(currentSpace?.id).then(result => {
+      if (result.success && result.data) {
+        setCachedCommands(result.data as SlashCommand[])
+      }
+    })
+  }, [currentSpace?.id])
 
   // Translate typewriter phrases
   const typewriterPhrases = TYPEWRITER_PHRASE_KEYS.map(key => t(key))
@@ -193,11 +224,11 @@ export function InputArea({ onSend, onStop, onInject, isGenerating, isCompact = 
 
   // Auto-clear error after 3 seconds
   useEffect(() => {
-    if (imageError) {
-      const timer = setTimeout(() => setImageError(null), 3000)
+    if (fileError) {
+      const timer = setTimeout(() => setFileError(null), 3000)
       return () => clearTimeout(timer)
     }
-  }, [imageError])
+  }, [fileError])
 
   // Auto-clear info toast after 2 seconds
   useEffect(() => {
@@ -226,6 +257,94 @@ export function InputArea({ onSend, onStop, onInject, isGenerating, isCompact = 
     }
   }, [showAttachMenu])
 
+  // === @ File reference: debounced fetch ===
+  const fetchFilesTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const fetchFiles = useCallback((query: string) => {
+    if (!currentSpace?.id) return
+    if (fetchFilesTimerRef.current) clearTimeout(fetchFilesTimerRef.current)
+    fetchFilesTimerRef.current = setTimeout(async () => {
+      const result = await api.spaceListFiles(currentSpace.id, query)
+      if (result.success && result.data) {
+        setFilePopoverItems(result.data as Array<{ name: string; path: string; isDirectory: boolean; extension?: string }>)
+      }
+    }, query ? 200 : 0) // Immediate on first @, debounced on subsequent typing
+  }, [currentSpace?.id])
+
+  // Cleanup debounce timer
+  useEffect(() => {
+    return () => {
+      if (fetchFilesTimerRef.current) clearTimeout(fetchFilesTimerRef.current)
+    }
+  }, [])
+
+  // === / Command popover: filtered commands ===
+  const filteredCommands = useMemo(() => {
+    if (!cmdPopoverVisible) return []
+    const filterLower = cmdPopoverFilter.toLowerCase()
+    const builtin = cachedCommands.filter(c => c.source.kind === 'builtin')
+    const skills = cachedCommands.filter(c => c.source.kind !== 'builtin')
+    const fb = filterLower
+      ? builtin.filter(c => c.name.toLowerCase().includes(filterLower) || c.description.toLowerCase().includes(filterLower))
+      : builtin
+    const fs = filterLower
+      ? skills.filter(c => c.name.toLowerCase().includes(filterLower) || c.description.toLowerCase().includes(filterLower))
+      : skills
+    return [...fb, ...fs]
+  }, [cmdPopoverVisible, cmdPopoverFilter, cachedCommands])
+
+  // Handle command selection from popover
+  const handleCommandSelect = useCallback((command: SlashCommand) => {
+    setCmdPopoverVisible(false)
+
+    switch (command.type) {
+      case 'immediate':
+        // Clear input and execute immediately
+        setContent('')
+        // Dispatch immediate command via custom event (handled by parent)
+        window.dispatchEvent(new CustomEvent('skillsfan:slash-command', {
+          detail: { command: command.name, type: 'immediate' }
+        }))
+        break
+
+      case 'prompt':
+        // Replace input with preset prompt content
+        setContent(command.content || '')
+        textareaRef.current?.focus()
+        break
+
+      case 'skill': {
+        // If user typed extra text after the command, combine and send
+        const afterCmd = content.slice(cmdTriggerPosition + 1 + command.name.length).trim()
+        if (afterCmd) {
+          const finalMsg = `${command.content}\n\nUser request: ${afterCmd}`
+          setContent('')
+          setActiveSkillBadge(null)
+          onSend(finalMsg)
+        } else {
+          // Show skill badge and wait for user input
+          setContent('')
+          setActiveSkillBadge({ name: command.name, content: command.content || '' })
+          textareaRef.current?.focus()
+        }
+        break
+      }
+    }
+  }, [content, cmdTriggerPosition, onSend])
+
+  // Handle file selection from popover
+  const handleFileSelect = useCallback((item: { name: string; path: string; isDirectory: boolean; extension?: string }) => {
+    const before = content.slice(0, fileTriggerPosition)
+    const afterPos = fileTriggerPosition + 1 + filePopoverFilter.length // @ + filter length
+    const after = content.slice(afterPos)
+    const newContent = `${before}@${item.path} ${after}`
+    setContent(newContent)
+    setFilePopoverVisible(false)
+    setFilePopoverFilter('')
+    setFilePopoverItems([])
+    // Refocus textarea
+    textareaRef.current?.focus()
+  }, [content, fileTriggerPosition, filePopoverFilter])
+
   // Apply suggested content from external source
   useEffect(() => {
     if (suggestedContent) {
@@ -236,7 +355,7 @@ export function InputArea({ onSend, onStop, onInject, isGenerating, isCompact = 
 
   // Show error to user
   const showError = (message: string) => {
-    setImageError({ id: `err-${Date.now()}`, message })
+    setFileError({ id: `err-${Date.now()}`, message })
   }
 
   // Onboarding state
@@ -250,64 +369,53 @@ export function InputArea({ onSend, onStop, onInject, isGenerating, isCompact = 
   // Show typewriter only when input is empty, not focused, not hovered, and animation is enabled
   const showTypewriter = showTypewriterAnimation && !content && !isFocused && !isHovered && !isOnboardingSendStep && !isGenerating
 
-  // Process file to ImageAttachment with professional compression
-  const processFileWithCompression = async (file: File): Promise<ImageAttachment | null> => {
-    // Validate type
-    if (!isValidImageType(file)) {
-      showError(t('Unsupported image format: {{type}}', { type: file.type || t('Unknown') }))
-      return null
-    }
-
-    // Validate size (before compression)
-    if (file.size > MAX_IMAGE_SIZE) {
-      showError(t('Image too large ({{size}}), max 20MB', { size: formatFileSize(file.size) }))
-      return null
-    }
-
-    try {
-      // Use professional image processor for compression
-      const processed = await processImage(file)
-
-      return {
-        id: `img-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        type: 'image',
-        mediaType: processed.mediaType,
-        data: processed.data,
-        name: file.name,
-        size: processed.compressedSize
-      }
-    } catch (error) {
-      console.error(`Failed to process image: ${file.name}`, error)
-      showError(t('Failed to process image: {{name}}', { name: file.name }))
-      return null
-    }
-  }
-
-  // Add images (with limit check and loading state)
-  const addImages = async (files: File[]) => {
-    const remainingSlots = MAX_IMAGES - images.length
+  // Add files as attachments (with limit check and loading state)
+  const addFiles = async (files: File[]) => {
+    const remainingSlots = MAX_ATTACHMENTS - attachments.length
     if (remainingSlots <= 0) return
 
     const filesToProcess = files.slice(0, remainingSlots)
 
-    // Show loading state during compression
-    setIsProcessingImages(true)
+    // Show loading state during processing
+    setIsProcessingFiles(true)
 
     try {
-      const newImages = await Promise.all(filesToProcess.map(processFileWithCompression))
-      const validImages = newImages.filter((img): img is ImageAttachment => img !== null)
+      const results = await Promise.allSettled(
+        filesToProcess.map(async (file) => {
+          // Validate support
+          if (!isSupportedFile(file)) {
+            showError(t('Unsupported file type: {{name}}', { name: file.name }))
+            return null
+          }
+          // Validate size
+          const sizeCheck = checkFileSize(file)
+          if (!sizeCheck.valid) {
+            showError(sizeCheck.error!)
+            return null
+          }
+          return processFile(file)
+        })
+      )
 
-      if (validImages.length > 0) {
-        setImages(prev => [...prev, ...validImages])
+      const validAttachments = results
+        .filter((r): r is PromiseFulfilledResult<Attachment | null> => r.status === 'fulfilled')
+        .map(r => r.value)
+        .filter((att): att is Attachment => att !== null)
+
+      if (validAttachments.length > 0) {
+        setAttachments(prev => [...prev, ...validAttachments])
       }
+    } catch (error) {
+      console.error('Failed to process files:', error)
+      showError(t('Failed to process files'))
     } finally {
-      setIsProcessingImages(false)
+      setIsProcessingFiles(false)
     }
   }
 
-  // Remove image
-  const removeImage = (id: string) => {
-    setImages(prev => prev.filter(img => img.id !== id))
+  // Remove attachment
+  const removeAttachment = (id: string) => {
+    setAttachments(prev => prev.filter(att => att.id !== id))
   }
 
   // Handle paste event
@@ -315,20 +423,20 @@ export function InputArea({ onSend, onStop, onInject, isGenerating, isCompact = 
     const items = e.clipboardData?.items
     if (!items) return
 
-    const imageFiles: File[] = []
+    const pasteFiles: File[] = []
 
     for (const item of Array.from(items)) {
-      if (item.type.startsWith('image/')) {
+      if (item.kind === 'file') {
         const file = item.getAsFile()
-        if (file) {
-          imageFiles.push(file)
+        if (file && isSupportedFile(file)) {
+          pasteFiles.push(file)
         }
       }
     }
 
-    if (imageFiles.length > 0) {
-      e.preventDefault()  // Prevent default only if we're handling images
-      await addImages(imageFiles)
+    if (pasteFiles.length > 0) {
+      e.preventDefault()  // Prevent default only if we're handling files
+      await addFiles(pasteFiles)
     }
   }
 
@@ -347,10 +455,10 @@ export function InputArea({ onSend, onStop, onInject, isGenerating, isCompact = 
     e.preventDefault()
     setIsDragOver(false)
 
-    const files = Array.from(e.dataTransfer.files).filter(file => isValidImageType(file))
+    const files = Array.from(e.dataTransfer.files).filter(file => isSupportedFile(file))
 
     if (files.length > 0) {
-      await addImages(files)
+      await addFiles(files)
     }
   }
 
@@ -358,7 +466,7 @@ export function InputArea({ onSend, onStop, onInject, isGenerating, isCompact = 
   const handleFileInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
     if (files.length > 0) {
-      await addImages(files)
+      await addFiles(files)
     }
     // Reset input
     if (fileInputRef.current) {
@@ -366,8 +474,8 @@ export function InputArea({ onSend, onStop, onInject, isGenerating, isCompact = 
     }
   }
 
-  // Handle image button click (from attachment menu)
-  const handleImageButtonClick = () => {
+  // Handle attach button click (from attachment menu)
+  const handleAttachButtonClick = () => {
     setShowAttachMenu(false)
     fileInputRef.current?.click()
   }
@@ -384,25 +492,34 @@ export function InputArea({ onSend, onStop, onInject, isGenerating, isCompact = 
   // Handle send
   const handleSend = () => {
     const textToSend = isOnboardingSendStep ? onboardingPrompt : content.trim()
-    const hasContent = textToSend || images.length > 0
+
+    // If skill badge is active, prepend skill content
+    let finalText = textToSend
+    if (activeSkillBadge && textToSend) {
+      finalText = `${activeSkillBadge.content}\n\nUser request: ${textToSend}`
+    }
+
+    const hasContent = finalText || attachments.length > 0
 
     if (!hasContent) return
 
     if (isGenerating && onInject) {
       // During generation: inject message instead of normal send
-      onInject(textToSend, images.length > 0 ? images : undefined)
+      onInject(finalText, attachments.length > 0 ? attachments : undefined)
       setContent('')
-      setImages([])
+      setAttachments([])
+      setActiveSkillBadge(null)
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto'
       }
     } else if (!isGenerating) {
       // Normal send
-      onSend(textToSend, images.length > 0 ? images : undefined, thinkingEnabled)
+      onSend(finalText, attachments.length > 0 ? attachments : undefined, thinkingEnabled)
 
       if (!isOnboardingSendStep) {
         setContent('')
-        setImages([])  // Clear images after send
+        setAttachments([])  // Clear attachments after send
+        setActiveSkillBadge(null)
         // Don't reset thinkingEnabled - user might want to keep it on
         // Reset height
         if (textareaRef.current) {
@@ -422,6 +539,59 @@ export function InputArea({ onSend, onStop, onInject, isGenerating, isCompact = 
     // Ignore key events during IME composition (Chinese/Japanese/Korean input)
     // This prevents Enter from sending the message while confirming IME candidates
     if (e.nativeEvent.isComposing) return
+
+    // === / Command popover keyboard navigation ===
+    if (cmdPopoverVisible && filteredCommands.length > 0) {
+      if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        setCmdPopoverIndex(prev => Math.max(0, prev - 1))
+        return
+      }
+      if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        setCmdPopoverIndex(prev => Math.min(filteredCommands.length - 1, prev + 1))
+        return
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault()
+        if (filteredCommands[cmdPopoverIndex]) {
+          handleCommandSelect(filteredCommands[cmdPopoverIndex])
+        }
+        return
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        setCmdPopoverVisible(false)
+        return
+      }
+    }
+
+    // === @ File popover keyboard navigation ===
+    if (filePopoverVisible && filePopoverItems.length > 0) {
+      const displayCount = Math.min(filePopoverItems.length, 20)
+      if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        setFilePopoverIndex(prev => Math.max(0, prev - 1))
+        return
+      }
+      if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        setFilePopoverIndex(prev => Math.min(displayCount - 1, prev + 1))
+        return
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault()
+        if (filePopoverItems[filePopoverIndex]) {
+          handleFileSelect(filePopoverItems[filePopoverIndex])
+        }
+        return
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        setFilePopoverVisible(false)
+        return
+      }
+    }
 
     // Mobile: Enter for newline, send via button only
     // PC: Enter to send, Shift+Enter for newline
@@ -446,10 +616,10 @@ export function InputArea({ onSend, onStop, onInject, isGenerating, isCompact = 
   }
 
   // In onboarding mode, can always send (prefilled content)
-  // Can send if has text OR has images (and not processing images)
+  // Can send if has text OR has attachments (and not processing files)
   // Allow sending during generation if onInject is provided (for inject feature)
-  const canSend = isOnboardingSendStep || ((content.trim().length > 0 || images.length > 0) && !isProcessingImages && (!isGenerating || !!onInject))
-  const hasImages = images.length > 0
+  const canSend = isOnboardingSendStep || ((content.trim().length > 0 || attachments.length > 0) && !isProcessingFiles && (!isGenerating || !!onInject))
+  const hasAttachments = attachments.length > 0
 
   return (
     <div className={`
@@ -459,11 +629,11 @@ export function InputArea({ onSend, onStop, onInject, isGenerating, isCompact = 
     `}>
       <div className={isCompact ? '' : 'max-w-4xl mx-auto'}>
         {/* Error toast notification */}
-        {imageError && (
+        {fileError && (
           <div className="mb-2 p-3 rounded-xl bg-destructive/10 border border-destructive/20
             flex items-start gap-2 animate-fade-in">
             <AlertCircle size={16} className="text-destructive mt-0.5 flex-shrink-0" />
-            <span className="text-sm text-destructive flex-1">{imageError.message}</span>
+            <span className="text-sm text-destructive flex-1">{fileError.message}</span>
           </div>
         )}
 
@@ -479,7 +649,7 @@ export function InputArea({ onSend, onStop, onInject, isGenerating, isCompact = 
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/jpeg,image/png,image/gif,image/webp"
+          accept={getAcceptedExtensions()}
           multiple
           className="hidden"
           onChange={handleFileInputChange}
@@ -519,20 +689,13 @@ export function InputArea({ onSend, onStop, onInject, isGenerating, isCompact = 
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
         >
-          {/* Image preview area */}
-          {hasImages && (
-            <ImageAttachmentPreview
-              images={images}
-              onRemove={removeImage}
+          {/* Attachment preview area */}
+          {(hasAttachments || isProcessingFiles) && (
+            <AttachmentPreview
+              attachments={attachments}
+              onRemove={removeAttachment}
+              isProcessing={isProcessingFiles}
             />
-          )}
-
-          {/* Image processing indicator */}
-          {isProcessingImages && (
-            <div className="px-4 py-2 flex items-center gap-2 text-xs text-muted-foreground border-b border-border/30">
-              <Loader2 size={14} className="animate-spin" />
-              <span>{t('Processing image...')}</span>
-            </div>
           )}
 
           {/* Drag overlay */}
@@ -541,8 +704,45 @@ export function InputArea({ onSend, onStop, onInject, isGenerating, isCompact = 
               bg-primary/5 rounded-2xl border-2 border-dashed border-primary/30
               pointer-events-none z-10">
               <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                <ImagePlus size={24} />
-                <span className="text-sm font-medium">{t('Drop to add images')}</span>
+                <Paperclip size={24} />
+                <span className="text-sm font-medium">{t('Drop files here')}</span>
+              </div>
+            </div>
+          )}
+
+          {/* @ File reference popover */}
+          <FilePopover
+            visible={filePopoverVisible}
+            filter={filePopoverFilter}
+            items={filePopoverItems}
+            selectedIndex={filePopoverIndex}
+            onSelect={handleFileSelect}
+            onClose={() => setFilePopoverVisible(false)}
+          />
+
+          {/* / Command popover */}
+          <CommandPopover
+            visible={cmdPopoverVisible}
+            filter={cmdPopoverFilter}
+            commands={cachedCommands}
+            selectedIndex={cmdPopoverIndex}
+            onSelect={handleCommandSelect}
+            onClose={() => setCmdPopoverVisible(false)}
+          />
+
+          {/* Active skill badge */}
+          {activeSkillBadge && (
+            <div className="mx-4 mt-2 flex items-center gap-2">
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full
+                bg-primary/10 border border-primary/20 text-xs font-medium text-primary">
+                <span>{'\u26a1'}</span>
+                <span>{activeSkillBadge.name}</span>
+                <button
+                  onClick={() => setActiveSkillBadge(null)}
+                  className="ml-0.5 hover:text-primary/70 transition-colors"
+                >
+                  {'\u2715'}
+                </button>
               </div>
             </div>
           )}
@@ -561,7 +761,41 @@ export function InputArea({ onSend, onStop, onInject, isGenerating, isCompact = 
             <textarea
               ref={textareaRef}
               value={displayContent}
-              onChange={(e) => !isOnboardingSendStep && setContent(e.target.value)}
+              onChange={(e) => {
+                if (isOnboardingSendStep) return
+                const value = e.target.value
+                setContent(value)
+
+                // Detect @ trigger for file reference
+                const cursorPos = e.target.selectionStart || 0
+                const beforeCursor = value.slice(0, cursorPos)
+                const atMatch = beforeCursor.match(/@([^\s@]*)$/)
+
+                if (atMatch && (atMatch.index === 0 || beforeCursor[atMatch.index! - 1] === ' ' || beforeCursor[atMatch.index! - 1] === '\n')) {
+                  const filter = atMatch[1]
+                  setFilePopoverVisible(true)
+                  setFilePopoverFilter(filter)
+                  setFileTriggerPosition(cursorPos - atMatch[0].length)
+                  setFilePopoverIndex(0)
+                  fetchFiles(filter)
+                  setCmdPopoverVisible(false) // Close command popover if open
+                  return
+                } else {
+                  setFilePopoverVisible(false)
+                }
+
+                // Detect / trigger for slash commands
+                const slashMatch = beforeCursor.match(/(^|\s)\/([^\s]*)$/)
+                if (slashMatch) {
+                  const filter = slashMatch[2]
+                  setCmdPopoverVisible(true)
+                  setCmdPopoverFilter(filter)
+                  setCmdTriggerPosition(cursorPos - slashMatch[2].length - 1) // position of /
+                  setCmdPopoverIndex(0)
+                } else {
+                  setCmdPopoverVisible(false)
+                }
+              }}
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
               onFocus={() => setIsFocused(true)}
@@ -584,16 +818,16 @@ export function InputArea({ onSend, onStop, onInject, isGenerating, isCompact = 
           <InputToolbar
             isGenerating={isGenerating}
             isOnboarding={isOnboardingSendStep}
-            isProcessingImages={isProcessingImages}
+            isProcessingFiles={isProcessingFiles}
             thinkingEnabled={thinkingEnabled}
             onThinkingToggle={() => setThinkingEnabled(!thinkingEnabled)}
             aiBrowserEnabled={aiBrowserEnabled}
             onAIBrowserToggle={() => setAIBrowserEnabled(!aiBrowserEnabled)}
             showAttachMenu={showAttachMenu}
             onAttachMenuToggle={() => setShowAttachMenu(!showAttachMenu)}
-            onImageClick={handleImageButtonClick}
-            imageCount={images.length}
-            maxImages={MAX_IMAGES}
+            onAttachClick={handleAttachButtonClick}
+            attachmentCount={attachments.length}
+            maxAttachments={MAX_ATTACHMENTS}
             attachMenuRef={attachMenuRef}
             canSend={canSend}
             onSend={handleSend}
@@ -615,16 +849,16 @@ export function InputArea({ onSend, onStop, onInject, isGenerating, isCompact = 
 interface InputToolbarProps {
   isGenerating: boolean
   isOnboarding: boolean
-  isProcessingImages: boolean
+  isProcessingFiles: boolean
   thinkingEnabled: boolean
   onThinkingToggle: () => void
   aiBrowserEnabled: boolean
   onAIBrowserToggle: () => void
   showAttachMenu: boolean
   onAttachMenuToggle: () => void
-  onImageClick: () => void
-  imageCount: number
-  maxImages: number
+  onAttachClick: () => void
+  attachmentCount: number
+  maxAttachments: number
   attachMenuRef: React.RefObject<HTMLDivElement | null>
   canSend: boolean
   onSend: () => void
@@ -635,16 +869,16 @@ interface InputToolbarProps {
 function InputToolbar({
   isGenerating,
   isOnboarding,
-  isProcessingImages,
+  isProcessingFiles,
   thinkingEnabled,
   onThinkingToggle,
   aiBrowserEnabled,
   onAIBrowserToggle,
   showAttachMenu,
   onAttachMenuToggle,
-  onImageClick,
-  imageCount,
-  maxImages,
+  onAttachClick,
+  attachmentCount,
+  maxAttachments,
   attachMenuRef,
   canSend,
   onSend,

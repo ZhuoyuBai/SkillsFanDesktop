@@ -12,7 +12,8 @@ import {
   openSpaceFolder,
   updateSpace,
   updateSpacePreferences,
-  getSpacePreferences
+  getSpacePreferences,
+  listWorkspaceFiles
 } from '../services/space.service'
 import { getSpacesDir } from '../services/config.service'
 
@@ -160,6 +161,17 @@ export function registerSpaceHandlers(): void {
     try {
       const preferences = getSpacePreferences(spaceId)
       return { success: true, data: preferences }
+    } catch (error: unknown) {
+      const err = error as Error
+      return { success: false, error: err.message }
+    }
+  })
+
+  // List workspace files (for @ file reference)
+  ipcMain.handle('space:list-files', async (_event, spaceId: string, query?: string) => {
+    try {
+      const files = await listWorkspaceFiles(spaceId, { query })
+      return { success: true, data: files }
     } catch (error: unknown) {
       const err = error as Error
       return { success: false, error: err.message }

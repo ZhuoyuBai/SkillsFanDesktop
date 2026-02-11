@@ -260,12 +260,30 @@ export function deleteSkill(skillName: string): {
 
 /**
  * Open skill folder in file manager
+ * Supports skills from all sources (SkillsFan, Claude, Agents)
  */
 export async function openSkillFolder(skillName: string): Promise<{
   success: boolean
   error?: string
 }> {
   try {
+    // First, try to find the skill in the registry to get its baseDir
+    const { getSkill } = await import('./skill-registry')
+    const skill = getSkill(skillName)
+
+    if (skill) {
+      // Use the skill's actual baseDir (works for all sources)
+      const skillPath = skill.baseDir
+      if (existsSync(skillPath)) {
+        const error = await shell.openPath(skillPath)
+        if (error) {
+          return { success: false, error }
+        }
+        return { success: true }
+      }
+    }
+
+    // Fallback: look in SkillsFan skills directory
     const skillsDir = getSkillsDir()
     const skillPath = join(skillsDir, skillName)
 

@@ -12,6 +12,7 @@ import {
   openSkillFolder,
   selectSkillArchive
 } from '../services/skill'
+import { listSlashCommands } from '../services/slash-command.service'
 
 export function registerSkillHandlers(): void {
   // Get all skills (auto-initializes if needed)
@@ -85,6 +86,17 @@ export function registerSkillHandlers(): void {
   ipcMain.handle('skill:open-folder', async (_event, skillName: string) => {
     try {
       return await openSkillFolder(skillName)
+    } catch (error: unknown) {
+      const err = error as Error
+      return { success: false, error: err.message }
+    }
+  })
+
+  // List slash commands (built-in + skills from all sources)
+  ipcMain.handle('skill:list-slash-commands', async (_event, spaceId?: string) => {
+    try {
+      const commands = await listSlashCommands(spaceId)
+      return { success: true, data: commands }
     } catch (error: unknown) {
       const err = error as Error
       return { success: false, error: err.message }
