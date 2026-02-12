@@ -37,7 +37,7 @@ export const AVAILABLE_MODELS: ModelOption[] = [
   }
 ];
 
-export const DEFAULT_MODEL = 'claude-opus-4-5-20251101';
+export const DEFAULT_MODEL = 'glm-5';
 
 // Permission Level
 export type PermissionLevel = 'allow' | 'ask' | 'deny';
@@ -566,7 +566,7 @@ export const DEFAULT_CONFIG: HaloConfig = {
     model: DEFAULT_MODEL
   },
   aiSources: {
-    current: 'custom',  // Default to custom API (no source configured yet)
+    current: 'glm',  // Default to GLM-5 via SkillsFan
   },
   permissions: {
     fileAccess: 'allow',

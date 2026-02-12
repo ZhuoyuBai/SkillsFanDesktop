@@ -39,6 +39,7 @@ const PROVIDER_LOGOS: Record<string, string> = {
 
 // Provider logo mapping by provider ID (exported for reuse in Loop Task model selector)
 export const PROVIDER_LOGOS_BY_ID: Record<string, string> = {
+  'glm': zhipuLogo,
   'zhipu': zhipuLogo,
   'minimax': minimaxLogo,
   'kimi': kimiLogo,
@@ -50,6 +51,7 @@ export const PROVIDER_LOGOS_BY_ID: Record<string, string> = {
 
 // Provider display names by ID (exported for reuse)
 export const PROVIDER_NAMES: Record<string, string> = {
+  'glm': 'GLM-5',
   'zhipu': 'Zhipu GLM',
   'minimax': 'MiniMax',
   'kimi': 'Kimi',
@@ -99,6 +101,7 @@ interface AuthProviderConfig {
   type: string
   displayName: LocalizedText
   enabled: boolean
+  recommended?: boolean
 }
 
 /**
@@ -183,8 +186,10 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
       }
     })
 
-  // Get logged-in OAuth providers dynamically
-  const loggedInOAuthProviders = authProviders
+  // Get all OAuth providers dynamically (both logged-in and not)
+  // Logged-in: always show. Not-logged-in: only show recommended ones
+  // (recommended = SkillsFan-backed providers like glm, skillsfan-credits)
+  const allOAuthProviders = authProviders
     .filter(p => p.type !== 'custom' && p.enabled)
     .map(p => {
       const providerConfig = (aiSources as Record<string, any>)[p.type] as OAuthSourceConfig | undefined
@@ -192,15 +197,19 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
         type: p.type,
         displayName: getLocalizedText(p.displayName),
         config: providerConfig,
-        isLoggedIn: providerConfig?.loggedIn === true
+        isLoggedIn: providerConfig?.loggedIn === true,
+        recommended: p.recommended
       }
     })
-    .filter(p => p.isLoggedIn)
+    .filter(p => p.isLoggedIn || p.recommended)
 
   // Get current model display name
   const rawModelName = getCurrentModelName(config)
-  // Translate "No model" to "Add Model"
-  const currentModelName = rawModelName === 'No model' ? t('model.addModel') : rawModelName
+  // If "No model", check if it's a known provider and show its name; otherwise "Add Model"
+  let currentModelName = rawModelName
+  if (rawModelName === 'No model') {
+    currentModelName = PROVIDER_NAMES[currentSource] || t('model.addModel')
+  }
 
   // Handle model selection for any provider
   const handleSelectModel = async (source: AISourceType, modelId: string) => {
@@ -274,6 +283,23 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
     setView('settings')
   }
 
+  // Handle selecting a not-logged-in OAuth provider - just switch, login prompted on send
+  const handleSelectOAuthProvider = async (providerType: string, displayName: string) => {
+    const newAiSources = {
+      ...aiSources,
+      current: providerType
+    }
+
+    const newConfig = {
+      ...config,
+      aiSources: newAiSources
+    }
+
+    await api.setConfig(newConfig)
+    setConfig(newConfig as HaloConfig)
+    setIsOpen(false)
+  }
+
   // Style configuration for different variants
   const styleConfig = {
     header: {
@@ -293,7 +319,7 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
   // Get current provider logo - check by provider ID first, then by API URL
   // For OAuth providers, use per-model logo matching
   const currentProviderConfig = configuredCustomProviders.find(p => p.id === currentSource)
-  const currentOAuthConfig = loggedInOAuthProviders.find(p => p.type === currentSource)
+  const currentOAuthConfig = allOAuthProviders.find(p => p.type === currentSource)
   const currentProviderLogo = currentProviderConfig?.logo ||
     (currentProviderConfig?.apiUrl ? getProviderLogo(currentProviderConfig.apiUrl) : null) ||
     (currentOAuthConfig?.config?.model
@@ -354,40 +380,66 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
             animate-in fade-in-0 slide-in-from-bottom-2 duration-200
           `.trim().replace(/\s+/g, ' ')}
         >
-          {/* OAuth Providers (Official) - shown first */}
-          {loggedInOAuthProviders.map((provider) => {
-            return (
-              <div key={provider.type}>
-                {(provider.config?.availableModels || []).map((modelId) => {
-                  const displayName = provider.config?.modelNames?.[modelId] || modelId
-                  const isSelected = currentSource === provider.type && provider.config?.model === modelId
-                  const modelLogo = getModelLogo(modelId, displayName, provider.type)
-                  return (
-                    <button
-                      key={modelId}
-                      onClick={() => handleSelectModel(provider.type, modelId)}
-                      className={`w-full px-3 py-2 text-left text-sm hover:bg-secondary/80 transition-colors flex items-center gap-2.5 ${
-                        isSelected ? 'text-primary' : 'text-foreground'
-                      }`}
-                    >
-                      {modelLogo ? (
-                        <img src={modelLogo} alt="" className="w-5 h-5 rounded object-cover flex-shrink-0" />
-                      ) : (
-                        <div className="w-5 h-5 rounded bg-muted flex items-center justify-center flex-shrink-0">
-                          <span className="text-xs text-muted-foreground">AI</span>
-                        </div>
-                      )}
-                      <span className="truncate">{displayName}</span>
-                      <span className="flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded font-medium text-white bg-primary/80">{t('Official')}</span>
-                    </button>
-                  )
-                })}
-              </div>
-            )
+          {/* OAuth Providers (Official) - all providers, logged in or not */}
+          {allOAuthProviders.map((provider) => {
+            if (provider.isLoggedIn && provider.config?.availableModels?.length) {
+              // Logged in: show individual models
+              return (
+                <div key={provider.type}>
+                  {provider.config.availableModels.map((modelId) => {
+                    const displayName = provider.config?.modelNames?.[modelId] || modelId
+                    const isSelected = currentSource === provider.type && provider.config?.model === modelId
+                    const modelLogo = getModelLogo(modelId, displayName, provider.type)
+                    return (
+                      <button
+                        key={modelId}
+                        onClick={() => handleSelectModel(provider.type, modelId)}
+                        className={`w-full px-3 py-2 text-left text-sm hover:bg-secondary/80 transition-colors flex items-center gap-2.5 ${
+                          isSelected ? 'text-primary' : 'text-foreground'
+                        }`}
+                      >
+                        {modelLogo ? (
+                          <img src={modelLogo} alt="" className="w-5 h-5 rounded object-cover flex-shrink-0" />
+                        ) : (
+                          <div className="w-5 h-5 rounded bg-muted flex items-center justify-center flex-shrink-0">
+                            <span className="text-xs text-muted-foreground">AI</span>
+                          </div>
+                        )}
+                        <span className="truncate">{displayName}</span>
+                        <span className="flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded font-medium text-white bg-primary/80">{t('Official')}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              )
+            } else {
+              // Not logged in: show single entry with provider display name, same style
+              const providerLogo = getProviderLogoById(provider.type)
+              const isSelected = currentSource === provider.type
+              return (
+                <button
+                  key={provider.type}
+                  onClick={() => handleSelectOAuthProvider(provider.type, provider.displayName)}
+                  className={`w-full px-3 py-2 text-left text-sm hover:bg-secondary/80 transition-colors flex items-center gap-2.5 ${
+                    isSelected ? 'text-primary' : 'text-foreground'
+                  }`}
+                >
+                  {providerLogo ? (
+                    <img src={providerLogo} alt="" className="w-5 h-5 rounded object-cover flex-shrink-0" />
+                  ) : (
+                    <div className="w-5 h-5 rounded bg-muted flex items-center justify-center flex-shrink-0">
+                      <span className="text-xs text-muted-foreground">AI</span>
+                    </div>
+                  )}
+                  <span className="truncate">{provider.displayName}</span>
+                  <span className="flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded font-medium text-white bg-primary/80">{t('Official')}</span>
+                </button>
+              )
+            }
           })}
 
           {/* Separator between official and custom providers */}
-          {loggedInOAuthProviders.length > 0 && configuredCustomProviders.length > 0 && (
+          {allOAuthProviders.length > 0 && configuredCustomProviders.length > 0 && (
             <div className="my-1 border-t border-border" />
           )}
 
@@ -415,7 +467,7 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
           })}
 
           {/* Divider */}
-          {(configuredCustomProviders.length > 0 || loggedInOAuthProviders.length > 0) && (
+          {(configuredCustomProviders.length > 0 || allOAuthProviders.length > 0) && (
             <div className="my-1 border-t border-border" />
           )}
 

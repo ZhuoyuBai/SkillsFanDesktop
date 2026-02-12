@@ -147,8 +147,8 @@ export function getSpacesDir(): string {
   return join(getHaloDir(), 'spaces')
 }
 
-// Default model (Opus 4.5)
-const DEFAULT_MODEL = 'claude-opus-4-5-20251101'
+// Default model (GLM-5)
+const DEFAULT_MODEL = 'glm-5'
 
 // Default configuration
 const DEFAULT_CONFIG: HaloConfig = {
@@ -159,7 +159,7 @@ const DEFAULT_CONFIG: HaloConfig = {
     model: DEFAULT_MODEL
   },
   aiSources: {
-    current: 'custom'
+    current: 'glm'
   },
   permissions: {
     fileAccess: 'allow',
@@ -195,7 +195,7 @@ function normalizeAiSources(parsed: Record<string, any>): AISourcesConfig {
   }
 
   if (!aiSources.current) {
-    aiSources.current = 'custom'
+    aiSources.current = 'glm'
   }
 
   const legacyApi = parsed?.api

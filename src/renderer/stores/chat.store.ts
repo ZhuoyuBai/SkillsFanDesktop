@@ -25,6 +25,7 @@ import type { Conversation, ConversationMeta, Message, ToolCall, Artifact, Thoug
 import { hasAnyAISource } from '../types'
 import { canvasLifecycle } from '../services/canvas-lifecycle'
 import { useAppStore } from './app.store'
+import { useToastStore } from './toast.store'
 
 // LRU cache size limit
 const CONVERSATION_CACHE_SIZE = 10
@@ -696,9 +697,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     // Check if AI source is configured before sending message
     const appConfig = useAppStore.getState().config
-    if (!appConfig || !hasAnyAISource(appConfig)) {
+    const currentAiSource = appConfig?.aiSources?.current
+    const currentSourceConfig = currentAiSource ? (appConfig?.aiSources as Record<string, any>)?.[currentAiSource] : undefined
+    const isCurrentSourceLoggedIn = currentSourceConfig && typeof currentSourceConfig === 'object' &&
+      (('loggedIn' in currentSourceConfig && currentSourceConfig.loggedIn === true) ||
+       ('apiKey' in currentSourceConfig && currentSourceConfig.apiKey))
+
+    if (!appConfig || (!hasAnyAISource(appConfig) && !currentAiSource)) {
       console.error('[ChatStore] No AI source configured')
-      // Add error thought without entering thinking state
       set((state) => {
         const newSessions = new Map(state.sessions)
         const session = newSessions.get(conversationId) || createEmptySessionState()
@@ -716,6 +722,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
         })
         return { sessions: newSessions }
       })
+      return
+    }
+
+    // Current source is an OAuth provider but not logged in - show toast prompt
+    if (currentAiSource && !isCurrentSourceLoggedIn) {
+      console.log(`[ChatStore] Current source ${currentAiSource} needs login`)
+      useToastStore.getState().addToast('请先登录后再使用此模型', 'error')
       return
     }
 

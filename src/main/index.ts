@@ -38,8 +38,10 @@ app.commandLine.appendSwitch('disable-blink-features', 'AutomationControlled')
 
 // Single instance lock: Prevent multiple instances of the application
 // Must be called before app.whenReady()
-// Skip in development mode to allow restart without killing process
-const gotTheLock = !app.isPackaged ? true : app.requestSingleInstanceLock()
+// Always request the lock, even in dev mode, to prevent protocol URLs
+// (skillsfan://auth/callback) from spawning a second Electron instance.
+// electron-vite dev sends SIGTERM on restart, releasing the OS-level lock.
+const gotTheLock = app.requestSingleInstanceLock()
 
 if (!gotTheLock) {
   // Another instance is already running, exit immediately

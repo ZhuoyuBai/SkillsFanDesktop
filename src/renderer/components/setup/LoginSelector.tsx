@@ -15,6 +15,7 @@ import kimiLogo from '../../assets/providers/kimi.jpg'
 import deepseekLogo from '../../assets/providers/deepseek.jpg'
 import claudeLogo from '../../assets/providers/claude.jpg'
 import openaiLogo from '../../assets/providers/openai.jpg'
+import skillsfanLogo from '../../assets/logo.png'
 
 /**
  * Provider preset configuration
@@ -25,10 +26,31 @@ interface ProviderPreset {
   nameKey: string
   logo?: string
   isCustom?: boolean
+  isOAuth?: boolean  // OAuth provider (uses SkillsFan login, not API key)
 }
 
 /**
- * Available AI providers
+ * OAuth-based providers (shown as recommended section)
+ */
+const OAUTH_PROVIDERS: ProviderPreset[] = [
+  {
+    id: 'glm',
+    name: 'GLM-5',
+    nameKey: 'GLM-5',
+    logo: zhipuLogo,
+    isOAuth: true,
+  },
+  {
+    id: 'skillsfan-credits',
+    name: 'SkillsFan',
+    nameKey: 'SkillsFan Credits',
+    logo: skillsfanLogo,
+    isOAuth: true,
+  },
+]
+
+/**
+ * Custom API providers (user brings their own API key)
  */
 const PROVIDER_PRESETS: ProviderPreset[] = [
   {
@@ -156,9 +178,34 @@ export function LoginSelector({ onSelectProvider, onBack, onSkip }: LoginSelecto
 
       {/* Main content */}
       <div className="w-full max-w-xl">
-        {/* Provider Grid */}
+        {/* Recommended OAuth Providers */}
+        <div className="bg-gray-50 rounded-xl p-5 border border-gray-200 mb-4">
+          <h3 className="text-sm text-gray-500 mb-4">{t('Recommended')}</h3>
+          <div className="grid grid-cols-2 gap-3">
+            {OAUTH_PROVIDERS.map((preset) => (
+              <button
+                key={preset.id}
+                type="button"
+                onClick={() => onSelectProvider(preset.id)}
+                className="flex items-center gap-3 p-4 rounded-xl border-2 border-gray-200 bg-white hover:border-orange-500 hover:bg-orange-50 transition-all"
+              >
+                {/* Logo */}
+                <div className="w-10 h-10 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0">
+                  <img src={preset.logo!} alt={preset.name} className="w-full h-full object-cover rounded-lg" />
+                </div>
+                {/* Name + badge */}
+                <div className="flex flex-col items-start">
+                  <span className="text-sm font-medium text-gray-700">{preset.name}</span>
+                  <span className="text-[10px] text-orange-600">{t('No API key needed')}</span>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Custom API Provider Grid */}
         <div className="bg-gray-50 rounded-xl p-5 border border-gray-200">
-          <h3 className="text-sm text-gray-500 mb-4">{t('Select AI Provider')}</h3>
+          <h3 className="text-sm text-gray-500 mb-4">{t('Custom API Key')}</h3>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {PROVIDER_PRESETS.map((preset) => (
               <button

@@ -13,7 +13,47 @@
  */
 
 import { protocol, net, app } from 'electron'
+import { resolve } from 'path'
+import { execSync } from 'child_process'
 import { handleCallback } from './skillsfan/auth.service'
+
+/**
+ * In dev mode on macOS, the stock Electron.app has no CFBundleURLTypes
+ * for 'skillsfan', so setAsDefaultProtocolClient is a no-op.
+ * We patch the local Info.plist and re-register with Launch Services
+ * to make the current Electron binary the handler.
+ */
+function ensureDevProtocolOnMac(): void {
+  if (app.isPackaged || process.platform !== 'darwin') return
+
+  try {
+    const plistPath = resolve(process.execPath, '..', '..', 'Info.plist')
+    const electronAppPath = resolve(process.execPath, '..', '..', '..')
+
+    // Add CFBundleURLTypes with skillsfan scheme via PlistBuddy (idempotent)
+    const cmds = [
+      `Add :CFBundleURLTypes array`,
+      `Add :CFBundleURLTypes:0 dict`,
+      `Add :CFBundleURLTypes:0:CFBundleURLName string skillsfan`,
+      `Add :CFBundleURLTypes:0:CFBundleURLSchemes array`,
+      `Add :CFBundleURLTypes:0:CFBundleURLSchemes:0 string skillsfan`
+    ]
+    for (const cmd of cmds) {
+      // PlistBuddy returns non-zero if key already exists — ignore
+      try { execSync(`/usr/libexec/PlistBuddy -c "${cmd}" "${plistPath}"`, { stdio: 'pipe' }) } catch { /* already exists */ }
+    }
+
+    // Force Launch Services to re-scan THIS Electron.app so macOS uses it
+    execSync(
+      `/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "${electronAppPath}"`,
+      { stdio: 'pipe' }
+    )
+
+    console.log('[Protocol] Patched dev Electron.app Info.plist for skillsfan:// URL scheme')
+  } catch (error) {
+    console.warn('[Protocol] Failed to patch dev Info.plist:', error)
+  }
+}
 
 /**
  * Register custom protocols for secure local resource access
@@ -29,17 +69,15 @@ export function registerProtocols(): void {
 
   console.log('[Protocol] Registered skillsfan-file:// protocol')
 
+  // In dev mode on macOS, patch Info.plist so setAsDefaultProtocolClient works
+  ensureDevProtocolOnMac()
+
   // Register skillsfan:// as default protocol handler for OAuth callbacks
-  // This allows the system to open our app when user is redirected from browser
-  if (!app.isDefaultProtocolClient('skillsfan')) {
-    const success = app.setAsDefaultProtocolClient('skillsfan')
-    if (success) {
-      console.log('[Protocol] Registered skillsfan:// as default protocol handler')
-    } else {
-      console.warn('[Protocol] Failed to register skillsfan:// protocol')
-    }
+  const success = app.setAsDefaultProtocolClient('skillsfan')
+  if (success) {
+    console.log('[Protocol] Registered skillsfan:// as default protocol handler')
   } else {
-    console.log('[Protocol] skillsfan:// protocol already registered')
+    console.warn('[Protocol] Failed to register skillsfan:// protocol')
   }
 }
 

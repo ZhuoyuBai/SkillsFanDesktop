@@ -65,7 +65,7 @@ export const AVAILABLE_MODELS: ModelOption[] = [
   }
 ]
 
-export const DEFAULT_MODEL = 'claude-opus-4-5-20251101'
+export const DEFAULT_MODEL = 'glm-5'
 
 // ============================================================================
 // Provider Configuration Types

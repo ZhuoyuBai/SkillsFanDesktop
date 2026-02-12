@@ -32,6 +32,7 @@ import { getConfig, saveConfig } from '../config.service'
 import { getCustomProvider } from './providers/custom.provider'
 import { getGitHubCopilotProvider } from './providers/github-copilot.provider'
 import { getSkillsFanCreditsProvider } from './providers/skillsfan-credits.provider'
+import { getGLMProvider } from './providers/glm.provider'
 import { loadAuthProvidersAsync, isOAuthProvider as isOAuthProviderCheck, type LoadedProvider } from './auth-loader'
 import { decryptString, decryptTokens } from '../secure-storage.service'
 
@@ -60,6 +61,7 @@ class AISourceManager {
     this.registerProvider(getCustomProvider())
     this.registerProvider(getGitHubCopilotProvider())
     this.registerProvider(getSkillsFanCreditsProvider())
+    this.registerProvider(getGLMProvider())
 
     // Start async initialization (optional providers + dynamic loading)
     this.initPromise = this.initializeAsync()
@@ -262,6 +264,10 @@ class AISourceManager {
     if (result.success && result.data) {
       // Update config with login result
       await this.handleOAuthLoginSuccess(type, result.data)
+
+      // Refresh sibling providers that share the same auth
+      // e.g., GLM and SkillsFan Credits share SkillsFan OAuth
+      await this.refreshSiblingProviders(type)
     }
 
     return result
@@ -314,6 +320,37 @@ class AISourceManager {
     } as any)
 
     console.log(`[AISourceManager] OAuth login for ${type} saved to config`)
+  }
+
+  /**
+   * After login, refresh other providers that share the same auth.
+   * e.g., GLM and SkillsFan Credits share SkillsFan OAuth tokens.
+   */
+  private async refreshSiblingProviders(loginType: AISourceType): Promise<void> {
+    const freshConfig = getConfig() as any
+    const aiSources: AISourcesConfig = freshConfig.aiSources || { current: loginType }
+    let updated = false
+
+    for (const provider of this.providers.values()) {
+      if (provider.type === loginType) continue
+      if (!provider.refreshConfig) continue
+      if (!provider.isConfigured(aiSources)) continue
+
+      try {
+        const result = await provider.refreshConfig(aiSources)
+        if (result.success && result.data) {
+          Object.assign(aiSources, result.data)
+          updated = true
+          console.log(`[AISourceManager] Sibling provider ${provider.type} config refreshed`)
+        }
+      } catch (error) {
+        console.warn(`[AISourceManager] Failed to refresh sibling ${provider.type}:`, error)
+      }
+    }
+
+    if (updated) {
+      saveConfig({ aiSources } as any)
+    }
   }
 
   /**

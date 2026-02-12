@@ -225,7 +225,15 @@ export default function App() {
     })
 
     // SkillsFan login success - complete model setup then go to chat
+    // Only handles login from non-setup contexts (Settings, Onboarding).
+    // SetupFlow handles its own login completion to avoid race conditions.
     const unsubSkillsFanLogin = api.onSkillsFanLoginSuccess(async () => {
+      const currentView = useAppStore.getState().view
+      if (currentView === 'setup') {
+        console.log('[App] SkillsFan login success, but SetupFlow is handling it')
+        return
+      }
+
       console.log('[App] SkillsFan login success, completing model setup...')
 
       // Complete login via AISourceManager - fetches models, saves tokens + models to config

@@ -37,13 +37,22 @@ export function SetupFlow() {
   // Track selected provider for ApiSetup
   const [selectedProviderId, setSelectedProviderId] = useState<string>('claude')
 
+  // OAuth provider types that use SkillsFan login flow
+  const OAUTH_PROVIDER_TYPES = new Set(['glm', 'skillsfan-credits', 'github-copilot'])
+
   // Handle provider selection from grid
   const handleSelectProvider = (providerId: string) => {
-    setSelectedProviderId(providerId)
-    setStep('custom')  // Navigate to ApiSetup
+    if (OAUTH_PROVIDER_TYPES.has(providerId)) {
+      // OAuth providers go through the login flow
+      handleOAuthLogin(providerId)
+    } else {
+      // Custom API providers go to ApiSetup
+      setSelectedProviderId(providerId)
+      setStep('custom')
+    }
   }
 
-  // Handle OAuth provider login (generic) - kept for future use
+  // Handle OAuth provider login (generic)
   const handleOAuthLogin = async (providerType: string) => {
     setError(null)
     setCurrentProvider(providerType)
