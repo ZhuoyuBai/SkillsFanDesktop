@@ -30,4 +30,8 @@ export interface SkillInfo {
   source: SkillSource
   /** 是否为只读（原生 Claude Code 技能不可删除） */
   readonly: boolean
+  /** 技能目录下的文件列表（相对路径） */
+  files: string[]
+  /** 文件内容映射（文件名→内容） */
+  fileContents: Record<string, string>
 }

@@ -88,14 +88,25 @@ export function loadSkillsFromDir(skillsDir: string, source: SkillSource): Skill
       // 从正文提取 H1 标题作为显示名称，如果没有则使用 name
       const displayName = extractH1Title(parsed.body) || parsed.data.name
 
+      const skillDir = dirname(skillFile)
+      const files = listFilesRecursive(skillDir, '')
+      const fileContents: Record<string, string> = {}
+      for (const f of files) {
+        try {
+          fileContents[f] = readFileSync(join(skillDir, f), 'utf-8')
+        } catch { /* skip unreadable files */ }
+      }
+
       skills.push({
         name: parsed.data.name,
         displayName,
         description: parsed.data.description,
         location: skillFile,
-        baseDir: dirname(skillFile),
+        baseDir: skillDir,
         source,
-        readonly: source.kind !== 'skillsfan'
+        readonly: source.kind !== 'skillsfan',
+        files,
+        fileContents
       })
 
       console.log(`[Skill] Loaded: ${parsed.data.name} (${source.kind})`)
@@ -146,7 +157,9 @@ export function loadClaudeCommands(commandsDir: string, source: SkillSource): Sk
         location: filePath,
         baseDir: commandsDir,
         source,
-        readonly: true  // Claude Code native commands are read-only
+        readonly: true,  // Claude Code native commands are read-only
+        files: [file],
+        fileContents: { [file]: content }
       })
 
       console.log(`[Skill] Loaded command: ${name} (${source.kind})`)
@@ -166,4 +179,41 @@ export function getSkillContent(location: string): string {
   const parsed = parseFrontmatter(content)
   // If no frontmatter (e.g., Claude commands), return full content
   return parsed?.body || content
+}
+
+/**
+ * List all files in a skill's directory (relative paths).
+ * For command-style skills (single .md file), returns just that file.
+ */
+export function listSkillFiles(skill: SkillInfo): string[] {
+  const { source, baseDir, location } = skill
+
+  // Commands are single files — return just the filename
+  if (source.kind === 'project-commands' || source.kind === 'global-commands') {
+    return [basename(location)]
+  }
+
+  // Skill folders — recursively list all files
+  return listFilesRecursive(baseDir, '')
+}
+
+function listFilesRecursive(dir: string, prefix: string): string[] {
+  const results: string[] = []
+  let entries: ReturnType<typeof readdirSync<import('fs').Dirent>>
+  try {
+    entries = readdirSync(dir, { withFileTypes: true })
+  } catch {
+    return results
+  }
+  for (const entry of entries) {
+    if (entry.name.startsWith('.')) continue
+    if (entry.name === 'node_modules') continue
+    const rel = prefix ? `${prefix}/${entry.name}` : entry.name
+    if (entry.isDirectory()) {
+      results.push(...listFilesRecursive(join(dir, entry.name), rel))
+    } else {
+      results.push(rel)
+    }
+  }
+  return results.sort()
 }

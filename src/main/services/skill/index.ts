@@ -25,3 +25,5 @@ export {
   openSkillFolder,
   selectSkillArchive
 } from './skill-manager'
+
+export { getSkillContent } from './skill-loader'

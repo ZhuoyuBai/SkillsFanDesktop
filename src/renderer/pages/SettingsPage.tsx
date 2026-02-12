@@ -1217,12 +1217,16 @@ export function SettingsPage() {
           </section>
           )}
 
-          {/* Skills Section */}
+          </div>{/* close max-w-2xl for full-width skills */}
+
+          {/* Skills Section - full width */}
           {activeSection === 'skills' && (
           <section className="bg-card rounded-xl border border-border p-6">
             <SkillList />
           </section>
           )}
+
+          <div className="max-w-2xl">{/* reopen max-w-2xl */}
 
           {/* Spaces Management Section */}
           {activeSection === 'spaces' && !api.isRemoteMode() && (

@@ -594,6 +594,22 @@ export const api = {
     return httpRequest('GET', `/api/skills/slash-commands${spaceId ? `?spaceId=${encodeURIComponent(spaceId)}` : ''}`)
   },
 
+  // Get skill content (SKILL.md body without frontmatter)
+  getSkillContent: async (skillName: string): Promise<ApiResponse<string>> => {
+    if (isElectron()) {
+      return window.skillsfan.getSkillContent(skillName)
+    }
+    return httpRequest('GET', `/api/skills/${encodeURIComponent(skillName)}/content`)
+  },
+
+  // Read a specific file within a skill directory
+  getSkillFileContent: async (skillName: string, relativePath: string): Promise<ApiResponse<string>> => {
+    if (isElectron()) {
+      return window.skillsfan.getSkillFileContent(skillName, relativePath)
+    }
+    return httpRequest('GET', `/api/skills/${encodeURIComponent(skillName)}/files/${encodeURIComponent(relativePath)}`)
+  },
+
   // ===== Onboarding =====
   writeOnboardingArtifact: async (
     spaceId: string,

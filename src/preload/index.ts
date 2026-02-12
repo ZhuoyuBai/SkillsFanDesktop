@@ -171,6 +171,8 @@ export interface HaloAPI {
   deleteSkill: (skillName: string) => Promise<IpcResponse>
   openSkillFolder: (skillName: string) => Promise<IpcResponse>
   listSlashCommands: (spaceId?: string) => Promise<IpcResponse>
+  getSkillContent: (skillName: string) => Promise<IpcResponse<string>>
+  getSkillFileContent: (skillName: string, relativePath: string) => Promise<IpcResponse<string>>
 
   // Onboarding
   writeOnboardingArtifact: (spaceId: string, filename: string, content: string) => Promise<IpcResponse>
@@ -519,6 +521,9 @@ const api: HaloAPI = {
   deleteSkill: (skillName) => ipcRenderer.invoke('skill:delete', skillName),
   openSkillFolder: (skillName) => ipcRenderer.invoke('skill:open-folder', skillName),
   listSlashCommands: (spaceId) => ipcRenderer.invoke('skill:list-slash-commands', spaceId),
+  getSkillContent: (skillName) => ipcRenderer.invoke('skill:get-content', skillName),
+  getSkillFileContent: (skillName, relativePath) =>
+    ipcRenderer.invoke('skill:get-file-content', skillName, relativePath),
 
   // Onboarding
   writeOnboardingArtifact: (spaceId, filename, content) =>

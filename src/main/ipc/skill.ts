@@ -3,10 +3,14 @@
  */
 
 import { ipcMain } from 'electron'
+import path from 'path'
+import { readFileSync } from 'fs'
 import {
   getAllSkills,
   reloadSkills,
   getSkillsDir,
+  getSkill,
+  getSkillContent,
   installSkill,
   deleteSkill,
   openSkillFolder,
@@ -89,6 +93,42 @@ export function registerSkillHandlers(): void {
     } catch (error: unknown) {
       const err = error as Error
       return { success: false, error: err.message }
+    }
+  })
+
+  // Get skill content (SKILL.md body without frontmatter)
+  ipcMain.handle('skill:get-content', async (_event, skillName: string) => {
+    try {
+      const skill = getSkill(skillName)
+      if (!skill) return { success: false, error: 'Skill not found' }
+      const content = getSkillContent(skill.location)
+      return { success: true, data: content }
+    } catch (error: unknown) {
+      return { success: false, error: (error as Error).message }
+    }
+  })
+
+  // Read a specific file's content within a skill directory
+  ipcMain.handle('skill:get-file-content', async (_event, skillName: string, relativePath: string) => {
+    try {
+      const skill = getSkill(skillName)
+      if (!skill) return { success: false, error: 'Skill not found' }
+
+      let fullPath: string
+      if (skill.source.kind === 'project-commands' || skill.source.kind === 'global-commands') {
+        fullPath = skill.location
+      } else {
+        fullPath = path.resolve(skill.baseDir, relativePath)
+        // Security: prevent path traversal
+        if (!fullPath.startsWith(path.resolve(skill.baseDir))) {
+          return { success: false, error: 'Invalid file path' }
+        }
+      }
+
+      const content = readFileSync(fullPath, 'utf-8')
+      return { success: true, data: content }
+    } catch (error: unknown) {
+      return { success: false, error: (error as Error).message }
     }
   })
 

@@ -146,7 +146,7 @@ export function CommandPopover({
                     /{highlightMatch(cmd.name, filter)}
                   </span>
                   <span className="text-xs text-muted-foreground truncate flex-1">
-                    {cmd.description}
+                    {t(cmd.description)}
                   </span>
                 </button>
               )
@@ -177,7 +177,7 @@ export function CommandPopover({
                     /{highlightMatch(cmd.name, filter)}
                   </span>
                   <span className="text-xs text-muted-foreground truncate flex-1">
-                    {cmd.description}
+                    {t(cmd.description)}
                   </span>
                   {icon && (
                     <span className="text-xs shrink-0">{icon}</span>
