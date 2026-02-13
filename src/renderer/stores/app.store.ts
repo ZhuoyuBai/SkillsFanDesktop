@@ -4,6 +4,7 @@
 
 import { create } from 'zustand'
 import { api } from '../api'
+import i18n from '../i18n'
 import type { HaloConfig, AppView, McpServerStatus } from '../types'
 import { hasAnyAISource } from '../types'
 import { useSpaceStore } from './space.store'
@@ -120,7 +121,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   startGitBashInstall: async () => {
     set({
-      gitBashInstallProgress: { phase: 'downloading', progress: 0, message: 'Preparing download...' }
+      gitBashInstallProgress: { phase: 'downloading', progress: 0, message: i18n.t('Preparing download...') }
     })
 
     try {
@@ -137,7 +138,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
       if (result.success) {
         set({
-          gitBashInstallProgress: { phase: 'done', progress: 100, message: 'Installation complete' }
+          gitBashInstallProgress: { phase: 'done', progress: 100, message: i18n.t('Installation complete') }
         })
         // Refresh status after successful install
         await get().refreshGitBashStatus()
@@ -146,7 +147,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           gitBashInstallProgress: {
             phase: 'error',
             progress: 0,
-            message: 'Installation failed',
+            message: i18n.t('Installation failed'),
             error: result.error || 'Unknown error'
           }
         })
@@ -156,7 +157,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         gitBashInstallProgress: {
           phase: 'error',
           progress: 0,
-          message: 'Installation failed',
+          message: i18n.t('Installation failed'),
           error: e instanceof Error ? e.message : String(e)
         }
       })
@@ -281,12 +282,12 @@ export const useAppStore = create<AppState>((set, get) => ({
         }
       } else {
         console.error('[Store] Failed to load config:', response.error)
-        set({ error: response.error || 'Failed to load configuration' })
+        set({ error: response.error || i18n.t('Failed to load configuration') })
         set({ view: 'setup' })
       }
     } catch (error) {
       console.error('[Store] Failed to initialize:', error)
-      set({ error: 'Failed to initialize application' })
+      set({ error: i18n.t('Failed to initialize application') })
       set({ view: 'setup' })
     } finally {
       set({ isLoading: false })

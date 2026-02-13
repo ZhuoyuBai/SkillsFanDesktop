@@ -177,7 +177,7 @@ export function SkillList() {
         setSkills(result.data as SkillInfo[])
         setError(null)
       } else {
-        setError(result.error || 'Failed to load skills')
+        setError(result.error || t('Failed to load skills'))
       }
     } catch (err) {
       setError((err as Error).message)
@@ -211,7 +211,7 @@ export function SkillList() {
           setFileContent('')
         }
       } else {
-        setError(result.error || 'Failed to reload skills')
+        setError(result.error || t('Failed to reload skills'))
       }
     } catch (err) {
       setError((err as Error).message)
@@ -227,7 +227,7 @@ export function SkillList() {
     try {
       const selectResult = await api.selectSkillArchive()
       if (!selectResult.success) {
-        throw new Error(selectResult.error || 'Failed to open file picker')
+        throw new Error(selectResult.error || t('Failed to open file picker'))
       }
 
       if (!selectResult.data) {
@@ -252,7 +252,7 @@ export function SkillList() {
           archivePath
         })
       } else {
-        throw new Error(installResult.error || 'Installation failed')
+        throw new Error(installResult.error || t('Installation failed'))
       }
     } catch (err) {
       setError((err as Error).message)
@@ -283,7 +283,7 @@ export function SkillList() {
             : t('Skill installed successfully')
         setToast({ message, type: 'success' })
       } else {
-        throw new Error(result.error || 'Installation failed')
+        throw new Error(result.error || t('Installation failed'))
       }
     } catch (err) {
       setToast({ message: (err as Error).message, type: 'error' })

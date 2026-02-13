@@ -20,10 +20,12 @@ export function CreditsDisplay() {
   const initialized = useRef(false)
 
   const currentSource = config?.aiSources?.current
+  // All providers that consume SkillsFan credits via proxy
+  const isCreditsProvider = new Set(['skillsfan-credits', 'glm', 'minimax-oauth']).has(currentSource || '')
 
   // On first mount, load cached credits from auth state for instant display
   useEffect(() => {
-    if (currentSource !== 'skillsfan-credits' || initialized.current) return
+    if (!isCreditsProvider || initialized.current) return
     initialized.current = true
 
     api.skillsfanGetAuthState().then((res) => {
@@ -40,7 +42,7 @@ export function CreditsDisplay() {
   }, [currentSource])
 
   const fetchCredits = useCallback(async () => {
-    if (currentSource !== 'skillsfan-credits') return
+    if (!isCreditsProvider) return
     setLoading(true)
     try {
       const res = await api.skillsfanGetCredits()
@@ -76,7 +78,7 @@ export function CreditsDisplay() {
 
   // Auto-refresh after agent completes
   useEffect(() => {
-    if (currentSource !== 'skillsfan-credits') return
+    if (!isCreditsProvider) return
 
     const cleanup = api.onAgentComplete(() => {
       // Delay slightly to allow backend to process credit deduction

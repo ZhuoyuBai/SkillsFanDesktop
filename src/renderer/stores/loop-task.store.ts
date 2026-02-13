@@ -7,6 +7,7 @@
 
 import { create } from 'zustand'
 import { api } from '../api'
+import i18n from '../i18n'
 import type {
   LoopTask,
   LoopTaskMeta,
@@ -163,7 +164,7 @@ export const useLoopTaskStore = create<LoopTaskState>((set, get) => ({
         newStates.set(spaceId, { ...currentState, tasks })
         set({ spaceStates: newStates, isLoading: false })
       } else {
-        set({ error: result.error || 'Failed to load tasks', isLoading: false })
+        set({ error: result.error || i18n.t('Failed to load tasks'), isLoading: false })
       }
     } catch (error) {
       set({ error: (error as Error).message, isLoading: false })
@@ -267,7 +268,7 @@ export const useLoopTaskStore = create<LoopTaskState>((set, get) => ({
 
         return task
       } else {
-        throw new Error(result.error || 'Failed to create task')
+        throw new Error(result.error || i18n.t('Failed to create task'))
       }
     } catch (error) {
       set({ error: (error as Error).message, isCreating: false })
@@ -411,7 +412,7 @@ export const useLoopTaskStore = create<LoopTaskState>((set, get) => ({
 
       if (!result.success) {
         console.error('[LoopTaskStore] Delete failed, rolling back:', result.error)
-        rollback(result.error || 'Failed to delete task')
+        rollback(result.error || i18n.t('Failed to delete task'))
       }
     } catch (error) {
       console.error('[LoopTaskStore] Delete error, rolling back:', error)

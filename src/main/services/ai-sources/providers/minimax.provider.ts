@@ -1,12 +1,11 @@
 /**
- * GLM Provider
+ * MiniMax Provider
  *
- * Uses the SkillsFan website as an OpenAI-compatible API proxy to access GLM-5.
- * Shares OAuth authentication with SkillsFan Credits provider.
- * Default model for new users.
+ * Uses the SkillsFan website as an OpenAI-compatible API proxy to access MiniMax models.
+ * Shares OAuth authentication with SkillsFan Credits and GLM providers.
  *
  * Authentication: Delegates to the existing SkillsFan OAuth auth service.
- * Tokens stay in skillsfan-auth.json (shared with SkillsFan Credits).
+ * Tokens stay in skillsfan-auth.json (shared with SkillsFan Credits and GLM).
  */
 
 import type {
@@ -38,7 +37,8 @@ import { SKILLSFAN_BASE_URL, AUTH_TIMEOUT_MS, TOKEN_REFRESH_THRESHOLD_MS } from 
 // Constants
 // ============================================================================
 
-const GLM_DEFAULT_MODEL = 'glm-5'
+const MINIMAX_DEFAULT_MODEL = 'MiniMax-M2.1'
+const PROVIDER_KEY = 'minimax-oauth'
 
 // ============================================================================
 // Types
@@ -59,7 +59,7 @@ interface ModelsResponse {
   data: SkillsFanModel[]
 }
 
-export interface GLMConfig extends OAuthSourceConfig {
+export interface MiniMaxConfig extends OAuthSourceConfig {
   modelPricing?: Record<string, { input: number; output: number }>
 }
 
@@ -67,26 +67,26 @@ export interface GLMConfig extends OAuthSourceConfig {
 // Provider Implementation
 // ============================================================================
 
-class GLMProvider implements OAuthAISourceProvider {
-  readonly type: AISourceType = 'glm'
-  readonly displayName = 'GLM-5'
+class MiniMaxProvider implements OAuthAISourceProvider {
+  readonly type: AISourceType = PROVIDER_KEY
+  readonly displayName = 'MiniMax'
 
   isConfigured(config: AISourcesConfig): boolean {
     if (sfIsLoggedIn()) return true
-    const glmConfig = config['glm'] as GLMConfig | undefined
-    return !!(glmConfig?.loggedIn)
+    const mmConfig = config[PROVIDER_KEY] as MiniMaxConfig | undefined
+    return !!(mmConfig?.loggedIn)
   }
 
   getBackendConfig(config: AISourcesConfig): BackendRequestConfig | null {
-    const glmConfig = config['glm'] as GLMConfig | undefined
+    const mmConfig = config[PROVIDER_KEY] as MiniMaxConfig | undefined
 
-    const token = sfGetFullAuthState().accessToken || glmConfig?.accessToken
+    const token = sfGetFullAuthState().accessToken || mmConfig?.accessToken
     if (!token) {
-      console.warn('[GLM] No access token available')
+      console.warn('[MiniMax] No access token available')
       return null
     }
 
-    const model = glmConfig?.model || GLM_DEFAULT_MODEL
+    const model = mmConfig?.model || MINIMAX_DEFAULT_MODEL
 
     return {
       url: `${SKILLSFAN_BASE_URL}/api/v1/chat/completions`,
@@ -97,25 +97,25 @@ class GLMProvider implements OAuthAISourceProvider {
   }
 
   getCurrentModel(config: AISourcesConfig): string | null {
-    const glmConfig = config['glm'] as GLMConfig | undefined
-    return glmConfig?.model || GLM_DEFAULT_MODEL
+    const mmConfig = config[PROVIDER_KEY] as MiniMaxConfig | undefined
+    return mmConfig?.model || MINIMAX_DEFAULT_MODEL
   }
 
   async getAvailableModels(config: AISourcesConfig): Promise<string[]> {
-    const glmConfig = config['glm'] as GLMConfig | undefined
+    const mmConfig = config[PROVIDER_KEY] as MiniMaxConfig | undefined
     try {
       const models = await this.fetchModelsFromAPI()
       return models.map(m => m.id)
     } catch {
-      return glmConfig?.availableModels || [GLM_DEFAULT_MODEL]
+      return mmConfig?.availableModels || [MINIMAX_DEFAULT_MODEL]
     }
   }
 
   getUserInfo(config: AISourcesConfig): AISourceUserInfo | null {
     const user = sfGetUserInfo()
     if (!user) {
-      const glmConfig = config['glm'] as GLMConfig | undefined
-      return glmConfig?.user || null
+      const mmConfig = config[PROVIDER_KEY] as MiniMaxConfig | undefined
+      return mmConfig?.user || null
     }
     return {
       name: user.name,
@@ -124,7 +124,7 @@ class GLMProvider implements OAuthAISourceProvider {
     }
   }
 
-  // ========== OAuth Flow (shared with SkillsFan Credits) ==========
+  // ========== OAuth Flow (shared with SkillsFan Credits and GLM) ==========
 
   async startLogin(): Promise<ProviderResult<OAuthStartResult>> {
     try {
@@ -137,7 +137,7 @@ class GLMProvider implements OAuthAISourceProvider {
         success: true,
         data: {
           loginUrl: SKILLSFAN_BASE_URL,
-          state: 'glm-login'
+          state: 'minimax-oauth-login'
         }
       }
     } catch (error) {
@@ -227,7 +227,7 @@ class GLMProvider implements OAuthAISourceProvider {
 
     try {
       const models = await this.fetchModelsFromAPI()
-      const glmConfig = config['glm'] as GLMConfig | undefined
+      const mmConfig = config[PROVIDER_KEY] as MiniMaxConfig | undefined
 
       const modelIds = models.map(m => m.id)
       const modelNames: Record<string, string> = {}
@@ -246,20 +246,20 @@ class GLMProvider implements OAuthAISourceProvider {
       const user = sfGetUserInfo()
       const baseConfig: Record<string, unknown> = {
         loggedIn: true,
-        user: glmConfig?.user || (user ? { name: user.name, avatar: user.avatar, uid: user.id } : undefined),
-        model: glmConfig?.model || GLM_DEFAULT_MODEL,
+        user: mmConfig?.user || (user ? { name: user.name, avatar: user.avatar, uid: user.id } : undefined),
+        model: mmConfig?.model || MINIMAX_DEFAULT_MODEL,
       }
 
       return {
         success: true,
         data: {
-          'glm': {
+          [PROVIDER_KEY]: {
             ...baseConfig,
-            ...glmConfig,
+            ...mmConfig,
             availableModels: modelIds,
             modelNames,
             modelPricing
-          } as GLMConfig
+          } as MiniMaxConfig
         }
       }
     } catch (error) {
@@ -281,7 +281,7 @@ class GLMProvider implements OAuthAISourceProvider {
     try {
       models = await this.fetchModelsFromAPI()
     } catch (e) {
-      console.warn('[GLM] Failed to fetch models during login:', e)
+      console.warn('[MiniMax] Failed to fetch models during login:', e)
     }
 
     const modelIds = models.map(m => m.id)
@@ -321,7 +321,7 @@ class GLMProvider implements OAuthAISourceProvider {
       },
       _availableModels: modelIds,
       _modelNames: modelNames,
-      _defaultModel: modelIds.includes(GLM_DEFAULT_MODEL) ? GLM_DEFAULT_MODEL : (modelIds[0] || GLM_DEFAULT_MODEL),
+      _defaultModel: modelIds.includes(MINIMAX_DEFAULT_MODEL) ? MINIMAX_DEFAULT_MODEL : (modelIds[0] || MINIMAX_DEFAULT_MODEL),
       _modelPricing: modelPricing
     }
 
@@ -346,9 +346,9 @@ class GLMProvider implements OAuthAISourceProvider {
     }
 
     const data: ModelsResponse = await response.json()
-    // Filter to only GLM models
+    // Filter to only MiniMax models
     return (data.data || []).filter(m =>
-      m.owned_by === 'zhipu' || m.id.toLowerCase().includes('glm')
+      m.owned_by === 'minimax' || m.id.toLowerCase().includes('minimax')
     )
   }
 }
@@ -357,13 +357,13 @@ class GLMProvider implements OAuthAISourceProvider {
 // Singleton Export
 // ============================================================================
 
-let providerInstance: GLMProvider | null = null
+let providerInstance: MiniMaxProvider | null = null
 
-export function getGLMProvider(): GLMProvider {
+export function getMiniMaxProvider(): MiniMaxProvider {
   if (!providerInstance) {
-    providerInstance = new GLMProvider()
+    providerInstance = new MiniMaxProvider()
   }
   return providerInstance
 }
 
-export { GLMProvider }
+export { MiniMaxProvider }

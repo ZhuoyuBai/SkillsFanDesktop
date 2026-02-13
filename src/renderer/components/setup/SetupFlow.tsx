@@ -38,7 +38,7 @@ export function SetupFlow() {
   const [selectedProviderId, setSelectedProviderId] = useState<string>('claude')
 
   // OAuth provider types that use SkillsFan login flow
-  const OAUTH_PROVIDER_TYPES = new Set(['glm', 'skillsfan-credits', 'github-copilot'])
+  const OAUTH_PROVIDER_TYPES = new Set(['glm', 'minimax-oauth', 'skillsfan-credits', 'github-copilot'])
 
   // Handle provider selection from grid
   const handleSelectProvider = (providerId: string) => {
@@ -64,7 +64,7 @@ export function SetupFlow() {
       // Start the login flow - this opens the browser
       const result = await api.authStartLogin(providerType)
       if (!result.success) {
-        throw new Error(result.error || 'Failed to start login')
+        throw new Error(result.error || t('Failed to start login'))
       }
 
       const { state, userCode, verificationUri } = result.data as {
@@ -86,7 +86,7 @@ export function SetupFlow() {
       // Complete the login - this polls for the token
       const completeResult = await api.authCompleteLogin(providerType, state)
       if (!completeResult.success) {
-        throw new Error(completeResult.error || 'Login failed')
+        throw new Error(completeResult.error || t('Login failed'))
       }
 
       // Success! Reload config and enter space view
@@ -98,7 +98,7 @@ export function SetupFlow() {
       await initialize()
     } catch (err) {
       console.error(`[SetupFlow] ${providerType} login error:`, err)
-      setError(err instanceof Error ? err.message : 'Login failed')
+      setError(err instanceof Error ? err.message : t('Login failed'))
       setStep('select')
       setCurrentProvider(null)
     }

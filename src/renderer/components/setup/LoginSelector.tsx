@@ -41,6 +41,13 @@ const OAUTH_PROVIDERS: ProviderPreset[] = [
     isOAuth: true,
   },
   {
+    id: 'minimax-oauth',
+    name: 'MiniMax',
+    nameKey: 'MiniMax',
+    logo: minimaxLogo,
+    isOAuth: true,
+  },
+  {
     id: 'skillsfan-credits',
     name: 'SkillsFan',
     nameKey: 'SkillsFan Credits',

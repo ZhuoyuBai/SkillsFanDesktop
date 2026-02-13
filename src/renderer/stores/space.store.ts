@@ -4,6 +4,7 @@
 
 import { create } from 'zustand'
 import { api } from '../api'
+import i18n from '../i18n'
 import type { Space, CreateSpaceInput, SpacePreferences } from '../types'
 
 interface SpaceState {
@@ -65,11 +66,11 @@ export const useSpaceStore = create<SpaceState>((set, get) => ({
       if (response.success && response.data) {
         set({ spaces: response.data as Space[] })
       } else {
-        set({ error: response.error || 'Failed to load spaces' })
+        set({ error: response.error || i18n.t('Failed to load spaces') })
       }
     } catch (error) {
       console.error('Failed to load spaces:', error)
-      set({ error: 'Failed to load spaces' })
+      set({ error: i18n.t('Failed to load spaces') })
     } finally {
       set({ isLoading: false })
     }
@@ -95,12 +96,12 @@ export const useSpaceStore = create<SpaceState>((set, get) => ({
 
         return newSpace
       } else {
-        set({ error: response.error || 'Failed to create space' })
+        set({ error: response.error || i18n.t('Failed to create space') })
         return null
       }
     } catch (error) {
       console.error('Failed to create space:', error)
-      set({ error: 'Failed to create space' })
+      set({ error: i18n.t('Failed to create space') })
       return null
     }
   },
@@ -128,12 +129,12 @@ export const useSpaceStore = create<SpaceState>((set, get) => ({
 
         return updatedSpace
       } else {
-        set({ error: response.error || 'Failed to update space' })
+        set({ error: response.error || i18n.t('Failed to update space') })
         return null
       }
     } catch (error) {
       console.error('Failed to update space:', error)
-      set({ error: 'Failed to update space' })
+      set({ error: i18n.t('Failed to update space') })
       return null
     }
   },

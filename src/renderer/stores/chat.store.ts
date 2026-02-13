@@ -26,6 +26,7 @@ import { hasAnyAISource } from '../types'
 import { canvasLifecycle } from '../services/canvas-lifecycle'
 import { useAppStore } from './app.store'
 import { useToastStore } from './toast.store'
+import i18n from '../i18n'
 
 // LRU cache size limit
 const CONVERSATION_CACHE_SIZE = 10
@@ -711,13 +712,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
         const errorThought: Thought = {
           id: `thought-error-${Date.now()}`,
           type: 'error',
-          content: 'No AI model configured. Please configure a model in Settings.',
+          content: i18n.t('No AI model configured. Please configure a model in Settings.'),
           timestamp: new Date().toISOString(),
           isError: true
         }
         newSessions.set(conversationId, {
           ...session,
-          error: 'No AI model configured',
+          error: i18n.t('No AI model configured'),
           thoughts: [...session.thoughts, errorThought]
         })
         return { sessions: newSessions }
@@ -728,7 +729,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     // Current source is an OAuth provider but not logged in - show toast prompt
     if (currentAiSource && !isCurrentSourceLoggedIn) {
       console.log(`[ChatStore] Current source ${currentAiSource} needs login`)
-      useToastStore.getState().addToast('请先登录后再使用此模型', 'error')
+      useToastStore.getState().addToast(i18n.t('Please log in before using this model'), 'error')
       return
     }
 
@@ -844,13 +845,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
           const errorThought: Thought = {
             id: `thought-error-${Date.now()}`,
             type: 'error',
-            content: response.error || 'Failed to send message',
+            content: response.error || i18n.t('Failed to send message'),
             timestamp: new Date().toISOString(),
             isError: true
           }
           newSessions.set(conversationId, {
             ...session,
-            error: response.error || 'Failed to send message',
+            error: response.error || i18n.t('Failed to send message'),
             isGenerating: false,
             isThinking: false,
             thoughts: [...session.thoughts, errorThought]
@@ -866,7 +867,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         const session = newSessions.get(conversationId) || createEmptySessionState()
         newSessions.set(conversationId, {
           ...session,
-          error: 'Failed to send message',
+          error: i18n.t('Failed to send message'),
           isGenerating: false,
           isThinking: false
         })

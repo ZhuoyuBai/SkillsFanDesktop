@@ -33,6 +33,7 @@ import { getCustomProvider } from './providers/custom.provider'
 import { getGitHubCopilotProvider } from './providers/github-copilot.provider'
 import { getSkillsFanCreditsProvider } from './providers/skillsfan-credits.provider'
 import { getGLMProvider } from './providers/glm.provider'
+import { getMiniMaxProvider } from './providers/minimax.provider'
 import { loadAuthProvidersAsync, isOAuthProvider as isOAuthProviderCheck, type LoadedProvider } from './auth-loader'
 import { decryptString, decryptTokens } from '../secure-storage.service'
 
@@ -62,6 +63,7 @@ class AISourceManager {
     this.registerProvider(getGitHubCopilotProvider())
     this.registerProvider(getSkillsFanCreditsProvider())
     this.registerProvider(getGLMProvider())
+    this.registerProvider(getMiniMaxProvider())
 
     // Start async initialization (optional providers + dynamic loading)
     this.initPromise = this.initializeAsync()

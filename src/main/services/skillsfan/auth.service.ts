@@ -419,8 +419,8 @@ export async function loadAuthState(): Promise<void> {
     const content = readFileSync(authPath, 'utf-8')
     const stored = JSON.parse(content) as SkillsFanAuthState
 
-    // Validate stored state
-    if (stored.isLoggedIn && stored.accessToken && stored.refreshToken) {
+    // Validate stored state - load if we have at least an access token
+    if (stored.isLoggedIn && stored.accessToken) {
       authState = stored
       console.log('[SkillsFan] Loaded persisted auth state for user:', stored.user?.name)
 
@@ -432,17 +432,23 @@ export async function loadAuthState(): Promise<void> {
 
       // Check if token needs refresh
       if (stored.tokenExpiresAt && stored.tokenExpiresAt < Date.now()) {
-        console.log('[SkillsFan] Token expired, attempting refresh')
-        const result = await refreshToken()
-        if (!result.success) {
-          if (result.reason === 'network_error') {
-            // Keep user logged in - ensureValidToken() will retry before API calls
-            console.log('[SkillsFan] Token refresh failed due to network error, keeping auth state for lazy retry')
-          } else {
-            // Server rejected token or no refresh token - must re-login
-            console.log('[SkillsFan] Token refresh rejected, clearing auth state')
-            await logout()
+        if (stored.refreshToken) {
+          console.log('[SkillsFan] Token expired, attempting refresh')
+          const result = await refreshToken()
+          if (!result.success) {
+            if (result.reason === 'network_error') {
+              // Keep user logged in - ensureValidToken() will retry before API calls
+              console.log('[SkillsFan] Token refresh failed due to network error, keeping auth state for lazy retry')
+            } else {
+              // Server rejected token - must re-login
+              console.log('[SkillsFan] Token refresh rejected, clearing auth state')
+              await logout()
+            }
           }
+        } else {
+          // No refresh token and access token expired - must re-login
+          console.log('[SkillsFan] Token expired and no refresh token, clearing auth state')
+          await logout()
         }
       }
     }

@@ -200,7 +200,7 @@ export function ApiSetup({ onBack, showBack = false, initialProviderId }: ApiSet
 
       const result = await api.setConfig(newConfig)
       if (!result.success) {
-        throw new Error(result.error || 'Failed to save config')
+        throw new Error(result.error || t('Failed to save config'))
       }
       setConfig(newConfig as any)
 

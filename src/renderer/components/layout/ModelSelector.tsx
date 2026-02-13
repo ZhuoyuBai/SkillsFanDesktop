@@ -42,6 +42,7 @@ export const PROVIDER_LOGOS_BY_ID: Record<string, string> = {
   'glm': zhipuLogo,
   'zhipu': zhipuLogo,
   'minimax': minimaxLogo,
+  'minimax-oauth': minimaxLogo,
   'kimi': kimiLogo,
   'deepseek': deepseekLogo,
   'claude': claudeLogo,
@@ -54,6 +55,7 @@ export const PROVIDER_NAMES: Record<string, string> = {
   'glm': 'GLM-5',
   'zhipu': 'Zhipu GLM',
   'minimax': 'MiniMax',
+  'minimax-oauth': 'MiniMax',
   'kimi': 'Kimi',
   'deepseek': 'DeepSeek',
   'claude': 'Claude',
@@ -128,6 +130,7 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
   const [isOpen, setIsOpen] = useState(false)
   const [authProviders, setAuthProviders] = useState<AuthProviderConfig[]>([])
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const lastRefreshRef = useRef<number>(0)
 
   // Load auth providers from config
   useEffect(() => {
@@ -137,6 +140,25 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
       }
     })
   }, [])
+
+  // Refresh model list when dropdown opens (throttled: once per 60s)
+  useEffect(() => {
+    if (!isOpen) return
+
+    const now = Date.now()
+    if (now - lastRefreshRef.current < 60_000) return
+    lastRefreshRef.current = now
+
+    api.refreshAISourcesConfig().then((result) => {
+      if (result.success) {
+        api.getConfig().then((configResult) => {
+          if (configResult.success && configResult.data) {
+            setConfig(configResult.data as HaloConfig)
+          }
+        })
+      }
+    })
+  }, [isOpen])
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -304,12 +326,12 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
   const styleConfig = {
     header: {
       button: "flex items-center gap-1.5 px-3 py-1.5 text-sm",
-      dropdown: "absolute left-0 bottom-full mb-2",
+      dropdown: "absolute left-0 top-full mt-2",
       showChevron: true,
     },
     compact: {
       button: "h-8 flex items-center gap-1.5 px-2.5 rounded-lg text-xs",
-      dropdown: "absolute left-0 bottom-full mb-1",
+      dropdown: "absolute left-0 top-full mt-1",
       showChevron: false,
     }
   }
@@ -376,17 +398,22 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
         <div
           className={`
             ${styles.dropdown}
-            w-48 bg-card border border-border rounded-xl shadow-lg z-50 py-1 overflow-hidden
-            animate-in fade-in-0 slide-in-from-bottom-2 duration-200
+            min-w-[11rem] max-w-[16rem] max-h-[20rem] overflow-y-auto bg-card border border-border rounded-xl shadow-lg z-50 py-1
+            animate-in fade-in-0 slide-in-from-top-2 duration-200
           `.trim().replace(/\s+/g, ' ')}
         >
           {/* OAuth Providers (Official) - all providers, logged in or not */}
-          {allOAuthProviders.map((provider) => {
+          {(() => {
+            const seenModelIds = new Set<string>()
+            return allOAuthProviders.map((provider) => {
             if (provider.isLoggedIn && provider.config?.availableModels?.length) {
               // Logged in: show individual models
               return (
                 <div key={provider.type}>
                   {provider.config.availableModels.map((modelId) => {
+                    // Deduplicate models across providers
+                    if (seenModelIds.has(modelId)) return null
+                    seenModelIds.add(modelId)
                     const displayName = provider.config?.modelNames?.[modelId] || modelId
                     const isSelected = currentSource === provider.type && provider.config?.model === modelId
                     const modelLogo = getModelLogo(modelId, displayName, provider.type)
@@ -406,7 +433,6 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
                           </div>
                         )}
                         <span className="truncate">{displayName}</span>
-                        <span className="flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded font-medium text-white bg-primary/80">{t('Official')}</span>
                       </button>
                     )
                   })}
@@ -432,11 +458,11 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
                     </div>
                   )}
                   <span className="truncate">{provider.displayName}</span>
-                  <span className="flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded font-medium text-white bg-primary/80">{t('Official')}</span>
                 </button>
               )
             }
-          })}
+          })
+          })()}
 
           {/* Separator between official and custom providers */}
           {allOAuthProviders.length > 0 && configuredCustomProviders.length > 0 && (

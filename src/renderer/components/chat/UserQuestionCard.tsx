@@ -232,13 +232,13 @@ export function UserQuestionCard({ questions, onAnswer, onSkip }: UserQuestionCa
               : 'bg-muted text-muted-foreground cursor-not-allowed'
           )}
         >
-          {t('提交')}
+          {t('Submit')}
         </button>
         <button
           onClick={onSkip}
           className="py-1.5 px-3 rounded text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
         >
-          {t('跳过')}
+          {t('Skip')}
         </button>
       </div>
     </div>
