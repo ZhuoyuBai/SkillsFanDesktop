@@ -18,13 +18,13 @@ export function AttachmentPreview({ attachments, onRemove, isProcessing }: Attac
   if (attachments.length === 0 && !isProcessing) return null
 
   return (
-    <div className="flex flex-wrap gap-2 px-1 py-1.5">
+    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 px-1 py-1.5">
       {attachments.map(att => (
         <AttachmentCard key={att.id} attachment={att} onRemove={() => onRemove(att.id)} />
       ))}
       {isProcessing && (
-        <div className="flex items-center justify-center w-48 h-14 rounded-xl
-                        border border-dashed border-border bg-muted/30 shrink-0">
+        <div className="flex items-center justify-center h-14 rounded-xl
+                        border border-dashed border-border bg-muted/30">
           <Loader2 size={16} className="animate-spin text-muted-foreground" />
         </div>
       )}
@@ -36,7 +36,7 @@ function AttachmentCard({ attachment, onRemove }: { attachment: Attachment; onRe
   return (
     <div className="group flex items-center gap-2.5 pl-1.5 pr-2 py-1.5 rounded-xl
                     border border-border bg-muted/30 hover:border-border/80
-                    transition-colors shrink-0 max-w-[240px]">
+                    transition-colors min-w-0">
       {/* Thumbnail / Icon */}
       <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0 flex items-center justify-center bg-muted/50">
         {attachment.type === 'image' ? (
@@ -51,8 +51,8 @@ function AttachmentCard({ attachment, onRemove }: { attachment: Attachment; onRe
       </div>
 
       {/* Name + Size */}
-      <div className="flex flex-col min-w-0 flex-1">
-        <span className="text-sm text-foreground truncate leading-tight">
+      <div className="flex flex-col items-start min-w-0 flex-1">
+        <span className="text-sm text-foreground truncate leading-tight max-w-full">
           {attachment.name || 'file'}
         </span>
         <span className="text-xs text-muted-foreground/60 leading-tight">
