@@ -20,7 +20,7 @@
  */
 
 import { useState, useRef, useEffect, useMemo, useCallback, KeyboardEvent, ClipboardEvent, DragEvent } from 'react'
-import { Plus, Paperclip, Loader2, AlertCircle, Globe, Package } from 'lucide-react'
+import { Paperclip, Loader2, AlertCircle, Globe, Package, Image, File } from 'lucide-react'
 import { useAppStore } from '../../stores/app.store'
 import { useSpaceStore } from '../../stores/space.store'
 import { useOnboardingStore } from '../../stores/onboarding.store'
@@ -156,6 +156,15 @@ function useTypewriter(phrases: string[], options?: {
 // Attachment constraints
 const MAX_ATTACHMENTS = 10  // Max attachments per message
 
+// Model patterns that do not support image/vision input (matched case-insensitively via includes)
+const NO_VISION_PATTERNS = ['glm-5', 'glm-4', 'minimax-m2.1', 'minimax-m2.5']
+
+function isNoVisionModel(modelId: string): boolean {
+  if (!modelId) return false
+  const lower = modelId.toLowerCase()
+  return NO_VISION_PATTERNS.some(p => lower.includes(p))
+}
+
 // Error message type
 interface AttachmentError {
   id: string
@@ -176,13 +185,22 @@ export function InputArea({ onSend, onStop, onInject, isGenerating, isCompact = 
   const [showAttachMenu, setShowAttachMenu] = useState(false)  // Attachment menu visibility
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const imageInputRef = useRef<HTMLInputElement>(null)
   const attachMenuRef = useRef<HTMLDivElement>(null)
 
   // AI Browser state
   const { enabled: aiBrowserEnabled, setEnabled: setAIBrowserEnabled } = useAIBrowserStore()
 
   // Settings navigation
-  const { openSettingsWithSection } = useAppStore()
+  const { config, openSettingsWithSection } = useAppStore()
+
+  // Current model ID for vision support check
+  const currentModelId = (() => {
+    const aiSources = config?.aiSources
+    if (!aiSources?.current) return ''
+    const providerConfig = (aiSources as any)[aiSources.current]
+    return (providerConfig?.model as string) || ''
+  })()
 
   // Current space for @ file reference
   const { currentSpace } = useSpaceStore()
@@ -474,10 +492,32 @@ export function InputArea({ onSend, onStop, onInject, isGenerating, isCompact = 
     }
   }
 
-  // Handle attach button click (from attachment menu)
+  // Handle image input change
+  const handleImageInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    if (files.length > 0) {
+      await addFiles(files)
+    }
+    if (imageInputRef.current) {
+      imageInputRef.current.value = ''
+    }
+  }
+
+  // Handle attach button click - select files
   const handleAttachButtonClick = () => {
     setShowAttachMenu(false)
     fileInputRef.current?.click()
+  }
+
+  // Handle image button click - select images only
+  const handleImageButtonClick = () => {
+    if (isNoVisionModel(currentModelId)) {
+      setInfoToast(t('This model does not support image understanding'))
+      setShowAttachMenu(false)
+      return
+    }
+    setShowAttachMenu(false)
+    imageInputRef.current?.click()
   }
 
   // Auto-resize textarea
@@ -502,6 +542,13 @@ export function InputArea({ onSend, onStop, onInject, isGenerating, isCompact = 
     const hasContent = finalText || attachments.length > 0
 
     if (!hasContent) return
+
+    // Block send if images attached with a model that doesn't support vision
+    const hasImageAttachments = attachments.some(a => a.type === 'image')
+    if (hasImageAttachments && isNoVisionModel(currentModelId)) {
+      setInfoToast(t('This model does not support image understanding'))
+      return
+    }
 
     if (isGenerating && onInject) {
       // During generation: inject message instead of normal send
@@ -645,14 +692,21 @@ export function InputArea({ onSend, onStop, onInject, isGenerating, isCompact = 
           </div>
         )}
 
-        {/* Hidden file input */}
+        {/* Hidden file inputs */}
         <input
           ref={fileInputRef}
           type="file"
-          accept={getAcceptedExtensions()}
           multiple
           className="hidden"
           onChange={handleFileInputChange}
+        />
+        <input
+          ref={imageInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          className="hidden"
+          onChange={handleImageInputChange}
         />
 
         {/* Skill Management Button - above input */}
@@ -677,6 +731,15 @@ export function InputArea({ onSend, onStop, onInject, isGenerating, isCompact = 
           </div>
         )}
 
+        {/* Attachment preview area - outside input container */}
+        {(hasAttachments || isProcessingFiles) && (
+          <AttachmentPreview
+            attachments={attachments}
+            onRemove={removeAttachment}
+            isProcessing={isProcessingFiles}
+          />
+        )}
+
         {/* Input container */}
         <div
           className={`
@@ -689,14 +752,6 @@ export function InputArea({ onSend, onStop, onInject, isGenerating, isCompact = 
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
         >
-          {/* Attachment preview area */}
-          {(hasAttachments || isProcessingFiles) && (
-            <AttachmentPreview
-              attachments={attachments}
-              onRemove={removeAttachment}
-              isProcessing={isProcessingFiles}
-            />
-          )}
 
           {/* Drag overlay */}
           {isDragOver && (
@@ -826,6 +881,7 @@ export function InputArea({ onSend, onStop, onInject, isGenerating, isCompact = 
             showAttachMenu={showAttachMenu}
             onAttachMenuToggle={() => setShowAttachMenu(!showAttachMenu)}
             onAttachClick={handleAttachButtonClick}
+            onImageClick={handleImageButtonClick}
             attachmentCount={attachments.length}
             maxAttachments={MAX_ATTACHMENTS}
             attachMenuRef={attachMenuRef}
@@ -833,6 +889,7 @@ export function InputArea({ onSend, onStop, onInject, isGenerating, isCompact = 
             onSend={handleSend}
             onStop={onStop}
             onDisabledClick={handleDisabledClick}
+            popoverUp={!noBorder}
           />
         </div>
       </div>
@@ -857,6 +914,7 @@ interface InputToolbarProps {
   showAttachMenu: boolean
   onAttachMenuToggle: () => void
   onAttachClick: () => void
+  onImageClick: () => void
   attachmentCount: number
   maxAttachments: number
   attachMenuRef: React.RefObject<HTMLDivElement | null>
@@ -864,6 +922,7 @@ interface InputToolbarProps {
   onSend: () => void
   onStop: () => void
   onDisabledClick: () => void  // Callback when clicking disabled buttons during generation
+  popoverUp?: boolean  // true = popover opens upward (bottom input), false = downward (centered input)
 }
 
 function InputToolbar({
@@ -877,13 +936,15 @@ function InputToolbar({
   showAttachMenu,
   onAttachMenuToggle,
   onAttachClick,
+  onImageClick,
   attachmentCount,
   maxAttachments,
   attachMenuRef,
   canSend,
   onSend,
   onStop,
-  onDisabledClick
+  onDisabledClick,
+  popoverUp = false
 }: InputToolbarProps) {
   const { t } = useTranslation()
 
@@ -892,57 +953,57 @@ function InputToolbar({
 
   return (
     <div className="flex items-center justify-between px-2 pb-2 pt-1">
-      {/* Left section: attachment button + thinking toggle */}
+      {/* Left section: attachment button + model/space selectors */}
       <div className="flex items-center gap-1">
-        {/* Attachment menu - temporarily hidden */}
-        {/* {!isGenerating && !isOnboarding && (
+        {/* Attachment menu */}
+        {!isGenerating && !isOnboarding && (
           <div className="relative" ref={attachMenuRef}>
             <button
               onClick={onAttachMenuToggle}
-              disabled={isProcessingImages}
+              disabled={isProcessingFiles}
               className={`w-8 h-8 flex items-center justify-center rounded-lg
                 transition-all duration-150
                 ${showAttachMenu
                   ? 'bg-primary/15 text-primary'
                   : 'text-foreground/80 hover:text-foreground hover:bg-muted'
                 }
-                ${isProcessingImages ? 'opacity-50 cursor-not-allowed' : ''}
+                ${isProcessingFiles ? 'opacity-50 cursor-not-allowed' : ''}
               `}
               title={t('Add attachment')}
             >
-              <Plus size={18} className={`transition-transform duration-200 ${showAttachMenu ? 'rotate-45' : ''}`} />
+              <Paperclip size={16} className={`transition-transform duration-200 ${showAttachMenu ? 'rotate-45' : ''}`} />
             </button>
 
             {showAttachMenu && (
-              <div className="absolute bottom-full left-0 mb-1 p-1 bg-popover border border-border
-                rounded-lg shadow-lg z-20 animate-fade-in">
+              <div className={`absolute left-0 p-1 bg-popover border border-border
+                rounded-lg shadow-lg z-20 animate-fade-in
+                ${popoverUp ? 'bottom-full mb-1' : 'top-full mt-1'}`}>
                 <button
                   onClick={onImageClick}
-                  disabled={imageCount >= maxImages}
-                  className={`w-full px-2.5 py-1.5 flex items-center gap-2 text-sm whitespace-nowrap
-                    rounded-md transition-colors duration-150
-                    ${imageCount >= maxImages
-                      ? 'text-muted-foreground/40 cursor-not-allowed'
-                      : 'text-foreground hover:bg-muted'
-                    }
-                  `}
+                  disabled={attachmentCount >= maxAttachments}
+                  className="w-full px-2.5 py-1.5 flex items-center gap-2 text-sm whitespace-nowrap
+                    rounded-md transition-colors text-muted-foreground hover:text-foreground hover:bg-muted disabled:text-muted-foreground/40 disabled:cursor-not-allowed"
                 >
-                  <ImagePlus size={14} className="text-muted-foreground" />
-                  <span>{t('Add image')}</span>
-                  {imageCount > 0 && (
-                    <span className="text-xs text-muted-foreground">
-                      {imageCount}/{maxImages}
-                    </span>
-                  )}
+                  <Image size={14} />
+                  <span>{t('Select image')}</span>
+                </button>
+                <button
+                  onClick={onAttachClick}
+                  disabled={attachmentCount >= maxAttachments}
+                  className="w-full px-2.5 py-1.5 flex items-center gap-2 text-sm whitespace-nowrap
+                    rounded-md transition-colors text-muted-foreground hover:text-foreground hover:bg-muted disabled:text-muted-foreground/40 disabled:cursor-not-allowed"
+                >
+                  <File size={14} />
+                  <span>{t('Select file')}</span>
                 </button>
               </div>
             )}
           </div>
-        )} */}
+        )}
 
         {/* Model Selector - icon only on narrow windows */}
         {!isOnboarding && (
-          <ModelSelector variant="compact" iconOnly={isMobile} disabled={isGenerating} onDisabledClick={onDisabledClick} />
+          <ModelSelector variant="compact" iconOnly={isMobile} disabled={isGenerating} onDisabledClick={onDisabledClick} popoverUp={popoverUp} />
         )}
 
         {/* Space Selector - icon only on narrow windows */}

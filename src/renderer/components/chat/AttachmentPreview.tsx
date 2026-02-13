@@ -1,14 +1,12 @@
 /**
- * AttachmentPreview - Universal attachment preview cards
+ * AttachmentPreview - Horizontal card style attachment preview
  *
- * Displays image thumbnails, PDF icons, code file icons, etc.
- * Each card shows file type icon, filename, size, and a remove button.
+ * Layout per card: [thumbnail/icon] [name + size] [x]
  */
 
 import { X, FileText, FileCode, Table, Loader2 } from 'lucide-react'
 import type { Attachment, TextAttachment } from '../../types'
 import { formatFileSize } from '../../utils/imageProcessor'
-import { useTranslation } from '../../i18n'
 
 interface AttachmentPreviewProps {
   attachments: Attachment[]
@@ -17,17 +15,15 @@ interface AttachmentPreviewProps {
 }
 
 export function AttachmentPreview({ attachments, onRemove, isProcessing }: AttachmentPreviewProps) {
-  const { t } = useTranslation()
-
   if (attachments.length === 0 && !isProcessing) return null
 
   return (
-    <div className="flex gap-2 px-3 py-2 overflow-x-auto border-b border-border/30">
+    <div className="flex flex-wrap gap-2 px-1 py-1.5">
       {attachments.map(att => (
         <AttachmentCard key={att.id} attachment={att} onRemove={() => onRemove(att.id)} />
       ))}
       {isProcessing && (
-        <div className="flex items-center justify-center w-24 h-[72px] rounded-lg
+        <div className="flex items-center justify-center w-48 h-14 rounded-xl
                         border border-dashed border-border bg-muted/30 shrink-0">
           <Loader2 size={16} className="animate-spin text-muted-foreground" />
         </div>
@@ -38,41 +34,41 @@ export function AttachmentPreview({ attachments, onRemove, isProcessing }: Attac
 
 function AttachmentCard({ attachment, onRemove }: { attachment: Attachment; onRemove: () => void }) {
   return (
-    <div className="relative group shrink-0 w-24 h-[72px] rounded-lg border border-border
-                    bg-muted/30 overflow-hidden flex flex-col items-center justify-center gap-0.5
-                    hover:border-border/80 transition-colors">
+    <div className="group flex items-center gap-2.5 pl-1.5 pr-2 py-1.5 rounded-xl
+                    border border-border bg-muted/30 hover:border-border/80
+                    transition-colors shrink-0 max-w-[240px]">
+      {/* Thumbnail / Icon */}
+      <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0 flex items-center justify-center bg-muted/50">
+        {attachment.type === 'image' ? (
+          <img
+            src={`data:${attachment.mediaType};base64,${attachment.data}`}
+            className="w-full h-full object-cover"
+            alt={attachment.name || 'image'}
+          />
+        ) : (
+          <FileIcon attachment={attachment} />
+        )}
+      </div>
+
+      {/* Name + Size */}
+      <div className="flex flex-col min-w-0 flex-1">
+        <span className="text-sm text-foreground truncate leading-tight">
+          {attachment.name || 'file'}
+        </span>
+        <span className="text-xs text-muted-foreground/60 leading-tight">
+          {formatFileSize(attachment.size || 0)}
+        </span>
+      </div>
+
       {/* Remove button */}
       <button
         onClick={onRemove}
-        className="absolute top-1 right-1 w-4 h-4 rounded-full bg-background/90 border border-border/50
-                   flex items-center justify-center opacity-0 group-hover:opacity-100
-                   transition-opacity hover:bg-destructive/10 hover:border-destructive/30"
+        className="w-5 h-5 rounded-full bg-muted flex items-center justify-center shrink-0
+                   text-muted-foreground/40 hover:text-foreground hover:bg-muted-foreground/20
+                   transition-colors"
       >
-        <X size={10} />
+        <X size={12} />
       </button>
-
-      {/* Icon / Thumbnail */}
-      {attachment.type === 'image' ? (
-        <img
-          src={`data:${attachment.mediaType};base64,${attachment.data}`}
-          className="w-full h-10 object-cover rounded-t-lg"
-          alt={attachment.name || 'image'}
-        />
-      ) : (
-        <div className="pt-1">
-          <FileIcon attachment={attachment} />
-        </div>
-      )}
-
-      {/* Filename */}
-      <span className="text-[10px] text-muted-foreground truncate w-full px-1.5 text-center leading-tight">
-        {attachment.name || 'file'}
-      </span>
-
-      {/* File size */}
-      <span className="text-[9px] text-muted-foreground/50 leading-tight">
-        {formatFileSize(attachment.size || 0)}
-      </span>
     </div>
   )
 }

@@ -351,6 +351,7 @@ class AISourceManager {
     }
 
     if (updated) {
+      this.preserveUserSelections(aiSources)
       saveConfig({ aiSources } as any)
     }
   }
@@ -477,6 +478,10 @@ class AISourceManager {
       }
     }
 
+    // Preserve user selections (current source, model per provider) that may
+    // have changed while providers were refreshing (race condition fix)
+    this.preserveUserSelections(aiSources)
+
     // Save merged config (tokens remain encrypted)
     saveConfig({ aiSources } as any)
   }
@@ -505,6 +510,7 @@ class AISourceManager {
       const freshConfig = getConfig() as any
       const aiSources: AISourcesConfig = freshConfig.aiSources || { current: 'custom' }
       Object.assign(aiSources, result.data)
+      this.preserveUserSelections(aiSources)
       saveConfig({ aiSources } as any)
     }
 
@@ -572,6 +578,30 @@ class AISourceManager {
     }
 
     return result
+  }
+
+  /**
+   * Re-read latest config from disk and preserve user-mutable fields
+   * (current source, model selection per provider) in the refreshed aiSources.
+   * Prevents race conditions where user changes during async refresh get overwritten.
+   */
+  private preserveUserSelections(aiSources: AISourcesConfig): void {
+    const latestConfig = getConfig() as any
+    const latestAiSources = latestConfig.aiSources || {}
+
+    aiSources.current = latestAiSources.current || aiSources.current
+
+    for (const key of Object.keys(aiSources)) {
+      if (key === 'current') continue
+      const refreshed = aiSources[key]
+      const latest = latestAiSources[key]
+      if (
+        refreshed && typeof refreshed === 'object' && 'model' in refreshed &&
+        latest && typeof latest === 'object' && 'model' in latest
+      ) {
+        ;(refreshed as any).model = (latest as any).model
+      }
+    }
   }
 }
 

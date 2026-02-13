@@ -50,6 +50,9 @@ export function TokenUsageIndicator({ tokenUsage, previousCost = 0, className = 
   // Calculate current message cost
   const currentCost = tokenUsage.totalCostUsd - previousCost
 
+  // Don't render when there's no usage data
+  if (contextUsed === 0) return null
+
   return (
     <div
       className={`relative inline-flex items-center ${className}`}

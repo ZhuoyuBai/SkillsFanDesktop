@@ -46,6 +46,7 @@ interface LoopTaskState {
   // Loading states
   isLoading: boolean
   isCreating: boolean
+  isGeneratingStories: boolean
 
   // Editing state (for new/edit task form)
   editingTask: Partial<LoopTask> | null
@@ -103,6 +104,7 @@ interface LoopTaskState {
   setCreateMethod: (method: CreateMethod | null) => void
   setAiDescription: (desc: string) => void
   setGeneratedPrdPath: (path: string | null) => void
+  setIsGeneratingStories: (v: boolean) => void
   resetWizard: () => void
 
   // Actions - Execution log
@@ -129,6 +131,7 @@ export const useLoopTaskStore = create<LoopTaskState>((set, get) => ({
   executionLog: '',
   isLoading: false,
   isCreating: false,
+  isGeneratingStories: false,
   editingTask: null,
   isEditing: false,
   wizardStep: 1 as WizardStep,
@@ -523,7 +526,8 @@ export const useLoopTaskStore = create<LoopTaskState>((set, get) => ({
       wizardStep: 1 as WizardStep,
       createMethod: null,
       aiDescription: '',
-      generatedPrdPath: null
+      generatedPrdPath: null,
+      isGeneratingStories: false
     })
   },
 
@@ -547,6 +551,11 @@ export const useLoopTaskStore = create<LoopTaskState>((set, get) => ({
     set({ generatedPrdPath: path })
   },
 
+  // Set story generation loading state
+  setIsGeneratingStories: (v) => {
+    set({ isGeneratingStories: v })
+  },
+
   // Reset wizard to initial state
   resetWizard: () => {
     set({
@@ -555,7 +564,8 @@ export const useLoopTaskStore = create<LoopTaskState>((set, get) => ({
       aiDescription: '',
       generatedPrdPath: null,
       editingTask: null,
-      isEditing: false
+      isEditing: false,
+      isGeneratingStories: false
     })
   },
 

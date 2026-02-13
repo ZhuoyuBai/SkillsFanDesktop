@@ -122,9 +122,10 @@ interface ModelSelectorProps {
   iconOnly?: boolean  // Show only icon without text (for narrow windows)
   disabled?: boolean  // Disable interaction during generation
   onDisabledClick?: () => void  // Callback when clicked while disabled
+  popoverUp?: boolean  // true = dropdown opens upward
 }
 
-export function ModelSelector({ variant = 'header', iconOnly = false, disabled = false, onDisabledClick }: ModelSelectorProps = {}) {
+export function ModelSelector({ variant = 'header', iconOnly = false, disabled = false, onDisabledClick, popoverUp = false }: ModelSelectorProps = {}) {
   const { t } = useTranslation()
   const { config, setConfig, setView } = useAppStore()
   const [isOpen, setIsOpen] = useState(false)
@@ -331,7 +332,7 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
     },
     compact: {
       button: "h-8 flex items-center gap-1.5 px-2.5 rounded-lg text-xs",
-      dropdown: "absolute left-0 top-full mt-1",
+      dropdown: popoverUp ? "absolute left-0 bottom-full mb-1" : "absolute left-0 top-full mt-1",
       showChevron: false,
     }
   }

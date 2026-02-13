@@ -22,7 +22,6 @@ import {
   Trash2,
   Circle,
   Sparkles,
-  CheckCircle2,
   RotateCcw,
   Loader2
 } from 'lucide-react'
@@ -44,7 +43,7 @@ interface Step2PlanEditProps {
 
 export function Step2PlanEdit({ spaceId, onCancel }: Step2PlanEditProps) {
   const { t } = useTranslation()
-  const { editingTask, updateEditing, setWizardStep, setGeneratedPrdPath, createTask, clearLog } = useLoopTaskStore()
+  const { editingTask, updateEditing, setWizardStep, setGeneratedPrdPath, createTask, clearLog, isGeneratingStories, setIsGeneratingStories } = useLoopTaskStore()
   const { addToast } = useToastStore()
 
   const {
@@ -65,6 +64,30 @@ export function Step2PlanEdit({ spaceId, onCancel }: Step2PlanEditProps) {
       setLocalStories(editingTask.stories)
     }
   }, [editingTask?.stories])
+
+  // Generate stories when coming from AI mode
+  useEffect(() => {
+    if (!isGeneratingStories) return
+    let cancelled = false
+
+    api.ralphGenerateStories({
+      projectDir: editingTask?.projectDir || '',
+      description: editingTask?.description || ''
+    }).then((result) => {
+      if (cancelled) return
+      if (result.success && result.data) {
+        updateEditing({ stories: result.data })
+      } else {
+        setError(result.error || t('Failed to generate sub-tasks'))
+      }
+    }).catch((err) => {
+      if (!cancelled) setError((err as Error).message)
+    }).finally(() => {
+      if (!cancelled) setIsGeneratingStories(false)
+    })
+
+    return () => { cancelled = true }
+  }, [isGeneratingStories])
 
   // Toggle story expand/collapse
   const toggleExpand = (storyId: string) => {
@@ -229,7 +252,8 @@ export function Step2PlanEdit({ spaceId, onCancel }: Step2PlanEditProps) {
             </label>
             <button
               onClick={handleAddStory}
-              className="px-3 py-1.5 text-sm bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 transition-colors flex items-center gap-1.5"
+              disabled={isGeneratingStories}
+              className="px-3 py-1.5 text-sm bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 disabled:opacity-50 transition-colors flex items-center gap-1.5"
             >
               <Plus size={14} />
               {t('Add')}
@@ -237,7 +261,12 @@ export function Step2PlanEdit({ spaceId, onCancel }: Step2PlanEditProps) {
           </div>
 
           {/* Story List */}
-          {localStories.length === 0 ? (
+          {isGeneratingStories ? (
+            <div className="flex flex-col items-center justify-center py-16 gap-3">
+              <Loader2 size={24} className="animate-spin text-primary" />
+              <p className="text-sm text-muted-foreground">{t('Generating sub-tasks...')}</p>
+            </div>
+          ) : localStories.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center border border-dashed border-border/60 rounded-xl bg-muted/10">
               <div className="w-16 h-16 rounded-full bg-muted/30 flex items-center justify-center mb-4 text-muted-foreground">
                 <Plus size={32} strokeWidth={1.5} />
@@ -342,7 +371,7 @@ export function Step2PlanEdit({ spaceId, onCancel }: Step2PlanEditProps) {
             </button>
             <button
               onClick={handleNext}
-              disabled={isLoading || localStories.length === 0}
+              disabled={isLoading || isGeneratingStories || localStories.length === 0}
               className="px-6 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 transition-colors flex items-center gap-2"
             >
               {isLoading ? (
@@ -353,7 +382,6 @@ export function Step2PlanEdit({ spaceId, onCancel }: Step2PlanEditProps) {
               ) : (
                 <>
                   {t('Start Execution')}
-                  <span className="text-xs opacity-60 ml-1 hidden sm:inline">&#8984;&#9166;</span>
                   <ChevronRight size={16} />
                 </>
               )}
@@ -501,23 +529,22 @@ function StoryCard({
                     onUpdate({ ...story, model: undefined, modelSource: undefined })
                     setShowModelDropdown(false)
                   }}
-                  className={cn(
-                    'w-full px-3 py-2 text-left hover:bg-muted/50 transition-colors flex items-center gap-2.5',
-                    !hasCustomModel && 'bg-primary/10'
-                  )}
+                  className="w-full px-3 py-2 text-left hover:bg-muted/50 transition-colors flex items-center gap-2.5"
                 >
                   <RotateCcw size={14} className="text-muted-foreground flex-shrink-0" />
                   <span className="text-sm text-foreground">{t('Use Default')}</span>
-                  {!hasCustomModel && <CheckCircle2 size={14} className="text-primary flex-shrink-0 ml-auto" />}
                 </button>
 
                 <div className="my-0.5 border-t border-border" />
 
                 {/* Official / OAuth Models */}
-                {loggedInOAuthProviders.map((provider) => (
+                {(() => {
+                  const seenModelIds = new Set<string>()
+                  return loggedInOAuthProviders.map((provider) => (
                   (provider.config?.availableModels || []).map((modelId) => {
+                    if (seenModelIds.has(modelId)) return null
+                    seenModelIds.add(modelId)
                     const displayName = provider.config?.modelNames?.[modelId] || modelId
-                    const isSelected = story.modelSource === provider.type && story.model === modelId
                     const modelLogo = getModelLogo(modelId, displayName, provider.type)
                     return (
                       <button
@@ -526,10 +553,7 @@ function StoryCard({
                           onUpdate({ ...story, model: modelId, modelSource: provider.type })
                           setShowModelDropdown(false)
                         }}
-                        className={cn(
-                          'w-full px-3 py-2 text-left hover:bg-muted/50 transition-colors flex items-center gap-2.5',
-                          isSelected && 'bg-primary/10'
-                        )}
+                        className="w-full px-3 py-2 text-left hover:bg-muted/50 transition-colors flex items-center gap-2.5"
                       >
                         {modelLogo ? (
                           <img src={modelLogo} alt="" className="w-4 h-4 rounded object-cover flex-shrink-0" />
@@ -539,11 +563,11 @@ function StoryCard({
                           </div>
                         )}
                         <span className="text-sm text-foreground truncate flex-1">{displayName}</span>
-                        {isSelected && <CheckCircle2 size={14} className="text-primary flex-shrink-0" />}
                       </button>
                     )
                   })
-                ))}
+                ))
+                })()}
 
                 {/* Divider between official and custom */}
                 {loggedInOAuthProviders.length > 0 && configuredCustomProviders.length > 0 && (
@@ -552,7 +576,6 @@ function StoryCard({
 
                 {/* Custom API Models */}
                 {configuredCustomProviders.map((provider) => {
-                  const isSelected = story.modelSource === provider.id
                   return (
                     <button
                       key={provider.id}
@@ -560,10 +583,7 @@ function StoryCard({
                         onUpdate({ ...story, model: provider.model, modelSource: provider.id })
                         setShowModelDropdown(false)
                       }}
-                      className={cn(
-                        'w-full px-3 py-2 text-left hover:bg-muted/50 transition-colors flex items-center gap-2.5',
-                        isSelected && 'bg-primary/10'
-                      )}
+                      className="w-full px-3 py-2 text-left hover:bg-muted/50 transition-colors flex items-center gap-2.5"
                     >
                       {provider.logo ? (
                         <img src={provider.logo} alt="" className="w-4 h-4 rounded object-cover flex-shrink-0" />
@@ -573,7 +593,6 @@ function StoryCard({
                         </div>
                       )}
                       <span className="text-sm text-foreground truncate flex-1">{provider.model || provider.name}</span>
-                      {isSelected && <CheckCircle2 size={14} className="text-primary flex-shrink-0" />}
                     </button>
                   )
                 })}

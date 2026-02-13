@@ -194,34 +194,15 @@ export function Step1CreateTask(_props: Step1CreateTaskProps) {
     setError(null)
 
     if (createMethod === 'ai') {
-      // AI: Generate stories then go to step 2
+      // AI: Jump to step 2 immediately, generate stories there
       if (!aiDescription.trim()) {
         setError(t('Please enter a feature description'))
         return
       }
 
-      setIsLoading(true)
-      try {
-        const result = await api.ralphGenerateStories({
-          projectDir: editingTask.projectDir,
-          description: aiDescription
-        })
-
-        if (result.success && result.data) {
-          updateEditing({
-            stories: result.data,
-            description: aiDescription,
-            source: 'generate'
-          })
-          setWizardStep(2 as WizardStep)
-        } else {
-          setError(result.error || t('Failed to generate sub-tasks'))
-        }
-      } catch (err) {
-        setError((err as Error).message)
-      } finally {
-        setIsLoading(false)
-      }
+      updateEditing({ description: aiDescription, source: 'generate', stories: [] })
+      useLoopTaskStore.getState().setIsGeneratingStories(true)
+      setWizardStep(2 as WizardStep)
     } else if (createMethod === 'manual') {
       // Manual: Go directly to step 2 with empty stories
       updateEditing({ source: 'manual', stories: [] })
@@ -505,12 +486,14 @@ export function Step1CreateTask(_props: Step1CreateTaskProps) {
                       {showModelDropdown && (
                         <div className="absolute z-10 mt-1 w-full bg-card border border-border rounded-lg shadow-lg overflow-hidden max-h-64 overflow-y-auto">
                           {/* Official / OAuth Models (on top) */}
-                          {loggedInOAuthProviders.map((provider) => (
+                          {(() => {
+                            const seenModelIds = new Set<string>()
+                            return loggedInOAuthProviders.map((provider) => (
                             (provider.config?.availableModels || []).map((modelId) => {
+                              if (seenModelIds.has(modelId)) return null
+                              seenModelIds.add(modelId)
                               const displayName = provider.config?.modelNames?.[modelId] || modelId
-                              const isSelected = editingTask?.modelSource === provider.type && editingTask?.model === modelId
                               const modelLogo = getModelLogo(modelId, displayName, provider.type)
-                              const creditInfo = AVAILABLE_MODELS.find(m => m.id === modelId)
                               return (
                                 <button
                                   key={`${provider.type}-${modelId}`}
@@ -518,10 +501,7 @@ export function Step1CreateTask(_props: Step1CreateTaskProps) {
                                     updateEditing({ model: modelId, modelSource: provider.type })
                                     setShowModelDropdown(false)
                                   }}
-                                  className={cn(
-                                    'w-full px-3 py-2.5 text-left hover:bg-muted/50 transition-colors flex items-center gap-2.5',
-                                    isSelected && 'bg-primary/10'
-                                  )}
+                                  className="w-full px-3 py-2.5 text-left hover:bg-muted/50 transition-colors flex items-center gap-2.5"
                                 >
                                   {modelLogo ? (
                                     <img src={modelLogo} alt="" className="w-5 h-5 rounded object-cover flex-shrink-0" />
@@ -530,20 +510,12 @@ export function Step1CreateTask(_props: Step1CreateTaskProps) {
                                       <span className="text-xs text-muted-foreground">AI</span>
                                     </div>
                                   )}
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-1.5">
-                                      <span className="text-sm font-medium text-foreground truncate">{displayName}</span>
-                                      <span className="flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded font-medium text-white bg-primary/80">{t('Official')}</span>
-                                    </div>
-                                    {creditInfo?.estimatedCreditsPerStory && (
-                                      <p className="text-xs text-muted-foreground mt-0.5">~{creditInfo.estimatedCreditsPerStory} {t('credits/sub-task')}</p>
-                                    )}
-                                  </div>
-                                  {isSelected && <CheckCircle2 size={14} className="text-primary flex-shrink-0" />}
+                                  <span className="text-sm text-foreground truncate">{displayName}</span>
                                 </button>
                               )
                             })
-                          ))}
+                          ))
+                          })()}
 
                           {/* Divider between official and custom */}
                           {loggedInOAuthProviders.length > 0 && configuredCustomProviders.length > 0 && (
@@ -552,7 +524,6 @@ export function Step1CreateTask(_props: Step1CreateTaskProps) {
 
                           {/* Custom API Models (below) */}
                           {configuredCustomProviders.map((provider) => {
-                            const isSelected = editingTask?.modelSource === provider.id
                             return (
                               <button
                                 key={provider.id}
@@ -560,10 +531,7 @@ export function Step1CreateTask(_props: Step1CreateTaskProps) {
                                   updateEditing({ model: provider.model, modelSource: provider.id })
                                   setShowModelDropdown(false)
                                 }}
-                                className={cn(
-                                  'w-full px-3 py-2.5 text-left hover:bg-muted/50 transition-colors flex items-center gap-2.5',
-                                  isSelected && 'bg-primary/10'
-                                )}
+                                className="w-full px-3 py-2.5 text-left hover:bg-muted/50 transition-colors flex items-center gap-2.5"
                               >
                                 {provider.logo ? (
                                   <img src={provider.logo} alt="" className="w-5 h-5 rounded object-cover flex-shrink-0" />
@@ -573,7 +541,6 @@ export function Step1CreateTask(_props: Step1CreateTaskProps) {
                                   </div>
                                 )}
                                 <span className="text-sm font-medium text-foreground truncate flex-1">{provider.model || provider.name}</span>
-                                {isSelected && <CheckCircle2 size={14} className="text-primary flex-shrink-0" />}
                               </button>
                             )
                           })}
@@ -645,7 +612,6 @@ export function Step1CreateTask(_props: Step1CreateTaskProps) {
             ) : (
               <>
                 {t('Next')}
-                <span className="text-xs opacity-60 ml-1 hidden sm:inline">&#8984;&#9166;</span>
                 <ChevronRight size={16} />
               </>
             )}
