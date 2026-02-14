@@ -20,6 +20,7 @@ export interface HaloAPI {
   setConfig: (updates: Record<string, unknown>) => Promise<IpcResponse>
   validateApi: (apiKey: string, apiUrl: string, provider: string) => Promise<IpcResponse>
   refreshAISourcesConfig: () => Promise<IpcResponse>
+  getPublicModels: () => Promise<IpcResponse>
   resetToDefault: () => Promise<IpcResponse>
 
   // Space
@@ -445,6 +446,7 @@ const api: HaloAPI = {
   validateApi: (apiKey, apiUrl, provider) =>
     ipcRenderer.invoke('config:validate-api', apiKey, apiUrl, provider),
   refreshAISourcesConfig: () => ipcRenderer.invoke('config:refresh-ai-sources'),
+  getPublicModels: () => ipcRenderer.invoke('config:get-public-models'),
   resetToDefault: () => ipcRenderer.invoke('config:reset-to-default'),
 
   // Space

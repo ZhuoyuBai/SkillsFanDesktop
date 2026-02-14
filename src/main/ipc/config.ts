@@ -6,6 +6,7 @@ import { ipcMain, BrowserWindow } from 'electron'
 import { getConfig, saveConfig, validateApiConnection } from '../services/config.service'
 import { getAISourceManager } from '../services/ai-sources'
 import { setIsQuitting } from '../services/tray.service'
+import { fetchPublicModels } from '../services/skillsfan/models.service'
 
 export function registerConfigHandlers(): void {
   // Get configuration
@@ -83,6 +84,17 @@ export function registerConfigHandlers(): void {
     } catch (error: unknown) {
       const err = error as Error
       console.error('[Config IPC] Refresh AI sources error:', err)
+      return { success: false, error: err.message }
+    }
+  })
+
+  // Get public model list (no auth required)
+  ipcMain.handle('config:get-public-models', async () => {
+    try {
+      const models = await fetchPublicModels()
+      return { success: true, data: models }
+    } catch (error: unknown) {
+      const err = error as Error
       return { success: false, error: err.message }
     }
   })

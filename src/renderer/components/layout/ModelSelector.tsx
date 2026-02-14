@@ -50,6 +50,12 @@ export const PROVIDER_LOGOS_BY_ID: Record<string, string> = {
   'skillsfan-credits': skillsfanLogo,
 }
 
+// Mapping from backend owned_by values to client provider types
+const OWNED_BY_TO_PROVIDER: Record<string, string> = {
+  'zhipu': 'glm',
+  'minimax': 'minimax-oauth',
+}
+
 // Provider display names by ID (exported for reuse)
 export const PROVIDER_NAMES: Record<string, string> = {
   'glm': 'GLM-5',
@@ -130,14 +136,20 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
   const { config, setConfig, setView } = useAppStore()
   const [isOpen, setIsOpen] = useState(false)
   const [authProviders, setAuthProviders] = useState<AuthProviderConfig[]>([])
+  const [publicModels, setPublicModels] = useState<Array<{ id: string; name: string; owned_by: string }>>([])
   const dropdownRef = useRef<HTMLDivElement>(null)
   const lastRefreshRef = useRef<number>(0)
 
-  // Load auth providers from config
+  // Load auth providers and public models on mount
   useEffect(() => {
     api.authGetProviders().then((result) => {
       if (result.success && result.data) {
         setAuthProviders(result.data as AuthProviderConfig[])
+      }
+    })
+    api.getPublicModels().then((result) => {
+      if (result.success && result.data) {
+        setPublicModels(result.data as Array<{ id: string; name: string; owned_by: string }>)
       }
     })
   }, [])
@@ -157,6 +169,12 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
             setConfig(configResult.data as HaloConfig)
           }
         })
+      }
+    })
+    // Also refresh public models
+    api.getPublicModels().then((result) => {
+      if (result.success && result.data) {
+        setPublicModels(result.data as Array<{ id: string; name: string; owned_by: string }>)
       }
     })
   }, [isOpen])
@@ -256,10 +274,25 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
       }
     } else if (providerConfig) {
       // OAuth provider - update dynamically
+      // Merge public model name if not already in modelNames
+      const publicModel = publicModels.find(m => m.id === modelId)
+      const mergedNames = { ...providerConfig.modelNames }
+      if (publicModel && !mergedNames[modelId]) {
+        mergedNames[modelId] = publicModel.name
+      }
       newAiSources[source] = {
         ...providerConfig,
-        model: modelId
+        model: modelId,
+        modelNames: mergedNames
       }
+    } else {
+      // Provider not configured yet (not logged in) - create minimal config with model
+      // Build modelNames from publicModels so getCurrentModelName() can resolve display name
+      const names: Record<string, string> = {}
+      for (const m of publicModels) {
+        names[m.id] = m.name
+      }
+      newAiSources[source] = { model: modelId, modelNames: names } as any
     }
 
     const newConfig = {
@@ -403,16 +436,16 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
             animate-in fade-in-0 slide-in-from-top-2 duration-200
           `.trim().replace(/\s+/g, ' ')}
         >
-          {/* OAuth Providers (Official) - all providers, logged in or not */}
+          {/* Public models from backend (shown for all users, no login required) */}
           {(() => {
             const seenModelIds = new Set<string>()
-            return allOAuthProviders.map((provider) => {
-            if (provider.isLoggedIn && provider.config?.availableModels?.length) {
-              // Logged in: show individual models
-              return (
+
+            // First: show models from logged-in providers (with full availableModels)
+            const loggedInElements = allOAuthProviders
+              .filter(p => p.isLoggedIn && p.config?.availableModels?.length)
+              .map((provider) => (
                 <div key={provider.type}>
-                  {provider.config.availableModels.map((modelId) => {
-                    // Deduplicate models across providers
+                  {provider.config!.availableModels.map((modelId) => {
                     if (seenModelIds.has(modelId)) return null
                     seenModelIds.add(modelId)
                     const displayName = provider.config?.modelNames?.[modelId] || modelId
@@ -438,31 +471,68 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
                     )
                   })}
                 </div>
-              )
-            } else {
-              // Not logged in: show single entry with provider display name, same style
-              const providerLogo = getProviderLogoById(provider.type)
-              const isSelected = currentSource === provider.type
-              return (
-                <button
-                  key={provider.type}
-                  onClick={() => handleSelectOAuthProvider(provider.type, provider.displayName)}
-                  className={`w-full px-3 py-2 text-left text-sm hover:bg-secondary/80 transition-colors flex items-center gap-2.5 ${
-                    isSelected ? 'text-primary' : 'text-foreground'
-                  }`}
-                >
-                  {providerLogo ? (
-                    <img src={providerLogo} alt="" className="w-5 h-5 rounded object-cover flex-shrink-0" />
-                  ) : (
-                    <div className="w-5 h-5 rounded bg-muted flex items-center justify-center flex-shrink-0">
-                      <span className="text-xs text-muted-foreground">AI</span>
-                    </div>
-                  )}
-                  <span className="truncate">{provider.displayName}</span>
-                </button>
-              )
+              ))
+
+            // Then: show public models from backend (deduped against logged-in models)
+            const publicElements = publicModels
+              .filter(m => !seenModelIds.has(m.id))
+              .map((model) => {
+                seenModelIds.add(model.id)
+                // Find the best matching provider for this model
+                const mappedProvider = OWNED_BY_TO_PROVIDER[model.owned_by]
+                const providerType = mappedProvider ||
+                  allOAuthProviders.find(p => p.type === model.owned_by)?.type ||
+                  'skillsfan-credits'
+                const providerAiSource = (aiSources as Record<string, any>)[providerType]
+                const isSelected = currentSource === providerType && providerAiSource?.model === model.id
+                const modelLogo = getModelLogo(model.id, model.name, providerType)
+                return (
+                  <button
+                    key={model.id}
+                    onClick={() => handleSelectModel(providerType, model.id)}
+                    className={`w-full px-3 py-2 text-left text-sm hover:bg-secondary/80 transition-colors flex items-center gap-2.5 ${
+                      isSelected ? 'text-primary' : 'text-foreground'
+                    }`}
+                  >
+                    {modelLogo ? (
+                      <img src={modelLogo} alt="" className="w-5 h-5 rounded object-cover flex-shrink-0" />
+                    ) : (
+                      <div className="w-5 h-5 rounded bg-muted flex items-center justify-center flex-shrink-0">
+                        <span className="text-xs text-muted-foreground">AI</span>
+                      </div>
+                    )}
+                    <span className="truncate">{model.name}</span>
+                  </button>
+                )
+              })
+
+            // If no models at all (backend empty + not logged in), fall back to provider names
+            if (loggedInElements.length === 0 && publicElements.length === 0) {
+              return allOAuthProviders.map((provider) => {
+                const providerLogo = getProviderLogoById(provider.type)
+                const isSelected = currentSource === provider.type
+                return (
+                  <button
+                    key={provider.type}
+                    onClick={() => handleSelectOAuthProvider(provider.type, provider.displayName)}
+                    className={`w-full px-3 py-2 text-left text-sm hover:bg-secondary/80 transition-colors flex items-center gap-2.5 ${
+                      isSelected ? 'text-primary' : 'text-foreground'
+                    }`}
+                  >
+                    {providerLogo ? (
+                      <img src={providerLogo} alt="" className="w-5 h-5 rounded object-cover flex-shrink-0" />
+                    ) : (
+                      <div className="w-5 h-5 rounded bg-muted flex items-center justify-center flex-shrink-0">
+                        <span className="text-xs text-muted-foreground">AI</span>
+                      </div>
+                    )}
+                    <span className="truncate">{provider.displayName}</span>
+                  </button>
+                )
+              })
             }
-          })
+
+            return [...loggedInElements, ...publicElements]
           })()}
 
           {/* Separator between official and custom providers */}

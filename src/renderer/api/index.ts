@@ -130,6 +130,13 @@ export const api = {
     return httpRequest('POST', '/api/config/refresh-ai-sources')
   },
 
+  getPublicModels: async (): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.skillsfan.getPublicModels()
+    }
+    return httpRequest('GET', '/api/config/public-models')
+  },
+
   resetToDefault: async (): Promise<ApiResponse> => {
     if (isElectron()) {
       return window.skillsfan.resetToDefault()

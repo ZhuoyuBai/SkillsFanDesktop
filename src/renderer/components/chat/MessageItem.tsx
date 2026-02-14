@@ -27,14 +27,12 @@ import { BrowserTaskCard, isBrowserTool } from '../tool/BrowserTaskCard'
 import { MarkdownRenderer } from './MarkdownRenderer'
 import { FileChangesFooter } from '../diff'
 import { MessageImages } from './ImageAttachmentPreview'
-import { TokenUsageIndicator } from './TokenUsageIndicator'
 import { HaloLogo } from '../brand/HaloLogo'
 import type { Message, Thought } from '../../types'
 import { useTranslation } from '../../i18n'
 
 interface MessageItemProps {
   message: Message
-  previousCost?: number  // Previous message's cumulative cost
   hideThoughts?: boolean
   isInContainer?: boolean
   isWorking?: boolean  // True when AI is still generating (not yet complete)
@@ -149,7 +147,7 @@ function ThoughtItem({ thought }: { thought: Thought }) {
   )
 }
 
-export function MessageItem({ message, previousCost = 0, hideThoughts = false, isInContainer = false, isWorking = false, isWaitingMore = false }: MessageItemProps) {
+export function MessageItem({ message, hideThoughts = false, isInContainer = false, isWorking = false, isWaitingMore = false }: MessageItemProps) {
   const isUser = message.role === 'user'
   const isStreaming = (message as any).isStreaming
   const [copied, setCopied] = useState(false)
@@ -284,12 +282,6 @@ export function MessageItem({ message, previousCost = 0, hideThoughts = false, i
         <FileChangesFooter thoughts={message.thoughts} />
       )}
 
-      {/* Token usage indicator - only for completed assistant messages with tokenUsage */}
-      {!isUser && !isWorking && message.tokenUsage && (
-        <div className="flex justify-end items-center gap-2 mt-2 pt-1">
-          <TokenUsageIndicator tokenUsage={message.tokenUsage} previousCost={previousCost} />
-        </div>
-      )}
     </div>
   )
 

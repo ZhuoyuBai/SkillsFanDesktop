@@ -69,17 +69,6 @@ export function MessageList({
       })
     : messages
 
-  // Calculate previous cost for each message (for cost diff display)
-  const getPreviousCost = (currentIndex: number): number => {
-    // Find the previous assistant message with tokenUsage
-    for (let i = currentIndex - 1; i >= 0; i--) {
-      const msg = displayMessages[i]
-      if (msg.role === 'assistant' && msg.tokenUsage?.totalCostUsd) {
-        return msg.tokenUsage.totalCostUsd
-      }
-    }
-    return 0
-  }
 
   // Extract real-time browser tool calls from streaming thoughts
   // This enables BrowserTaskCard to show operations as they happen
@@ -104,8 +93,7 @@ export function MessageList({
       ${isCompact ? 'max-w-full' : 'max-w-3xl mx-auto'}
     `}>
       {/* Render completed messages - thoughts shown above assistant messages */}
-      {displayMessages.map((message, index) => {
-        const previousCost = getPreviousCost(index)
+      {displayMessages.map((message) => {
         // Show collapsed thoughts ABOVE assistant messages, in same container for consistent width
         if (message.role === 'assistant' && message.thoughts && message.thoughts.length > 0) {
           return (
@@ -115,12 +103,12 @@ export function MessageList({
                 {/* Collapsed thought process above the message */}
                 <CollapsedThoughtProcess thoughts={message.thoughts} />
                 {/* Then the message itself (without embedded thoughts) */}
-                <MessageItem message={message} previousCost={previousCost} hideThoughts isInContainer />
+                <MessageItem message={message} hideThoughts isInContainer />
               </div>
             </div>
           )
         }
-        return <MessageItem key={message.id} message={message} previousCost={previousCost} />
+        return <MessageItem key={message.id} message={message} />
       })}
 
       {/* Current generation block: Linear Stream (Claude Code style) */}
