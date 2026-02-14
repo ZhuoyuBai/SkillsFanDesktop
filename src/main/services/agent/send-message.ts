@@ -460,10 +460,19 @@ async function processMessageStream(
     console.log(`[Agent][${conversationId}] Message includes ${images.length} image(s)`)
   }
 
+  // Inject memory flush hint if context was recently compressed
+  let memoryFlushPrefix = ''
+  const v2InfoForFlush = v2Sessions.get(conversationId)
+  if (v2InfoForFlush?.needsMemoryFlush) {
+    memoryFlushPrefix = '<memory_flush_hint>Context was recently compressed. If important context from our previous conversation has not been saved to MEMORY.md or memory/*.md, save it now before responding.</memory_flush_hint>\n\n'
+    v2InfoForFlush.needsMemoryFlush = false
+    console.log(`[Agent][${conversationId}] Memory flush hint injected`)
+  }
+
   // Inject Canvas Context prefix if available
   // This provides AI awareness of what user is currently viewing
   const canvasPrefix = formatCanvasContext(canvasContext)
-  const messageWithContext = canvasPrefix + message
+  const messageWithContext = memoryFlushPrefix + canvasPrefix + message
 
   // Build message content (text-only or multi-modal with images/PDFs/text)
   const messageContent = buildMessageContent(messageWithContext, images, attachments)
@@ -698,6 +707,13 @@ async function processMessageStream(
             trigger: compactMetadata.trigger,
             preTokens: compactMetadata.pre_tokens
           })
+
+          // Flag memory flush for next message - prompt AI to save important context
+          const v2Info = v2Sessions.get(conversationId)
+          if (v2Info) {
+            v2Info.needsMemoryFlush = true
+            console.log(`[Agent][${conversationId}] Memory flush flagged for next message`)
+          }
         }
       }
 

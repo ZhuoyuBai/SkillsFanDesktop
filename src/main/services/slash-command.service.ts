@@ -87,7 +87,7 @@ const BUILTIN_COMMANDS: SlashCommand[] = [
     description: 'Edit project memory file',
     type: 'prompt',
     source: { kind: 'builtin' },
-    content: 'Review and update the project memory file (CLAUDE.md). Check if there are new patterns, decisions, or conventions that should be documented based on our recent work.'
+    content: 'Review and update the project memory file (MEMORY.md). Read the current MEMORY.md (create if it doesn\'t exist), then check if there are new patterns, decisions, conventions, or important context from our work. Also review memory/*.md files if they exist.'
   },
   {
     name: 'terminal-setup',

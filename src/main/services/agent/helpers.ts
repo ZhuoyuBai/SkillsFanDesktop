@@ -8,7 +8,7 @@
 
 import { app, BrowserWindow } from 'electron'
 import { join, dirname } from 'path'
-import { existsSync, mkdirSync, symlinkSync, unlinkSync, lstatSync, readlinkSync } from 'fs'
+import { existsSync, mkdirSync, symlinkSync, unlinkSync, lstatSync, readlinkSync, readFileSync, writeFileSync } from 'fs'
 import { getConfig, getTempSpacePath } from '../config.service'
 import { getSpace } from '../space.service'
 import { getAISourceManager } from '../ai-sources'
@@ -285,11 +285,58 @@ export function getEnabledMcpServers(mcpServers: Record<string, any>): Record<st
  */
 export function buildSystemPromptAppend(workDir: string, modelInfo?: string): string {
   const modelLine = modelInfo ? `You are powered by ${modelInfo}.` : ''
+
+  // Read or auto-create MEMORY.md (long-term memory)
+  // Skip temp space (artifacts dir) - only for real workspaces
+  let memorySection = ''
+  const memoryPath = join(workDir, 'MEMORY.md')
+  const isTempSpace = workDir.includes('/artifacts') && workDir.includes('skillsfan')
+
+  if (!isTempSpace) {
+    // Auto-create MEMORY.md with default template if it doesn't exist
+    if (!existsSync(memoryPath)) {
+      try {
+        const template = `# Project Memory\n\n> This file is automatically loaded into every conversation.\n> AI will update it with important decisions, patterns, and context.\n> Keep it concise (under 200 lines). Use memory/*.md for detailed notes.\n`
+        writeFileSync(memoryPath, template, 'utf-8')
+        console.log(`[Agent] MEMORY.md auto-created at ${memoryPath}`)
+      } catch (e) {
+        console.error('[Agent] Failed to auto-create MEMORY.md:', e)
+      }
+    }
+
+    // Read and inject into system prompt
+    if (existsSync(memoryPath)) {
+      try {
+        const raw = readFileSync(memoryPath, 'utf-8')
+        const lines = raw.split('\n')
+        const content = lines.slice(0, 200).join('\n')
+        const truncated = lines.length > 200 ? '\n[... truncated, use Read tool for full file]' : ''
+        memorySection = `
+
+## Project Memory
+
+<project_memory>
+${content}${truncated}
+</project_memory>
+
+### Memory Guidelines
+- **MEMORY.md** (long-term): Stable knowledge auto-loaded above. Update with key decisions, patterns, preferences.
+- **memory/*.md** (short-term): Topic or daily notes (e.g. memory/${new Date().toISOString().slice(0, 10)}.md). Create as needed. Search with Grep.
+- Save important context proactively, especially when conversation grows long.
+- Keep MEMORY.md under 200 lines. Move details to memory/ topic files.
+`
+        console.log(`[Agent] MEMORY.md loaded (${lines.length} lines${lines.length > 200 ? ', truncated to 200' : ''})`)
+      } catch (e) {
+        console.error('[Agent] Failed to read MEMORY.md:', e)
+      }
+    }
+  }
+
   return `
 You are SkillsFan (技能范), an AI assistant that helps users accomplish real work.
 ${modelLine}
 All created files will be saved in the user's workspace. Current workspace: ${workDir}.
-
+${memorySection}
 ## 统一规划原则（最高优先级）
 
 **核心理念：先规划，后执行。收到用户请求后，必须先完成规划阶段。**

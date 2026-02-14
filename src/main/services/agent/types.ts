@@ -239,6 +239,8 @@ export interface V2SessionInfo {
   lastUsedAt: number
   // Track config at session creation time for rebuild detection
   config: SessionConfig
+  /** Flag: context was compressed, next message should prompt memory save */
+  needsMemoryFlush?: boolean
 }
 
 // ============================================
