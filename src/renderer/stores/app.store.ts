@@ -41,6 +41,10 @@ interface AppState {
   // Settings page initial section
   settingsSection: SettingsSection | null
 
+  // Model selector (pre-loaded once during init, cached in store)
+  publicModels: Array<{ id: string; name: string; owned_by: string }>
+  authProviders: Array<{ type: string; displayName: string | Record<string, string>; enabled: boolean; recommended?: boolean }>
+
   // Actions
   setView: (view: AppView) => void
   goBack: () => void  // Navigate back to previous view
@@ -49,6 +53,8 @@ interface AppState {
   setConfig: (config: HaloConfig) => void
   updateConfig: (updates: Partial<HaloConfig>) => void
   setMcpStatus: (status: McpServerStatus[], timestamp: number) => void
+  setPublicModels: (models: Array<{ id: string; name: string; owned_by: string }>) => void
+  setAuthProviders: (providers: Array<{ type: string; displayName: string | Record<string, string>; enabled: boolean; recommended?: boolean }>) => void
 
   // Git Bash actions
   setMockBashMode: (mode: boolean) => void
@@ -75,6 +81,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   mockBashMode: false,
   gitBashInstallProgress: { phase: 'idle', progress: 0, message: '' },
   settingsSection: null,
+  publicModels: [],
+  authProviders: [],
 
   // Actions
   setView: (view) => {
@@ -107,6 +115,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   setMcpStatus: (status, timestamp) => {
     set({ mcpStatus: status, mcpStatusTimestamp: timestamp })
   },
+  setPublicModels: (models) => set({ publicModels: models }),
+  setAuthProviders: (providers) => set({ authProviders: providers }),
 
   // Settings actions
   setSettingsSection: (section) => set({ settingsSection: section }),
@@ -279,6 +289,21 @@ export const useAppStore = create<AppState>((set, get) => ({
           }).catch(() => {
             // Non-critical, ignore errors
           })
+
+          // Pre-load public models and auth providers (for model selector)
+          api.getPublicModels().then((result) => {
+            if (result.success && result.data) {
+              set({ publicModels: result.data as Array<{ id: string; name: string; owned_by: string }> })
+              console.log('[Store] Public models pre-loaded:', (result.data as any[]).length)
+            }
+          }).catch(() => {})
+
+          api.authGetProviders().then((result) => {
+            if (result.success && result.data) {
+              set({ authProviders: result.data as any[] })
+              console.log('[Store] Auth providers pre-loaded:', (result.data as any[]).length)
+            }
+          }).catch(() => {})
         }
       } else {
         console.error('[Store] Failed to load config:', response.error)

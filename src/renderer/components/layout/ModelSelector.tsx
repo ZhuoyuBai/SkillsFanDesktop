@@ -133,26 +133,11 @@ interface ModelSelectorProps {
 
 export function ModelSelector({ variant = 'header', iconOnly = false, disabled = false, onDisabledClick, popoverUp = false }: ModelSelectorProps = {}) {
   const { t } = useTranslation()
-  const { config, setConfig, setView } = useAppStore()
+  const { config, setConfig, setView, publicModels, authProviders: storeAuthProviders, setPublicModels } = useAppStore()
+  const authProviders = storeAuthProviders as AuthProviderConfig[]
   const [isOpen, setIsOpen] = useState(false)
-  const [authProviders, setAuthProviders] = useState<AuthProviderConfig[]>([])
-  const [publicModels, setPublicModels] = useState<Array<{ id: string; name: string; owned_by: string }>>([])
   const dropdownRef = useRef<HTMLDivElement>(null)
   const lastRefreshRef = useRef<number>(0)
-
-  // Load auth providers and public models on mount
-  useEffect(() => {
-    api.authGetProviders().then((result) => {
-      if (result.success && result.data) {
-        setAuthProviders(result.data as AuthProviderConfig[])
-      }
-    })
-    api.getPublicModels().then((result) => {
-      if (result.success && result.data) {
-        setPublicModels(result.data as Array<{ id: string; name: string; owned_by: string }>)
-      }
-    })
-  }, [])
 
   // Refresh model list when dropdown opens (throttled: once per 60s)
   useEffect(() => {
@@ -171,7 +156,7 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
         })
       }
     })
-    // Also refresh public models
+    // Refresh public models → update store
     api.getPublicModels().then((result) => {
       if (result.success && result.data) {
         setPublicModels(result.data as Array<{ id: string; name: string; owned_by: string }>)
@@ -372,20 +357,15 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
 
   const styles = styleConfig[variant]
 
-  // Get current provider logo - check by provider ID first, then by API URL
-  // For OAuth providers, use per-model logo matching
+  // Get current provider logo - always try model ID matching first
   const currentProviderConfig = configuredCustomProviders.find(p => p.id === currentSource)
-  const currentOAuthConfig = allOAuthProviders.find(p => p.type === currentSource)
+  const currentSourceConfig = (aiSources as Record<string, any>)[currentSource]
+  const currentModelId = currentSourceConfig?.model || ''
+  const currentModelDisplayName = currentSourceConfig?.modelNames?.[currentModelId] || ''
   const currentProviderLogo = currentProviderConfig?.logo ||
     (currentProviderConfig?.apiUrl ? getProviderLogo(currentProviderConfig.apiUrl) : null) ||
-    (currentOAuthConfig?.config?.model
-      ? getModelLogo(
-          currentOAuthConfig.config.model,
-          currentOAuthConfig.config.modelNames?.[currentOAuthConfig.config.model] || '',
-          currentSource
-        )
-      : getProviderLogoById(currentSource)
-    )
+    (currentModelId ? getModelLogo(currentModelId, currentModelDisplayName, currentSource) : null) ||
+    getProviderLogoById(currentSource)
 
   return (
     <div className="relative" ref={dropdownRef}>
