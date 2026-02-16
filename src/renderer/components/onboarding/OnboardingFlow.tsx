@@ -1,9 +1,10 @@
 /**
  * OnboardingFlow - Main container for first-launch onboarding
  * 4 pages: Welcome/Slogan, Skills Market, Agent Ability, Model Support
+ * macOS-style: Large image, dots, one sentence, prev/next buttons, start now on last page
  */
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Store,
@@ -16,6 +17,7 @@ import {
   ChevronRight
 } from 'lucide-react'
 import { OnboardingPage, FeatureItem } from './OnboardingPage'
+import { api } from '../../api'
 
 // Import provider logos
 import zhipuLogo from '../../assets/providers/zhipu.jpg'
@@ -31,7 +33,6 @@ import skillsImage from '../../assets/onboarding/skills.png'
 import agentImage from '../../assets/onboarding/agent.png'
 import modelsImage from '../../assets/onboarding/models.png'
 
-// Onboarding images
 const ONBOARDING_IMAGES = {
   welcome: welcomeImage,
   skills: skillsImage,
@@ -39,7 +40,6 @@ const ONBOARDING_IMAGES = {
   models: modelsImage
 }
 
-// Model providers for the last page
 const MODEL_PROVIDERS = [
   { name: '智谱', logo: zhipuLogo },
   { name: 'MiniMax', logo: minimaxLogo },
@@ -52,11 +52,20 @@ const MODEL_PROVIDERS = [
 interface OnboardingFlowProps {
   onComplete: () => void
   onLogin?: () => void
+  onStartNow?: () => void
 }
 
-export function OnboardingFlow({ onComplete, onLogin }: OnboardingFlowProps) {
+export function OnboardingFlow({ onComplete, onLogin, onStartNow }: OnboardingFlowProps) {
   const { t } = useTranslation()
   const [currentStep, setCurrentStep] = useState(0)
+
+  // Hide macOS traffic lights during onboarding
+  useEffect(() => {
+    api.setWindowButtonVisibility(false)
+    return () => {
+      api.setWindowButtonVisibility(true)
+    }
+  }, [])
 
   const totalSteps = 4
 
@@ -74,11 +83,10 @@ export function OnboardingFlow({ onComplete, onLogin }: OnboardingFlowProps) {
     }
   }
 
-  const handleLogin = () => {
-    if (onLogin) {
-      onLogin()
+  const handleStartNow = () => {
+    if (onStartNow) {
+      onStartNow()
     } else {
-      // Default: go to setup with login mode
       onComplete()
     }
   }
@@ -86,17 +94,17 @@ export function OnboardingFlow({ onComplete, onLogin }: OnboardingFlowProps) {
   // Feature items for page 2 - Skills Market
   const skillsFeatures: FeatureItem[] = [
     {
-      icon: <Store className="w-5 h-5" />,
+      icon: <Store className="w-4 h-4" />,
       title: t('onboarding.skills.market.title'),
       description: t('onboarding.skills.market.desc')
     },
     {
-      icon: <Layers className="w-5 h-5" />,
+      icon: <Layers className="w-4 h-4" />,
       title: t('onboarding.skills.manage.title'),
       description: t('onboarding.skills.manage.desc')
     },
     {
-      icon: <RefreshCw className="w-5 h-5" />,
+      icon: <RefreshCw className="w-4 h-4" />,
       title: t('onboarding.skills.update.title'),
       description: t('onboarding.skills.update.desc')
     }
@@ -105,98 +113,31 @@ export function OnboardingFlow({ onComplete, onLogin }: OnboardingFlowProps) {
   // Feature items for page 3 - Agent Ability
   const agentFeatures: FeatureItem[] = [
     {
-      icon: <Zap className="w-5 h-5" />,
+      icon: <Zap className="w-4 h-4" />,
       title: t('onboarding.agent.execute.title'),
       description: t('onboarding.agent.execute.desc')
     },
     {
-      icon: <GitBranch className="w-5 h-5" />,
+      icon: <GitBranch className="w-4 h-4" />,
       title: t('onboarding.agent.workflow.title'),
       description: t('onboarding.agent.workflow.desc')
     },
     {
-      icon: <Users className="w-5 h-5" />,
+      icon: <Users className="w-4 h-4" />,
       title: t('onboarding.agent.partner.title'),
       description: t('onboarding.agent.partner.desc')
     }
   ]
 
-  // Navigation buttons component - smaller, more subtle style (light mode)
-  const NavigationButtons = ({ showPrev = true }: { showPrev?: boolean }) => (
-    <div className="flex items-center justify-end gap-2">
-      {showPrev && currentStep > 0 && (
-        <button
-          onClick={goPrev}
-          className="flex items-center gap-1 px-3 py-1.5 text-xs text-gray-500 hover:text-gray-900 transition-colors"
-        >
-          <ChevronLeft className="w-3.5 h-3.5" />
-          {t('onboarding.prev')}
-        </button>
-      )}
-      <button
-        onClick={goNext}
-        className="flex items-center gap-1 px-3 py-1.5 text-xs text-gray-700 hover:text-gray-900 transition-colors"
-      >
-        {t('onboarding.next')}
-        <ChevronRight className="w-3.5 h-3.5" />
-      </button>
-    </div>
-  )
-
-  // Last page buttons - Full width login + Custom API text link + Back button (light mode)
-  const LastPageButtons = () => (
-    <div className="flex flex-col items-stretch gap-2 w-full">
-      <button
-        onClick={handleLogin}
-        className="w-full py-2.5 text-sm font-medium bg-orange-600 text-white rounded-md hover:bg-orange-700 transition-colors"
-      >
-        {t('onboarding.login')}
-      </button>
-      <button
-        onClick={onComplete}
-        className="py-1.5 text-xs text-gray-500 hover:text-gray-900 transition-colors"
-      >
-        {t('onboarding.customApi')}
-      </button>
-      <div className="flex-1 min-h-[80px]" />
-      <button
-        onClick={goPrev}
-        className="flex items-center gap-1 py-1.5 text-xs text-gray-500 hover:text-gray-900 transition-colors self-start"
-      >
-        <ChevronLeft className="w-3.5 h-3.5" />
-        {t('onboarding.prev')}
-      </button>
-    </div>
-  )
-
-  // Model logos grid for last page (light mode)
-  const ModelLogosGrid = () => (
-    <div className="grid grid-cols-3 gap-3" style={{ minWidth: '340px' }}>
-      {MODEL_PROVIDERS.map((provider) => (
-        <div
-          key={provider.name}
-          className="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg"
-        >
-          <img
-            src={provider.logo}
-            alt={provider.name}
-            className="w-6 h-6 rounded object-cover"
-          />
-          <span className="text-sm text-gray-900">{provider.name}</span>
-        </div>
-      ))}
-    </div>
-  )
-
-  // Progress dots (light mode)
+  // Progress dots
   const ProgressDots = () => (
-    <div className="flex items-center justify-center gap-2">
+    <div className="flex items-center gap-2.5">
       {Array.from({ length: totalSteps }).map((_, index) => (
         <div
           key={index}
-          className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${
+          className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${
             index === currentStep
-              ? 'bg-orange-500 w-4'
+              ? 'bg-gray-800'
               : 'bg-gray-300'
           }`}
         />
@@ -204,17 +145,96 @@ export function OnboardingFlow({ onComplete, onLogin }: OnboardingFlowProps) {
     </div>
   )
 
+  // Navigation buttons for pages 1-3: prev (left) + next (right)
+  const NavButtons = ({ showPrev = true }: { showPrev?: boolean }) => (
+    <div className="flex items-center justify-between w-full">
+      {/* Prev button - left side */}
+      {showPrev && currentStep > 0 ? (
+        <button
+          onClick={goPrev}
+          className="flex items-center gap-1.5 px-5 py-2 text-base text-gray-500 hover:text-gray-800 transition-colors"
+        >
+          <ChevronLeft className="w-5 h-5" />
+          {t('onboarding.prev')}
+        </button>
+      ) : (
+        <div />
+      )}
+
+      {/* Next button - right side */}
+      <button
+        onClick={goNext}
+        className="flex items-center gap-1.5 px-6 py-2.5 text-base bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-lg transition-colors font-medium"
+      >
+        {t('onboarding.next')}
+        <ChevronRight className="w-5 h-5" />
+      </button>
+    </div>
+  )
+
+  // Last page buttons: prev (left) + start now (right)
+  const LastPageButtons = () => (
+    <div className="flex items-center justify-between w-full">
+      {/* Prev button - left side */}
+      <button
+        onClick={goPrev}
+        className="flex items-center gap-1.5 px-5 py-2 text-base text-gray-500 hover:text-gray-800 transition-colors"
+      >
+        <ChevronLeft className="w-5 h-5" />
+        {t('onboarding.prev')}
+      </button>
+
+      {/* Right side: Set up API + Start now */}
+      <div className="flex items-center gap-4">
+        <button
+          onClick={onComplete}
+          className="px-5 py-2.5 text-base text-gray-500 hover:text-gray-800 transition-colors"
+        >
+          {t('onboarding.customApi')}
+        </button>
+        <button
+          onClick={handleStartNow}
+          className="flex items-center gap-1.5 px-7 py-2.5 text-base bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors font-medium"
+        >
+          {t('onboarding.startNow')}
+          <ChevronRight className="w-5 h-5" />
+        </button>
+      </div>
+    </div>
+  )
+
+  // Compact model logos for last page
+  const ModelLogosCompact = () => (
+    <div className="flex items-center gap-4">
+      {MODEL_PROVIDERS.map((provider) => (
+        <div
+          key={provider.name}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-50 rounded-md"
+        >
+          <img
+            src={provider.logo}
+            alt={provider.name}
+            className="w-5 h-5 rounded object-cover"
+          />
+          <span className="text-xs text-gray-600">{provider.name}</span>
+        </div>
+      ))}
+    </div>
+  )
+
+  const dots = <ProgressDots />
+
   return (
     <div className="h-full w-full bg-white relative overflow-hidden">
-      {/* Page 1: Welcome / Slogan */}
+      {/* Page 1: Welcome */}
       <OnboardingPage
         image={ONBOARDING_IMAGES.welcome}
         title={t('onboarding.welcome.title')}
         subtitle={t('onboarding.welcome.subtitle')}
-        footer={<ProgressDots />}
+        dots={dots}
         isActive={currentStep === 0}
       >
-        <NavigationButtons showPrev={false} />
+        <NavButtons showPrev={false} />
       </OnboardingPage>
 
       {/* Page 2: Skills Market */}
@@ -222,10 +242,10 @@ export function OnboardingFlow({ onComplete, onLogin }: OnboardingFlowProps) {
         image={ONBOARDING_IMAGES.skills}
         title={t('onboarding.skills.title')}
         features={skillsFeatures}
-        footer={<ProgressDots />}
+        dots={dots}
         isActive={currentStep === 1}
       >
-        <NavigationButtons />
+        <NavButtons />
       </OnboardingPage>
 
       {/* Page 3: Agent Ability */}
@@ -233,18 +253,18 @@ export function OnboardingFlow({ onComplete, onLogin }: OnboardingFlowProps) {
         image={ONBOARDING_IMAGES.agent}
         title={t('onboarding.agent.title')}
         features={agentFeatures}
-        footer={<ProgressDots />}
+        dots={dots}
         isActive={currentStep === 2}
       >
-        <NavigationButtons />
+        <NavButtons />
       </OnboardingPage>
 
       {/* Page 4: Model Support */}
       <OnboardingPage
         image={ONBOARDING_IMAGES.models}
         title={t('onboarding.models.title')}
-        customContent={<ModelLogosGrid />}
-        footer={<ProgressDots />}
+        customContent={<ModelLogosCompact />}
+        dots={dots}
         isActive={currentStep === 3}
       >
         <LastPageButtons />

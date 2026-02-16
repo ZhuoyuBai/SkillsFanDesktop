@@ -198,6 +198,7 @@ export interface HaloAPI {
 
   // Window
   setTitleBarOverlay: (options: { color: string; symbolColor: string }) => Promise<IpcResponse>
+  setWindowButtonVisibility: (visible: boolean) => Promise<IpcResponse>
   maximizeWindow: () => Promise<IpcResponse>
   unmaximizeWindow: () => Promise<IpcResponse>
   isWindowMaximized: () => Promise<IpcResponse<boolean>>
@@ -552,6 +553,7 @@ const api: HaloAPI = {
 
   // Window
   setTitleBarOverlay: (options) => ipcRenderer.invoke('window:set-title-bar-overlay', options),
+  setWindowButtonVisibility: (visible) => ipcRenderer.invoke('window:set-button-visibility', visible),
   maximizeWindow: () => ipcRenderer.invoke('window:maximize'),
   unmaximizeWindow: () => ipcRenderer.invoke('window:unmaximize'),
   isWindowMaximized: () => ipcRenderer.invoke('window:is-maximized'),

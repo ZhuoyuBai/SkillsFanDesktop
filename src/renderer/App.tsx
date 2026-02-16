@@ -507,6 +507,15 @@ export default function App() {
           <OnboardingFlow
             onComplete={() => setView('setup')}
             onLogin={handleOnboardingLogin}
+            onStartNow={async () => {
+              await api.setConfig({ isFirstLaunch: false })
+              await useSpaceStore.getState().loadSpaces()
+              const { haloSpace } = useSpaceStore.getState()
+              if (haloSpace) {
+                useSpaceStore.getState().setCurrentSpace(haloSpace)
+              }
+              setView('space')
+            }}
           />
         )
       case 'setup':

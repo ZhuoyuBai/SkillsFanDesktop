@@ -737,6 +737,13 @@ export const api = {
     return window.skillsfan.setTitleBarOverlay(options)
   },
 
+  setWindowButtonVisibility: async (visible: boolean): Promise<ApiResponse> => {
+    if (!isElectron()) {
+      return { success: true }
+    }
+    return window.skillsfan.setWindowButtonVisibility(visible)
+  },
+
   maximizeWindow: async (): Promise<ApiResponse> => {
     if (!isElectron()) {
       return { success: false, error: 'Only available in desktop app' }

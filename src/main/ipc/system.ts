@@ -90,6 +90,19 @@ export function registerSystemHandlers(window: BrowserWindow | null): void {
     }
   )
 
+  // Set window button visibility (macOS traffic lights)
+  ipcMain.handle('window:set-button-visibility', async (_event, visible: boolean) => {
+    try {
+      if (process.platform === 'darwin' && mainWindow) {
+        mainWindow.setWindowButtonVisibility(visible)
+      }
+      return { success: true }
+    } catch (error) {
+      const err = error as Error
+      return { success: false, error: err.message }
+    }
+  })
+
   // Maximize window
   ipcMain.handle('window:maximize', async () => {
     try {

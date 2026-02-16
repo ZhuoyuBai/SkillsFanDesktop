@@ -128,7 +128,7 @@ export function LoginSelector({ onSelectProvider, onBack, onSkip }: LoginSelecto
     <div className="h-full w-full flex flex-col items-center bg-white pt-[12vh] px-8 relative overflow-y-auto">
       {/* Back Button - Top Left (when coming from onboarding) */}
       {onBack && (
-        <div className="absolute top-6 left-6">
+        <div className="absolute top-12 left-6">
           <button
             onClick={onBack}
             className="flex items-center gap-1.5 px-4 py-2 text-sm text-gray-500 hover:text-gray-900 transition-colors"
@@ -140,7 +140,7 @@ export function LoginSelector({ onSelectProvider, onBack, onSkip }: LoginSelecto
       )}
 
       {/* Language Selector - Top Right */}
-      <div className="absolute top-6 right-6">
+      <div className="absolute top-12 right-6">
         <div className="relative">
           <button
             onClick={() => setIsLangDropdownOpen(!isLangDropdownOpen)}
