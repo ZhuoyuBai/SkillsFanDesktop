@@ -152,11 +152,11 @@ export function SkillsFanAccountSection() {
   const getPlanDisplay = (plan: SkillsFanUser['plan']) => {
     switch (plan) {
       case 'pro':
-        return { label: 'Pro', className: 'bg-primary/20 text-primary' }
+        return { badgeLabel: t('Member'), planLabel: t('Membership active'), className: 'bg-primary/20 text-primary' }
       case 'enterprise':
-        return { label: 'Enterprise', className: 'bg-purple-500/20 text-purple-500' }
+        return { badgeLabel: t('Member'), planLabel: t('Membership active'), className: 'bg-purple-500/20 text-purple-500' }
       default:
-        return { label: 'Free', className: 'bg-muted text-muted-foreground' }
+        return { badgeLabel: 'Free', planLabel: 'Free', className: 'bg-muted text-muted-foreground' }
     }
   }
 
@@ -199,7 +199,7 @@ export function SkillsFanAccountSection() {
                   const planInfo = getPlanDisplay(authState.user.plan)
                   return (
                     <span className={`px-2 py-0.5 text-xs rounded-full ${planInfo.className}`}>
-                      {planInfo.label}
+                      {planInfo.badgeLabel}
                     </span>
                   )
                 })()}
@@ -218,7 +218,7 @@ export function SkillsFanAccountSection() {
                 <div className="text-sm font-medium mt-1">
                   {(() => {
                     const planInfo = getPlanDisplay(authState.user.plan)
-                    return planInfo.label
+                    return planInfo.planLabel
                   })()}
                 </div>
                 {authState.user.planExpiresAt && (

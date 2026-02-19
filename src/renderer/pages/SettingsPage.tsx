@@ -30,7 +30,9 @@ import { SkillsFanAccountSection } from '../components/settings/SkillsFanAccount
 import { SpaceManagementSection } from '../components/settings/SpaceManagementSection'
 import { ResetSection } from '../components/settings/ResetSection'
 import { useTranslation, setLanguage, getCurrentLanguage, SUPPORTED_LOCALES, type LocaleCode } from '../i18n'
-import { Loader2, LogOut, Plus, Check, Globe, Key, MessageSquare, Bot, Palette, Server, Settings as SettingsIcon, Wifi, ExternalLink, X, Package, User, Layers, type LucideIcon } from 'lucide-react'
+import { Loader2, LogOut, Plus, Check, Globe, Key, MessageSquare, Bot, Palette, Server, Settings as SettingsIcon, Wifi, ExternalLink, X, Package, User, Layers, Lock, type LucideIcon } from 'lucide-react'
+import { useToastStore } from '../stores/toast.store'
+import type { SkillsFanAuthState } from '../../shared/types/skillsfan'
 
 // Import provider logos
 import zhipuLogo from '../assets/providers/zhipu.jpg'
@@ -175,6 +177,7 @@ type SettingsSection = 'ai-model' | 'display' | 'mcp' | 'skills' | 'system' | 'r
 export function SettingsPage() {
   const { t } = useTranslation()
   const { config, setConfig, goBack, settingsSection, setSettingsSection } = useAppStore()
+  const { addToast } = useToastStore()
 
   // Active section state - use settingsSection from store if available
   const [activeSection, setActiveSection] = useState<SettingsSection>(() => {
@@ -236,6 +239,7 @@ export function SettingsPage() {
   } | null>(null)
 
   // Remote access state
+  const [authState, setAuthState] = useState<SkillsFanAuthState | null>(null)
   const [remoteStatus, setRemoteStatus] = useState<RemoteAccessStatus | null>(null)
   const [isEnablingRemote, setIsEnablingRemote] = useState(false)
   const [isEnablingTunnel, setIsEnablingTunnel] = useState(false)
@@ -259,6 +263,20 @@ export function SettingsPage() {
   const [latestVersion, setLatestVersion] = useState<string | null>(null)
   const [isCheckingUpdate, setIsCheckingUpdate] = useState(false)
   const [downloadProgress, setDownloadProgress] = useState<{ percent: number; bytesPerSecond: number; transferred: number; total: number } | null>(null)
+
+  // Load SkillsFan auth state for permission checks
+  useEffect(() => {
+    const loadAuthState = async () => {
+      try {
+        const result = await api.skillsfanGetAuthState()
+        if (result.success) setAuthState(result.data)
+      } catch { /* ignore */ }
+    }
+    loadAuthState()
+    const unsubLogin = api.onSkillsFanLoginSuccess(() => loadAuthState())
+    const unsubLogout = api.onSkillsFanLogout(() => setAuthState({ isLoggedIn: false }))
+    return () => { unsubLogin(); unsubLogout() }
+  }, [])
 
   // Load remote access status
   useEffect(() => {
@@ -416,6 +434,17 @@ export function SettingsPage() {
   }
 
   const handleToggleRemote = async () => {
+    // Permission check: not logged in
+    if (!authState?.isLoggedIn) {
+      addToast(t('Please log in to use this feature'), 'info')
+      return
+    }
+    // Permission check: free plan
+    if (!authState.user || authState.user.plan === 'free') {
+      addToast(t('This feature is only available for Pro members'), 'info')
+      return
+    }
+
     console.log('[Settings] handleToggleRemote called, current status:', remoteStatus?.enabled)
 
     if (remoteStatus?.enabled) {
@@ -655,7 +684,6 @@ export function SettingsPage() {
   }
 
   // Navigation items configuration
-  // Note: 'mcp' and 'remote' are temporarily hidden (functionality preserved)
   const navItems: { id: SettingsSection; icon: LucideIcon; label: string; desktopOnly?: boolean; hidden?: boolean }[] = [
     { id: 'account', icon: User, label: t('Account'), desktopOnly: true },
     { id: 'ai-model', icon: Bot, label: t('AI Model') },
@@ -664,7 +692,7 @@ export function SettingsPage() {
     { id: 'display', icon: Palette, label: t('Display & Language') },
     { id: 'system', icon: SettingsIcon, label: t('System'), desktopOnly: true },
     { id: 'mcp', icon: Server, label: t('MCP Servers'), hidden: true },
-    { id: 'remote', icon: Wifi, label: t('Remote Access'), hidden: true },
+    { id: 'remote', icon: Wifi, label: t('Remote Access'), desktopOnly: true },
   ]
 
   return (
@@ -1258,7 +1286,15 @@ export function SettingsPage() {
               {/* Enable/Disable Toggle */}
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="font-medium">{t('Enable Remote Access')}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium">{t('Enable Remote Access')}</p>
+                    {(!authState?.isLoggedIn || authState?.user?.plan === 'free') && (
+                      <span className="flex items-center gap-1 text-xs text-muted-foreground bg-secondary px-1.5 py-0.5 rounded">
+                        <Lock className="w-3 h-3" />
+                        Pro
+                      </span>
+                    )}
+                  </div>
                   <p className="text-sm text-muted-foreground">
                     {t('Allow access to Halo from other devices')}
                   </p>
