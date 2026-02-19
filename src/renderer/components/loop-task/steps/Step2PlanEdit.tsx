@@ -23,8 +23,10 @@ import {
   Circle,
   Sparkles,
   RotateCcw,
-  Loader2
+  Loader2,
+  Info
 } from 'lucide-react'
+import { ConfirmDialog } from '../../ui/ConfirmDialog'
 import { useLoopTaskStore } from '../../../stores/loop-task.store'
 import { useToastStore } from '../../../stores/toast.store'
 import { api } from '../../../api'
@@ -319,11 +321,19 @@ export function Step2PlanEdit({ spaceId, onCancel }: Step2PlanEditProps) {
           )}
 
           {/* Max Iterations Config */}
-          <div className="p-4 border border-border rounded-lg space-y-3">
+          <div className="p-4 border border-border rounded-lg">
             <div className="flex items-center justify-between">
-              <label className="text-sm font-medium text-foreground">
-                {t('Max Iterations')}
-              </label>
+              <div className="flex items-center gap-1.5">
+                <label className="text-sm font-medium text-foreground">
+                  {t('Max Iterations')}
+                </label>
+                <div className="relative group/tooltip">
+                  <Info size={13} className="text-muted-foreground cursor-default" />
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-64 bg-popover border border-border text-xs text-muted-foreground rounded-md px-2.5 py-2 shadow-md opacity-0 group-hover/tooltip:opacity-100 pointer-events-none transition-opacity z-10 whitespace-normal">
+                    {t('Maximum number of iterations per sub-task before marking as failed')}
+                  </div>
+                </div>
+              </div>
               <div className="flex items-center gap-2">
                 <input
                   type="number"
@@ -333,14 +343,11 @@ export function Step2PlanEdit({ spaceId, onCancel }: Step2PlanEditProps) {
                   }
                   min={1}
                   max={50}
-                  className="w-20 px-3 py-1.5 bg-input border border-border rounded-md text-foreground text-center focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  className="w-20 px-3 py-1.5 bg-input border border-border rounded-md text-foreground text-center focus:outline-none focus:ring-0 focus:border-primary/50"
                 />
                 <span className="text-sm text-muted-foreground">{t('iterations')}</span>
               </div>
             </div>
-            <p className="text-xs text-muted-foreground">
-              {t('Maximum number of iterations per sub-task before marking as failed')}
-            </p>
           </div>
 
           {/* Error display */}
@@ -441,6 +448,7 @@ function StoryCard({
 }: StoryCardProps) {
   const { t } = useTranslation()
   const [showModelDropdown, setShowModelDropdown] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   // Close dropdown when clicking outside
@@ -491,18 +499,17 @@ function StoryCard({
     <div className="border border-border rounded-lg overflow-hidden bg-card">
       {/* Header */}
       <div
-        className="flex items-center gap-2 p-3 cursor-pointer hover:bg-accent/50 transition-colors"
+        className="group flex items-center gap-2 p-3 cursor-pointer hover:bg-accent/50 transition-colors"
         onClick={onToggle}
       >
         <Circle className="text-muted-foreground" size={14} />
         <span className="w-5 h-5 flex items-center justify-center bg-muted rounded text-xs font-medium text-muted-foreground">
           {story.priority}
         </span>
-        <span className="font-mono text-xs text-muted-foreground">{story.id}</span>
         <span className="flex-1 font-medium text-foreground text-sm truncate">{story.title}</span>
 
         {/* Actions */}
-        <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
           {/* Model selector button */}
           <div className="relative" ref={dropdownRef}>
             <button
@@ -631,7 +638,7 @@ function StoryCard({
             <Pencil size={14} />
           </button>
           <button
-            onClick={onRemove}
+            onClick={() => setShowDeleteConfirm(true)}
             className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
             title={t('Remove')}
           >
@@ -681,8 +688,16 @@ function StoryCard({
 
             {/* Quality Gates */}
             <div onClick={(e) => e.stopPropagation()}>
-              <div className="text-xs font-medium text-muted-foreground mb-1">
-                {t('Quality Gates')}
+              <div className="flex items-center gap-1.5 mb-1">
+                <div className="text-xs font-medium text-muted-foreground">
+                  {t('Quality Gates')}
+                </div>
+                <div className="relative group/tooltip">
+                  <Info size={12} className="text-muted-foreground cursor-default" />
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-56 bg-popover border border-border text-xs text-muted-foreground rounded-md px-2.5 py-2 shadow-md opacity-0 group-hover/tooltip:opacity-100 pointer-events-none transition-opacity z-10 whitespace-normal">
+                    {t('Enable when writing code to ensure quality')}
+                  </div>
+                </div>
               </div>
               <div className="flex gap-4">
                 <label className="flex items-center gap-2 cursor-pointer">
@@ -708,13 +723,19 @@ function StoryCard({
                   <span className="text-sm text-foreground">{t('Tests')}</span>
                 </label>
               </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                💡 {t('Enable when writing code to ensure quality')}
-              </p>
             </div>
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={showDeleteConfirm}
+        title={t('Delete')}
+        message={t('Are you sure you want to delete this task?')}
+        variant="danger"
+        onConfirm={() => { setShowDeleteConfirm(false); onRemove() }}
+        onCancel={() => setShowDeleteConfirm(false)}
+      />
     </div>
   )
 }

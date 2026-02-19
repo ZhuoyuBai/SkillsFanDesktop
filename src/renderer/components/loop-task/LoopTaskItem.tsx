@@ -153,7 +153,7 @@ export function LoopTaskItem({
               onBlur={handleSaveEdit}
               onKeyDown={handleKeyDown}
               onClick={(e) => e.stopPropagation()}
-              className="w-full px-1 py-0 text-sm bg-input border border-border rounded focus:outline-none focus:ring-1 focus:ring-primary/40"
+              className="w-full px-1 py-0 text-sm bg-input border border-border rounded focus:outline-none focus:ring-0 focus:border-primary/50"
             />
           ) : (
             <div className="flex items-center gap-1">

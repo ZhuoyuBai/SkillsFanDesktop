@@ -211,7 +211,7 @@ export function UserQuestionCard({ questions, onAnswer, onSkip }: UserQuestionCa
                   value={customInputs[currentQuestion.question] || ''}
                   onChange={(e) => handleCustomInput(currentQuestion.question, e.target.value)}
                   placeholder={t('Type your answer...')}
-                  className="w-full px-2 py-1.5 text-xs rounded border border-border bg-background focus:outline-none focus:ring-1 focus:ring-primary/50 focus:border-primary"
+                  className="w-full px-2 py-1.5 text-xs rounded border border-border bg-background focus:outline-none focus:ring-0 focus:border-primary/50"
                   autoFocus
                 />
               </div>

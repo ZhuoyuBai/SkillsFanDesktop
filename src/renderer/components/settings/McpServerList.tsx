@@ -373,7 +373,7 @@ function ServerItem({
                     type="text"
                     value={editingName}
                     onChange={e => handleNameChange(e.target.value)}
-                    className="w-full px-3 py-2 border border-border rounded-lg bg-input text-foreground focus:ring-2 focus:ring-primary focus:border-transparent transition-colors"
+                    className="w-full px-3 py-2 border border-border rounded-lg bg-input text-foreground focus:ring-0 focus:border-primary/50 transition-colors"
                     placeholder="my-mcp-server"
                   />
                 </div>
@@ -399,7 +399,7 @@ function ServerItem({
                       setHasChanges(true)
                       setJsonText(JSON.stringify(newConfig, null, 2))
                     }}
-                    className="w-full px-3 py-2 border border-border rounded-lg bg-input text-foreground focus:ring-2 focus:ring-primary focus:border-transparent transition-colors"
+                    className="w-full px-3 py-2 border border-border rounded-lg bg-input text-foreground focus:ring-0 focus:border-primary/50 transition-colors"
                   >
                     <option value="stdio">{t('Command line (stdio)')}</option>
                     <option value="http">HTTP</option>
@@ -419,7 +419,7 @@ function ServerItem({
                         type="text"
                         value={(editingConfig as { command: string }).command}
                         onChange={e => updateVisualField('command', e.target.value)}
-                        className="w-full px-3 py-2 border border-border rounded-lg bg-input text-foreground focus:ring-2 focus:ring-primary focus:border-transparent font-mono text-sm transition-colors"
+                        className="w-full px-3 py-2 border border-border rounded-lg bg-input text-foreground focus:ring-0 focus:border-primary/50 font-mono text-sm transition-colors"
                         placeholder="npx"
                       />
                     </div>
@@ -436,7 +436,7 @@ function ServerItem({
                               type="text"
                               value={arg}
                               onChange={e => updateArgs(index, e.target.value)}
-                              className="flex-1 px-3 py-2 border border-border rounded-lg bg-input text-foreground focus:ring-2 focus:ring-primary focus:border-transparent font-mono text-sm transition-colors"
+                              className="flex-1 px-3 py-2 border border-border rounded-lg bg-input text-foreground focus:ring-0 focus:border-primary/50 font-mono text-sm transition-colors"
                               placeholder={t('Argument value')}
                             />
                             <button
@@ -468,7 +468,7 @@ function ServerItem({
                       type="text"
                       value={(editingConfig as { url: string }).url}
                       onChange={e => updateVisualField('url', e.target.value)}
-                      className="w-full px-3 py-2 border border-border rounded-lg bg-input text-foreground focus:ring-2 focus:ring-primary focus:border-transparent font-mono text-sm transition-colors"
+                      className="w-full px-3 py-2 border border-border rounded-lg bg-input text-foreground focus:ring-0 focus:border-primary/50 font-mono text-sm transition-colors"
                       placeholder="https://api.example.com/mcp"
                     />
                   </div>
@@ -481,7 +481,7 @@ function ServerItem({
                   value={jsonText}
                   onChange={handleJsonChange}
                   spellCheck={false}
-                  className="w-full h-48 px-3 py-2 border border-border rounded-lg bg-input text-foreground focus:ring-2 focus:ring-primary focus:border-transparent font-mono text-sm resize-none transition-colors"
+                  className="w-full h-48 px-3 py-2 border border-border rounded-lg bg-input text-foreground focus:ring-0 focus:border-primary/50 font-mono text-sm resize-none transition-colors"
                   placeholder='{ "command": "npx", "args": ["-y", "@example/mcp"] }'
                 />
                 {jsonError && (
@@ -674,7 +674,7 @@ function AddServerDialog({
                 type="text"
                 value={name}
                 onChange={e => setName(e.target.value)}
-                className="w-full px-3 py-2 border border-border rounded-lg bg-input text-foreground focus:ring-2 focus:ring-primary focus:border-transparent transition-colors"
+                className="w-full px-3 py-2 border border-border rounded-lg bg-input text-foreground focus:ring-0 focus:border-primary/50 transition-colors"
                 placeholder="my-mcp-server"
                 autoFocus
               />
@@ -688,7 +688,7 @@ function AddServerDialog({
               <select
                 value={serverType}
                 onChange={e => setServerType(e.target.value as 'stdio' | 'http' | 'sse')}
-                className="w-full px-3 py-2 border border-border rounded-lg bg-input text-foreground focus:ring-2 focus:ring-primary focus:border-transparent transition-colors"
+                className="w-full px-3 py-2 border border-border rounded-lg bg-input text-foreground focus:ring-0 focus:border-primary/50 transition-colors"
               >
                 <option value="stdio">{t('Command line (stdio)')}</option>
                 <option value="http">HTTP</option>
@@ -707,7 +707,7 @@ function AddServerDialog({
                     type="text"
                     value={command}
                     onChange={e => setCommand(e.target.value)}
-                    className="w-full px-3 py-2 border border-border rounded-lg bg-input text-foreground focus:ring-2 focus:ring-primary focus:border-transparent font-mono text-sm transition-colors"
+                    className="w-full px-3 py-2 border border-border rounded-lg bg-input text-foreground focus:ring-0 focus:border-primary/50 font-mono text-sm transition-colors"
                     placeholder="npx"
                   />
                 </div>
@@ -723,7 +723,7 @@ function AddServerDialog({
                           type="text"
                           value={arg}
                           onChange={e => updateArg(index, e.target.value)}
-                          className="flex-1 px-3 py-2 border border-border rounded-lg bg-input text-foreground focus:ring-2 focus:ring-primary focus:border-transparent font-mono text-sm transition-colors"
+                          className="flex-1 px-3 py-2 border border-border rounded-lg bg-input text-foreground focus:ring-0 focus:border-primary/50 font-mono text-sm transition-colors"
                           placeholder={t('Argument value')}
                         />
                         <button
@@ -755,7 +755,7 @@ function AddServerDialog({
                   type="text"
                   value={url}
                   onChange={e => setUrl(e.target.value)}
-                  className="w-full px-3 py-2 border border-border rounded-lg bg-input text-foreground focus:ring-2 focus:ring-primary focus:border-transparent font-mono text-sm transition-colors"
+                  className="w-full px-3 py-2 border border-border rounded-lg bg-input text-foreground focus:ring-0 focus:border-primary/50 font-mono text-sm transition-colors"
                   placeholder="https://api.example.com/mcp"
                 />
               </div>
@@ -773,7 +773,7 @@ function AddServerDialog({
                 type="text"
                 value={name}
                 onChange={e => setName(e.target.value)}
-                className="w-full px-3 py-2 border border-border rounded-lg bg-input text-foreground focus:ring-2 focus:ring-primary focus:border-transparent transition-colors"
+                className="w-full px-3 py-2 border border-border rounded-lg bg-input text-foreground focus:ring-0 focus:border-primary/50 transition-colors"
                 placeholder="my-mcp-server"
                 autoFocus
               />
@@ -788,7 +788,7 @@ function AddServerDialog({
                 value={jsonText}
                 onChange={handleJsonChange}
                 spellCheck={false}
-                className="w-full h-48 px-3 py-2 border border-border rounded-lg bg-input text-foreground focus:ring-2 focus:ring-primary focus:border-transparent font-mono text-sm resize-none transition-colors"
+                className="w-full h-48 px-3 py-2 border border-border rounded-lg bg-input text-foreground focus:ring-0 focus:border-primary/50 font-mono text-sm resize-none transition-colors"
                 placeholder='{ "command": "npx", "args": ["-y", "@example/mcp"] }'
               />
               {jsonError && (

@@ -84,7 +84,7 @@ export function StoryEditModal({ story, isNew, onSave, onClose }: StoryEditModal
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder={t('Short descriptive title')}
-              className="w-full px-3 py-2 bg-input border border-border rounded-md text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+              className="w-full px-3 py-2 bg-input border border-border rounded-md text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-0 focus:border-primary/50"
             />
           </div>
 
@@ -96,7 +96,7 @@ export function StoryEditModal({ story, isNew, onSave, onClose }: StoryEditModal
               onChange={(e) => setDescription(e.target.value)}
               placeholder={t('As a [user], I want [goal] so that [benefit]')}
               rows={3}
-              className="w-full px-3 py-2 bg-input border border-border rounded-md text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 resize-none"
+              className="w-full px-3 py-2 bg-input border border-border rounded-md text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-0 focus:border-primary/50 resize-none"
             />
           </div>
 
@@ -116,7 +116,7 @@ export function StoryEditModal({ story, isNew, onSave, onClose }: StoryEditModal
                       newCriteria[index] = e.target.value
                       setAcceptanceCriteria(newCriteria)
                     }}
-                    className="flex-1 px-3 py-1.5 bg-input border border-border rounded-md text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                    className="flex-1 px-3 py-1.5 bg-input border border-border rounded-md text-sm text-foreground focus:outline-none focus:ring-0 focus:border-primary/50"
                   />
                   <button
                     onClick={() => handleRemoveCriterion(index)}
@@ -135,7 +135,7 @@ export function StoryEditModal({ story, isNew, onSave, onClose }: StoryEditModal
                   onChange={(e) => setNewCriterion(e.target.value)}
                   onKeyDown={handleKeyDown}
                   placeholder={t('Add criterion...')}
-                  className="flex-1 px-3 py-1.5 bg-input border border-border rounded-md text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  className="flex-1 px-3 py-1.5 bg-input border border-border rounded-md text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-0 focus:border-primary/50"
                 />
                 <button
                   onClick={handleAddCriterion}
@@ -161,7 +161,7 @@ export function StoryEditModal({ story, isNew, onSave, onClose }: StoryEditModal
               onChange={(e) => setNotes(e.target.value)}
               placeholder={t('Additional notes or context')}
               rows={2}
-              className="w-full px-3 py-2 bg-input border border-border rounded-md text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 resize-none"
+              className="w-full px-3 py-2 bg-input border border-border rounded-md text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-0 focus:border-primary/50 resize-none"
             />
           </div>
 

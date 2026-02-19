@@ -346,7 +346,7 @@ export function Step1CreateTask(_props: Step1CreateTaskProps) {
                   onChange={(e) => setAiDescription(e.target.value)}
                   placeholder={t('Describe the feature you want to implement...')}
                   rows={5}
-                  className="w-full px-4 py-3 border border-border bg-card/95 rounded-2xl text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/50 resize-none transition-all"
+                  className="w-full px-4 py-3 border border-border bg-card/95 rounded-2xl text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-0 focus:border-primary/50 resize-none transition-all"
                 />
               </div>
             )}
@@ -566,7 +566,7 @@ export function Step1CreateTask(_props: Step1CreateTaskProps) {
                         value={editingTask?.projectDir || ''}
                         onChange={(e) => updateEditing({ projectDir: e.target.value })}
                         placeholder="/path/to/your/project"
-                        className="flex-1 px-3 py-2 bg-input border border-border rounded-md text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                        className="flex-1 px-3 py-2 bg-input border border-border rounded-md text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-0"
                       />
                       <button
                         onClick={handleSelectFolder}

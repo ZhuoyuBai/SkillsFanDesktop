@@ -102,7 +102,7 @@ function UnifiedTaskItem({
       }}
       className={`w-full px-4 py-2 text-left cursor-pointer group relative
         transition-all duration-200
-        focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-inset
+        focus:outline-none focus:ring-0
         ${isActive
           ? 'bg-gradient-to-r from-primary/15 via-primary/10 to-transparent border-l-2 border-primary'
           : 'hover:bg-secondary/40'
@@ -507,7 +507,7 @@ export function ConversationList({
               }}
               className={`w-full p-2 flex justify-center cursor-pointer
                 transition-all duration-200
-                focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-inset
+                focus:outline-none focus:ring-0
                 ${(task.type === 'conversation' && task.id === currentConversationId && selectionType === 'conversation') ||
                   (task.type === 'loopTask' && task.id === currentTaskId && selectionType === 'loopTask')
                   ? 'bg-primary/8'
