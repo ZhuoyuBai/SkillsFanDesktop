@@ -427,7 +427,7 @@ export function SettingsPage() {
   }
 
   const loadQRCode = async () => {
-    const response = await api.getRemoteQRCode(true) // Include token
+    const response = await api.getRemoteQRCode(false) // URL only, user enters password on device
     if (response.success && response.data) {
       setQrCode((response.data as any).qrCode)
     }
@@ -1517,9 +1517,6 @@ export function SettingsPage() {
                         <div className="text-center text-sm">
                           <p className="text-muted-foreground">
                             {t('Scan the QR code with your phone and enter the password to access')}
-                          </p>
-                          <p className="text-amber-500 text-xs mt-1">
-                            {t('QR code contains password, do not share screenshots with others')}
                           </p>
                         </div>
                       </div>
