@@ -283,7 +283,10 @@ export function getEnabledMcpServers(mcpServers: Record<string, any>): Record<st
  * @param workDir - Current working directory
  * @param modelInfo - The actual model being used (user-configured, may differ from SDK's internal model)
  */
-export function buildSystemPromptAppend(workDir: string, modelInfo?: string): string {
+export function buildSystemPromptAppend(
+  workDir: string,
+  modelInfo?: string
+): string {
   const modelLine = modelInfo ? `You are powered by ${modelInfo}.` : ''
 
   // Read or auto-create MEMORY.md (long-term memory)

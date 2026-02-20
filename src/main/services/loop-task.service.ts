@@ -9,6 +9,7 @@
 
 import { join } from 'path'
 import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, rmSync } from 'fs'
+import { atomicWriteJsonSync } from '../utils/atomic-write'
 import { getSpace, getSpaceMetaDir } from './space.service'
 import { v4 as uuidv4 } from 'uuid'
 import type {
@@ -16,8 +17,10 @@ import type {
   LoopTaskMeta,
   LoopTaskIndex,
   CreateLoopTaskConfig,
-  UserStory
+  UserStory,
+  TaskSchedule
 } from '../../shared/types/loop-task'
+import { scheduleTask, unscheduleTask } from './scheduler.service'
 
 const INDEX_VERSION = 1
 
@@ -87,7 +90,7 @@ function writeIndex(tasksDir: string, tasks: LoopTaskMeta[]): void {
   }
 
   try {
-    writeFileSync(indexPath, JSON.stringify(index, null, 2))
+    atomicWriteJsonSync(indexPath, index)
     console.log(`[LoopTask] Index written with ${tasks.length} tasks`)
   } catch (error) {
     console.error('[LoopTask] Failed to write index:', error)
@@ -239,6 +242,7 @@ export function createTask(spaceId: string, config: CreateLoopTaskConfig): LoopT
     maxIterations: config.maxIterations,
     model: config.model,
     modelSource: config.modelSource,
+    schedule: (config as any).schedule || { type: 'manual', enabled: false },
     createdAt: now,
     updatedAt: now
   }
@@ -249,12 +253,17 @@ export function createTask(spaceId: string, config: CreateLoopTaskConfig): LoopT
     mkdirSync(tasksDir, { recursive: true })
   }
 
-  writeFileSync(join(tasksDir, `${id}.json`), JSON.stringify(task, null, 2))
+  atomicWriteJsonSync(join(tasksDir, `${id}.json`), task)
 
   // Update index
   updateIndexEntry(tasksDir, spaceId, id, toMeta(task))
 
   console.log(`[LoopTask] Task created: ${id}, ${task.stories.length} stories`)
+
+  // Start schedule if enabled
+  if (task.schedule?.enabled) {
+    scheduleTask(spaceId, task.id, task.schedule)
+  }
 
   return task
 }
@@ -303,10 +312,19 @@ export function updateTask(
   updated.completedCount = updated.stories.filter((s) => s.status === 'completed').length
 
   const tasksDir = getTasksDir(spaceId)
-  writeFileSync(join(tasksDir, `${taskId}.json`), JSON.stringify(updated, null, 2))
+  atomicWriteJsonSync(join(tasksDir, `${taskId}.json`), updated)
 
   // Update index
   updateIndexEntry(tasksDir, spaceId, taskId, toMeta(updated))
+
+  // Update schedule if it changed
+  if (updates.schedule) {
+    if (updates.schedule.enabled) {
+      scheduleTask(spaceId, taskId, updates.schedule)
+    } else {
+      unscheduleTask(taskId)
+    }
+  }
 
   return updated
 }
@@ -326,6 +344,9 @@ export function deleteTask(spaceId: string, taskId: string): boolean {
   const filePath = join(tasksDir, `${taskId}.json`)
 
   if (existsSync(filePath)) {
+    // Stop any active schedule
+    unscheduleTask(taskId)
+
     rmSync(filePath)
 
     // Update index (remove entry)

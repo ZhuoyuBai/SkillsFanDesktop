@@ -6,6 +6,7 @@ import { app } from 'electron'
 import { join } from 'path'
 import { homedir } from 'os'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
+import { atomicWriteJsonSync, safeReadJsonSync, cleanupTmpFiles } from '../utils/atomic-write'
 
 // Import analytics config type
 import type { AnalyticsConfig } from './analytics/types'
@@ -293,10 +294,13 @@ export async function initializeApp(): Promise<void> {
     }
   }
 
+  // Clean up any residual .tmp files from previous crashes
+  cleanupTmpFiles(haloDir)
+
   // Create default config if it doesn't exist
   const configPath = getConfigPath()
   if (!existsSync(configPath)) {
-    writeFileSync(configPath, JSON.stringify(DEFAULT_CONFIG, null, 2))
+    atomicWriteJsonSync(configPath, DEFAULT_CONFIG, { backup: true })
   }
 }
 
@@ -309,8 +313,8 @@ export function getConfig(): HaloConfig {
   }
 
   try {
-    const content = readFileSync(configPath, 'utf-8')
-    const parsed = JSON.parse(content)
+    const parsed = safeReadJsonSync(configPath, null as any)
+    if (!parsed) return DEFAULT_CONFIG
     const aiSources = normalizeAiSources(parsed)
     // Deep merge to ensure all nested defaults are applied
     return {
@@ -375,7 +379,7 @@ export function saveConfig(config: Partial<HaloConfig>): HaloConfig {
   }
 
   const configPath = getConfigPath()
-  writeFileSync(configPath, JSON.stringify(newConfig, null, 2))
+  atomicWriteJsonSync(configPath, newConfig, { backup: true })
 
   // Detect API config changes and notify subscribers
   // This allows agent.service to invalidate sessions when API config changes

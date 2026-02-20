@@ -9,9 +9,11 @@
 
 import { join } from 'path'
 import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, rmSync } from 'fs'
+import { atomicWriteJsonSync } from '../utils/atomic-write'
 import { getTempSpacePath } from './config.service'
 import { getSpace, getSpaceMetaDir } from './space.service'
 import { v4 as uuidv4 } from 'uuid'
+import { getMemoryIndexManager } from './memory'
 
 // Thought types for agent reasoning
 interface Thought {
@@ -141,7 +143,7 @@ function writeIndex(conversationsDir: string, conversations: ConversationMeta[])
   }
 
   try {
-    writeFileSync(indexPath, JSON.stringify(index, null, 2))
+    atomicWriteJsonSync(indexPath, index)
     console.log(`[Conversation] Index written with ${conversations.length} conversations`)
   } catch (error) {
     console.error('[Conversation] Failed to write index:', error)
@@ -316,7 +318,7 @@ export function createConversation(spaceId: string, title?: string): Conversatio
     mkdirSync(conversationsDir, { recursive: true })
   }
 
-  writeFileSync(join(conversationsDir, `${id}.json`), JSON.stringify(conversation, null, 2))
+  atomicWriteJsonSync(join(conversationsDir, `${id}.json`), conversation)
 
   // Update index
   updateIndexEntry(conversationsDir, spaceId, id, toMeta(conversation))
@@ -367,7 +369,7 @@ export function updateConversation(
   }
 
   const conversationsDir = getConversationsDir(spaceId)
-  writeFileSync(join(conversationsDir, `${conversationId}.json`), JSON.stringify(updated, null, 2))
+  atomicWriteJsonSync(join(conversationsDir, `${conversationId}.json`), updated)
 
   // Update index (title or other metadata may have changed)
   updateIndexEntry(conversationsDir, spaceId, conversationId, toMeta(updated))
@@ -421,10 +423,22 @@ export function addMessage(spaceId: string, conversationId: string, message: Omi
   }
 
   const conversationsDir = getConversationsDir(spaceId)
-  writeFileSync(join(conversationsDir, `${conversationId}.json`), JSON.stringify(conversation, null, 2))
+  atomicWriteJsonSync(join(conversationsDir, `${conversationId}.json`), conversation)
 
   // Update index with new messageCount and preview
   updateIndexEntry(conversationsDir, spaceId, conversationId, toMeta(conversation))
+
+  // Async: index message for cross-conversation memory search
+  if (message.content && message.content.trim().length >= 10) {
+    setImmediate(() => {
+      try {
+        getMemoryIndexManager().indexMessage(
+          spaceId, conversationId, conversation.title,
+          message.role, message.content, newMessage.timestamp
+        )
+      } catch (e) { console.error('[Memory] Failed to index message:', e) }
+    })
+  }
 
   return newMessage
 }
@@ -449,10 +463,22 @@ export function updateLastMessage(
     conversation.updatedAt = new Date().toISOString()
 
     const conversationsDir = getConversationsDir(spaceId)
-    writeFileSync(join(conversationsDir, `${conversationId}.json`), JSON.stringify(conversation, null, 2))
+    atomicWriteJsonSync(join(conversationsDir, `${conversationId}.json`), conversation)
 
     // Update index (preview may have changed)
     updateIndexEntry(conversationsDir, spaceId, conversationId, toMeta(conversation))
+
+    // Async: index updated assistant content for memory search
+    if (updates.content && updates.content.trim().length >= 10) {
+      setImmediate(() => {
+        try {
+          getMemoryIndexManager().indexMessage(
+            spaceId, conversationId, conversation.title,
+            'assistant', updates.content as string, conversation.updatedAt
+          )
+        } catch (e) { console.error('[Memory] Failed to index assistant message:', e) }
+      })
+    }
   }
 
   return lastMessage
@@ -468,6 +494,13 @@ export function deleteConversation(spaceId: string, conversationId: string): boo
 
     // Update index (remove entry)
     updateIndexEntry(conversationsDir, spaceId, conversationId, null)
+
+    // Async: remove conversation from memory index
+    setImmediate(() => {
+      try {
+        getMemoryIndexManager().removeConversation(conversationId)
+      } catch (e) { console.error('[Memory] Failed to remove conversation from index:', e) }
+    })
 
     return true
   }
@@ -504,7 +537,7 @@ export function clearAllConversations(spaceId: string): number {
   // Clear the index file
   const indexPath = join(conversationsDir, 'index.json')
   if (existsSync(indexPath)) {
-    writeFileSync(indexPath, JSON.stringify([], null, 2))
+    atomicWriteJsonSync(indexPath, [])
   }
 
   return deletedCount
@@ -517,7 +550,7 @@ export function saveSessionId(spaceId: string, conversationId: string, sessionId
   if (conversation) {
     conversation.sessionId = sessionId
     const conversationsDir = getConversationsDir(spaceId)
-    writeFileSync(join(conversationsDir, `${conversationId}.json`), JSON.stringify(conversation, null, 2))
+    atomicWriteJsonSync(join(conversationsDir, `${conversationId}.json`), conversation)
   }
 }
 

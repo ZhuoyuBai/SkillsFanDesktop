@@ -54,6 +54,8 @@ import {
   extractSingleUsage,
   extractResultUsage
 } from './message-utils'
+import { getMemoryIndexManager } from '../memory'
+import { agentQueue } from './lane-queue'
 
 // ============================================
 // Send Message
@@ -62,15 +64,37 @@ import {
 /**
  * Send message to agent (supports multiple concurrent sessions)
  *
- * This is the main entry point for sending messages to the AI agent.
- * It handles:
- * - API credential resolution (Anthropic, OpenAI, OAuth providers)
- * - V2 Session creation/reuse
- * - Message streaming with token-level updates
- * - Tool calls and permissions
- * - Error handling and recovery
+ * Uses Lane Queue to ensure messages to the same conversation are processed
+ * serially, preventing race conditions from rapid message sending.
  */
 export async function sendMessage(
+  mainWindow: BrowserWindow | null,
+  request: AgentRequest
+): Promise<void> {
+  const { conversationId } = request
+
+  // Check queue status and notify frontend if queued
+  const status = agentQueue.getStatus(conversationId)
+  if (status.running) {
+    console.log(`[Agent] Message queued for conv=${conversationId}, position=${status.queued + 1}`)
+    sendToRenderer('agent:queued', request.spaceId, conversationId, {
+      type: 'queued',
+      position: status.queued + 1
+    })
+  }
+
+  // Enqueue through Lane Queue — same conversation serialized, different conversations parallel
+  return agentQueue.enqueue(
+    conversationId,
+    () => sendMessageInternal(mainWindow, request),
+    { overflow: 'reject', maxQueueLength: 3 }
+  )
+}
+
+/**
+ * Internal message sending logic (called via Lane Queue)
+ */
+async function sendMessageInternal(
   mainWindow: BrowserWindow | null,
   request: AgentRequest
 ): Promise<void> {
@@ -469,10 +493,54 @@ async function processMessageStream(
     console.log(`[Agent][${conversationId}] Memory flush hint injected`)
   }
 
+  // Cross-conversation memory search — inject as message prefix (not system prompt)
+  // This runs on every message send, so it works even when V2 session is reused
+  //
+  // Strategy: keyword search + recent conversation fallback
+  // Keyword search alone can miss semantic gaps (e.g., "职业" vs "产品经理")
+  // Recent fallback ensures the model always has some cross-conversation context
+  let memoryPrefix = ''
+  if (!ralphMode?.enabled) {
+    try {
+      const memoryManager = getMemoryIndexManager()
+
+      // 1. Keyword-based search (searches both content and conversation titles)
+      let fragments = memoryManager.searchRelevant(
+        spaceId, message, conversationId, 5
+      )
+
+      // 2. Fallback: if few keyword results, supplement with recent conversations
+      if (fragments.length < 2) {
+        const recentFragments = memoryManager.getRecentFragments(
+          spaceId, conversationId, 3
+        )
+        // Merge and dedup by id
+        const existingIds = new Set(fragments.map(f => f.id))
+        for (const rf of recentFragments) {
+          if (!existingIds.has(rf.id)) {
+            fragments.push(rf)
+            existingIds.add(rf.id)
+          }
+        }
+        fragments = fragments.slice(0, 5)
+        if (recentFragments.length > 0) {
+          console.log(`[Agent] Memory fallback: added ${recentFragments.length} recent fragments`)
+        }
+      }
+
+      if (fragments.length > 0) {
+        memoryPrefix = `<related_history>\nThe following are messages from previous conversations with this user. Reference this information when answering questions about past discussions.\n\n${fragments.map((f: any) => `[${f.conversation_title}] (${f.role}):\n${f.content.slice(0, 500)}`).join('\n---\n')}\n</related_history>\n\n`
+        console.log(`[Agent] Injected ${fragments.length} cross-conversation memory fragments into message`)
+      }
+    } catch (e) {
+      // Memory system not critical - continue without it
+    }
+  }
+
   // Inject Canvas Context prefix if available
   // This provides AI awareness of what user is currently viewing
   const canvasPrefix = formatCanvasContext(canvasContext)
-  const messageWithContext = memoryFlushPrefix + canvasPrefix + message
+  const messageWithContext = memoryPrefix + memoryFlushPrefix + canvasPrefix + message
 
   // Build message content (text-only or multi-modal with images/PDFs/text)
   const messageContent = buildMessageContent(messageWithContext, images, attachments)

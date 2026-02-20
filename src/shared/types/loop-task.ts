@@ -9,6 +9,34 @@ export type StoryStatus = 'pending' | 'running' | 'completed' | 'failed'
 // Task status
 export type TaskStatus = 'idle' | 'running' | 'paused' | 'completed' | 'failed'
 
+// Schedule type for automated execution
+export type ScheduleType = 'manual' | 'cron' | 'interval'
+
+/**
+ * Task schedule configuration
+ */
+export interface TaskSchedule {
+  type: ScheduleType
+  cronExpression?: string    // type='cron': e.g. '0 9 * * 1-5' = weekdays 9am
+  intervalMs?: number        // type='interval': minimum 60000 (1 minute)
+  timezone?: string          // Default: system timezone
+  enabled: boolean
+  lastScheduledAt?: string
+  nextScheduledAt?: string
+}
+
+/**
+ * Retry configuration with exponential backoff
+ */
+export interface RetryConfig {
+  enabled: boolean
+  maxRetries: number                       // Default 3
+  initialBackoffMs: number                 // Default 30000 (30s)
+  maxBackoffMs: number                     // Default 3600000 (1h)
+  backoffMultiplier: number                // Default 2
+  pauseAfterConsecutiveFailures: number    // Default 3
+}
+
 // Task source
 export type TaskSource = 'import' | 'generate' | 'manual'
 
@@ -75,6 +103,10 @@ export interface LoopTask extends LoopTaskMeta {
   maxIterations: number
   startedAt?: string
   completedAt?: string
+  // Scheduling (optional, backward compatible)
+  schedule?: TaskSchedule
+  retryConfig?: RetryConfig
+  consecutiveFailures?: number
 }
 
 /**

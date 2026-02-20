@@ -5,6 +5,7 @@
 import { shell } from 'electron'
 import { join, basename, extname } from 'path'
 import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, statSync, rmSync } from 'fs'
+import { atomicWriteJsonSync } from '../utils/atomic-write'
 import * as fs from 'fs/promises'
 import { getHaloDir, getTempSpacePath, getSpacesDir } from './config.service'
 import { v4 as uuidv4 } from 'uuid'
@@ -89,7 +90,7 @@ function loadSpaceIndex(): SpaceIndex {
 
 function saveSpaceIndex(index: SpaceIndex): void {
   const indexPath = getSpaceIndexPath()
-  writeFileSync(indexPath, JSON.stringify(index, null, 2))
+  atomicWriteJsonSync(indexPath, index, { backup: true })
 }
 
 function addToSpaceIndex(path: string): void {
@@ -320,7 +321,7 @@ export function createSpace(input: { name: string; icon: string; iconColor?: str
     updatedAt: now
   }
 
-  writeFileSync(join(spacePath, SPACE_DATA_DIR, 'meta.json'), JSON.stringify(meta, null, 2))
+  atomicWriteJsonSync(join(spacePath, SPACE_DATA_DIR, 'meta.json'), meta, { backup: true })
 
   // Register custom path in index
   if (isCustomPath) {
@@ -432,7 +433,7 @@ export function updateSpace(spaceId: string, updates: { name?: string; icon?: st
     }
     meta.updatedAt = new Date().toISOString()
 
-    writeFileSync(metaPath, JSON.stringify(meta, null, 2))
+    atomicWriteJsonSync(metaPath, meta, { backup: true })
 
     return getSpace(spaceId)
   } catch (error) {
@@ -489,7 +490,7 @@ export function updateSpacePreferences(
 
     meta.updatedAt = new Date().toISOString()
 
-    writeFileSync(metaPath, JSON.stringify(meta, null, 2))
+    atomicWriteJsonSync(metaPath, meta, { backup: true })
 
     console.log(`[Space] Updated preferences for ${spaceId}:`, preferences)
 

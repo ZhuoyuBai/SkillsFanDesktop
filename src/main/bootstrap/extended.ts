@@ -32,6 +32,9 @@ import { registerGitBashHandlers, initializeGitBashOnStartup } from '../ipc/git-
 import { initializeRegistry, startSkillWatcher } from '../services/skill'
 import { registerRalphHandlers } from '../ipc/ralph'
 import { registerLoopTaskHandlers } from '../ipc/loop-task'
+import { shutdownMemory } from '../services/memory'
+import { shutdownScheduler } from '../services/scheduler.service'
+import { cancelAllRetries } from '../services/retry-handler'
 
 /**
  * Initialize extended services after window is visible
@@ -133,6 +136,15 @@ export function cleanupExtendedServices(): void {
 
   // Search: Cancel any ongoing searches
   cleanupSearchHandlers()
+
+  // Memory: Close SQLite database
+  shutdownMemory()
+
+  // Scheduler: Stop all cron jobs and interval timers
+  shutdownScheduler()
+
+  // Retry handler: Cancel all pending retry timers
+  cancelAllRetries()
 
   console.log('[Bootstrap] Extended services cleaned up')
 }

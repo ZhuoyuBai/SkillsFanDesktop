@@ -13,6 +13,7 @@ import { BrowserWindow } from 'electron'
 import { activeSessions, v2Sessions } from './session-manager'
 import { updateLastMessage } from '../conversation.service'
 import { sendMessage } from './send-message'
+import { agentQueue } from './lane-queue'
 import type { Thought, ImageAttachment } from './types'
 
 // ============================================
@@ -26,6 +27,12 @@ import type { Thought, ImageAttachment } from './types'
  */
 export async function stopGeneration(conversationId?: string): Promise<void> {
   if (conversationId) {
+    // Clear queued messages for this conversation
+    const cleared = agentQueue.clearQueue(conversationId)
+    if (cleared > 0) {
+      console.log(`[Agent] Cleared ${cleared} queued messages for: ${conversationId}`)
+    }
+
     // Stop specific session
     const session = activeSessions.get(conversationId)
     if (session) {
@@ -101,6 +108,12 @@ export async function interruptAndInject(
   const { spaceId, conversationId, message, images } = request
 
   console.log(`[Agent] interruptAndInject: conv=${conversationId}`)
+
+  // 0. Clear queued messages (user interrupt = don't need queued messages)
+  const cleared = agentQueue.clearQueue(conversationId)
+  if (cleared > 0) {
+    console.log(`[Agent] Cleared ${cleared} queued messages for inject`)
+  }
 
   // 1. Get current session state
   const sessionState = activeSessions.get(conversationId)
