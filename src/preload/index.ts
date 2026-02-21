@@ -23,6 +23,9 @@ export interface HaloAPI {
   getPublicModels: () => Promise<IpcResponse>
   resetToDefault: () => Promise<IpcResponse>
 
+  // Memory
+  clearMemory: (scope: 'space' | 'all', spaceId?: string) => Promise<IpcResponse>
+
   // Space
   getHaloSpace: () => Promise<IpcResponse>
   listSpaces: () => Promise<IpcResponse>
@@ -449,6 +452,10 @@ const api: HaloAPI = {
   refreshAISourcesConfig: () => ipcRenderer.invoke('config:refresh-ai-sources'),
   getPublicModels: () => ipcRenderer.invoke('config:get-public-models'),
   resetToDefault: () => ipcRenderer.invoke('config:reset-to-default'),
+
+  // Memory
+  clearMemory: (scope: 'space' | 'all', spaceId?: string) =>
+    ipcRenderer.invoke('memory:clear', scope, spaceId),
 
   // Space
   getHaloSpace: () => ipcRenderer.invoke('space:get-halo'),

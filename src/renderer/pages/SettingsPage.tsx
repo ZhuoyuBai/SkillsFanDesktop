@@ -4,6 +4,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useAppStore } from '../stores/app.store'
+import { useSpaceStore } from '../stores/space.store'
 import { api } from '../api'
 import type { HaloConfig, ThemeMode, McpServersConfig, AISourceType, OAuthSourceConfig } from '../types'
 import { AVAILABLE_MODELS, DEFAULT_MODEL } from '../types'
@@ -30,7 +31,7 @@ import { SkillsFanAccountSection } from '../components/settings/SkillsFanAccount
 import { SpaceManagementSection } from '../components/settings/SpaceManagementSection'
 import { ResetSection } from '../components/settings/ResetSection'
 import { useTranslation, setLanguage, getCurrentLanguage, SUPPORTED_LOCALES, type LocaleCode } from '../i18n'
-import { Loader2, LogOut, Plus, Check, Globe, Key, MessageSquare, Bot, Palette, Server, Settings as SettingsIcon, Wifi, ExternalLink, X, Package, User, Layers, Lock, type LucideIcon } from 'lucide-react'
+import { Loader2, LogOut, Plus, Check, Globe, Key, MessageSquare, Bot, Palette, Server, Settings as SettingsIcon, Wifi, ExternalLink, X, Package, User, Layers, Lock, SlidersHorizontal, ChevronDown, type LucideIcon } from 'lucide-react'
 import { useToastStore } from '../stores/toast.store'
 import type { SkillsFanAuthState } from '../../shared/types/skillsfan'
 
@@ -172,11 +173,12 @@ interface RemoteAccessStatus {
 }
 
 // Settings section type
-type SettingsSection = 'ai-model' | 'display' | 'mcp' | 'skills' | 'system' | 'remote' | 'account'
+type SettingsSection = 'ai-model' | 'display' | 'mcp' | 'skills' | 'system' | 'remote' | 'account' | 'spaces' | 'advanced'
 
 export function SettingsPage() {
   const { t } = useTranslation()
   const { config, setConfig, goBack, settingsSection, setSettingsSection } = useAppStore()
+  const { currentSpace } = useSpaceStore()
   const { addToast } = useToastStore()
 
   // Active section state - use settingsSection from store if available
@@ -253,6 +255,11 @@ export function SettingsPage() {
   // System settings state
   const [autoLaunch, setAutoLaunch] = useState(config?.system?.autoLaunch || false)
   const [minimizeToTray, setMinimizeToTray] = useState(config?.system?.minimizeToTray || false)
+
+  // Advanced settings state
+  const [showClearMemoryDialog, setShowClearMemoryDialog] = useState(false)
+  const [clearMemoryScope, setClearMemoryScope] = useState<'space' | 'all'>('space')
+  const [isClearingMemory, setIsClearingMemory] = useState(false)
 
   // API Key visibility state
   const [showApiKey, setShowApiKey] = useState(false)
@@ -535,6 +542,47 @@ export function SettingsPage() {
     }
   }
 
+  // Handle memory enabled change
+  const handleMemoryEnabledChange = async (enabled: boolean) => {
+    const memoryConfig = { enabled, retentionDays: config?.memory?.retentionDays ?? 0 }
+    try {
+      await api.setConfig({ memory: memoryConfig })
+      setConfig({ ...config!, memory: memoryConfig } as HaloConfig)
+    } catch (error) {
+      console.error('[Settings] Failed to update memory config:', error)
+    }
+  }
+
+  // Handle memory retention change
+  const handleRetentionChange = async (days: number) => {
+    const memoryConfig = { enabled: config?.memory?.enabled ?? true, retentionDays: days }
+    try {
+      await api.setConfig({ memory: memoryConfig })
+      setConfig({ ...config!, memory: memoryConfig } as HaloConfig)
+    } catch (error) {
+      console.error('[Settings] Failed to update memory retention:', error)
+    }
+  }
+
+  // Handle clear memory
+  const handleClearMemory = async () => {
+    setIsClearingMemory(true)
+    try {
+      const spaceId = clearMemoryScope === 'space' ? currentSpace?.id : undefined
+      const result = await api.clearMemory(clearMemoryScope, spaceId)
+      if (result.success) {
+        addToast(t('Memory cleared successfully'), 'success')
+      } else {
+        addToast(result.error || t('Failed to clear memory'), 'error')
+      }
+    } catch {
+      addToast(t('Failed to clear memory'), 'error')
+    } finally {
+      setIsClearingMemory(false)
+      setShowClearMemoryDialog(false)
+    }
+  }
+
   // Handle MCP servers save
   const handleMcpServersSave = async (servers: McpServersConfig) => {
     await api.setConfig({ mcpServers: servers })
@@ -691,6 +739,7 @@ export function SettingsPage() {
     { id: 'spaces', icon: Layers, label: t('Spaces'), desktopOnly: true },
     { id: 'display', icon: Palette, label: t('Display & Language') },
     { id: 'system', icon: SettingsIcon, label: t('System'), desktopOnly: true },
+    { id: 'advanced', icon: SlidersHorizontal, label: t('Advanced'), desktopOnly: true },
     { id: 'mcp', icon: Server, label: t('MCP Servers'), hidden: true },
     { id: 'remote', icon: Wifi, label: t('Remote Access'), desktopOnly: true },
   ]
@@ -895,7 +944,7 @@ export function SettingsPage() {
                         value={apiKey}
                         onChange={(e) => setApiKey(e.target.value)}
                         placeholder={currentPreset.apiType === 'openai' ? 'sk-xxxxxxxxxxxxx' : 'sk-ant-xxxxxxxxxxxxx'}
-                        className="w-full px-3 py-2 pr-10 text-sm bg-input rounded-lg border border-border focus:border-primary focus:outline-none transition-colors"
+                        className="w-full px-3 py-2 pr-10 text-sm bg-input rounded-lg border border-border focus:outline-none transition-colors"
                       />
                       <button
                         type="button"
@@ -928,7 +977,7 @@ export function SettingsPage() {
                       value={apiUrl}
                       onChange={(e) => setApiUrl(e.target.value)}
                       placeholder={currentPreset.apiUrl || 'https://...'}
-                      className="w-full px-3 py-2 text-sm bg-input rounded-lg border border-border focus:border-primary focus:outline-none transition-colors"
+                      className="w-full px-3 py-2 text-sm bg-input rounded-lg border border-border focus:outline-none transition-colors"
                     />
                     {!currentPreset.isCustom && (
                       <p className="mt-1 text-xs text-muted-foreground">
@@ -948,18 +997,21 @@ export function SettingsPage() {
                             value={model}
                             onChange={(e) => setModel(e.target.value)}
                             placeholder="claude-sonnet-4-5-20250929"
-                            className="w-full px-3 py-2 text-sm bg-input rounded-lg border border-border focus:border-primary focus:outline-none transition-colors"
+                            className="w-full px-3 py-2 text-sm bg-input rounded-lg border border-border focus:outline-none transition-colors"
                           />
                         ) : (
-                          <select
-                            value={model}
-                            onChange={(e) => setModel(e.target.value)}
-                            className="w-full px-3 py-2 text-sm bg-input rounded-lg border border-border focus:border-primary focus:outline-none transition-colors"
-                          >
-                            {AVAILABLE_MODELS.map((m) => (
-                              <option key={m.id} value={m.id}>{m.name}</option>
-                            ))}
-                          </select>
+                          <div className="relative">
+                            <select
+                              value={model}
+                              onChange={(e) => setModel(e.target.value)}
+                              className="appearance-none w-full px-3 pr-8 py-2 text-sm bg-input rounded-lg border border-border focus:outline-none transition-colors cursor-pointer"
+                            >
+                              {AVAILABLE_MODELS.map((m) => (
+                                <option key={m.id} value={m.id}>{m.name}</option>
+                              ))}
+                            </select>
+                            <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+                          </div>
                         )}
                         <div className="mt-1 flex items-center justify-between gap-4">
                           <span className="text-xs text-muted-foreground">
@@ -968,6 +1020,11 @@ export function SettingsPage() {
                               : t(AVAILABLE_MODELS.find((m) => m.id === model)?.description || '')}
                           </span>
                           <label className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer whitespace-nowrap shrink-0">
+                            <span className={`inline-flex items-center justify-center w-4 h-4 rounded border transition-colors ${
+                              useCustomModel ? 'bg-primary border-primary' : 'border-border bg-input'
+                            }`}>
+                              {useCustomModel && <Check className="w-3 h-3 text-primary-foreground" />}
+                            </span>
                             <input
                               type="checkbox"
                               checked={useCustomModel}
@@ -977,7 +1034,7 @@ export function SettingsPage() {
                                   setModel(DEFAULT_MODEL)
                                 }
                               }}
-                              className="w-3.5 h-3.5 rounded border-border cursor-pointer accent-primary"
+                              className="sr-only"
                             />
                             {t('Custom')}
                           </label>
@@ -990,7 +1047,7 @@ export function SettingsPage() {
                           value={model}
                           onChange={(e) => setModel(e.target.value)}
                           placeholder={currentPreset.defaultModel || 'model-name'}
-                          className="w-full px-3 py-2 text-sm bg-input rounded-lg border border-border focus:border-primary focus:outline-none transition-colors"
+                          className="w-full px-3 py-2 text-sm bg-input rounded-lg border border-border focus:outline-none transition-colors"
                         />
                         {!currentPreset.isCustom && (
                           <p className="mt-1 text-xs text-muted-foreground">
@@ -1051,17 +1108,20 @@ export function SettingsPage() {
               {/* Language */}
               <div className="pt-4 border-t border-border">
                 <label className="block text-sm text-muted-foreground mb-2">{t('Language')}</label>
-                <select
-                  value={getCurrentLanguage()}
-                  onChange={(e) => setLanguage(e.target.value as LocaleCode)}
-                  className="w-full px-4 py-2 bg-input rounded-lg border border-border focus:border-primary focus:outline-none transition-colors"
-                >
-                  {Object.entries(SUPPORTED_LOCALES).map(([code, name]) => (
-                    <option key={code} value={code}>
-                      {name}
-                    </option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <select
+                    value={getCurrentLanguage()}
+                    onChange={(e) => setLanguage(e.target.value as LocaleCode)}
+                    className="appearance-none w-full px-4 pr-8 py-2 bg-input rounded-lg border border-border focus:outline-none transition-colors cursor-pointer"
+                  >
+                    {Object.entries(SUPPORTED_LOCALES).map(([code, name]) => (
+                      <option key={code} value={code}>
+                        {name}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+                </div>
               </div>
             </div>
           </section>
@@ -1215,6 +1275,168 @@ export function SettingsPage() {
                 </div>
               </div>
             </section>
+          )}
+
+          {/* Advanced Section */}
+          {activeSection === 'advanced' && !api.isRemoteMode() && (
+            <section className="bg-card rounded-xl border border-border p-6">
+              <h2 className="text-lg font-medium mb-4">{t('Advanced')}</h2>
+
+              <div className="space-y-4">
+                {/* Cross-conversation Memory Toggle */}
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <p className="font-medium">{t('Cross-conversation Memory')}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {t('AI can remember content from previous conversations')}
+                    </p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={config?.memory?.enabled ?? true}
+                      onChange={(e) => handleMemoryEnabledChange(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-muted-foreground/40 rounded-full peer peer-checked:bg-primary transition-colors">
+                      <div
+                        className={`w-5 h-5 bg-white rounded-full shadow-md transform transition-transform ${
+                          (config?.memory?.enabled ?? true) ? 'translate-x-5' : 'translate-x-0.5'
+                        } mt-0.5`}
+                      />
+                    </div>
+                  </label>
+                </div>
+
+                {/* Memory Retention Period */}
+                <div className={`pt-4 border-t border-border transition-opacity ${(config?.memory?.enabled ?? true) ? '' : 'opacity-50 pointer-events-none'}`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <p className="font-medium">{t('Memory Retention Period')}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {t('How far back AI can recall conversations')}
+                      </p>
+                    </div>
+                    <div className="relative">
+                      <select
+                        value={config?.memory?.retentionDays ?? 0}
+                        onChange={(e) => handleRetentionChange(Number(e.target.value))}
+                        className="appearance-none px-3 pr-8 py-1.5 bg-input rounded-lg border border-border focus:outline-none transition-colors cursor-pointer"
+                      >
+                        <option value={7}>{t('7 days')}</option>
+                        <option value={30}>{t('30 days')}</option>
+                        <option value={180}>{t('180 days')}</option>
+                        <option value={0}>{t('Forever')}</option>
+                      </select>
+                      <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Clear Memory Button */}
+                <div className={`pt-4 border-t border-border transition-opacity ${(config?.memory?.enabled ?? true) ? '' : 'opacity-50 pointer-events-none'}`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <p className="font-medium">{t('Clear Memory')}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {t('Delete all conversation memory accumulated by AI')}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setShowClearMemoryDialog(true)}
+                      className="px-4 py-2 bg-red-500/10 text-red-500 rounded-lg hover:bg-red-500/20 transition-colors border border-red-500/30"
+                    >
+                      {t('Clear Memory')}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* Clear Memory Dialog */}
+          {showClearMemoryDialog && (
+            <div
+              className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4"
+              onClick={(e) => {
+                if (e.target === e.currentTarget) setShowClearMemoryDialog(false)
+              }}
+            >
+              <div className="bg-background border border-border rounded-lg w-full max-w-sm shadow-lg">
+                <div className="p-4 space-y-4">
+                  <h3 className="font-medium text-foreground">{t('Clear Memory')}</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {t('This will delete all conversation memory accumulated by AI. This action cannot be undone.')}
+                  </p>
+
+                  {/* Scope selection */}
+                  <div className="space-y-2">
+                    <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer hover:bg-secondary/50 transition-colors ${
+                      clearMemoryScope === 'space' ? 'border-primary' : 'border-border'
+                    }`}>
+                      <span className={`inline-flex items-center justify-center w-4 h-4 rounded-full border-2 transition-colors ${
+                        clearMemoryScope === 'space' ? 'border-primary' : 'border-muted-foreground/40'
+                      }`}>
+                        {clearMemoryScope === 'space' && <span className="w-2 h-2 rounded-full bg-primary" />}
+                      </span>
+                      <input
+                        type="radio"
+                        name="clearScope"
+                        value="space"
+                        checked={clearMemoryScope === 'space'}
+                        onChange={() => setClearMemoryScope('space')}
+                        className="sr-only"
+                      />
+                      <div>
+                        <p className="text-sm font-medium">{t('Current Space')}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {currentSpace?.name || t('Default Space')}
+                        </p>
+                      </div>
+                    </label>
+                    <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer hover:bg-secondary/50 transition-colors ${
+                      clearMemoryScope === 'all' ? 'border-primary' : 'border-border'
+                    }`}>
+                      <span className={`inline-flex items-center justify-center w-4 h-4 rounded-full border-2 transition-colors ${
+                        clearMemoryScope === 'all' ? 'border-primary' : 'border-muted-foreground/40'
+                      }`}>
+                        {clearMemoryScope === 'all' && <span className="w-2 h-2 rounded-full bg-primary" />}
+                      </span>
+                      <input
+                        type="radio"
+                        name="clearScope"
+                        value="all"
+                        checked={clearMemoryScope === 'all'}
+                        onChange={() => setClearMemoryScope('all')}
+                        className="sr-only"
+                      />
+                      <div>
+                        <p className="text-sm font-medium">{t('All Spaces')}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {t('Clear memory across all spaces')}
+                        </p>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-border">
+                  <button
+                    onClick={() => setShowClearMemoryDialog(false)}
+                    className="px-4 py-2 text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {t('Cancel')}
+                  </button>
+                  <button
+                    onClick={handleClearMemory}
+                    disabled={isClearingMemory}
+                    className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50"
+                  >
+                    {isClearingMemory ? t('Clearing...') : t('Confirm Clear')}
+                  </button>
+                </div>
+              </div>
+            </div>
           )}
 
           {/* MCP Servers Section */}
@@ -1395,7 +1617,7 @@ export function SettingsPage() {
                               }}
                               placeholder={t('4-32 characters')}
                               maxLength={32}
-                              className="w-32 px-2 py-1 text-sm bg-input rounded border border-border focus:border-primary focus:outline-none"
+                              className="w-32 px-2 py-1 text-sm bg-input rounded border border-border focus:outline-none"
                             />
                             <button
                               onClick={async () => {

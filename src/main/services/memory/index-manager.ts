@@ -53,6 +53,31 @@ CREATE INDEX IF NOT EXISTS idx_fragments_space ON fragments(space_id);
 
 export class MemoryIndexManager {
   private db: Database.Database | null = null
+  private _enabled: boolean = true
+  private _retentionDays: number = 0
+
+  /**
+   * Update cached config values (called when config changes)
+   */
+  updateConfig(enabled: boolean, retentionDays: number): void {
+    this._enabled = enabled
+    this._retentionDays = retentionDays
+    console.log(`[Memory] Config updated: enabled=${enabled}, retentionDays=${retentionDays}`)
+  }
+
+  get enabled(): boolean { return this._enabled }
+  get retentionDays(): number { return this._retentionDays }
+
+  /**
+   * Calculate the cutoff date based on retention setting.
+   * Returns null if retention is "forever" (0).
+   */
+  private getRetentionCutoff(): string | null {
+    if (this._retentionDays <= 0) return null
+    const cutoff = new Date()
+    cutoff.setDate(cutoff.getDate() - this._retentionDays)
+    return cutoff.toISOString()
+  }
 
   /**
    * Initialize the database connection and create tables
@@ -136,14 +161,22 @@ export class MemoryIndexManager {
     const keywords = extractSearchKeywords(query)
     if (keywords.length === 0) return []
 
+    const cutoff = this.getRetentionCutoff()
+
     // Build LIKE conditions: match against both content AND conversation title
     // This helps bridge semantic gaps (e.g., searching "职业" matches title "我是一名产品经理")
     const contentConditions = keywords.map(() => 'f.content LIKE ?').join(' OR ')
     const titleConditions = keywords.map(() => 'c.title LIKE ?').join(' OR ')
-    const params = [
+    const params: unknown[] = [
       ...keywords.map(kw => `%${kw}%`),  // for content conditions
       ...keywords.map(kw => `%${kw}%`)   // for title conditions
     ]
+
+    let timeFilter = ''
+    if (cutoff) {
+      timeFilter = 'AND f.created_at >= ?'
+      params.push(cutoff)
+    }
 
     try {
       return this.db.prepare(`
@@ -154,6 +187,7 @@ export class MemoryIndexManager {
         WHERE ((${contentConditions}) OR (${titleConditions}))
           AND f.space_id = ?
           AND f.conversation_id != ?
+          ${timeFilter}
         ORDER BY f.created_at DESC
         LIMIT ?
       `).all(...params, spaceId, excludeConversationId, limit) as MemoryFragment[]
@@ -177,6 +211,14 @@ export class MemoryIndexManager {
   ): MemoryFragment[] {
     if (!this.db) return []
 
+    const cutoff = this.getRetentionCutoff()
+    const params: unknown[] = [spaceId, excludeConversationId]
+    let timeFilter = ''
+    if (cutoff) {
+      timeFilter = 'AND f.created_at >= ?'
+      params.push(cutoff)
+    }
+
     try {
       return this.db.prepare(`
         SELECT f.id, f.conversation_id, f.space_id, f.role, f.content, f.created_at,
@@ -186,9 +228,10 @@ export class MemoryIndexManager {
         WHERE f.space_id = ?
           AND f.conversation_id != ?
           AND f.role = 'user'
+          ${timeFilter}
         ORDER BY f.created_at DESC
         LIMIT ?
-      `).all(spaceId, excludeConversationId, limit) as MemoryFragment[]
+      `).all(...params, limit) as MemoryFragment[]
     } catch (error) {
       console.error('[Memory] getRecentFragments failed:', error)
       return []
@@ -206,6 +249,46 @@ export class MemoryIndexManager {
       this.db.prepare('DELETE FROM conversations WHERE id = ?').run(conversationId)
     } catch (error) {
       console.error('[Memory] Failed to remove conversation:', error)
+    }
+  }
+
+  /**
+   * Clear all memory fragments for a specific space.
+   */
+  clearBySpace(spaceId: string): { deletedFragments: number; deletedConversations: number } {
+    if (!this.db) return { deletedFragments: 0, deletedConversations: 0 }
+
+    try {
+      const fragResult = this.db.prepare('DELETE FROM fragments WHERE space_id = ?').run(spaceId)
+      const convResult = this.db.prepare('DELETE FROM conversations WHERE space_id = ?').run(spaceId)
+      console.log(`[Memory] Cleared space ${spaceId}: ${fragResult.changes} fragments, ${convResult.changes} conversations`)
+      return {
+        deletedFragments: fragResult.changes,
+        deletedConversations: convResult.changes
+      }
+    } catch (error) {
+      console.error('[Memory] Failed to clear space:', error)
+      return { deletedFragments: 0, deletedConversations: 0 }
+    }
+  }
+
+  /**
+   * Clear ALL memory fragments and conversations across all spaces.
+   */
+  clearAll(): { deletedFragments: number; deletedConversations: number } {
+    if (!this.db) return { deletedFragments: 0, deletedConversations: 0 }
+
+    try {
+      const fragResult = this.db.prepare('DELETE FROM fragments').run()
+      const convResult = this.db.prepare('DELETE FROM conversations').run()
+      console.log(`[Memory] Cleared all: ${fragResult.changes} fragments, ${convResult.changes} conversations`)
+      return {
+        deletedFragments: fragResult.changes,
+        deletedConversations: convResult.changes
+      }
+    } catch (error) {
+      console.error('[Memory] Failed to clear all:', error)
+      return { deletedFragments: 0, deletedConversations: 0 }
     }
   }
 

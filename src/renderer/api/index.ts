@@ -145,6 +145,14 @@ export const api = {
     return { success: false, error: 'Reset to default is only available in desktop mode' }
   },
 
+  // ===== Memory =====
+  clearMemory: async (scope: 'space' | 'all', spaceId?: string): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.skillsfan.clearMemory(scope, spaceId)
+    }
+    return httpRequest('POST', '/api/memory/clear', { scope, spaceId })
+  },
+
   // ===== Space =====
   getHaloSpace: async (): Promise<ApiResponse> => {
     if (isElectron()) {

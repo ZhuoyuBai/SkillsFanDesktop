@@ -259,7 +259,7 @@ async function sendMessageInternal(
         // Append AI Browser system prompt if enabled
         // Pass actual model name so AI knows what model it's running on
         // Ralph mode appends custom system prompt for autonomous loop tasks
-        append: buildSystemPromptAppend(workDir, credentials.model)
+        append: buildSystemPromptAppend(workDir, credentials.model, config.memory?.enabled)
           + (aiBrowserEnabled ? AI_BROWSER_SYSTEM_PROMPT : '')
           + (ralphMode?.systemPromptAppend || '')
       },
@@ -487,7 +487,8 @@ async function processMessageStream(
   // Inject memory flush hint if context was recently compressed
   let memoryFlushPrefix = ''
   const v2InfoForFlush = v2Sessions.get(conversationId)
-  if (v2InfoForFlush?.needsMemoryFlush) {
+  const memoryManager = getMemoryIndexManager()
+  if (memoryManager.enabled && v2InfoForFlush?.needsMemoryFlush) {
     memoryFlushPrefix = '<memory_flush_hint>Context was recently compressed. If important context from our previous conversation has not been saved to MEMORY.md or memory/*.md, save it now before responding.</memory_flush_hint>\n\n'
     v2InfoForFlush.needsMemoryFlush = false
     console.log(`[Agent][${conversationId}] Memory flush hint injected`)
@@ -500,10 +501,8 @@ async function processMessageStream(
   // Keyword search alone can miss semantic gaps (e.g., "职业" vs "产品经理")
   // Recent fallback ensures the model always has some cross-conversation context
   let memoryPrefix = ''
-  if (!ralphMode?.enabled) {
+  if (!ralphMode?.enabled && memoryManager.enabled) {
     try {
-      const memoryManager = getMemoryIndexManager()
-
       // 1. Keyword-based search (searches both content and conversation titles)
       let fragments = memoryManager.searchRelevant(
         spaceId, message, conversationId, 5

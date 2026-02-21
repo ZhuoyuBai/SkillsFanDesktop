@@ -10,7 +10,7 @@ import { hasAnyAISource } from '../types'
 import { useSpaceStore } from './space.store'
 
 // Settings section type (must match SettingsPage)
-export type SettingsSection = 'ai-model' | 'display' | 'mcp' | 'skills' | 'system' | 'remote' | 'account' | 'spaces'
+export type SettingsSection = 'ai-model' | 'display' | 'mcp' | 'skills' | 'system' | 'remote' | 'account' | 'spaces' | 'advanced'
 
 // Git Bash installation progress
 interface GitBashInstallProgress {

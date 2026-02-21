@@ -38,6 +38,27 @@ export function onApiConfigChange(handler: ApiConfigChangeHandler): () => void {
   }
 }
 
+// ============================================================================
+// Memory Config Change Notification
+// ============================================================================
+
+type MemoryConfigChangeHandler = (enabled: boolean, retentionDays: number) => void
+const memoryConfigChangeHandlers: MemoryConfigChangeHandler[] = []
+
+/**
+ * Register a callback to be notified when memory config changes.
+ * Used by MemoryIndexManager to update its cached config.
+ *
+ * @returns Unsubscribe function
+ */
+export function onMemoryConfigChange(handler: MemoryConfigChangeHandler): () => void {
+  memoryConfigChangeHandlers.push(handler)
+  return () => {
+    const idx = memoryConfigChangeHandlers.indexOf(handler)
+    if (idx >= 0) memoryConfigChangeHandlers.splice(idx, 1)
+  }
+}
+
 // Types (shared with renderer)
 interface HaloConfig {
   api: {
@@ -82,6 +103,11 @@ interface HaloConfig {
   // Spaces configuration (default space settings)
   spaces?: {
     defaultSpaceId: string | null  // null = Halo space
+  }
+  // Memory configuration (cross-conversation memory)
+  memory?: {
+    enabled: boolean       // Master toggle, default true
+    retentionDays: number  // 0 = forever, 7/30/180
   }
 }
 
@@ -186,6 +212,10 @@ const DEFAULT_CONFIG: HaloConfig = {
   isFirstLaunch: true,
   spaces: {
     defaultSpaceId: null  // null = Halo space
+  },
+  memory: {
+    enabled: true,
+    retentionDays: 0  // 0 = forever
   }
 }
 
@@ -331,7 +361,9 @@ export function getConfig(): HaloConfig {
       // analytics: keep as-is (managed by analytics.service.ts)
       analytics: parsed.analytics,
       // spaces: merge with defaults
-      spaces: { ...DEFAULT_CONFIG.spaces, ...parsed.spaces }
+      spaces: { ...DEFAULT_CONFIG.spaces, ...parsed.spaces },
+      // memory: merge with defaults
+      memory: { ...DEFAULT_CONFIG.memory, ...parsed.memory }
     }
   } catch (error) {
     console.error('Failed to read config:', error)
@@ -377,6 +409,10 @@ export function saveConfig(config: Partial<HaloConfig>): HaloConfig {
   if (config.spaces) {
     newConfig.spaces = { ...currentConfig.spaces, ...config.spaces }
   }
+  // memory: merge with current config
+  if (config.memory) {
+    newConfig.memory = { ...currentConfig.memory, ...config.memory }
+  }
 
   const configPath = getConfigPath()
   atomicWriteJsonSync(configPath, newConfig, { backup: true })
@@ -403,6 +439,25 @@ export function saveConfig(config: Partial<HaloConfig>): HaloConfig {
             handler()
           } catch (e) {
             console.error('[Config] Error in API config change handler:', e)
+          }
+        })
+      }, 0)
+    }
+  }
+
+  // Detect memory config changes and notify subscribers
+  if (config.memory && memoryConfigChangeHandlers.length > 0) {
+    const memoryChanged =
+      config.memory.enabled !== currentConfig.memory?.enabled ||
+      config.memory.retentionDays !== currentConfig.memory?.retentionDays
+    if (memoryChanged) {
+      const m = newConfig.memory!
+      setTimeout(() => {
+        memoryConfigChangeHandlers.forEach(handler => {
+          try {
+            handler(m.enabled, m.retentionDays)
+          } catch (e) {
+            console.error('[Config] Error in memory config change handler:', e)
           }
         })
       }, 0)

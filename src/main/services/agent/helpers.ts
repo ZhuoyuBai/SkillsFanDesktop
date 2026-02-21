@@ -285,17 +285,20 @@ export function getEnabledMcpServers(mcpServers: Record<string, any>): Record<st
  */
 export function buildSystemPromptAppend(
   workDir: string,
-  modelInfo?: string
+  modelInfo?: string,
+  memoryEnabled?: boolean
 ): string {
   const modelLine = modelInfo ? `You are powered by ${modelInfo}.` : ''
 
   // Read or auto-create MEMORY.md (long-term memory)
   // Skip temp space (artifacts dir) - only for real workspaces
+  // Skip if memory is explicitly disabled via config
   let memorySection = ''
   const memoryPath = join(workDir, 'MEMORY.md')
   const isTempSpace = workDir.includes('/artifacts') && workDir.includes('skillsfan')
+  const shouldInjectMemory = memoryEnabled !== false
 
-  if (!isTempSpace) {
+  if (!isTempSpace && shouldInjectMemory) {
     // Auto-create MEMORY.md with default template if it doesn't exist
     if (!existsSync(memoryPath)) {
       try {

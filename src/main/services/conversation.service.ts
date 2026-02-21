@@ -432,10 +432,13 @@ export function addMessage(spaceId: string, conversationId: string, message: Omi
   if (message.content && message.content.trim().length >= 10) {
     setImmediate(() => {
       try {
-        getMemoryIndexManager().indexMessage(
-          spaceId, conversationId, conversation.title,
-          message.role, message.content, newMessage.timestamp
-        )
+        const manager = getMemoryIndexManager()
+        if (manager.enabled) {
+          manager.indexMessage(
+            spaceId, conversationId, conversation.title,
+            message.role, message.content, newMessage.timestamp
+          )
+        }
       } catch (e) { console.error('[Memory] Failed to index message:', e) }
     })
   }
@@ -472,10 +475,13 @@ export function updateLastMessage(
     if (updates.content && updates.content.trim().length >= 10) {
       setImmediate(() => {
         try {
-          getMemoryIndexManager().indexMessage(
-            spaceId, conversationId, conversation.title,
-            'assistant', updates.content as string, conversation.updatedAt
-          )
+          const manager = getMemoryIndexManager()
+          if (manager.enabled) {
+            manager.indexMessage(
+              spaceId, conversationId, conversation.title,
+              'assistant', updates.content as string, conversation.updatedAt
+            )
+          }
         } catch (e) { console.error('[Memory] Failed to index assistant message:', e) }
       })
     }

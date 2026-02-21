@@ -286,7 +286,7 @@ export async function ensureSessionWarm(
     systemPrompt: {
       type: 'preset' as const,
       preset: 'claude_code' as const,
-      append: buildSystemPromptAppend(workDir, credentials.model)
+      append: buildSystemPromptAppend(workDir, credentials.model, config.memory?.enabled)
     },
     maxTurns: 50,
     allowedTools: ['Read', 'Write', 'Edit', 'Grep', 'Glob', 'Bash'],

@@ -32,6 +32,7 @@ import { registerGitBashHandlers, initializeGitBashOnStartup } from '../ipc/git-
 import { initializeRegistry, startSkillWatcher } from '../services/skill'
 import { registerRalphHandlers } from '../ipc/ralph'
 import { registerLoopTaskHandlers } from '../ipc/loop-task'
+import { registerMemoryHandlers } from '../ipc/memory'
 import { shutdownMemory } from '../services/memory'
 import { shutdownScheduler } from '../services/scheduler.service'
 import { cancelAllRetries } from '../services/retry-handler'
@@ -85,6 +86,9 @@ export function initializeExtendedServices(mainWindow: BrowserWindow): void {
 
   // Loop Task: Persistent loop task storage
   registerLoopTaskHandlers(mainWindow)
+
+  // Memory: Memory management (clear memory)
+  registerMemoryHandlers()
 
   // Skill: Initialize skill registry and start file watcher
   // Skills are loaded from 5 sources: project commands, SkillsFan, global commands, Claude skills, Agent skills

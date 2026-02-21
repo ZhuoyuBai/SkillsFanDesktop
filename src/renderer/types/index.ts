@@ -181,6 +181,12 @@ export interface SpacesConfig {
   defaultSpaceId: string | null;  // null = Halo space
 }
 
+// Memory configuration (cross-conversation memory)
+export interface MemoryConfig {
+  enabled: boolean;
+  retentionDays: number;  // 0 = forever, 7/30/180
+}
+
 export interface HaloConfig {
   api: ApiConfig;  // Legacy, kept for backward compatibility
   aiSources?: AISourcesConfig;  // New multi-source configuration
@@ -190,6 +196,7 @@ export interface HaloConfig {
   remoteAccess: RemoteAccessConfig;
   mcpServers: McpServersConfig;  // MCP servers configuration
   spaces?: SpacesConfig;  // Space settings (default space, etc.)
+  memory?: MemoryConfig;  // Cross-conversation memory settings
   isFirstLaunch: boolean;
 }
 
