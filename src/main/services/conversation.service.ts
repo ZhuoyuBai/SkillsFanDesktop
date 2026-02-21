@@ -463,7 +463,9 @@ export function updateLastMessage(
   // Only update assistant messages
   if (lastMessage.role === 'assistant') {
     Object.assign(lastMessage, updates)
-    conversation.updatedAt = new Date().toISOString()
+    // Keep conversation ordering stable on assistant-only updates.
+    // We intentionally do NOT bump updatedAt here, so completed background
+    // responses won't jump above a newly created task in the sidebar.
 
     const conversationsDir = getConversationsDir(spaceId)
     atomicWriteJsonSync(join(conversationsDir, `${conversationId}.json`), conversation)
@@ -477,9 +479,10 @@ export function updateLastMessage(
         try {
           const manager = getMemoryIndexManager()
           if (manager.enabled) {
+            const indexedAt = new Date().toISOString()
             manager.indexMessage(
               spaceId, conversationId, conversation.title,
-              'assistant', updates.content as string, conversation.updatedAt
+              'assistant', updates.content as string, indexedAt
             )
           }
         } catch (e) { console.error('[Memory] Failed to index assistant message:', e) }

@@ -40,7 +40,8 @@ function getSendStrategy(channel: string): SendStrategy {
     case 'agent:tool-call':                       // Tool call
     case 'agent:tool-result':                     // Tool result
     case 'agent:compact':                         // Context compression
-    case 'agent:queued':    return 'reliable'     // Must deliver
+    case 'agent:queued':                          // Queue notification
+    case 'agent:start':     return 'reliable'     // Must deliver
     default:                return 'dropIfSlow'
   }
 }

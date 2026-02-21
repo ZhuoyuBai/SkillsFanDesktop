@@ -788,6 +788,8 @@ export const api = {
   },
 
   // ===== Event Listeners =====
+  onAgentStart: (callback: (data: unknown) => void) =>
+    onEvent('agent:start', callback),
   onAgentMessage: (callback: (data: unknown) => void) =>
     onEvent('agent:message', callback),
   onAgentToolCall: (callback: (data: unknown) => void) =>

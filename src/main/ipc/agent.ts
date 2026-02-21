@@ -4,6 +4,7 @@
 
 import { ipcMain, BrowserWindow } from 'electron'
 import { sendMessage, stopGeneration, interruptAndInject, handleToolApproval, handleUserQuestionAnswer, getSessionState, ensureSessionWarm, testMcpConnections } from '../services/agent'
+import type { Attachment, ImageAttachment } from '../services/agent/types'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -20,24 +21,8 @@ export function registerAgentHandlers(window: BrowserWindow | null): void {
         conversationId: string
         message: string
         resumeSessionId?: string
-        images?: Array<{
-          id: string
-          type: 'image'
-          mediaType: 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'
-          data: string
-          name?: string
-          size?: number
-        }>
-        attachments?: Array<{
-          id: string
-          type: 'image' | 'pdf' | 'text'
-          mediaType: string
-          data?: string
-          content?: string
-          name?: string
-          size?: number
-          language?: string
-        }>
+        images?: ImageAttachment[]
+        attachments?: Attachment[]
         thinkingEnabled?: boolean  // Enable extended thinking mode
       }
     ) => {
@@ -71,24 +56,8 @@ export function registerAgentHandlers(window: BrowserWindow | null): void {
         spaceId: string
         conversationId: string
         message: string
-        images?: Array<{
-          id: string
-          type: 'image'
-          mediaType: 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'
-          data: string
-          name?: string
-          size?: number
-        }>
-        attachments?: Array<{
-          id: string
-          type: 'image' | 'pdf' | 'text'
-          mediaType: string
-          data?: string
-          content?: string
-          name?: string
-          size?: number
-          language?: string
-        }>
+        images?: ImageAttachment[]
+        attachments?: Attachment[]
       }
     ) => {
       try {

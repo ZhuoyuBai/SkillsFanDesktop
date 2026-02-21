@@ -174,6 +174,7 @@ interface ChatState {
   addTaskStatus: (conversationId: string, taskContent: string, status: string) => void
 
   // Event handlers (called from App component) - with session IDs
+  handleAgentStart: (data: AgentEventBase) => void
   handleAgentMessage: (data: AgentEventBase & { content: string; isComplete: boolean }) => void
   handleAgentToolCall: (data: AgentEventBase & ToolCall) => void
   handleAgentToolResult: (data: AgentEventBase & { toolId: string; result: string; isError: boolean }) => void
@@ -734,23 +735,35 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
 
     try {
-      // Initialize/reset session state for this conversation
+      // Distinguish first message vs queued message:
+      // - First message (not generating): full reset + isThinking for immediate UI feedback
+      // - Queued message (already generating): don't touch streaming state
       set((state) => {
         const newSessions = new Map(state.sessions)
         const existingSession = newSessions.get(conversationId) || createEmptySessionState()
-        newSessions.set(conversationId, {
-          ...existingSession,
-          isGenerating: true,
-          streamingContent: '',
-          isStreaming: false,
-          thoughts: [],
-          isThinking: true,
-          pendingToolApproval: null,
-          error: null,
-          compactInfo: null,
-          textSegments: [],
-          lastSegmentIndex: 0
-        })
+
+        if (existingSession.isGenerating) {
+          // Queued message: don't reset streaming state, just clear error
+          newSessions.set(conversationId, {
+            ...existingSession,
+            error: null
+          })
+        } else {
+          // First message: full reset + immediate thinking feedback
+          newSessions.set(conversationId, {
+            ...existingSession,
+            isGenerating: true,
+            error: null,
+            streamingContent: '',
+            isStreaming: false,
+            thoughts: [],
+            isThinking: true,
+            pendingToolApproval: null,
+            compactInfo: null,
+            textSegments: [],
+            lastSegmentIndex: 0
+          })
+        }
         return { sessions: newSessions }
       })
 
@@ -1033,6 +1046,31 @@ export const useChatStore = create<ChatState>((set, get) => ({
     })
   },
 
+  // Handle agent start - reset session state when a message actually begins executing
+  // This is sent by the backend when a queued message starts processing (not when queued)
+  handleAgentStart: (data) => {
+    const { conversationId } = data
+    console.log(`[ChatStore] handleAgentStart [${conversationId}]`)
+
+    set((state) => {
+      const newSessions = new Map(state.sessions)
+      const session = newSessions.get(conversationId) || createEmptySessionState()
+      newSessions.set(conversationId, {
+        ...session,
+        isGenerating: true,
+        streamingContent: '',
+        isStreaming: false,
+        thoughts: [],
+        isThinking: true,
+        pendingToolApproval: null,
+        compactInfo: null,
+        textSegments: [],
+        lastSegmentIndex: 0
+      })
+      return { sessions: newSessions }
+    })
+  },
+
   // Handle agent message - update session-specific streaming content
   // Backend now sends full accumulated content (all text blocks concatenated)
   handleAgentMessage: (data) => {
@@ -1124,11 +1162,40 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const { spaceId, conversationId } = data
     console.log(`[ChatStore] handleAgentComplete [${conversationId}]`)
 
-    // First, just stop streaming indicator but keep isGenerating=true
-    // This keeps the streaming bubble visible during backend load
+    // Commit streaming content to cache BEFORE async reload.
+    // When lane queue pumps the next message, handleAgentStart clears streamingContent.
+    // Without this, msg1's response would be lost between handleAgentStart (clears streaming)
+    // and getConversation() completing (restores from backend).
     set((state) => {
       const newSessions = new Map(state.sessions)
       const session = newSessions.get(conversationId)
+
+      // Save streaming content into conversation cache as a temporary assistant message
+      const newCache = new Map(state.conversationCache)
+      const cached = newCache.get(conversationId)
+      if (cached && session?.streamingContent) {
+        const tempAssistant: Message = {
+          id: `streaming-complete-${Date.now()}`,
+          role: 'assistant',
+          content: session.streamingContent,
+          timestamp: new Date().toISOString(),
+          thoughts: session.thoughts?.length > 0 ? session.thoughts : undefined
+        }
+        const messages = [...cached.messages]
+        const lastMsg = messages[messages.length - 1]
+        // Replace empty assistant placeholder if present at end
+        if (lastMsg?.role === 'assistant' && !lastMsg.content) {
+          messages[messages.length - 1] = tempAssistant
+        } else {
+          messages.push(tempAssistant)
+        }
+        newCache.set(conversationId, {
+          ...cached,
+          messages,
+          updatedAt: new Date().toISOString()
+        })
+      }
+
       if (session) {
         newSessions.set(conversationId, {
           ...session,
@@ -1137,7 +1204,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           // Keep isGenerating=true and streamingContent until backend loads
         })
       }
-      return { sessions: newSessions }
+      return { sessions: newSessions, conversationCache: newCache }
     })
 
     // Reload conversation from backend (Single Source of Truth)
@@ -1163,7 +1230,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
         // Now atomically: update cache, metadata, AND clear session state
         // This prevents flash by doing all in one render
         set((state) => {
-          // Update cache with fresh data
+          // Update cache with fresh data from backend
+          // Backend saves user messages immediately in sendMessageInternal,
+          // so all user messages are already in backend data — no need to preserve optimistic ones
           const newCache = new Map(state.conversationCache)
           newCache.set(conversationId, updatedConversation)
 
@@ -1179,16 +1248,20 @@ export const useChatStore = create<ChatState>((set, get) => ({
             })
           }
 
-          // Clear session state atomically with conversation update
+          // Clear session state — but only if next message hasn't already started
           const newSessions = new Map(state.sessions)
           const currentSession = newSessions.get(conversationId)
           if (currentSession) {
-            newSessions.set(conversationId, {
-              ...currentSession,
-              isGenerating: false,
-              streamingContent: '',
-              compactInfo: null  // Clear temporary compact notification
-            })
+            const nextMessageStarted = currentSession.isThinking === true
+            if (!nextMessageStarted) {
+              newSessions.set(conversationId, {
+                ...currentSession,
+                isGenerating: false,
+                streamingContent: '',
+                compactInfo: null
+              })
+            }
+            // If nextMessageStarted, leave session state untouched
           }
 
           return {
@@ -1201,17 +1274,20 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }
     } catch (error) {
       console.error('[ChatStore] Failed to reload conversation:', error)
-      // Even on error, must clear state to avoid stale content
+      // Clear state on error — but only if next message hasn't already started
       set((state) => {
         const newSessions = new Map(state.sessions)
         const currentSession = newSessions.get(conversationId)
         if (currentSession) {
-          newSessions.set(conversationId, {
-            ...currentSession,
-            isGenerating: false,
-            streamingContent: '',
-            compactInfo: null  // Clear temporary compact notification
-          })
+          const nextMessageStarted = currentSession.isThinking === true
+          if (!nextMessageStarted) {
+            newSessions.set(conversationId, {
+              ...currentSession,
+              isGenerating: false,
+              streamingContent: '',
+              compactInfo: null
+            })
+          }
         }
         return { sessions: newSessions }
       })

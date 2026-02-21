@@ -59,15 +59,12 @@ export function MessageList({
 }: MessageListProps) {
   const { t } = useTranslation()
 
-  // Filter out empty assistant placeholder message during generation
-  // (Backend adds empty assistant message as placeholder, we show streaming content instead)
-  const displayMessages = isGenerating
-    ? messages.filter((msg, idx) => {
-        const isLastMessage = idx === messages.length - 1
-        const isEmptyAssistant = msg.role === 'assistant' && !msg.content
-        return !(isLastMessage && isEmptyAssistant)
-      })
-    : messages
+  // Filter out assistant placeholders with no visible text.
+  // Rapid interrupt/inject can leave empty assistant records in history.
+  const displayMessages = messages.filter((msg) => {
+    if (msg.role !== 'assistant') return true
+    return Boolean(msg.content?.trim())
+  })
 
 
   // Extract real-time browser tool calls from streaming thoughts

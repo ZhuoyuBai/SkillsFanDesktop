@@ -74,6 +74,7 @@ function applyTheme(theme: 'light' | 'dark' | 'system') {
 export default function App() {
   const { view, config, initialize, setMcpStatus, setView, setConfig } = useAppStore()
   const {
+    handleAgentStart,
     handleAgentMessage,
     handleAgentToolCall,
     handleAgentToolResult,
@@ -167,6 +168,11 @@ export default function App() {
   // Register agent event listeners (global - handles events for all conversations)
   useEffect(() => {
     console.log('[App] Registering agent event listeners')
+
+    // Agent start - message actually begins executing (after queue wait)
+    const unsubStart = api.onAgentStart((data) => {
+      handleAgentStart(data as AgentEventBase)
+    })
 
     // Primary thought listener - handles all agent reasoning events
     const unsubThought = api.onAgentThought((data) => {
@@ -262,6 +268,7 @@ export default function App() {
     return () => {
       unsubThought()
       unsubMessage()
+      unsubStart()
       unsubToolCall()
       unsubToolResult()
       unsubError()
@@ -273,6 +280,7 @@ export default function App() {
       unsubSkillsFanLogin()
     }
   }, [
+    handleAgentStart,
     handleAgentMessage,
     handleAgentToolCall,
     handleAgentToolResult,

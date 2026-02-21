@@ -144,6 +144,7 @@ export interface HaloAPI {
   answerUserQuestion: (conversationId: string, answers: Record<string, string>) => Promise<IpcResponse>
 
   // Event listeners
+  onAgentStart: (callback: (data: unknown) => void) => () => void
   onAgentMessage: (callback: (data: unknown) => void) => () => void
   onAgentToolCall: (callback: (data: unknown) => void) => () => void
   onAgentToolResult: (callback: (data: unknown) => void) => () => void
@@ -502,6 +503,7 @@ const api: HaloAPI = {
   answerUserQuestion: (conversationId, answers) => ipcRenderer.invoke('agent:answer-question', conversationId, answers),
 
   // Event listeners
+  onAgentStart: (callback) => createEventListener('agent:start', callback),
   onAgentMessage: (callback) => createEventListener('agent:message', callback),
   onAgentToolCall: (callback) => createEventListener('agent:tool-call', callback),
   onAgentToolResult: (callback) => createEventListener('agent:tool-result', callback),

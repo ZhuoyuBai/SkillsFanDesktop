@@ -199,6 +199,7 @@ export function onEvent(channel: string, callback: (data: unknown) => void): () 
   if (isElectron()) {
     // Use IPC in Electron
     const methodMap: Record<string, keyof typeof window.skillsfan> = {
+      'agent:start': 'onAgentStart',
       'agent:message': 'onAgentMessage',
       'agent:tool-call': 'onAgentToolCall',
       'agent:tool-result': 'onAgentToolResult',

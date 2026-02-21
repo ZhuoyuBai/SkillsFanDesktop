@@ -104,6 +104,7 @@ async function sendMessageInternal(
     spaceId,
     conversationId,
     message,
+    messagePrefix,
     resumeSessionId,
     images,
     attachments,
@@ -112,6 +113,9 @@ async function sendMessageInternal(
     canvasContext,
     ralphMode
   } = request
+
+  // Notify frontend that this queued message is now actually executing
+  sendToRenderer('agent:start', spaceId, conversationId, {})
 
   const attCount = (images?.length || 0) + (attachments?.length || 0)
   console.log(`[Agent] sendMessage: conv=${conversationId}${attCount > 0 ? `, attachments=${attCount}` : ''}${aiBrowserEnabled ? ', AI Browser enabled' : ''}${thinkingEnabled ? ', thinking=ON' : ''}${canvasContext?.isOpen ? `, canvas tabs=${canvasContext.tabCount}` : ''}${ralphMode?.enabled ? ', Ralph mode' : ''}`)
@@ -349,6 +353,7 @@ async function sendMessageInternal(
       spaceId,
       conversationId,
       message,
+      messagePrefix,
       images,
       attachments,
       canvasContext,
@@ -447,6 +452,7 @@ async function processMessageStream(
   spaceId: string,
   conversationId: string,
   message: string,
+  messagePrefix: AgentRequest['messagePrefix'],
   images: AgentRequest['images'],
   attachments: AgentRequest['attachments'],
   canvasContext: AgentRequest['canvasContext'],
@@ -539,7 +545,8 @@ async function processMessageStream(
   // Inject Canvas Context prefix if available
   // This provides AI awareness of what user is currently viewing
   const canvasPrefix = formatCanvasContext(canvasContext)
-  const messageWithContext = memoryPrefix + memoryFlushPrefix + canvasPrefix + message
+  const runtimePrefix = messagePrefix ? `${messagePrefix}\n\n` : ''
+  const messageWithContext = memoryPrefix + memoryFlushPrefix + canvasPrefix + runtimePrefix + message
 
   // Build message content (text-only or multi-modal with images/PDFs/text)
   const messageContent = buildMessageContent(messageWithContext, images, attachments)

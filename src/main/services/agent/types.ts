@@ -112,6 +112,8 @@ export interface AgentRequest {
   spaceId: string
   conversationId: string
   message: string
+  /** Runtime-only instruction prefix injected before message (not persisted to conversation history) */
+  messagePrefix?: string
   resumeSessionId?: string
   images?: ImageAttachment[]  // Optional images for multi-modal messages
   attachments?: Attachment[]  // General attachments (PDF, text, code files)

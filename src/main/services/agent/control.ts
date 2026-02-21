@@ -11,10 +11,55 @@
 
 import { BrowserWindow } from 'electron'
 import { activeSessions, v2Sessions } from './session-manager'
-import { updateLastMessage } from '../conversation.service'
+import { getConversation, updateLastMessage } from '../conversation.service'
 import { sendMessage } from './send-message'
 import { agentQueue } from './lane-queue'
-import type { Thought, ImageAttachment } from './types'
+import type { Thought, Attachment, ImageAttachment } from './types'
+
+const CONTINUATION_PREFIX_MAX_CHARS = 1200
+
+/**
+ * Get the latest user message content before current injection.
+ */
+function getLatestUserMessage(spaceId: string, conversationId: string): string {
+  const conversation = getConversation(spaceId, conversationId) as {
+    messages?: Array<{ role?: string; content?: string }>
+  } | null
+
+  if (!conversation || !Array.isArray(conversation.messages)) {
+    return ''
+  }
+
+  const messages = conversation.messages
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const msg = messages[i]
+    if (msg?.role === 'user' && typeof msg.content === 'string' && msg.content.trim()) {
+      return msg.content.trim()
+    }
+  }
+  return ''
+}
+
+/**
+ * Build a runtime-only prefix so follow-up messages sent during generation
+ * continue the previous unfinished request instead of replacing it.
+ */
+function buildContinuationPrefix(previousUserMessage: string): string {
+  if (!previousUserMessage) return ''
+
+  const safePrevious = previousUserMessage.length > CONTINUATION_PREFIX_MAX_CHARS
+    ? `${previousUserMessage.slice(0, CONTINUATION_PREFIX_MAX_CHARS)}...`
+    : previousUserMessage
+
+  return [
+    '<follow_up_during_generation>',
+    'The user sent a follow-up while your previous response was still generating.',
+    'Treat the new user message as additive context. Do not drop unfinished intent from the previous user request.',
+    'If the new message explicitly asks to replace/cancel the previous request, follow the new instruction.',
+    `Previous unfinished user request:\n${safePrevious}`,
+    '</follow_up_during_generation>'
+  ].join('\n\n')
+}
 
 // ============================================
 // Stop Generation
@@ -94,7 +139,7 @@ export async function stopGeneration(conversationId?: string): Promise<void> {
  * the partial output and the new user input.
  *
  * @param mainWindow - Main window for IPC communication
- * @param request - Inject request with spaceId, conversationId, message, and optional images
+ * @param request - Inject request with spaceId, conversationId, message, and optional attachments
  */
 export async function interruptAndInject(
   mainWindow: BrowserWindow | null,
@@ -103,9 +148,10 @@ export async function interruptAndInject(
     conversationId: string
     message: string
     images?: ImageAttachment[]
+    attachments?: Attachment[]
   }
 ): Promise<void> {
-  const { spaceId, conversationId, message, images } = request
+  const { spaceId, conversationId, message, images, attachments } = request
 
   console.log(`[Agent] interruptAndInject: conv=${conversationId}`)
 
@@ -122,6 +168,9 @@ export async function interruptAndInject(
   if (!sessionState || !v2SessionInfo) {
     throw new Error('No active session to inject into')
   }
+
+  const previousUserMessage = getLatestUserMessage(spaceId, conversationId)
+  const continuationPrefix = buildContinuationPrefix(previousUserMessage)
 
   // 2. Capture current streaming content and thoughts before interruption
   const partialContent = sessionState.currentStreamingContent || ''
@@ -147,8 +196,8 @@ export async function interruptAndInject(
     console.error(`[Agent] Failed to interrupt/drain V2 session for inject:`, e)
   }
 
-  // 4. Save partial assistant message with thoughts (if there's content)
-  if (partialContent.trim() || thoughts.length > 0) {
+  // 4. Save partial assistant message only when there is visible text content.
+  if (partialContent.trim()) {
     updateLastMessage(spaceId, conversationId, {
       content: partialContent,
       thoughts: thoughts
@@ -163,7 +212,10 @@ export async function interruptAndInject(
     spaceId,
     conversationId,
     message,
-    images
+    messagePrefix: continuationPrefix || undefined,
+    images,
+    attachments,
+    aiBrowserEnabled: v2SessionInfo.config.aiBrowserEnabled
   })
 }
 
