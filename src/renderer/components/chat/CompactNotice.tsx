@@ -26,7 +26,7 @@ export function CompactNotice({ trigger, preTokens, className = '' }: CompactNot
   return (
     <div className={`flex justify-center my-4 ${className}`}>
       <div className="inline-flex items-center gap-2 px-4 py-2 bg-secondary/50 rounded-full text-xs text-muted-foreground">
-        <span className="w-1.5 h-1.5 bg-amber-500/60 rounded-full" />
+        <span className="w-1.5 h-1.5 bg-muted-foreground/40 rounded-full" />
         <span>
           {t('Context has been intelligently compressed')}
           {trigger === 'auto' && ` (${formatTokens(preTokens)} tokens)`}

@@ -437,7 +437,7 @@ export function SpacePage() {
                     className="p-1.5 hover:bg-secondary rounded-lg transition-colors"
                     aria-label={t('Open folder')}
                   >
-                    <FolderOpen className="w-4 h-4 text-amber-500" />
+                    <FolderOpen className="w-4 h-4 text-slate-400" />
                   </button>
                   <button
                     onClick={() => setView('settings')}

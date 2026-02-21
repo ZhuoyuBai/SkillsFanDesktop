@@ -38,7 +38,7 @@ const STEP_CONFIGS = {
     titleKey: 'View AI artifacts',
     descriptionKey: 'This is a file created by AI. Click to open and view',
     icon: FileText,
-    iconColor: 'text-amber-500',
+    iconColor: 'text-primary',
     buttonText: null,
   },
 }

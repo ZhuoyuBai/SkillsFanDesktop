@@ -179,7 +179,7 @@ const ProcessTag = memo(function ProcessTag({
 
   // Icon styles based on type
   const iconStyles = {
-    thinking: 'text-amber-500/70',
+    thinking: 'text-blue-400/70',
     tool: 'text-muted-foreground/60',
     skill: 'text-violet-500',
     error: 'text-destructive/70',

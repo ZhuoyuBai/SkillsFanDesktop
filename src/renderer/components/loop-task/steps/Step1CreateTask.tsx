@@ -247,10 +247,10 @@ export function Step1CreateTask(_props: Step1CreateTaskProps) {
     <div className="flex flex-col h-full min-h-0">
       <div className="flex-1 overflow-auto p-4 min-h-0">
         <div className="max-w-2xl mx-auto space-y-6">
-          {/* Creation Method - Horizontal Row */}
-          <div className="space-y-6">
-            <div className="text-center">
-              <h3 className="text-2xl font-semibold text-foreground">
+          {/* Creation Method */}
+          <div className="space-y-5">
+            <div className="text-center pt-4">
+              <h3 className="text-3xl font-bold text-foreground">
                 {t('Choose the best way to create your automated task')}
               </h3>
             </div>
@@ -260,26 +260,22 @@ export function Step1CreateTask(_props: Step1CreateTaskProps) {
               <button
                 onClick={() => handleMethodSelect('ai')}
                 className={cn(
-                  'relative px-3 py-2.5 border rounded-lg transition-all duration-200 text-left flex items-center gap-2.5 group',
+                  'relative flex flex-col items-center gap-2 px-3 py-4 border rounded-xl transition-all duration-200 group',
                   createMethod === 'ai'
-                    ? 'border-primary/40 bg-primary/10'
-                    : 'border-border hover:border-foreground/20 hover:bg-muted/30'
+                    ? 'border-primary/40 bg-primary/5 shadow-sm'
+                    : 'border-border hover:border-foreground/15 hover:bg-muted/20 hover:-translate-y-0.5'
                 )}
               >
-                <div
-                  className={cn(
-                    'w-8 h-8 rounded-md flex items-center justify-center transition-all duration-200 shrink-0',
-                    createMethod === 'ai'
-                      ? 'bg-primary/15 text-primary'
-                      : 'bg-muted/50 text-muted-foreground group-hover:bg-muted'
-                  )}
-                >
-                  <Wand2 size={16} strokeWidth={1.5} />
+                <div className={cn(
+                  'transition-colors duration-200',
+                  createMethod === 'ai' ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'
+                )}>
+                  <Wand2 size={24} strokeWidth={1.5} />
                 </div>
-                <span className="text-sm font-semibold text-foreground flex-1">
+                <span className="text-sm font-semibold text-foreground">
                   {t('AI Generate')}
                 </span>
-                <span className="px-1.5 py-0.5 bg-primary text-primary-foreground text-[10px] font-medium rounded">
+                <span className="px-2 py-0.5 bg-primary text-primary-foreground text-[10px] font-medium rounded-full">
                   {t('Recommended')}
                 </span>
               </button>
@@ -288,24 +284,23 @@ export function Step1CreateTask(_props: Step1CreateTaskProps) {
               <button
                 onClick={() => handleMethodSelect('manual')}
                 className={cn(
-                  'relative px-3 py-2.5 border rounded-lg transition-all duration-200 text-left flex items-center gap-2.5 group',
+                  'relative flex flex-col items-center gap-2 px-3 py-4 border rounded-xl transition-all duration-200 group',
                   createMethod === 'manual'
-                    ? 'border-primary/40 bg-primary/10'
-                    : 'border-border hover:border-foreground/20 hover:bg-muted/30'
+                    ? 'border-primary/40 bg-primary/5 shadow-sm'
+                    : 'border-border hover:border-foreground/15 hover:bg-muted/20 hover:-translate-y-0.5'
                 )}
               >
-                <div
-                  className={cn(
-                    'w-8 h-8 rounded-md flex items-center justify-center transition-all duration-200 shrink-0',
-                    createMethod === 'manual'
-                      ? 'bg-primary/15 text-primary'
-                      : 'bg-muted/50 text-muted-foreground group-hover:bg-muted'
-                  )}
-                >
-                  <FileEdit size={16} strokeWidth={1.5} />
+                <div className={cn(
+                  'transition-colors duration-200',
+                  createMethod === 'manual' ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'
+                )}>
+                  <FileEdit size={24} strokeWidth={1.5} />
                 </div>
                 <span className="text-sm font-semibold text-foreground">
                   {t('Manual Create')}
+                </span>
+                <span className="text-[11px] text-muted-foreground">
+                  {t('Add sub-tasks step by step')}
                 </span>
               </button>
 
@@ -313,24 +308,23 @@ export function Step1CreateTask(_props: Step1CreateTaskProps) {
               <button
                 onClick={() => handleMethodSelect('import')}
                 className={cn(
-                  'relative px-3 py-2.5 border rounded-lg transition-all duration-200 text-left flex items-center gap-2.5 group',
+                  'relative flex flex-col items-center gap-2 px-3 py-4 border rounded-xl transition-all duration-200 group',
                   createMethod === 'import'
-                    ? 'border-primary/40 bg-primary/10'
-                    : 'border-border hover:border-foreground/20 hover:bg-muted/30'
+                    ? 'border-primary/40 bg-primary/5 shadow-sm'
+                    : 'border-border hover:border-foreground/15 hover:bg-muted/20 hover:-translate-y-0.5'
                 )}
               >
-                <div
-                  className={cn(
-                    'w-8 h-8 rounded-md flex items-center justify-center transition-all duration-200 shrink-0',
-                    createMethod === 'import'
-                      ? 'bg-primary/15 text-primary'
-                      : 'bg-muted/50 text-muted-foreground group-hover:bg-muted'
-                  )}
-                >
-                  <Upload size={16} strokeWidth={1.5} />
+                <div className={cn(
+                  'transition-colors duration-200',
+                  createMethod === 'import' ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'
+                )}>
+                  <Upload size={24} strokeWidth={1.5} />
                 </div>
                 <span className="text-sm font-semibold text-foreground">
                   {t('Import')}
+                </span>
+                <span className="text-[11px] text-muted-foreground">
+                  {t('From prd.json file')}
                 </span>
               </button>
             </div>

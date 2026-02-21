@@ -165,7 +165,7 @@ export function LoginSelector({ onSelectProvider, onBack, onSkip }: LoginSelecto
                     key={code}
                     onClick={() => handleLanguageChange(code as LocaleCode)}
                     className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 transition-colors ${
-                      currentLang === code ? 'text-orange-600 font-medium' : 'text-gray-900'
+                      currentLang === code ? 'text-primary font-medium' : 'text-gray-900'
                     }`}
                   >
                     {name}
@@ -194,7 +194,7 @@ export function LoginSelector({ onSelectProvider, onBack, onSkip }: LoginSelecto
                 key={preset.id}
                 type="button"
                 onClick={() => onSelectProvider(preset.id)}
-                className="flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-gray-200 bg-white hover:border-orange-500 hover:bg-orange-50 transition-all"
+                className="flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-gray-200 bg-white hover:border-primary hover:bg-primary/5 transition-all"
               >
                 {/* Logo or Icon */}
                 <div className="w-10 h-10 rounded-lg flex items-center justify-center overflow-hidden">

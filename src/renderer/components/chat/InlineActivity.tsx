@@ -155,7 +155,7 @@ function StatusIcon({ isRunning, isError, isWaiting }: {
   isWaiting: boolean
 }) {
   if (isWaiting) {
-    return <AlertCircle size={14} className="text-amber-500/70 flex-shrink-0" />
+    return <AlertCircle size={14} className="text-yellow-500/70 flex-shrink-0" />
   }
   if (isError) {
     return <XCircle size={14} className="text-destructive/70 flex-shrink-0" />

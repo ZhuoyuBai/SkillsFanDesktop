@@ -194,7 +194,7 @@ export function OnboardingFlow({ onComplete, onLogin, onStartNow }: OnboardingFl
         </button>
         <button
           onClick={handleStartNow}
-          className="flex items-center gap-1.5 px-7 py-2.5 text-base bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors font-medium"
+          className="flex items-center gap-1.5 px-7 py-2.5 text-base bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg transition-colors font-medium"
         >
           {t('onboarding.startNow')}
           <ChevronRight className="w-5 h-5" />

@@ -1,16 +1,16 @@
 /**
- * StepIndicator - Visual step progress indicator for the wizard flow
+ * StepIndicator - Compact horizontal bar step indicator
  *
- * Displays the 3 steps with connected dots:
- * - Completed: primary dot with checkmark, clickable to go back
- * - Current: primary dot with ring glow
- * - Future: muted outlined dot
+ * Displays steps inline with connecting lines:
+ *   1 · Create Task ━━━ 2 · Plan Edit ━━━ 3 · Execute
  *
- * Cannot click back from Step 3 (execution).
+ * - Completed: primary color, clickable to go back
+ * - Current: foreground bold
+ * - Future: muted
+ * - Cannot click back from Step 3 (execution)
  */
 
 import { useTranslation } from 'react-i18next'
-import { Check } from 'lucide-react'
 import { useLoopTaskStore } from '../../../stores/loop-task.store'
 import { cn } from '../../../lib/utils'
 import type { WizardStep } from '../../../../shared/types/loop-task'
@@ -40,55 +40,51 @@ export function StepIndicator({ currentStep }: StepIndicatorProps) {
     }
   }
 
-  // Progress line: percentage of the track that is filled
-  // Track spans from center of dot 1 to center of dot 3
-  const progressPercent = ((currentStep - 1) / (STEP_KEYS.length - 1)) * 100
-
   return (
-    <div className="px-6 py-5 shrink-0">
-      <div className="relative flex items-start">
-        {/* Track line (background) — spans between first and last dot centers */}
-        <div className="absolute top-[15px] left-[16.67%] right-[16.67%] h-[2px] bg-border rounded-full" />
-        {/* Active progress line */}
-        <div className="absolute top-[15px] left-[16.67%] right-[16.67%] h-[2px] rounded-full overflow-hidden">
-          <div
-            className="h-full bg-primary transition-all duration-500 ease-out"
-            style={{ width: `${progressPercent}%` }}
-          />
-        </div>
-
-        {/* Step dots */}
-        {STEP_KEYS.map((step) => {
+    <div className="px-6 py-2.5 shrink-0">
+      <div className="flex items-center">
+        {STEP_KEYS.map((step, index) => {
           const isCompleted = step < currentStep
           const isCurrent = step === currentStep
           const canClick = isCompleted && currentStep < 3
 
           return (
-            <div key={step} className="flex-1 flex flex-col items-center relative z-10">
+            <div key={step} className="contents">
+              {/* Step label */}
               <button
                 onClick={() => handleStepClick(step)}
                 disabled={!canClick}
                 className={cn(
-                  'w-[30px] h-[30px] rounded-full flex items-center justify-center text-xs font-semibold transition-all duration-300',
-                  isCompleted && 'bg-primary text-primary-foreground shadow-sm',
-                  isCompleted && canClick && 'cursor-pointer hover:shadow-md hover:scale-105',
-                  isCurrent && 'bg-primary text-primary-foreground shadow-md ring-[3px] ring-primary/25',
-                  !isCompleted && !isCurrent && 'bg-background border-2 border-muted text-muted-foreground',
+                  'flex items-center gap-1.5 text-xs whitespace-nowrap transition-colors duration-300',
+                  isCompleted && 'text-primary',
+                  isCompleted && canClick && 'cursor-pointer hover:text-primary/80',
+                  isCurrent && 'text-foreground font-semibold',
+                  !isCompleted && !isCurrent && 'text-muted-foreground',
                   !canClick && !isCurrent && 'cursor-default'
                 )}
               >
-                {isCompleted ? <Check size={14} strokeWidth={2.5} /> : step}
-              </button>
-              <span
-                className={cn(
-                  'text-[11px] mt-2 text-center leading-tight transition-colors duration-300',
-                  isCurrent && 'text-foreground font-medium',
-                  isCompleted && 'text-foreground',
-                  !isCompleted && !isCurrent && 'text-muted-foreground'
-                )}
-              >
+                <span className={cn(
+                  'w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-medium shrink-0 transition-all duration-300',
+                  isCompleted && 'bg-primary text-primary-foreground',
+                  isCurrent && 'bg-foreground/10 text-foreground',
+                  !isCompleted && !isCurrent && 'bg-muted text-muted-foreground'
+                )}>
+                  {step}
+                </span>
                 {stepLabels[step]}
-              </span>
+              </button>
+
+              {/* Connecting line (not after last step) */}
+              {index < STEP_KEYS.length - 1 && (
+                <div className="flex-1 h-[2px] mx-3 bg-border rounded-full overflow-hidden">
+                  <div
+                    className={cn(
+                      'h-full rounded-full transition-all duration-500 ease-out',
+                      step < currentStep ? 'bg-primary w-full' : 'w-0'
+                    )}
+                  />
+                </div>
+              )}
             </div>
           )
         })}

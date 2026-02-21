@@ -94,7 +94,7 @@ function ThoughtItem({ thought }: { thought: Thought }) {
       case 'tool_use':
         return {
           label: `${t('Calling')} ${thought.toolName}`,
-          color: 'text-amber-400',
+          color: 'text-blue-400',
           Icon: thought.toolName ? getToolIcon(thought.toolName) : Wrench
         }
       case 'tool_result':

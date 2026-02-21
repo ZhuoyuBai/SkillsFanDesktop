@@ -59,7 +59,7 @@ function getThoughtColor(type: Thought['type'], isError?: boolean): string {
     case 'thinking':
       return 'text-muted-foreground'
     case 'tool_use':
-      return 'text-amber-400'
+      return 'text-blue-400'
     case 'tool_result':
       return 'text-green-400'
     case 'text':

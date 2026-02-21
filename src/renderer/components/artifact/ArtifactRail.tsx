@@ -326,7 +326,7 @@ export function ArtifactRail({
             title={t('Open folder (⌘⇧F)')}
             aria-label={t('Open folder')}
           >
-            <FolderOpen className="w-4 h-4 text-amber-500" />
+            <FolderOpen className="w-4 h-4 text-slate-400" />
             <span>{t('Folder')}</span>
           </button>
         </div>
@@ -355,7 +355,7 @@ export function ArtifactRail({
           "
           aria-label={t('Open artifacts panel')}
         >
-          <FolderOpen className="w-4 h-4 text-amber-500" />
+          <FolderOpen className="w-4 h-4 text-slate-400" />
           {artifacts.length > 0 && (
             <span className="text-[10px] font-medium text-muted-foreground">
               {artifacts.length}
@@ -505,7 +505,7 @@ export function ArtifactRail({
               className="p-2 hover:bg-secondary rounded-lg transition-colors"
               title={t('Open folder')}
             >
-              <FolderOpen className="w-5 h-5 text-amber-500" />
+              <FolderOpen className="w-5 h-5 text-slate-400" />
             </button>
           )}
         </div>

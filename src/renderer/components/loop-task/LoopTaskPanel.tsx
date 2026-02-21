@@ -23,7 +23,6 @@ import {
   CheckCircle2,
   XCircle,
   ChevronDown,
-  X,
   Sparkles,
   AlertCircle
 } from 'lucide-react'
@@ -113,19 +112,10 @@ export function LoopTaskPanel({ spaceId }: LoopTaskPanelProps) {
   if (isEditing) {
     return (
       <div className="flex flex-col flex-1 min-h-0">
-        {/* Header - Cancel button aligned with sidebar */}
-        <div className="px-4 pt-16 pb-3 shrink-0">
-          <button
-            onClick={handleCancel}
-            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <X size={18} />
-            <span>{t('Cancel')}</span>
-          </button>
+        {/* Step Indicator - flush to top (with traffic light padding on macOS) */}
+        <div className="pt-12 shrink-0">
+          <StepIndicator currentStep={wizardStep} />
         </div>
-
-        {/* Step Indicator */}
-        <StepIndicator currentStep={wizardStep} />
 
         {/* Step Content - flex-1 to take remaining space, overflow-hidden to enable child scrolling */}
         <div className="flex-1 overflow-hidden min-h-0">

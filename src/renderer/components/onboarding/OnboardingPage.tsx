@@ -93,7 +93,7 @@ export function OnboardingPage({
           >
             {features.map((feature, index) => (
               <span key={index} className="flex items-center gap-2">
-                <span className="text-orange-400">{feature.icon}</span>
+                <span className="text-primary">{feature.icon}</span>
                 {feature.title}
               </span>
             ))}

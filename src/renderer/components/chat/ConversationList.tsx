@@ -136,7 +136,7 @@ function UnifiedTaskItem({
           {task.type === 'conversation' ? (
             <MessageSquare className="w-4 h-4 text-muted-foreground flex-shrink-0" />
           ) : (
-            <Zap className="w-4 h-4 text-amber-500 flex-shrink-0" />
+            <Zap className="w-4 h-4 text-teal-400 flex-shrink-0" />
           )}
 
           {/* Title */}
@@ -518,7 +518,7 @@ export function ConversationList({
               {task.type === 'conversation' ? (
                 <MessageSquare className="w-4 h-4 text-muted-foreground" />
               ) : (
-                <Zap className="w-4 h-4 text-amber-500" />
+                <Zap className="w-4 h-4 text-teal-400" />
               )}
             </div>
           ))}
