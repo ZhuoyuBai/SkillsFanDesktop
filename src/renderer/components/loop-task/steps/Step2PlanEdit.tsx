@@ -378,17 +378,12 @@ export function Step2PlanEdit({ spaceId, onCancel }: Step2PlanEditProps) {
                       : 'border-foreground/20 text-foreground hover:bg-muted/50'
                   )}
                 >
-                  {editingTask?.schedule?.enabled ? t('Scheduled') : t('Schedule')}
+                  {t('Schedule')}({editingTask?.schedule?.enabled ? t('Enabled') : t('Not enabled')})
                 </button>
                 {showSchedulePopover && (
                   <div className="absolute z-20 right-0 mt-1.5 w-80 bg-card border border-border rounded-lg shadow-lg">
                     <div className="flex items-center justify-between p-4">
-                      <div>
-                        <label className="text-sm font-medium text-foreground">{t('Schedule')}</label>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          {editingTask?.schedule?.enabled ? t('Enabled') : t('Not enabled')}
-                        </p>
-                      </div>
+                      <label className="text-sm font-medium text-foreground">{t('Schedule')}</label>
                       <button
                         onClick={handleScheduleToggle}
                         className={cn(

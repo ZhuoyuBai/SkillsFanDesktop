@@ -347,19 +347,19 @@ export function ChatView({ isCompact = false }: ChatViewProps) {
   return (
     <div
       className={`
-        flex-1 flex flex-col h-full
+        flex-1 min-h-0 flex flex-col
         transition-[padding] duration-300 ease-out
         ${isCompact ? 'bg-background/50' : 'bg-background'}
       `}
     >
       {/* Messages area wrapper - relative for button positioning */}
-      <div className="flex-1 relative overflow-hidden">
+      <div className="flex-1 min-h-0 relative overflow-hidden">
         {/* Scrollable messages container */}
         <div
           ref={containerRef}
           onScroll={handleScroll}
           className={`
-            h-full overflow-auto py-6
+            h-full min-h-0 overflow-auto py-6
             transition-[padding] duration-300 ease-out
             ${isCompact ? 'px-3' : 'px-4'}
           `}
@@ -406,7 +406,7 @@ export function ChatView({ isCompact = false }: ChatViewProps) {
 
       {/* UserQuestionCard - show when AI is asking a question */}
       {pendingUserQuestion && currentConversation && (
-        <div className={`px-4 ${isCompact ? '' : 'max-w-3xl mx-auto w-full'}`}>
+        <div className={`shrink-0 px-4 ${isCompact ? '' : 'max-w-3xl mx-auto w-full'}`}>
           <UserQuestionCard
             questions={pendingUserQuestion.questions}
             onAnswer={(answers) => answerUserQuestion(currentConversation.id, answers)}
@@ -416,7 +416,7 @@ export function ChatView({ isCompact = false }: ChatViewProps) {
       )}
 
       {/* Input area - only show at bottom when there are messages */}
-      {hasMessages && bottomInputArea}
+      {hasMessages && <div className="shrink-0">{bottomInputArea}</div>}
     </div>
   )
 }

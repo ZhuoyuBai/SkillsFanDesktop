@@ -401,7 +401,7 @@ export function SpacePage() {
   })
 
   return (
-    <div className="h-full w-full flex flex-col bg-card">
+    <div className="h-full min-h-0 w-full flex flex-col bg-card">
       {/*
         ChatCapsule overlay is now managed via IPC to render above BrowserView.
         The overlay SPA is a separate WebContentsView that appears above all views.
@@ -469,7 +469,7 @@ export function SpacePage() {
       )}
 
       {/* Main content */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 min-h-0 flex overflow-hidden">
         {/* Conversation list sidebar - hidden when maximized or on mobile */}
         {!isCanvasMaximized && !isMobile && (
           <ConversationList
@@ -495,7 +495,7 @@ export function SpacePage() {
               <div
                 ref={chatContainerRef}
                 className={`
-                  flex flex-col min-w-0 relative
+                  flex min-h-0 flex-col min-w-0 relative
                   ${hasBrowserTab ? '' : 'transition-[border-color] duration-300 ease-out'}
                   ${isCanvasOpen ? 'border-r border-border/60' : 'flex-1 border-r border-transparent'}
                   ${isCanvasTransitioning ? 'pointer-events-none' : ''}
@@ -562,7 +562,7 @@ export function SpacePage() {
 
         {/* Mobile Layout */}
         {isMobile && (
-          <div className="flex-1 flex flex-col min-w-0">
+          <div className="flex-1 min-h-0 flex flex-col min-w-0">
             {selectionType === 'loopTask' ? (
               <LoopTaskPanel spaceId={currentSpace.id} />
             ) : (
