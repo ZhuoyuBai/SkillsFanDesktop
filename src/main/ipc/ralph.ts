@@ -69,7 +69,10 @@ export function registerRalphHandlers(window: BrowserWindow | null): void {
           modelSource: loopTask.modelSource,
           createdAt: loopTask.createdAt,
           startedAt: loopTask.startedAt,
-          completedAt: loopTask.completedAt
+          completedAt: loopTask.completedAt,
+          stepRetryConfig: loopTask.stepRetryConfig,
+          loopConfig: loopTask.loopConfig,
+          currentLoop: loopTask.currentLoop
         }
 
         // Set as current task before starting

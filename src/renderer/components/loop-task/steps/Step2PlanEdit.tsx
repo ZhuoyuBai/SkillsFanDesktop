@@ -5,7 +5,7 @@
  * - View and edit story list
  * - Add, edit, delete, reorder stories
  * - Override model per story
- * - Configure max iterations
+ * - Configure execution settings (step retry, loop execution)
  *
  * When "Next" is clicked, generates prd.json and goes to step 3
  */
@@ -20,7 +20,8 @@ import {
   ChevronUp,
   Trash2,
   Sparkles,
-  Loader2
+  Loader2,
+  Settings2
 } from 'lucide-react'
 import { ConfirmDialog } from '../../ui/ConfirmDialog'
 import { useLoopTaskStore } from '../../../stores/loop-task.store'
@@ -31,7 +32,8 @@ import { getModelLogo } from '../../layout/ModelSelector'
 import { useModelProviders } from '../../../hooks/useModelProviders'
 import { SchedulePicker } from '../schedule'
 import type { OAuthProviderInfo, CustomProviderInfo } from '../../../hooks/useModelProviders'
-import type { UserStory, WizardStep, TaskSchedule } from '../../../../shared/types/loop-task'
+import type { UserStory, WizardStep, TaskSchedule, StepRetryConfig, LoopConfig } from '../../../../shared/types/loop-task'
+import { calculateMaxIterations } from '../../../../shared/types/loop-task'
 
 
 interface Step2PlanEditProps {
@@ -68,27 +70,22 @@ export function Step2PlanEdit({ spaceId, onCancel }: Step2PlanEditProps) {
   })
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
-  const [showIterationsPopover, setShowIterationsPopover] = useState(false)
-  const [showSchedulePopover, setShowSchedulePopover] = useState(false)
-  const iterationsPopoverRef = useRef<HTMLDivElement>(null)
-  const schedulePopoverRef = useRef<HTMLDivElement>(null)
+  const [showExecutionSettings, setShowExecutionSettings] = useState(false)
+  const executionSettingsRef = useRef<HTMLDivElement>(null)
   const autoGenerateTriggeredRef = useRef(false)
 
-  // Close popovers on click outside
+  // Close popover on click outside
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (showIterationsPopover && iterationsPopoverRef.current && !iterationsPopoverRef.current.contains(e.target as Node)) {
-        setShowIterationsPopover(false)
-      }
-      if (showSchedulePopover && schedulePopoverRef.current && !schedulePopoverRef.current.contains(e.target as Node)) {
-        setShowSchedulePopover(false)
+      if (executionSettingsRef.current && !executionSettingsRef.current.contains(e.target as Node)) {
+        setShowExecutionSettings(false)
       }
     }
-    if (showIterationsPopover || showSchedulePopover) {
+    if (showExecutionSettings) {
       document.addEventListener('mousedown', handler)
       return () => document.removeEventListener('mousedown', handler)
     }
-  }, [showIterationsPopover, showSchedulePopover])
+  }, [showExecutionSettings])
 
   // Schedule toggle helper
   const handleScheduleToggle = () => {
@@ -288,17 +285,23 @@ export function Step2PlanEdit({ spaceId, onCancel }: Step2PlanEditProps) {
       }
 
       // Create the task
+      const stepRetryConfig: StepRetryConfig = editingTask?.stepRetryConfig ?? { onFailure: 'retry', maxRetries: 3 }
+      const loopConfig: LoopConfig = editingTask?.loopConfig ?? { enabled: false, maxLoops: 1 }
+      const maxIterations = calculateMaxIterations(localStories.length, stepRetryConfig, loopConfig)
+
       const task = await createTask(spaceId, {
         name: editingTask?.name || (editingTask?.description || '').slice(0, 30).trim() || t('New Loop Task'),
         projectDir: editingTask?.projectDir || '',
         description: editingTask?.description || '',
         source: editingTask?.source || 'manual',
         stories: localStories,
-        maxIterations: editingTask?.maxIterations || 10,
+        maxIterations,
         branchName: editingTask?.branchName,
         model: editingTask?.model,
         modelSource: editingTask?.modelSource,
-        schedule: editingTask?.schedule
+        schedule: editingTask?.schedule,
+        stepRetryConfig,
+        loopConfig
       })
 
       // Clear log and go to step 3 (execute)
@@ -340,68 +343,132 @@ export function Step2PlanEdit({ spaceId, onCancel }: Step2PlanEditProps) {
               {t('Sub-tasks')} ({localStories.length})
             </label>
             <div className="flex items-center gap-2">
-              {/* Max Iterations button + popover */}
-              <div className="relative" ref={iterationsPopoverRef}>
+              {/* Execution Settings button + popover */}
+              <div className="relative" ref={executionSettingsRef}>
                 <button
-                  onClick={() => { setShowIterationsPopover(!showIterationsPopover); setShowSchedulePopover(false) }}
-                  className="px-3 py-1.5 border border-foreground/20 rounded text-sm text-foreground hover:bg-muted/50 transition-colors"
+                  onClick={() => setShowExecutionSettings(!showExecutionSettings)}
+                  className="px-3 py-1.5 border border-foreground/20 rounded text-sm text-foreground hover:bg-muted/50 transition-colors flex items-center gap-1.5"
                 >
-                  {editingTask?.maxIterations || 10} {t('iterations')}
+                  <Settings2 size={14} />
+                  {t('Execution Settings')}
                 </button>
-                {showIterationsPopover && (
-                  <div className="absolute z-20 right-0 mt-1.5 w-64 bg-card border border-border rounded-lg shadow-lg p-4 space-y-3">
-                    <label className="text-sm font-medium text-foreground">{t('Max Iterations')}</label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="number"
-                        value={editingTask?.maxIterations || 10}
-                        onChange={(e) => updateEditing({ maxIterations: parseInt(e.target.value) || 10 })}
-                        min={1}
-                        max={50}
-                        className="w-20 px-3 py-1.5 bg-input border border-border rounded-md text-foreground text-center focus:outline-none focus:ring-0 focus:border-primary/50"
-                      />
-                      <span className="text-sm text-muted-foreground">{t('iterations')}</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">{t('Maximum number of iterations per sub-task before marking as failed')}</p>
-                  </div>
-                )}
-              </div>
-
-              {/* Schedule button + popover */}
-              <div className="relative" ref={schedulePopoverRef}>
-                <button
-                  onClick={() => { setShowSchedulePopover(!showSchedulePopover); setShowIterationsPopover(false) }}
-                  className={cn(
-                    'px-3 py-1.5 border rounded text-sm transition-colors',
-                    editingTask?.schedule?.enabled
-                      ? 'border-primary/30 text-primary hover:bg-primary/5'
-                      : 'border-foreground/20 text-foreground hover:bg-muted/50'
-                  )}
-                >
-                  {t('Schedule')}({editingTask?.schedule?.enabled ? t('Enabled') : t('Not enabled')})
-                </button>
-                {showSchedulePopover && (
-                  <div className="absolute z-20 right-0 mt-1.5 w-80 bg-card border border-border rounded-lg shadow-lg">
-                    <div className="flex items-center justify-between p-4">
-                      <label className="text-sm font-medium text-foreground">{t('Schedule')}</label>
-                      <button
-                        onClick={handleScheduleToggle}
-                        className={cn(
-                          'relative w-11 h-6 rounded-full transition-colors',
-                          editingTask?.schedule?.enabled ? 'bg-primary' : 'bg-muted'
-                        )}
-                      >
-                        <div className={cn(
-                          'absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform',
-                          editingTask?.schedule?.enabled ? 'translate-x-[22px]' : 'translate-x-0.5'
-                        )} />
-                      </button>
-                    </div>
-                    {editingTask?.schedule?.enabled && editingTask.schedule && (
-                      <div className="px-4 pb-4 border-t border-border pt-3">
-                        <SchedulePicker schedule={editingTask.schedule} onChange={(schedule) => updateEditing({ schedule })} />
+                {showExecutionSettings && (
+                  <div className="absolute z-20 right-0 mt-1.5 w-80 bg-card border border-border rounded-lg shadow-lg p-4 space-y-4">
+                    {/* On Failure: Retry or Skip */}
+                    <div className="space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-sm font-medium text-foreground">{t('On Failure')}</label>
+                        <div className="flex rounded-md border border-border overflow-hidden">
+                          <button
+                            onClick={() => updateEditing({
+                              stepRetryConfig: { onFailure: 'retry', maxRetries: editingTask?.stepRetryConfig?.maxRetries ?? 3 }
+                            })}
+                            className={cn(
+                              'px-3 py-1 text-xs font-medium transition-colors',
+                              (editingTask?.stepRetryConfig?.onFailure ?? 'retry') === 'retry'
+                                ? 'bg-primary text-primary-foreground'
+                                : 'bg-transparent text-muted-foreground hover:text-foreground'
+                            )}
+                          >
+                            {t('Retry')}
+                          </button>
+                          <button
+                            onClick={() => updateEditing({
+                              stepRetryConfig: { onFailure: 'skip', maxRetries: editingTask?.stepRetryConfig?.maxRetries ?? 3 }
+                            })}
+                            className={cn(
+                              'px-3 py-1 text-xs font-medium transition-colors border-l border-border',
+                              (editingTask?.stepRetryConfig?.onFailure ?? 'retry') === 'skip'
+                                ? 'bg-primary text-primary-foreground'
+                                : 'bg-transparent text-muted-foreground hover:text-foreground'
+                            )}
+                          >
+                            {t('Skip')}
+                          </button>
+                        </div>
                       </div>
-                    )}
+                      {(editingTask?.stepRetryConfig?.onFailure ?? 'retry') === 'retry' && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground">{t('Max retries per step')}</span>
+                          <select
+                            value={editingTask?.stepRetryConfig?.maxRetries ?? 3}
+                            onChange={(e) => updateEditing({
+                              stepRetryConfig: { onFailure: 'retry', maxRetries: parseInt(e.target.value) }
+                            })}
+                            className="w-14 px-1.5 py-1 bg-input border border-border rounded text-foreground text-sm text-center focus:outline-none focus:ring-0 focus:border-primary/50"
+                          >
+                            {[1, 2, 3, 5, 10].map(n => <option key={n} value={n}>{n}</option>)}
+                          </select>
+                          <span className="text-xs text-muted-foreground">{t('times')}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="border-t border-border" />
+
+                    {/* Loop Execution */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-sm font-medium text-foreground">{t('Loop Execution')}</label>
+                        <button
+                          onClick={() => updateEditing({
+                            loopConfig: {
+                              ...(editingTask?.loopConfig || { enabled: false, maxLoops: 3 }),
+                              enabled: !(editingTask?.loopConfig?.enabled ?? false)
+                            }
+                          })}
+                          className={cn(
+                            'relative w-10 h-5 rounded-full transition-colors',
+                            editingTask?.loopConfig?.enabled ? 'bg-primary' : 'bg-muted'
+                          )}
+                        >
+                          <div className={cn(
+                            'absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform',
+                            editingTask?.loopConfig?.enabled ? 'translate-x-[20px]' : 'translate-x-0.5'
+                          )} />
+                        </button>
+                      </div>
+                      {editingTask?.loopConfig?.enabled && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground">{t('Number of loops')}</span>
+                          <select
+                            value={editingTask?.loopConfig?.maxLoops ?? 3}
+                            onChange={(e) => updateEditing({
+                              loopConfig: { enabled: true, maxLoops: parseInt(e.target.value) }
+                            })}
+                            className="w-14 px-1.5 py-1 bg-input border border-border rounded text-foreground text-sm text-center focus:outline-none focus:ring-0 focus:border-primary/50"
+                          >
+                            {[2, 3, 5, 10, 20, 50, 100].map(n => <option key={n} value={n}>{n}</option>)}
+                          </select>
+                          <span className="text-xs text-muted-foreground">{t('times')}</span>
+                        </div>
+                      )}
+                      <p className="text-xs text-muted-foreground">{t('Repeat all steps from the beginning after completion')}</p>
+                    </div>
+
+                    <div className="border-t border-border" />
+
+                    {/* Schedule */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-sm font-medium text-foreground">{t('Schedule')}</label>
+                        <button
+                          onClick={handleScheduleToggle}
+                          className={cn(
+                            'relative w-10 h-5 rounded-full transition-colors',
+                            editingTask?.schedule?.enabled ? 'bg-primary' : 'bg-muted'
+                          )}
+                        >
+                          <div className={cn(
+                            'absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform',
+                            editingTask?.schedule?.enabled ? 'translate-x-[20px]' : 'translate-x-0.5'
+                          )} />
+                        </button>
+                      </div>
+                      {editingTask?.schedule?.enabled && editingTask.schedule && (
+                        <SchedulePicker schedule={editingTask.schedule} onChange={(schedule) => updateEditing({ schedule })} />
+                      )}
+                    </div>
                   </div>
                 )}
               </div>

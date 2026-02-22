@@ -3,6 +3,8 @@
  * Defines all types for the autonomous AI agent loop system
  */
 
+import type { StepRetryConfig, LoopConfig } from '../../../shared/types/loop-task'
+
 // User Story status
 export type StoryStatus = 'pending' | 'running' | 'completed' | 'failed'
 
@@ -42,12 +44,16 @@ export interface RalphTask {
   status: TaskStatus
   currentStoryIndex: number // index of currently executing story
   iteration: number // current iteration count
-  maxIterations: number // maximum iterations allowed
+  maxIterations: number // maximum iterations allowed (safety limit)
   model?: string // AI model override for this task
   modelSource?: string // AI source/provider for this task
   createdAt: string
   startedAt?: string
   completedAt?: string
+  // Step-level retry and loop execution
+  stepRetryConfig?: StepRetryConfig
+  loopConfig?: LoopConfig
+  currentLoop?: number
 }
 
 /**
@@ -59,6 +65,8 @@ export interface CreateTaskConfig {
   stories: UserStory[]
   maxIterations: number
   branchName?: string // optional, auto-generated if not provided
+  stepRetryConfig?: StepRetryConfig
+  loopConfig?: LoopConfig
 }
 
 /**

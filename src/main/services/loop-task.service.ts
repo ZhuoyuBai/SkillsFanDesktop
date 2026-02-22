@@ -244,6 +244,9 @@ export function createTask(spaceId: string, config: CreateLoopTaskConfig): LoopT
     model: config.model,
     modelSource: config.modelSource,
     schedule: config.schedule || { type: 'manual', enabled: false },
+    stepRetryConfig: config.stepRetryConfig || { onFailure: 'retry', maxRetries: 3 },
+    loopConfig: config.loopConfig || { enabled: false, maxLoops: 1 },
+    currentLoop: 0,
     createdAt: now,
     updatedAt: now
   }
@@ -278,7 +281,23 @@ export function getTask(spaceId: string, taskId: string): LoopTask | null {
 
   if (existsSync(filePath)) {
     try {
-      const task = JSON.parse(readFileSync(filePath, 'utf-8'))
+      const task: LoopTask = JSON.parse(readFileSync(filePath, 'utf-8'))
+
+      // Backward compatibility: fill defaults for new fields
+      if (!task.stepRetryConfig) {
+        task.stepRetryConfig = { onFailure: 'skip', maxRetries: 0 }
+      } else if ('enabled' in task.stepRetryConfig && !('onFailure' in task.stepRetryConfig)) {
+        // Migrate old format: enabled:boolean → onFailure:'retry'|'skip'
+        const old = task.stepRetryConfig as unknown as { enabled: boolean; maxRetries: number }
+        task.stepRetryConfig = { onFailure: old.enabled ? 'retry' : 'skip', maxRetries: old.maxRetries }
+      }
+      if (!task.loopConfig) {
+        task.loopConfig = { enabled: false, maxLoops: 1 }
+      }
+      if (task.currentLoop === undefined) {
+        task.currentLoop = 0
+      }
+
       return task
     } catch (error) {
       console.error('[LoopTask] Failed to read task:', error)

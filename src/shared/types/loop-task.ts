@@ -37,6 +37,41 @@ export interface RetryConfig {
   pauseAfterConsecutiveFailures: number    // Default 3
 }
 
+// Step failure behavior
+export type StepFailureAction = 'retry' | 'skip'
+
+/**
+ * Step-level failure handling configuration
+ * Controls what happens when an individual step fails
+ */
+export interface StepRetryConfig {
+  onFailure: StepFailureAction  // Default: 'retry'
+  maxRetries: number            // Default: 3 (only used when onFailure === 'retry')
+}
+
+/**
+ * Loop execution configuration
+ * Controls whether all steps repeat from the beginning after completion
+ */
+export interface LoopConfig {
+  enabled: boolean    // Default: false
+  maxLoops: number    // Default: 1
+}
+
+/**
+ * Calculate safe maxIterations from user-facing config
+ * Formula: storyCount * (1 + maxRetries) * maxLoops, capped at 500
+ */
+export function calculateMaxIterations(
+  storyCount: number,
+  stepRetry?: StepRetryConfig,
+  loop?: LoopConfig
+): number {
+  const retries = stepRetry?.onFailure === 'retry' ? (stepRetry.maxRetries ?? 3) : 0
+  const loops = loop?.enabled ? (loop.maxLoops ?? 1) : 1
+  return Math.min(storyCount * (1 + retries) * loops, 500)
+}
+
 // Task source
 export type TaskSource = 'import' | 'generate' | 'manual'
 
@@ -108,6 +143,10 @@ export interface LoopTask extends LoopTaskMeta {
   schedule?: TaskSchedule
   retryConfig?: RetryConfig
   consecutiveFailures?: number
+  // Step-level retry and loop execution (optional, backward compatible)
+  stepRetryConfig?: StepRetryConfig
+  loopConfig?: LoopConfig
+  currentLoop?: number
 }
 
 /**
@@ -124,6 +163,8 @@ export interface CreateLoopTaskConfig {
   model?: string // AI model override for this task
   modelSource?: string // AI source/provider for this task
   schedule?: TaskSchedule
+  stepRetryConfig?: StepRetryConfig
+  loopConfig?: LoopConfig
 }
 
 /**

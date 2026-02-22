@@ -110,6 +110,9 @@ export async function createTask(config: CreateTaskConfig): Promise<RalphTask> {
     currentStoryIndex: -1,
     iteration: 0,
     maxIterations,
+    stepRetryConfig: config.stepRetryConfig,
+    loopConfig: config.loopConfig,
+    currentLoop: 0,
     createdAt: new Date().toISOString()
   }
 
@@ -208,108 +211,206 @@ export function setCurrentTask(task: RalphTask): void {
 // ============================================
 
 /**
- * Main execution loop
+ * Main execution loop - supports step retry and loop execution
  */
 async function runLoop(task: RalphTask): Promise<void> {
   console.log(`[Ralph] Starting loop for task ${task.id}`)
 
-  while (task.iteration < task.maxIterations) {
+  const stepRetry = task.stepRetryConfig || { onFailure: 'skip' as const, maxRetries: 0 }
+  const loopCfg = task.loopConfig || { enabled: false, maxLoops: 1 }
+  const maxLoops = loopCfg.enabled ? loopCfg.maxLoops : 1
+
+  // Outer loop: loop execution (repeat all steps)
+  for (let loop = task.currentLoop || 0; loop < maxLoops; loop++) {
+    task.currentLoop = loop
+
+    if (loop > 0) {
+      // New loop cycle: reset all stories to pending
+      console.log(`[Ralph] Starting loop cycle ${loop + 1}/${maxLoops}`)
+      resetStoriesForNewLoop(task)
+      broadcastTaskUpdate(task)
+    }
+
+    // Inner loop: execute each story in order
+    while (true) {
+      // Safety limit check
+      if (task.iteration >= task.maxIterations) {
+        console.log(`[Ralph] Safety limit reached (${task.maxIterations} iterations)`)
+        task.status = 'paused'
+        broadcastTaskUpdate(task)
+        return
+      }
+
+      // Check for abort
+      if (taskAbortController?.signal.aborted) {
+        console.log(`[Ralph] Task aborted`)
+        return
+      }
+
+      // Find next pending story
+      const story = findNextPendingStory(task)
+      if (!story) {
+        // All stories completed/failed in this loop cycle
+        console.log(`[Ralph] All stories done in loop ${loop + 1}/${maxLoops}`)
+        break
+      }
+
+      // Execute story with retry logic
+      await executeStoryWithRetry(task, story, stepRetry)
+    }
+
+    // Check abort between loop cycles
+    if (taskAbortController?.signal.aborted) {
+      console.log(`[Ralph] Task aborted between loops`)
+      return
+    }
+  }
+
+  // All loops completed
+  if (task.status === 'running') {
+    task.status = 'completed'
+    task.completedAt = new Date().toISOString()
+    broadcastTaskUpdate(task)
+    console.log(`[Ralph] Task completed, all loops finished`)
+  }
+
+  console.log(`[Ralph] Loop ended for task ${task.id}, status: ${task.status}`)
+}
+
+/**
+ * Execute a story with automatic retry on failure
+ */
+async function executeStoryWithRetry(
+  task: RalphTask,
+  story: UserStory,
+  retryConfig: { onFailure: string; maxRetries: number }
+): Promise<void> {
+  const maxAttempts = retryConfig.onFailure === 'retry' ? (retryConfig.maxRetries + 1) : 1
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    // Safety limit check
+    if (task.iteration >= task.maxIterations) {
+      story.status = 'failed'
+      story.error = 'Safety iteration limit reached'
+      broadcastTaskUpdate(task)
+      return
+    }
+
     // Check for abort
     if (taskAbortController?.signal.aborted) {
-      console.log(`[Ralph] Task aborted`)
-      break
+      return
     }
 
-    // Find next pending story
-    const story = findNextPendingStory(task)
-    if (!story) {
-      console.log(`[Ralph] All stories completed`)
-      task.status = 'completed'
-      task.completedAt = new Date().toISOString()
+    if (attempt > 0) {
+      console.log(`[Ralph] Retrying story ${story.id}, attempt ${attempt + 1}/${maxAttempts}`)
+      story.retryCount = (story.retryCount || 0) + 1
+      story.lastRetryAt = new Date().toISOString()
+      task.iteration++
       broadcastTaskUpdate(task)
-      break
     }
 
-    // Update story status
+    // Set story status to running
     const storyIndex = task.stories.findIndex((s) => s.id === story.id)
     task.currentStoryIndex = storyIndex
     story.status = 'running'
     story.startedAt = new Date().toISOString()
+    story.error = undefined
     broadcastTaskUpdate(task)
 
-    console.log(`[Ralph] Executing story ${story.id}: ${story.title}`)
+    console.log(`[Ralph] Executing story ${story.id}: ${story.title} (attempt ${attempt + 1}/${maxAttempts})`)
 
     try {
-      // Execute the story
       const startTime = Date.now()
       const signal = await executeStory(
         mainWindow,
         task,
         story,
-        (log) => {
-          broadcastStoryLog(task.id, story.id, log)
-        }
+        (log) => broadcastStoryLog(task.id, story.id, log)
       )
 
-      // Calculate duration
       story.duration = Date.now() - startTime
 
       if (signal === 'STORY_FAILED') {
         story.status = 'failed'
         story.error = 'Story execution reported failure'
         await appendError(task.projectDir, story, story.error)
+        await syncTaskToPrd(task)
+        broadcastTaskUpdate(task)
+
+        // If more retries available, reset to pending and continue
+        if (attempt < maxAttempts - 1) {
+          console.log(`[Ralph] Story ${story.id} failed, will retry (${attempt + 1}/${maxAttempts})`)
+          story.status = 'pending'
+          broadcastTaskUpdate(task)
+          continue
+        }
+
+        // Exhausted retries
+        console.log(`[Ralph] Story ${story.id} failed after ${maxAttempts} attempts`)
       } else {
+        // Success
         story.status = 'completed'
         story.completedAt = new Date().toISOString()
-
-        // Try to extract commit hash from output
-        // This would need access to the actual output
-        // story.commitHash = extractCommitHash(output)
-
         await appendProgress(task.projectDir, story, {
           implemented: [`Completed ${story.title}`],
           learnings: []
         })
+        await syncTaskToPrd(task)
+        broadcastTaskUpdate(task)
+
+        if (signal === 'COMPLETE') {
+          console.log(`[Ralph] Agent returned COMPLETE signal (ignored, using findNextPendingStory)`)
+        }
       }
 
-      // Sync to prd.json
-      await syncTaskToPrd(task)
-
-      broadcastTaskUpdate(task)
-
-      // Log COMPLETE signal but don't break - let findNextPendingStory decide when loop ends
-      // This prevents Agent misreporting COMPLETE from skipping remaining stories
-      if (signal === 'COMPLETE') {
-        console.log(`[Ralph] Agent returned COMPLETE signal (ignored, using findNextPendingStory)`)
+      // Increment iteration count (first attempt only, retries increment above)
+      if (attempt === 0) {
+        task.iteration++
+        broadcastTaskUpdate(task)
       }
+
+      return // Done with this story (success or final failure)
     } catch (error) {
       const err = error as Error
-      console.error(`[Ralph] Story ${story.id} failed:`, err.message)
+      console.error(`[Ralph] Story ${story.id} error:`, err.message)
 
       story.status = 'failed'
       story.error = err.message
       story.completedAt = new Date().toISOString()
-
       await appendError(task.projectDir, story, err.message)
       await syncTaskToPrd(task)
-
       broadcastTaskUpdate(task)
 
-      // Continue to next story on error (don't abort entire task)
+      // If more retries available, reset to pending and continue
+      if (attempt < maxAttempts - 1) {
+        story.status = 'pending'
+        broadcastTaskUpdate(task)
+        continue
+      }
+
+      // Exhausted retries
+      if (attempt === 0) {
+        task.iteration++
+        broadcastTaskUpdate(task)
+      }
+      return
     }
-
-    task.iteration++
-    broadcastTaskUpdate(task)
   }
+}
 
-  // Check if we hit max iterations
-  if (task.iteration >= task.maxIterations && task.status === 'running') {
-    console.log(`[Ralph] Max iterations reached`)
-    task.status = 'paused'
-    broadcastTaskUpdate(task)
+/**
+ * Reset all stories to pending for a new loop cycle
+ */
+function resetStoriesForNewLoop(task: RalphTask): void {
+  for (const story of task.stories) {
+    story.status = 'pending'
+    story.error = undefined
+    story.startedAt = undefined
+    story.completedAt = undefined
+    story.duration = undefined
+    // Don't reset retryCount - keep cumulative count
   }
-
-  console.log(`[Ralph] Loop ended for task ${task.id}, status: ${task.status}`)
+  task.currentStoryIndex = -1
 }
 
 /**

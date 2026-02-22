@@ -504,7 +504,9 @@ export const useLoopTaskStore = create<LoopTaskState>((set, get) => ({
         description: '',
         source: 'generate' as TaskSource,
         stories: [],
-        maxIterations: 10
+        maxIterations: 10,
+        stepRetryConfig: { onFailure: 'retry' as const, maxRetries: 3 },
+        loopConfig: { enabled: false, maxLoops: 1 }
       },
       isEditing: true,
       wizardStep: 1 as WizardStep,
