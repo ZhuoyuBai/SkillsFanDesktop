@@ -10,21 +10,62 @@ import { useState, useCallback, memo, useRef, useMemo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
-import { Check, Copy } from 'lucide-react'
+import { Check, Copy, FileText } from 'lucide-react'
 import { useTranslation } from '../../i18n'
 import { hljs } from '../../lib/highlight-loader'
+import { canvasLifecycle } from '../../services/canvas-lifecycle'
 
 interface MarkdownRendererProps {
   content: string
   className?: string
+  /** Map of file name → full path for clickable file links in inline code */
+  filePathMap?: Record<string, string>
+}
+
+// Common file extensions that should be clickable
+const CLICKABLE_EXTENSIONS = /\.(csv|xlsx|xls|json|md|txt|html|htm|pdf|png|jpg|jpeg|gif|webp|svg|js|jsx|ts|tsx|py|rb|go|rs|java|c|cpp|swift|kt|php|sh|sql|yaml|yml|xml|css|scss|vue|svelte|log)$/i
+
+// Inline code that may be a clickable file link
+function InlineCode({
+  children,
+  filePathMap,
+  ...props
+}: React.HTMLAttributes<HTMLElement> & { children?: React.ReactNode; filePathMap?: Record<string, string> }) {
+  const text = typeof children === 'string' ? children : ''
+  const isFile = text && CLICKABLE_EXTENSIONS.test(text)
+  const fullPath = isFile ? (filePathMap?.[text] || filePathMap?.[text.split('/').pop() || '']) : undefined
+
+  if (isFile && fullPath) {
+    return (
+      <button
+        onClick={() => canvasLifecycle.openFile(fullPath, text.split('/').pop())}
+        className="inline-flex items-center gap-1 px-1.5 py-0.5 mx-0.5 bg-primary/10 text-primary rounded text-[0.9em] font-mono hover:bg-primary/20 transition-colors cursor-pointer border border-primary/20"
+        title={fullPath}
+        {...props}
+      >
+        <FileText size={12} className="shrink-0" />
+        {children}
+      </button>
+    )
+  }
+
+  return (
+    <code
+      className="px-1.5 py-0.5 mx-0.5 bg-secondary/80 text-primary rounded text-[0.9em] font-mono"
+      {...props}
+    >
+      {children}
+    </code>
+  )
 }
 
 // Code block with copy button
 function CodeBlock({
   children,
   className,
+  filePathMap,
   ...props
-}: React.HTMLAttributes<HTMLElement> & { children?: React.ReactNode }) {
+}: React.HTMLAttributes<HTMLElement> & { children?: React.ReactNode; filePathMap?: Record<string, string> }) {
   const { t } = useTranslation()
   const [copied, setCopied] = useState(false)
   const codeRef = useRef<HTMLElement>(null)
@@ -44,14 +85,7 @@ function CodeBlock({
 
   // Inline code (no language class, short content)
   if (!className) {
-    return (
-      <code
-        className="px-1.5 py-0.5 mx-0.5 bg-secondary/80 text-primary rounded text-[0.9em] font-mono"
-        {...props}
-      >
-        {children}
-      </code>
-    )
+    return <InlineCode filePathMap={filePathMap} {...props}>{children}</InlineCode>
   }
 
   // Code block
@@ -93,10 +127,11 @@ function CodeBlock({
   )
 }
 
-// Custom components for markdown elements
-const components = {
+// Build markdown components with optional file path context
+function buildComponents(filePathMap?: Record<string, string>) {
+  return {
   // Code blocks and inline code
-  code: CodeBlock,
+  code: (props: any) => <CodeBlock {...props} filePathMap={filePathMap} />,
 
   // Paragraphs
   p: ({ children }: { children?: React.ReactNode }) => (
@@ -186,15 +221,17 @@ const components = {
       {...props}
     />
   ),
-}
+}}
 
 export const MarkdownRenderer = memo(function MarkdownRenderer({
   content,
-  className = ''
+  className = '',
+  filePathMap
 }: MarkdownRendererProps) {
   // Configure rehype-highlight to use our lazy-loaded hljs instance
   // This ensures we use the same instance with pre-registered common languages
   const rehypeHighlightOptions = useMemo(() => [[rehypeHighlight, { hljs }]], [])
+  const components = useMemo(() => buildComponents(filePathMap), [filePathMap])
 
   if (!content) return null
 

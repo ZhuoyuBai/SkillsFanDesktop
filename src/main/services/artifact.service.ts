@@ -406,7 +406,7 @@ function getMimeType(ext: string): string {
  * Check if file is binary (image, etc.)
  */
 function isBinaryFile(ext: string): boolean {
-  const binaryExtensions = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'ico', 'bmp', 'pdf', 'zip', 'tar', 'gz', 'rar']
+  const binaryExtensions = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'ico', 'bmp', 'pdf', 'zip', 'tar', 'gz', 'rar', 'xlsx', 'xls']
   return binaryExtensions.includes(ext.toLowerCase().replace('.', ''))
 }
 

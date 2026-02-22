@@ -218,6 +218,23 @@ export function MessageItem({ message, hideThoughts = false, isInContainer = fal
   // Check if there are running browser tools (based on isWorking state)
   const hasBrowserActivity = isWorking && browserToolCalls.length > 0
 
+  // Extract file paths from thoughts for clickable file links in markdown
+  const filePathMap = useMemo(() => {
+    const thoughts = message.thoughts || []
+    const map: Record<string, string> = {}
+    for (const t of thoughts) {
+      if (t.type === 'tool_use' && (t.toolName === 'Write' || t.toolName === 'Edit' || t.toolName === 'Read')) {
+        const filePath = (t.toolInput as Record<string, unknown>)?.file_path as string
+        if (filePath) {
+          const fileName = filePath.split('/').pop() || filePath
+          map[fileName] = filePath
+          map[filePath] = filePath
+        }
+      }
+    }
+    return Object.keys(map).length > 0 ? map : undefined
+  }, [message.thoughts])
+
   // Message bubble content
   const bubble = (
     <div
@@ -247,7 +264,7 @@ export function MessageItem({ message, hideThoughts = false, isInContainer = fal
             <span className="whitespace-pre-wrap">{message.content}</span>
           ) : (
             // Assistant messages: full markdown rendering
-            <MarkdownRenderer content={message.content} />
+            <MarkdownRenderer content={message.content} filePathMap={filePathMap} />
           )
         )}
         {/* Streaming logo animation when actively receiving tokens */}

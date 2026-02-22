@@ -24,7 +24,7 @@ const CANVAS_VIEWABLE_EXTENSIONS = new Set([
   // Documents
   'md', 'markdown', 'txt', 'log', 'env', 'pdf',
   // Data
-  'json', 'csv',
+  'json', 'csv', 'xlsx', 'xls',
   // Web
   'html', 'htm',
   // Images

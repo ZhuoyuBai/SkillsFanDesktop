@@ -42,6 +42,7 @@ export type ContentType =
   | 'text'
   | 'json'
   | 'csv'
+  | 'xlsx'
   | 'browser'
   | 'terminal'
 
@@ -134,6 +135,9 @@ function detectContentType(path: string): { type: ContentType; language?: string
       return { type: 'json', language: 'json' }
     case 'csv':
       return { type: 'csv' }
+    case 'xlsx':
+    case 'xls':
+      return { type: 'xlsx' }
     case 'png':
     case 'jpg':
     case 'jpeg':

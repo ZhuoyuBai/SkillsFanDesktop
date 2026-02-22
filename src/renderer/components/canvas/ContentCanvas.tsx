@@ -33,6 +33,7 @@ import { ImageViewer } from './viewers/ImageViewer'
 import { HtmlViewer } from './viewers/HtmlViewer'
 import { JsonViewer } from './viewers/JsonViewer'
 import { CsvViewer } from './viewers/CsvViewer'
+import { ExcelViewer } from './viewers/ExcelViewer'
 import { TextViewer } from './viewers/TextViewer'
 import { BrowserViewer, BrowserViewerFallback } from './viewers/BrowserViewer'
 import { api } from '../../api'
@@ -211,6 +212,9 @@ function TabContent({ tab, onScrollChange }: TabContentProps) {
 
     case 'csv':
       return <CsvViewer tab={tab} onScrollChange={onScrollChange} />
+
+    case 'xlsx':
+      return <ExcelViewer tab={tab} onScrollChange={onScrollChange} />
 
     case 'text':
       return <TextViewer tab={tab} onScrollChange={onScrollChange} />
