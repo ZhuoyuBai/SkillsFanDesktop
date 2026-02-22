@@ -25,13 +25,15 @@ import { validateToken } from './auth'
  * - dropIfSlow: Can be skipped for slow consumers.
  * - throttled:  Merge and throttle before sending.
  */
-type SendStrategy = 'reliable' | 'dropIfSlow' | 'throttled'
+/** @internal - exported for testing */
+export type SendStrategy = 'reliable' | 'dropIfSlow' | 'throttled'
 
 const THROTTLE_INTERVAL_MS = 150
 const SLOW_CONSUMER_THRESHOLD = 1024 * 1024       // 1MB: skip non-critical messages
 const SLOW_CONSUMER_DISCONNECT = 4 * 1024 * 1024  // 4MB: disconnect
 
-function getSendStrategy(channel: string): SendStrategy {
+/** @internal - exported for testing */
+export function getSendStrategy(channel: string): SendStrategy {
   switch (channel) {
     case 'agent:message':   return 'throttled'    // Streaming text delta
     case 'agent:thought':   return 'dropIfSlow'   // Thought process
@@ -56,7 +58,8 @@ interface ThrottleState {
   lastSentAt: number
 }
 
-interface WebSocketClient {
+/** @internal - exported for testing */
+export interface WebSocketClient {
   id: string
   ws: WebSocket
   authenticated: boolean
@@ -76,7 +79,8 @@ let wss: WebSocketServer | null = null
 // Slow Consumer Detection
 // ============================================
 
-function checkSlowConsumer(client: WebSocketClient): 'ok' | 'slow' | 'critical' {
+/** @internal - exported for testing */
+export function checkSlowConsumer(client: WebSocketClient): 'ok' | 'slow' | 'critical' {
   const buffered = client.ws.bufferedAmount
   if (buffered > SLOW_CONSUMER_DISCONNECT) return 'critical'
   if (buffered > SLOW_CONSUMER_THRESHOLD) return 'slow'
@@ -91,7 +95,8 @@ function checkSlowConsumer(client: WebSocketClient): 'ok' | 'slow' | 'critical' 
  * Send message to client with strategy-based handling.
  * Returns true if the message was actually sent.
  */
-function sendToClientEnhanced(
+/** @internal - exported for testing */
+export function sendToClientEnhanced(
   client: WebSocketClient,
   message: object,
   strategy: SendStrategy
@@ -150,7 +155,8 @@ function sendToClient(client: WebSocketClient, message: object): void {
 // Delta Throttling
 // ============================================
 
-function sendThrottled(
+/** @internal - exported for testing */
+export function sendThrottled(
   client: WebSocketClient,
   conversationId: string,
   channel: string,
@@ -178,7 +184,8 @@ function sendThrottled(
   }
 }
 
-function flushThrottled(
+/** @internal - exported for testing */
+export function flushThrottled(
   client: WebSocketClient,
   conversationId: string,
   channel: string
