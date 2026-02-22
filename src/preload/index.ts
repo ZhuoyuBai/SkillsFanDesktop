@@ -36,6 +36,7 @@ export interface HaloAPI {
   updateSpace: (spaceId: string, updates: { name?: string; icon?: string }) => Promise<IpcResponse>
   getDefaultSpacePath: () => Promise<IpcResponse>
   selectFolder: () => Promise<IpcResponse>
+  pathExists: (targetPath: string) => Promise<IpcResponse<boolean>>
   updateSpacePreferences: (spaceId: string, preferences: {
     layout?: {
       artifactRailExpanded?: boolean
@@ -380,6 +381,7 @@ export interface HaloAPI {
   loopTaskReorderStories: (spaceId: string, taskId: string, fromIndex: number, toIndex: number) => Promise<IpcResponse>
   loopTaskRetryStory: (spaceId: string, taskId: string, storyId: string) => Promise<IpcResponse>
   loopTaskRetryFailed: (spaceId: string, taskId: string) => Promise<IpcResponse>
+  loopTaskResetAll: (spaceId: string, taskId: string) => Promise<IpcResponse>
   loopTaskExportPrd: (config: {
     projectDir: string
     description: string
@@ -469,6 +471,7 @@ const api: HaloAPI = {
   updateSpace: (spaceId, updates) => ipcRenderer.invoke('space:update', spaceId, updates),
   getDefaultSpacePath: () => ipcRenderer.invoke('space:get-default-path'),
   selectFolder: () => ipcRenderer.invoke('dialog:select-folder'),
+  pathExists: (targetPath) => ipcRenderer.invoke('space:path-exists', targetPath),
   updateSpacePreferences: (spaceId, preferences) =>
     ipcRenderer.invoke('space:update-preferences', spaceId, preferences),
   getSpacePreferences: (spaceId) => ipcRenderer.invoke('space:get-preferences', spaceId),
@@ -682,6 +685,7 @@ const api: HaloAPI = {
   loopTaskReorderStories: (spaceId, taskId, fromIndex, toIndex) => ipcRenderer.invoke('loop-task:reorder-stories', spaceId, taskId, fromIndex, toIndex),
   loopTaskRetryStory: (spaceId, taskId, storyId) => ipcRenderer.invoke('loop-task:retry-story', spaceId, taskId, storyId),
   loopTaskRetryFailed: (spaceId, taskId) => ipcRenderer.invoke('loop-task:retry-failed', spaceId, taskId),
+  loopTaskResetAll: (spaceId, taskId) => ipcRenderer.invoke('loop-task:reset-all', spaceId, taskId),
   loopTaskExportPrd: (config) => ipcRenderer.invoke('loop-task:export-prd', config),
   loopTaskDeletePrd: (prdPath) => ipcRenderer.invoke('loop-task:delete-prd', prdPath),
   readFile: (filePath) => ipcRenderer.invoke('file:read', filePath),

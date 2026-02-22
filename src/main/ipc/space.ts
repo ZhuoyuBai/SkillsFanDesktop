@@ -13,7 +13,8 @@ import {
   updateSpace,
   updateSpacePreferences,
   getSpacePreferences,
-  listWorkspaceFiles
+  listWorkspaceFiles,
+  isExistingDirectory
 } from '../services/space.service'
 import { getSpacesDir } from '../services/config.service'
 
@@ -136,6 +137,16 @@ export function registerSpaceHandlers(): void {
       }
 
       return { success: true, data: result.filePaths[0] }
+    } catch (error: unknown) {
+      const err = error as Error
+      return { success: false, error: err.message }
+    }
+  })
+
+  // Validate if a path exists and is a directory
+  ipcMain.handle('space:path-exists', async (_event, targetPath: string) => {
+    try {
+      return { success: true, data: isExistingDirectory(targetPath) }
     } catch (error: unknown) {
       const err = error as Error
       return { success: false, error: err.message }

@@ -19,6 +19,7 @@ import {
   reorderStories,
   retryStory,
   retryFailed,
+  resetAndRerun,
   listAllScheduledTasks
 } from '../services/loop-task.service'
 import type { CreateLoopTaskConfig, LoopTask, UserStory } from '../../shared/types/loop-task'
@@ -96,7 +97,7 @@ export function registerLoopTaskHandlers(window: BrowserWindow | null): void {
   // Delete a task
   ipcMain.handle('loop-task:delete', async (_event, spaceId: string, taskId: string) => {
     try {
-      const result = deleteTask(spaceId, taskId)
+      const result = await deleteTask(spaceId, taskId)
       return { success: true, data: result }
     } catch (error: unknown) {
       const err = error as Error
@@ -207,6 +208,24 @@ export function registerLoopTaskHandlers(window: BrowserWindow | null): void {
       } catch (error: unknown) {
         const err = error as Error
         console.error('[LoopTask IPC] retry-failed error:', err)
+        return { success: false, error: err.message }
+      }
+    }
+  )
+
+  // Reset all stories and prepare for rerun
+  ipcMain.handle(
+    'loop-task:reset-all',
+    async (_event, spaceId: string, taskId: string) => {
+      try {
+        const task = resetAndRerun(spaceId, taskId)
+        if (task) {
+          return { success: true, data: task }
+        }
+        return { success: false, error: 'Task not found or currently running' }
+      } catch (error: unknown) {
+        const err = error as Error
+        console.error('[LoopTask IPC] reset-all error:', err)
         return { success: false, error: err.message }
       }
     }

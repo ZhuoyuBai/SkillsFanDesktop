@@ -116,8 +116,13 @@ export function Step4Execute() {
               <span className="text-muted-foreground">
                 {completedCount}/{totalCount} {t('sub-tasks')} ({progress}%)
               </span>
-              <span className="text-muted-foreground">
+              <span className="text-muted-foreground flex items-center gap-2">
                 {t('Iteration')}: {currentTask?.iteration || 0}/{currentTask?.maxIterations || 10}
+                {currentTask?.loopConfig?.enabled && currentTask.loopConfig.maxLoops > 1 && (
+                  <span className="px-1.5 py-0.5 bg-primary/10 rounded text-xs text-primary">
+                    {t('Loop')} {(currentTask?.currentLoop ?? 0) + 1}/{currentTask.loopConfig.maxLoops}
+                  </span>
+                )}
               </span>
             </div>
             <div className="w-full h-2 bg-muted rounded-full overflow-hidden">

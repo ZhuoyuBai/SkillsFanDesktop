@@ -15,8 +15,8 @@ import * as spaceController from '../../controllers/space.controller'
 import * as conversationController from '../../controllers/conversation.controller'
 import * as configController from '../../controllers/config.controller'
 import { listArtifacts } from '../../services/artifact.service'
-import { getTempSpacePath } from '../../services/config.service'
-import { getSpace, getAllSpacePaths } from '../../services/space.service'
+import { getTempSpacePath, getSpacesDir } from '../../services/config.service'
+import { getSpace, getAllSpacePaths, isExistingDirectory } from '../../services/space.service'
 import * as loopTaskService from '../../services/loop-task.service'
 
 // Helper: get working directory for a space
@@ -79,6 +79,16 @@ export function registerApiRoutes(app: Express, mainWindow: BrowserWindow | null
     try {
       const spacesDir = getSpacesDir()
       res.json({ success: true, data: spacesDir })
+    } catch (error) {
+      res.json({ success: false, error: (error as Error).message })
+    }
+  })
+
+  // Validate if a path exists and is a directory
+  app.get('/api/path-exists', async (req: Request, res: Response) => {
+    try {
+      const targetPath = typeof req.query.path === 'string' ? req.query.path : ''
+      res.json({ success: true, data: isExistingDirectory(targetPath) })
     } catch (error) {
       res.json({ success: false, error: (error as Error).message })
     }
@@ -384,6 +394,16 @@ export function registerApiRoutes(app: Express, mainWindow: BrowserWindow | null
     }
   })
 
+  // List all scheduled tasks across spaces
+  app.get('/api/loop-tasks/scheduled', async (_req: Request, res: Response) => {
+    try {
+      const tasks = loopTaskService.listAllScheduledTasks()
+      res.json({ success: true, data: tasks })
+    } catch (error) {
+      res.json({ success: false, error: (error as Error).message })
+    }
+  })
+
   // Create a new task
   app.post('/api/spaces/:spaceId/loop-tasks', async (req: Request, res: Response) => {
     try {
@@ -428,7 +448,7 @@ export function registerApiRoutes(app: Express, mainWindow: BrowserWindow | null
   // Delete a task
   app.delete('/api/spaces/:spaceId/loop-tasks/:taskId', async (req: Request, res: Response) => {
     try {
-      const success = loopTaskService.deleteTask(req.params.spaceId, req.params.taskId)
+      const success = await loopTaskService.deleteTask(req.params.spaceId, req.params.taskId)
       res.json({ success })
     } catch (error) {
       res.json({ success: false, error: (error as Error).message })
@@ -485,6 +505,52 @@ export function registerApiRoutes(app: Express, mainWindow: BrowserWindow | null
         toIndex
       )
       res.json({ success })
+    } catch (error) {
+      res.json({ success: false, error: (error as Error).message })
+    }
+  })
+
+  // Retry a failed story
+  app.post('/api/spaces/:spaceId/loop-tasks/:taskId/stories/:storyId/retry', async (req: Request, res: Response) => {
+    try {
+      const task = loopTaskService.retryStory(
+        req.params.spaceId,
+        req.params.taskId,
+        req.params.storyId
+      )
+      if (task) {
+        res.json({ success: true, data: task })
+      } else {
+        res.json({ success: false, error: 'Story not found or not in failed state' })
+      }
+    } catch (error) {
+      res.json({ success: false, error: (error as Error).message })
+    }
+  })
+
+  // Retry all failed stories
+  app.post('/api/spaces/:spaceId/loop-tasks/:taskId/retry-failed', async (req: Request, res: Response) => {
+    try {
+      const task = loopTaskService.retryFailed(req.params.spaceId, req.params.taskId)
+      if (task) {
+        res.json({ success: true, data: task })
+      } else {
+        res.json({ success: false, error: 'Task not found' })
+      }
+    } catch (error) {
+      res.json({ success: false, error: (error as Error).message })
+    }
+  })
+
+  // Reset all stories and set task back to idle
+  app.post('/api/spaces/:spaceId/loop-tasks/:taskId/reset-all', async (req: Request, res: Response) => {
+    try {
+      const task = loopTaskService.resetAndRerun(req.params.spaceId, req.params.taskId)
+      if (task) {
+        res.json({ success: true, data: task })
+      } else {
+        res.json({ success: false, error: 'Task not found or currently running' })
+      }
     } catch (error) {
       res.json({ success: false, error: (error as Error).message })
     }

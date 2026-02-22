@@ -218,6 +218,13 @@ export const api = {
     return { success: false, error: 'Cannot select folder in remote mode' }
   },
 
+  pathExists: async (targetPath: string): Promise<ApiResponse<boolean>> => {
+    if (isElectron()) {
+      return window.skillsfan.pathExists(targetPath) as Promise<ApiResponse<boolean>>
+    }
+    return httpRequest('GET', `/api/path-exists?path=${encodeURIComponent(targetPath)}`)
+  },
+
   updateSpace: async (
     spaceId: string,
     updates: { name?: string; icon?: string; iconColor?: string }
@@ -1450,6 +1457,13 @@ export const api = {
       return window.skillsfan.loopTaskRetryFailed(spaceId, taskId)
     }
     return httpRequest('POST', `/api/spaces/${spaceId}/loop-tasks/${taskId}/retry-failed`)
+  },
+
+  loopTaskResetAll: async (spaceId: string, taskId: string): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.skillsfan.loopTaskResetAll(spaceId, taskId)
+    }
+    return httpRequest('POST', `/api/spaces/${spaceId}/loop-tasks/${taskId}/reset-all`)
   },
 
   loopTaskExportPrd: async (config: {

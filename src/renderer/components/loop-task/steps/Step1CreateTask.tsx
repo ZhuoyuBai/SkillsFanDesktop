@@ -179,16 +179,49 @@ export function Step1CreateTask(_props: Step1CreateTaskProps) {
 
   // Handle Next button click
   const handleNext = async () => {
-    // Pro membership check
-    if (!authState?.user || authState.user.plan === 'free') {
+    // Pro membership check (AI generate only)
+    if (createMethod === 'ai' && (!authState?.user || authState.user.plan === 'free')) {
       addToast(t('This feature is only available for Pro members'), 'info')
       return
     }
 
-    if (!editingTask?.projectDir) {
+    const projectDir = editingTask?.projectDir?.trim() || ''
+    if (!projectDir) {
       setError(t('Please select a project directory'))
       setShowAdvanced(true)
       return
+    }
+
+    try {
+      const pathCheck = await api.pathExists(projectDir)
+      if (!pathCheck.success) {
+        setError(t('Failed to verify project directory'))
+        console.warn('[Step1CreateTask] Project directory verification failed:', pathCheck.error)
+        setShowAdvanced(true)
+        return
+      }
+      if (!pathCheck.data) {
+        setError(t('Project directory does not exist'))
+        setShowAdvanced(true)
+        return
+      }
+    } catch (err) {
+      const message = (err as Error).message || ''
+
+      // Backward compatibility:
+      // old main process may not register the new IPC method yet.
+      if (message.includes("No handler registered for 'space:path-exists'")) {
+        console.warn('[Step1CreateTask] space:path-exists handler missing, skip directory validation')
+        addToast(t('Project directory validation is unavailable. Please restart the app to enable it.'), 'info')
+        setError(null)
+      } else {
+        setError(t('Failed to verify project directory'))
+        setShowAdvanced(true)
+      }
+      console.error('[Step1CreateTask] Project directory verification error:', err)
+      if (!message.includes("No handler registered for 'space:path-exists'")) {
+        return
+      }
     }
 
     setError(null)

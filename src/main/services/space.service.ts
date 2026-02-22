@@ -72,6 +72,18 @@ export function getSpaceMetaDir(spacePath: string): string {
   return newDir
 }
 
+export function isExistingDirectory(targetPath: string): boolean {
+  if (!targetPath || typeof targetPath !== 'string') {
+    return false
+  }
+
+  try {
+    return existsSync(targetPath) && statSync(targetPath).isDirectory()
+  } catch {
+    return false
+  }
+}
+
 function getSpaceIndexPath(): string {
   return join(getHaloDir(), 'spaces-index.json')
 }

@@ -35,6 +35,7 @@ import { registerLoopTaskHandlers } from '../ipc/loop-task'
 import { registerMemoryHandlers } from '../ipc/memory'
 import { shutdownMemory } from '../services/memory'
 import { shutdownScheduler } from '../services/scheduler.service'
+import { recoverInterruptedTasks } from '../services/loop-task.service'
 import { cancelAllRetries } from '../services/retry-handler'
 
 /**
@@ -86,6 +87,18 @@ export function initializeExtendedServices(mainWindow: BrowserWindow): void {
 
   // Loop Task: Persistent loop task storage
   registerLoopTaskHandlers(mainWindow)
+
+  // Recover stale running loop tasks after crash/restart
+  try {
+    const recovery = recoverInterruptedTasks()
+    if (recovery.recoveredCount > 0) {
+      console.log(
+        `[Bootstrap] Recovered ${recovery.recoveredCount} interrupted loop task(s): ${recovery.recoveredTaskIds.join(', ')}`
+      )
+    }
+  } catch (err) {
+    console.error('[Bootstrap] Failed to recover interrupted loop tasks:', err)
+  }
 
   // Memory: Memory management (clear memory)
   registerMemoryHandlers()

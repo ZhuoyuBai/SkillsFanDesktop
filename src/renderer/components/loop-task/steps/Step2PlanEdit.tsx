@@ -827,6 +827,33 @@ function InlineStoryCard({
             </div>
           </div>
         </div>
+
+        {/* Quality Gates */}
+        <div>
+          <div className="text-xs text-muted-foreground mb-1.5">
+            {t('Quality Gates')} <span className="text-muted-foreground/60">({t('Optional')})</span>
+          </div>
+          <div className="flex items-center gap-4 px-3 py-2.5 bg-input border border-border rounded">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={story.requireTypecheck || false}
+                onChange={(e) => onChange({ ...story, requireTypecheck: e.target.checked })}
+                className="w-3.5 h-3.5 rounded border-border text-primary focus:ring-0 focus:ring-offset-0"
+              />
+              <span className="text-xs text-foreground">{t('Require Typecheck')}</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={story.requireTests || false}
+                onChange={(e) => onChange({ ...story, requireTests: e.target.checked })}
+                className="w-3.5 h-3.5 rounded border-border text-primary focus:ring-0 focus:ring-offset-0"
+              />
+              <span className="text-xs text-foreground">{t('Require Tests')}</span>
+            </label>
+          </div>
+        </div>
       </div>
 
       <ConfirmDialog

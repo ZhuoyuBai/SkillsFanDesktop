@@ -21,6 +21,7 @@ import type {
   TaskSchedule
 } from '../../shared/types/loop-task'
 import { scheduleTask, unscheduleTask } from './scheduler.service'
+import { getCurrentTask, stopTask as stopRalphTask } from './ralph'
 
 const INDEX_VERSION = 1
 
@@ -359,24 +360,30 @@ export function renameTask(spaceId: string, taskId: string, name: string): LoopT
 /**
  * Delete a loop task
  */
-export function deleteTask(spaceId: string, taskId: string): boolean {
+export async function deleteTask(spaceId: string, taskId: string): Promise<boolean> {
   const tasksDir = getTasksDir(spaceId)
   const filePath = join(tasksDir, `${taskId}.json`)
 
-  if (existsSync(filePath)) {
-    // Stop any active schedule
-    unscheduleTask(taskId)
-
-    rmSync(filePath)
-
-    // Update index (remove entry)
-    updateIndexEntry(tasksDir, spaceId, taskId, null)
-
-    console.log(`[LoopTask] Task deleted: ${taskId}`)
-    return true
+  if (!existsSync(filePath)) {
+    return false
   }
 
-  return false
+  const runningTask = getCurrentTask()
+  if (runningTask && runningTask.id === taskId && runningTask.status === 'running') {
+    console.log(`[LoopTask] Stopping running task before delete: ${taskId}`)
+    await stopRalphTask(taskId)
+  }
+
+  // Stop any active schedule
+  unscheduleTask(taskId)
+
+  rmSync(filePath)
+
+  // Update index (remove entry)
+  updateIndexEntry(tasksDir, spaceId, taskId, null)
+
+  console.log(`[LoopTask] Task deleted: ${taskId}`)
+  return true
 }
 
 /**
@@ -531,6 +538,36 @@ export function retryFailed(spaceId: string, taskId: string): LoopTask | null {
 }
 
 /**
+ * Reset all stories and rerun the task from scratch
+ */
+export function resetAndRerun(spaceId: string, taskId: string): LoopTask | null {
+  const task = getTask(spaceId, taskId)
+  if (!task) return null
+
+  // Only allow reset when not running
+  if (task.status === 'running') return null
+
+  for (const story of task.stories) {
+    story.status = 'pending'
+    story.error = undefined
+    story.startedAt = undefined
+    story.completedAt = undefined
+    story.duration = undefined
+  }
+
+  return updateTask(spaceId, taskId, {
+    stories: task.stories,
+    status: 'idle',
+    iteration: 0,
+    currentStoryIndex: -1,
+    currentLoop: 0,
+    startedAt: undefined,
+    completedAt: undefined,
+    consecutiveFailures: 0
+  })
+}
+
+/**
  * List all scheduled tasks across all spaces
  */
 export function listAllScheduledTasks(): (LoopTaskMeta & { spaceName?: string })[] {
@@ -551,6 +588,63 @@ export function listAllScheduledTasks(): (LoopTaskMeta & { spaceName?: string })
   }
 
   return result
+}
+
+/**
+ * Recover interrupted tasks after app crash/restart.
+ * Resets stale running task/story states back to idle/pending.
+ */
+export function recoverInterruptedTasks(): { recoveredCount: number; recoveredTaskIds: string[] } {
+  const spaces = listSpaces()
+  const recoveredTaskIds: string[] = []
+
+  for (const space of spaces) {
+    let taskMetas: LoopTaskMeta[] = []
+    try {
+      taskMetas = listTasks(space.id)
+    } catch (error) {
+      console.error(`[LoopTask] Failed to list tasks for recovery, space=${space.id}:`, error)
+      continue
+    }
+
+    for (const meta of taskMetas) {
+      const task = getTask(space.id, meta.id)
+      if (!task) continue
+
+      const hasRunningStory = task.stories.some((story) => story.status === 'running')
+      if (task.status !== 'running' && !hasRunningStory) {
+        continue
+      }
+
+      const recoveredStories = task.stories.map((story) => {
+        if (story.status !== 'running') {
+          return story
+        }
+        return {
+          ...story,
+          status: 'pending' as const,
+          startedAt: undefined,
+          completedAt: undefined,
+          duration: undefined
+        }
+      })
+
+      updateTask(space.id, task.id, {
+        status: 'idle',
+        stories: recoveredStories,
+        currentStoryIndex: -1,
+        completedAt: undefined
+      })
+
+      recoveredTaskIds.push(task.id)
+      console.log(`[LoopTask] Recovered interrupted task: ${task.id}`)
+    }
+  }
+
+  return {
+    recoveredCount: recoveredTaskIds.length,
+    recoveredTaskIds
+  }
 }
 
 // ============================================================================

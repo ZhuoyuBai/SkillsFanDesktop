@@ -158,6 +158,7 @@ function TaskViewMode({ task, spaceId }: TaskViewModeProps) {
   const [showScheduleEdit, setShowScheduleEdit] = useState(false)
 
   const [isRetrying, setIsRetrying] = useState(false)
+  const [isResetting, setIsResetting] = useState(false)
 
   const isRunning = task.status === 'running'
   const isCompleted = task.status === 'completed'
@@ -193,6 +194,25 @@ function TaskViewMode({ task, spaceId }: TaskViewModeProps) {
       console.error('Failed to retry all failed:', err)
     } finally {
       setIsRetrying(false)
+    }
+  }
+
+  // Reset all stories and prepare for rerun
+  const handleResetAll = async () => {
+    setIsResetting(true)
+    try {
+      const result = await api.loopTaskResetAll(spaceId, task.id)
+      if (result.success && result.data) {
+        handleTaskUpdate(result.data as LoopTask)
+        clearLog()
+      } else {
+        setError(result.error || t('Reset failed'))
+      }
+    } catch (err) {
+      console.error('Failed to reset all stories:', err)
+      setError((err as Error).message)
+    } finally {
+      setIsResetting(false)
     }
   }
 
@@ -325,8 +345,13 @@ function TaskViewMode({ task, spaceId }: TaskViewModeProps) {
                 <span className="text-muted-foreground">
                   {completedCount}/{totalCount} {t('sub-tasks')} ({progress}%)
                 </span>
-                <span className="text-muted-foreground">
+                <span className="text-muted-foreground flex items-center gap-2">
                   {t('Iteration')}: {task.iteration}/{task.maxIterations}
+                  {task.loopConfig?.enabled && task.loopConfig.maxLoops > 1 && (
+                    <span className="px-1.5 py-0.5 bg-primary/10 rounded text-xs text-primary">
+                      {t('Loop')} {(task.currentLoop ?? 0) + 1}/{task.loopConfig.maxLoops}
+                    </span>
+                  )}
                 </span>
               </div>
               <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
@@ -339,9 +364,19 @@ function TaskViewMode({ task, spaceId }: TaskViewModeProps) {
                 />
               </div>
               {isCompleted && (
-                <div className="flex items-center gap-2 text-success">
-                  <CheckCircle2 size={16} />
-                  <span className="text-sm font-medium">{t('All tasks completed!')}</span>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-success">
+                    <CheckCircle2 size={16} />
+                    <span className="text-sm font-medium">{t('All tasks completed!')}</span>
+                  </div>
+                  <button
+                    onClick={handleResetAll}
+                    disabled={isResetting}
+                    className="px-3 py-1 text-sm border border-border text-foreground rounded-md hover:bg-muted/50 disabled:opacity-50 transition-colors flex items-center gap-1.5"
+                  >
+                    {isResetting ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                    {t('Re-execute All')}
+                  </button>
                 </div>
               )}
               {isFailed && (
@@ -350,16 +385,26 @@ function TaskViewMode({ task, spaceId }: TaskViewModeProps) {
                     <XCircle size={16} />
                     <span className="text-sm font-medium">{t('Task failed')}</span>
                   </div>
-                  {failedCount > 0 && (
+                  <div className="flex items-center gap-2">
+                    {failedCount > 0 && (
+                      <button
+                        onClick={handleRetryAllFailed}
+                        disabled={isRetrying}
+                        className="px-3 py-1 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 transition-colors flex items-center gap-1.5"
+                      >
+                        {isRetrying ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                        {t('Retry All Failed')} ({failedCount})
+                      </button>
+                    )}
                     <button
-                      onClick={handleRetryAllFailed}
-                      disabled={isRetrying}
-                      className="px-3 py-1 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 transition-colors flex items-center gap-1.5"
+                      onClick={handleResetAll}
+                      disabled={isResetting}
+                      className="px-3 py-1 text-sm border border-border text-foreground rounded-md hover:bg-muted/50 disabled:opacity-50 transition-colors flex items-center gap-1.5"
                     >
-                      {isRetrying ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-                      {t('Retry All Failed')} ({failedCount})
+                      {isResetting ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                      {t('Re-execute All')}
                     </button>
-                  )}
+                  </div>
                 </div>
               )}
             </div>
