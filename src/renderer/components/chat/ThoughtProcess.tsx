@@ -386,7 +386,12 @@ export function ThoughtProcess({ thoughts, isThinking }: ThoughtProcessProps) {
           <span className={`text-sm font-medium ${isThinking ? 'text-primary' : 'text-foreground'}`}>
             {isThinking ? (() => {
               const data = getActionSummaryData(thoughts)
-              return t(data.key, data.params)
+              const text = t(data.key, data.params)
+              // Animate trailing "..." for thinking states
+              if (text.endsWith('...')) {
+                return <>{text.slice(0, -3)}<span className="thinking-dots"><span className="dot">.</span><span className="dot">.</span><span className="dot">.</span></span></>
+              }
+              return text
             })() : t('Thought process')}
           </span>
 

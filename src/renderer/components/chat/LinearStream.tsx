@@ -650,7 +650,7 @@ export function LinearStream({
       {isThinking && !isStreaming && !currentText.trim() && (
         <div className="py-2 flex items-center gap-2">
           <HaloLogo size={16} animated={true} />
-          <span className="text-sm text-muted-foreground">{t('chat.thinking')}</span>
+          <span className="text-sm text-muted-foreground">{t('chat.thinking').replace(/\.{3}$/, '')}<span className="thinking-dots"><span className="dot">.</span><span className="dot">.</span><span className="dot">.</span></span></span>
         </div>
       )}
     </div>

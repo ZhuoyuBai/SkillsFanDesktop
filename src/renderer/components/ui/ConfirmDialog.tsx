@@ -8,6 +8,7 @@
 
 import { useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
+import { AlertTriangle, Info } from 'lucide-react'
 import { cn } from '../../lib/utils'
 
 interface ConfirmDialogProps {
@@ -52,15 +53,33 @@ export function ConfirmDialog({
 
   if (!isOpen) return null
 
+  const iconConfig = {
+    danger: {
+      Icon: AlertTriangle,
+      bg: 'bg-destructive/10',
+      color: 'text-destructive'
+    },
+    warning: {
+      Icon: AlertTriangle,
+      bg: 'bg-warning/10',
+      color: 'text-warning'
+    },
+    info: {
+      Icon: Info,
+      bg: 'bg-primary/10',
+      color: 'text-primary'
+    }
+  }[variant]
+
   const confirmButtonClass = {
-    danger: 'bg-destructive text-destructive-foreground hover:bg-destructive/90',
-    warning: 'bg-yellow-500 text-white hover:bg-yellow-600',
-    info: 'bg-primary text-primary-foreground hover:bg-primary/90'
+    danger: 'bg-destructive/90 hover:bg-destructive text-destructive-foreground',
+    warning: 'bg-warning/90 hover:bg-warning text-warning-foreground',
+    info: 'bg-primary/90 hover:bg-primary text-primary-foreground'
   }[variant]
 
   return (
     <div
-      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 no-drag"
       onClick={(e) => {
         if (e.target === e.currentTarget) onCancel()
       }}
@@ -68,21 +87,36 @@ export function ConfirmDialog({
       aria-modal="true"
       aria-label={title}
     >
-      <div className="bg-background border border-border rounded-lg w-full max-w-sm shadow-lg">
-        <div className="p-4 space-y-3">
-          <h3 className="font-medium text-foreground">{title}</h3>
-          <p className="text-sm text-muted-foreground whitespace-pre-line">{message}</p>
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onCancel} />
+      <div className="relative bg-card border border-border/80 rounded-2xl p-7 w-full max-w-sm animate-fade-in shadow-2xl">
+        <div className="flex items-start gap-3 mb-4">
+          <div
+            className={cn(
+              'flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center',
+              iconConfig.bg,
+              iconConfig.color
+            )}
+          >
+            <iconConfig.Icon className="w-5 h-5" />
+          </div>
+          <div className="flex-1 pt-1">
+            <h3 className="text-lg font-semibold text-foreground/95 tracking-tight">{title}</h3>
+          </div>
         </div>
-        <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-border">
+        <p className="text-sm text-muted-foreground whitespace-pre-line mb-6">{message}</p>
+        <div className="flex items-center justify-end gap-3">
           <button
             onClick={onCancel}
-            className="px-4 py-2 text-muted-foreground hover:text-foreground transition-colors"
+            className="px-5 py-2.5 text-muted-foreground hover:text-foreground hover:bg-secondary/60 rounded-xl transition-all"
           >
             {cancelLabel || t('Cancel')}
           </button>
           <button
             onClick={onConfirm}
-            className={cn('px-4 py-2 rounded-md transition-colors', confirmButtonClass)}
+            className={cn(
+              'px-5 py-2.5 rounded-xl shadow-sm hover:shadow-md transition-all',
+              confirmButtonClass
+            )}
           >
             {confirmLabel || t('Confirm')}
           </button>

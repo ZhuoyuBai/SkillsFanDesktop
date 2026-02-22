@@ -59,7 +59,7 @@ export function ThinkingBlock({ blocks, isThinking }: ThinkingBlockProps) {
 
           {/* Title */}
           <span className={`text-sm font-medium ${isThinking ? 'text-primary' : 'text-muted-foreground'}`}>
-            {isThinking ? t('Thinking...') : t('Thought process')}
+            {isThinking ? <>{t('Thinking...').replace(/\.{3}$/, '')}<span className="thinking-dots"><span className="dot">.</span><span className="dot">.</span><span className="dot">.</span></span></> : t('Thought process')}
           </span>
 
           {/* Preview text when collapsed */}
