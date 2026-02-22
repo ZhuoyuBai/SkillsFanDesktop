@@ -251,7 +251,7 @@ export function Step1CreateTask(_props: Step1CreateTaskProps) {
           <div className="space-y-5">
             <div className="text-center pt-4">
               <h3 className="text-3xl font-bold text-foreground">
-                {t('Choose the best way to create your automated task')}
+                {t('Create Automated Task')}
               </h3>
             </div>
 
@@ -338,7 +338,7 @@ export function Step1CreateTask(_props: Step1CreateTaskProps) {
                 <textarea
                   value={aiDescription}
                   onChange={(e) => setAiDescription(e.target.value)}
-                  placeholder={t('Describe the feature you want to implement...')}
+                  placeholder={t('Describe what you want to build, AI will break it down into executable sub-tasks...')}
                   rows={5}
                   className="w-full px-4 py-3 border border-border bg-card/95 rounded-2xl text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-0 focus:border-primary/50 resize-none transition-all"
                 />
