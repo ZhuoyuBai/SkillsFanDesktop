@@ -346,6 +346,7 @@ export interface HaloAPI {
 
   // Loop Task (persistent storage)
   loopTaskList: (spaceId: string) => Promise<IpcResponse>
+  loopTaskListScheduled: () => Promise<IpcResponse>
   loopTaskCreate: (spaceId: string, config: {
     name?: string
     projectDir: string
@@ -669,6 +670,7 @@ const api: HaloAPI = {
 
   // Loop Task (persistent storage)
   loopTaskList: (spaceId) => ipcRenderer.invoke('loop-task:list', spaceId),
+  loopTaskListScheduled: () => ipcRenderer.invoke('loop-task:list-scheduled'),
   loopTaskCreate: (spaceId, config) => ipcRenderer.invoke('loop-task:create', spaceId, config),
   loopTaskGet: (spaceId, taskId) => ipcRenderer.invoke('loop-task:get', spaceId, taskId),
   loopTaskUpdate: (spaceId, taskId, updates) => ipcRenderer.invoke('loop-task:update', spaceId, taskId, updates),

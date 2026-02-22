@@ -568,6 +568,9 @@ function parseStoriesFromOutput(output: string): UserStory[] {
     if (!Array.isArray(parsed)) {
       throw new Error('Parsed result is not an array')
     }
+    if (parsed.length === 0) {
+      throw new Error('Generated story list is empty')
+    }
 
     // Validate and transform to UserStory format
     // Note: requireTypecheck and requireTests default to false

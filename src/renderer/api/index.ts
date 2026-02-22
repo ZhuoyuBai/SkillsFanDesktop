@@ -1325,6 +1325,13 @@ export const api = {
     return httpRequest('GET', `/api/spaces/${spaceId}/loop-tasks`)
   },
 
+  loopTaskListScheduled: async (): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.skillsfan.loopTaskListScheduled()
+    }
+    return httpRequest('GET', `/api/loop-tasks/scheduled`)
+  },
+
   loopTaskCreate: async (
     spaceId: string,
     config: {

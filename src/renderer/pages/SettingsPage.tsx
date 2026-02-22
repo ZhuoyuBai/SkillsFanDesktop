@@ -30,8 +30,9 @@ import { SkillList } from '../components/settings/SkillList'
 import { SkillsFanAccountSection } from '../components/settings/SkillsFanAccountSection'
 import { SpaceManagementSection } from '../components/settings/SpaceManagementSection'
 import { ResetSection } from '../components/settings/ResetSection'
+import { ScheduledTasksSection } from '../components/settings/ScheduledTasksSection'
 import { useTranslation, setLanguage, getCurrentLanguage, SUPPORTED_LOCALES, type LocaleCode } from '../i18n'
-import { Loader2, LogOut, Plus, Check, Globe, Key, MessageSquare, Bot, Palette, Server, Settings as SettingsIcon, Wifi, ExternalLink, X, Package, User, Layers, Lock, SlidersHorizontal, ChevronDown, type LucideIcon } from 'lucide-react'
+import { Loader2, LogOut, Plus, Check, Globe, Key, MessageSquare, Bot, Palette, Server, Settings as SettingsIcon, Wifi, ExternalLink, X, Package, User, Layers, Lock, SlidersHorizontal, ChevronDown, Clock, type LucideIcon } from 'lucide-react'
 import { useToastStore } from '../stores/toast.store'
 import type { SkillsFanAuthState } from '../../shared/types/skillsfan'
 
@@ -173,7 +174,7 @@ interface RemoteAccessStatus {
 }
 
 // Settings section type
-type SettingsSection = 'ai-model' | 'display' | 'mcp' | 'skills' | 'system' | 'remote' | 'account' | 'spaces' | 'advanced'
+type SettingsSection = 'ai-model' | 'display' | 'mcp' | 'skills' | 'system' | 'remote' | 'account' | 'spaces' | 'advanced' | 'scheduled'
 
 export function SettingsPage() {
   const { t } = useTranslation()
@@ -739,6 +740,7 @@ export function SettingsPage() {
     { id: 'spaces', icon: Layers, label: t('Spaces'), desktopOnly: true },
     { id: 'display', icon: Palette, label: t('Display & Language') },
     { id: 'system', icon: SettingsIcon, label: t('System'), desktopOnly: true },
+    { id: 'scheduled', icon: Clock, label: t('Scheduled Tasks'), desktopOnly: true },
     { id: 'advanced', icon: SlidersHorizontal, label: t('Advanced'), desktopOnly: true },
     { id: 'mcp', icon: Server, label: t('MCP Servers'), hidden: true },
     { id: 'remote', icon: Wifi, label: t('Remote Access'), desktopOnly: true },
@@ -1477,6 +1479,13 @@ export function SettingsPage() {
           )}
 
           <div className="max-w-2xl">{/* reopen max-w-2xl */}
+
+          {/* Scheduled Tasks Section */}
+          {activeSection === 'scheduled' && !api.isRemoteMode() && (
+          <section className="bg-card rounded-xl border border-border p-6">
+            <ScheduledTasksSection />
+          </section>
+          )}
 
           {/* Spaces Management Section */}
           {activeSection === 'spaces' && !api.isRemoteMode() && (

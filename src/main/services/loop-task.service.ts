@@ -10,7 +10,7 @@
 import { join } from 'path'
 import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, rmSync } from 'fs'
 import { atomicWriteJsonSync } from '../utils/atomic-write'
-import { getSpace, getSpaceMetaDir } from './space.service'
+import { getSpace, getSpaceMetaDir, listSpaces } from './space.service'
 import { v4 as uuidv4 } from 'uuid'
 import type {
   LoopTask,
@@ -113,7 +113,8 @@ function toMeta(task: LoopTask): LoopTaskMeta {
     updatedAt: task.updatedAt,
     ...(failedCount > 0 && { failedCount }),
     ...(task.model && { model: task.model }),
-    ...(task.modelSource && { modelSource: task.modelSource })
+    ...(task.modelSource && { modelSource: task.modelSource }),
+    ...(task.schedule && { schedule: task.schedule })
   }
 }
 
@@ -242,7 +243,7 @@ export function createTask(spaceId: string, config: CreateLoopTaskConfig): LoopT
     maxIterations: config.maxIterations,
     model: config.model,
     modelSource: config.modelSource,
-    schedule: (config as any).schedule || { type: 'manual', enabled: false },
+    schedule: config.schedule || { type: 'manual', enabled: false },
     createdAt: now,
     updatedAt: now
   }
@@ -508,6 +509,29 @@ export function retryFailed(spaceId: string, taskId: string): LoopTask | null {
   }
 
   return updateTask(spaceId, taskId, { stories: task.stories, status: task.status })
+}
+
+/**
+ * List all scheduled tasks across all spaces
+ */
+export function listAllScheduledTasks(): (LoopTaskMeta & { spaceName?: string })[] {
+  const spaces = listSpaces()
+  const result: (LoopTaskMeta & { spaceName?: string })[] = []
+
+  for (const space of spaces) {
+    try {
+      const tasks = listTasks(space.id)
+      for (const task of tasks) {
+        if (task.schedule && task.schedule.enabled && task.schedule.type !== 'manual') {
+          result.push({ ...task, spaceName: space.name })
+        }
+      }
+    } catch {
+      // Skip spaces that fail to load
+    }
+  }
+
+  return result
 }
 
 // ============================================================================

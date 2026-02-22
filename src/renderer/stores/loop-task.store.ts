@@ -506,7 +506,12 @@ export const useLoopTaskStore = create<LoopTaskState>((set, get) => ({
         stories: [],
         maxIterations: 10
       },
-      isEditing: true
+      isEditing: true,
+      wizardStep: 1 as WizardStep,
+      createMethod: null,
+      aiDescription: '',
+      generatedPrdPath: null,
+      isGeneratingStories: false
     })
   },
 
@@ -599,33 +604,65 @@ export const useLoopTaskStore = create<LoopTaskState>((set, get) => ({
   // Handle task update from backend (via IPC event)
   handleTaskUpdate: (task) => {
     const state = get()
+    const nowIso = new Date().toISOString()
+
+    // Ralph runtime updates may not include loop-task metadata fields.
+    // Derive robust values from stories and existing list state.
+    const derivedStoryCount = Number.isFinite(task.storyCount)
+      ? task.storyCount
+      : task.stories.length
+    const derivedCompletedCount = Number.isFinite(task.completedCount)
+      ? task.completedCount
+      : task.stories.filter((s) => s.status === 'completed').length
+
+    // Resolve spaceId: prefer payload, then find by existing task id, then current space.
+    let resolvedSpaceId = task.spaceId
+    if (!resolvedSpaceId) {
+      for (const [spaceId, spaceState] of state.spaceStates.entries()) {
+        if (spaceState.tasks.some((t) => t.id === task.id)) {
+          resolvedSpaceId = spaceId
+          break
+        }
+      }
+    }
+    if (!resolvedSpaceId) {
+      resolvedSpaceId = state.currentSpaceId || ''
+    }
+
+    const normalizedTask: LoopTask = {
+      ...task,
+      spaceId: resolvedSpaceId,
+      storyCount: derivedStoryCount,
+      completedCount: derivedCompletedCount,
+      updatedAt: task.updatedAt || nowIso
+    }
 
     // Update cache
     const newCache = new Map(state.taskCache)
-    newCache.set(task.id, task)
+    newCache.set(task.id, normalizedTask)
 
     // Update list metadata
     const newStates = new Map(state.spaceStates)
-    const currentState = newStates.get(task.spaceId)
-    if (currentState) {
+    const currentState = resolvedSpaceId ? newStates.get(resolvedSpaceId) : undefined
+    if (resolvedSpaceId && currentState) {
       const meta: LoopTaskMeta = {
-        id: task.id,
-        spaceId: task.spaceId,
-        name: task.name,
-        projectDir: task.projectDir,
-        status: task.status,
-        storyCount: task.storyCount,
-        completedCount: task.completedCount,
-        createdAt: task.createdAt,
-        updatedAt: task.updatedAt,
-        ...(task.model && { model: task.model }),
-        ...(task.modelSource && { modelSource: task.modelSource })
+        id: normalizedTask.id,
+        spaceId: resolvedSpaceId,
+        name: normalizedTask.name,
+        projectDir: normalizedTask.projectDir,
+        status: normalizedTask.status,
+        storyCount: normalizedTask.storyCount,
+        completedCount: normalizedTask.completedCount,
+        createdAt: normalizedTask.createdAt,
+        updatedAt: normalizedTask.updatedAt,
+        ...(normalizedTask.model && { model: normalizedTask.model }),
+        ...(normalizedTask.modelSource && { modelSource: normalizedTask.modelSource })
       }
-      const taskExists = currentState.tasks.some((t) => t.id === task.id)
+      const taskExists = currentState.tasks.some((t) => t.id === normalizedTask.id)
       if (taskExists) {
-        newStates.set(task.spaceId, {
+        newStates.set(resolvedSpaceId, {
           ...currentState,
-          tasks: currentState.tasks.map((t) => (t.id === task.id ? meta : t))
+          tasks: currentState.tasks.map((t) => (t.id === normalizedTask.id ? meta : t))
         })
       }
     }

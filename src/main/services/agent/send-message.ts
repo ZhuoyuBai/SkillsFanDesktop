@@ -714,6 +714,11 @@ async function processMessageStream(
           accumulatedTextContent += thought.content
           textBlockCount++
 
+          // Ralph mode: non-streaming fallback still needs output callback.
+          if (ralphMode?.onOutput) {
+            ralphMode.onOutput(accumulatedTextContent)
+          }
+
           // Send streaming update with accumulated content
           sendToRenderer('agent:message', spaceId, conversationId, {
             type: 'message',
@@ -867,6 +872,12 @@ async function processMessageStream(
   }
 
   // Ralph mode: call onComplete callback
+  // Ensure Ralph receives final accumulated output even when token-level stream events are unavailable.
+  const finalRalphOutput = accumulatedTextContent || currentStreamingText
+  if (ralphMode?.onOutput && finalRalphOutput) {
+    ralphMode.onOutput(finalRalphOutput)
+  }
+
   if (ralphMode?.onComplete) {
     ralphMode.onComplete()
   }

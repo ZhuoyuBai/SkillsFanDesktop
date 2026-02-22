@@ -88,6 +88,7 @@ export interface LoopTaskMeta {
   failedCount?: number
   model?: string // AI model override for this task (e.g. 'claude-sonnet-4-5-20250929')
   modelSource?: string // AI source/provider for this task (e.g. 'skillsfan-credits', 'deepseek')
+  schedule?: TaskSchedule
 }
 
 /**
@@ -122,6 +123,7 @@ export interface CreateLoopTaskConfig {
   branchName?: string
   model?: string // AI model override for this task
   modelSource?: string // AI source/provider for this task
+  schedule?: TaskSchedule
 }
 
 /**

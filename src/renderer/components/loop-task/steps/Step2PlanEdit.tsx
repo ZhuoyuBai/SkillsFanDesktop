@@ -18,24 +18,20 @@ import {
   ChevronRight,
   ChevronDown,
   ChevronUp,
-  Pencil,
   Trash2,
-  Circle,
   Sparkles,
-  RotateCcw,
-  Loader2,
-  Info
+  Loader2
 } from 'lucide-react'
 import { ConfirmDialog } from '../../ui/ConfirmDialog'
 import { useLoopTaskStore } from '../../../stores/loop-task.store'
 import { useToastStore } from '../../../stores/toast.store'
 import { api } from '../../../api'
-import { StoryEditModal } from '../../ralph/StoryEditModal'
 import { cn } from '../../../lib/utils'
 import { getModelLogo } from '../../layout/ModelSelector'
 import { useModelProviders } from '../../../hooks/useModelProviders'
+import { SchedulePicker } from '../schedule'
 import type { OAuthProviderInfo, CustomProviderInfo } from '../../../hooks/useModelProviders'
-import type { UserStory, WizardStep } from '../../../../shared/types/loop-task'
+import type { UserStory, WizardStep, TaskSchedule } from '../../../../shared/types/loop-task'
 
 
 interface Step2PlanEditProps {
@@ -50,94 +46,184 @@ export function Step2PlanEdit({ spaceId, onCancel }: Step2PlanEditProps) {
 
   const {
     loggedInOAuthProviders,
-    configuredCustomProviders
+    configuredCustomProviders,
+    getModelDisplayName: getDefaultModelName,
+    getModelLogo: getDefaultModelLogo
   } = useModelProviders()
 
-  const [localStories, setLocalStories] = useState<UserStory[]>(editingTask?.stories || [])
-  const [editingStory, setEditingStory] = useState<UserStory | null>(null)
-  const [isCreating, setIsCreating] = useState(false)
-  const [expandedStories, setExpandedStories] = useState<Set<string>>(new Set())
+  const [localStories, setLocalStories] = useState<UserStory[]>(() => {
+    const existing = editingTask?.stories || []
+    if (existing.length > 0) return existing
+    return [{
+      id: 'US-001',
+      title: '',
+      description: '',
+      acceptanceCriteria: [],
+      priority: 1,
+      status: 'pending' as const,
+      notes: '',
+      model: editingTask?.model,
+      modelSource: editingTask?.modelSource
+    }]
+  })
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [showIterationsPopover, setShowIterationsPopover] = useState(false)
+  const [showSchedulePopover, setShowSchedulePopover] = useState(false)
+  const iterationsPopoverRef = useRef<HTMLDivElement>(null)
+  const schedulePopoverRef = useRef<HTMLDivElement>(null)
+  const autoGenerateTriggeredRef = useRef(false)
+
+  // Close popovers on click outside
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (showIterationsPopover && iterationsPopoverRef.current && !iterationsPopoverRef.current.contains(e.target as Node)) {
+        setShowIterationsPopover(false)
+      }
+      if (showSchedulePopover && schedulePopoverRef.current && !schedulePopoverRef.current.contains(e.target as Node)) {
+        setShowSchedulePopover(false)
+      }
+    }
+    if (showIterationsPopover || showSchedulePopover) {
+      document.addEventListener('mousedown', handler)
+      return () => document.removeEventListener('mousedown', handler)
+    }
+  }, [showIterationsPopover, showSchedulePopover])
+
+  // Schedule toggle helper
+  const handleScheduleToggle = () => {
+    const schedule = editingTask?.schedule
+    const isEnabled = schedule?.enabled ?? false
+    const newSchedule: TaskSchedule = schedule?.type && schedule.type !== 'manual'
+      ? { ...schedule, enabled: !isEnabled }
+      : { type: 'cron', cronExpression: '0 9 * * *', enabled: !isEnabled }
+    updateEditing({ schedule: newSchedule })
+  }
 
   // Sync local stories with editing task
   useEffect(() => {
-    if (editingTask?.stories) {
+    if (editingTask?.stories && editingTask.stories.length > 0) {
       setLocalStories(editingTask.stories)
     }
   }, [editingTask?.stories])
+
+  // Auto-trigger generation when entering step 2 from AI mode,
+  // even if the generation flag was lost during step transition.
+  useEffect(() => {
+    if (autoGenerateTriggeredRef.current) return
+    if (isGeneratingStories) {
+      autoGenerateTriggeredRef.current = true
+      return
+    }
+
+    const shouldAutoGenerate =
+      editingTask?.source === 'generate' &&
+      ((editingTask?.stories?.length || 0) === 0)
+
+    if (shouldAutoGenerate) {
+      autoGenerateTriggeredRef.current = true
+      setIsGeneratingStories(true)
+    }
+  }, [editingTask?.source, editingTask?.stories, isGeneratingStories, setIsGeneratingStories])
 
   // Generate stories when coming from AI mode
   useEffect(() => {
     if (!isGeneratingStories) return
     let cancelled = false
+    const projectDir = (editingTask?.projectDir || '').trim()
+    const description = (editingTask?.description || '').trim()
+
+    if (!projectDir || !description) {
+      console.warn('[Step2PlanEdit] Missing context for story generation', {
+        hasProjectDir: !!projectDir,
+        hasDescription: !!description
+      })
+      setError(t('Failed to generate sub-tasks'))
+      addToast(t('Failed to generate sub-tasks'), 'error')
+      setIsGeneratingStories(false)
+      return
+    }
+
+    console.log('[Step2PlanEdit] Generating stories...', {
+      projectDir,
+      descriptionLength: description.length
+    })
 
     api.ralphGenerateStories({
-      projectDir: editingTask?.projectDir || '',
-      description: editingTask?.description || ''
+      projectDir,
+      description
     }).then((result) => {
       if (cancelled) return
-      if (result.success && result.data) {
-        updateEditing({ stories: result.data })
+      const rawData = result.data as unknown
+      const generatedStories: UserStory[] = Array.isArray(rawData)
+        ? (rawData as UserStory[])
+        : (rawData && typeof rawData === 'object' && Array.isArray((rawData as { stories?: unknown }).stories))
+          ? (rawData as { stories: UserStory[] }).stories
+          : []
+
+      console.log('[Step2PlanEdit] Generate stories result', {
+        success: result.success,
+        count: generatedStories.length,
+        hasError: !!result.error
+      })
+
+      if (result.success && generatedStories.length > 0) {
+        updateEditing({ stories: generatedStories })
+        setLocalStories(generatedStories)
       } else {
-        setError(result.error || t('Failed to generate sub-tasks'))
+        const errMsg = result.error || t('Failed to generate sub-tasks')
+        setError(errMsg)
+        addToast(errMsg, 'error')
       }
     }).catch((err) => {
-      if (!cancelled) setError((err as Error).message)
+      if (!cancelled) {
+        const errMsg = (err as Error).message || t('Failed to generate sub-tasks')
+        setError(errMsg)
+        addToast(errMsg, 'error')
+      }
     }).finally(() => {
       if (!cancelled) setIsGeneratingStories(false)
     })
 
     return () => { cancelled = true }
-  }, [isGeneratingStories])
+  }, [
+    isGeneratingStories,
+    editingTask?.projectDir,
+    editingTask?.description,
+    setIsGeneratingStories,
+    t,
+    addToast,
+    updateEditing
+  ])
 
-  // Toggle story expand/collapse
-  const toggleExpand = (storyId: string) => {
-    setExpandedStories((prev) => {
-      const next = new Set(prev)
-      if (next.has(storyId)) {
-        next.delete(storyId)
-      } else {
-        next.add(storyId)
-      }
-      return next
-    })
-  }
-
-  // Add new story
+  // Add new empty story card
   const handleAddStory = () => {
-    setIsCreating(true)
-    setEditingStory({
-      id: '',
+    const maxId = localStories.reduce((max, s) => {
+      const match = s.id.match(/US-(\d+)/)
+      return match ? Math.max(max, parseInt(match[1], 10)) : max
+    }, 0)
+    const newId = `US-${String(maxId + 1).padStart(3, '0')}`
+    // Inherit model from last story, or fall back to task default
+    const lastStory = localStories[localStories.length - 1]
+    const inheritModel = lastStory?.model || editingTask?.model
+    const inheritModelSource = lastStory?.modelSource || editingTask?.modelSource
+    const newStory: UserStory = {
+      id: newId,
       title: '',
       description: '',
       acceptanceCriteria: [],
       priority: localStories.length + 1,
       status: 'pending',
-      notes: ''
-    })
+      notes: '',
+      model: inheritModel,
+      modelSource: inheritModelSource
+    }
+    setLocalStories([...localStories, newStory])
   }
 
-  // Save story (new or edit)
-  const handleSaveStory = (story: UserStory) => {
-    if (isCreating) {
-      // Generate US-xxx format ID
-      const maxId = localStories.reduce((max, s) => {
-        const match = s.id.match(/US-(\d+)/)
-        return match ? Math.max(max, parseInt(match[1], 10)) : max
-      }, 0)
-      const newId = `US-${String(maxId + 1).padStart(3, '0')}`
-
-      const newStory = { ...story, id: newId }
-      setLocalStories([...localStories, newStory])
-      addToast(t('Sub-task added'), 'success')
-    } else {
-      // Update existing
-      setLocalStories(localStories.map((s) => (s.id === story.id ? story : s)))
-      addToast(t('Sub-task updated'), 'success')
-    }
-    setEditingStory(null)
-    setIsCreating(false)
+  // Update story inline (auto-save)
+  const handleUpdateStory = (index: number, updated: UserStory) => {
+    setLocalStories(localStories.map((s, i) => (i === index ? updated : s)))
   }
 
   // Remove story
@@ -211,7 +297,8 @@ export function Step2PlanEdit({ spaceId, onCancel }: Step2PlanEditProps) {
         maxIterations: editingTask?.maxIterations || 10,
         branchName: editingTask?.branchName,
         model: editingTask?.model,
-        modelSource: editingTask?.modelSource
+        modelSource: editingTask?.modelSource,
+        schedule: editingTask?.schedule
       })
 
       // Clear log and go to step 3 (execute)
@@ -252,103 +339,115 @@ export function Step2PlanEdit({ spaceId, onCancel }: Step2PlanEditProps) {
             <label className="block text-sm font-medium text-foreground">
               {t('Sub-tasks')} ({localStories.length})
             </label>
-            <button
-              onClick={handleAddStory}
-              disabled={isGeneratingStories}
-              className="px-3 py-1.5 text-sm bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 disabled:opacity-50 transition-colors flex items-center gap-1.5"
-            >
-              <Plus size={14} />
-              {t('Add')}
-            </button>
+            <div className="flex items-center gap-2">
+              {/* Max Iterations button + popover */}
+              <div className="relative" ref={iterationsPopoverRef}>
+                <button
+                  onClick={() => { setShowIterationsPopover(!showIterationsPopover); setShowSchedulePopover(false) }}
+                  className="px-3 py-1.5 border border-foreground/20 rounded text-sm text-foreground hover:bg-muted/50 transition-colors"
+                >
+                  {editingTask?.maxIterations || 10} {t('iterations')}
+                </button>
+                {showIterationsPopover && (
+                  <div className="absolute z-20 right-0 mt-1.5 w-64 bg-card border border-border rounded-lg shadow-lg p-4 space-y-3">
+                    <label className="text-sm font-medium text-foreground">{t('Max Iterations')}</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        value={editingTask?.maxIterations || 10}
+                        onChange={(e) => updateEditing({ maxIterations: parseInt(e.target.value) || 10 })}
+                        min={1}
+                        max={50}
+                        className="w-20 px-3 py-1.5 bg-input border border-border rounded-md text-foreground text-center focus:outline-none focus:ring-0 focus:border-primary/50"
+                      />
+                      <span className="text-sm text-muted-foreground">{t('iterations')}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">{t('Maximum number of iterations per sub-task before marking as failed')}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Schedule button + popover */}
+              <div className="relative" ref={schedulePopoverRef}>
+                <button
+                  onClick={() => { setShowSchedulePopover(!showSchedulePopover); setShowIterationsPopover(false) }}
+                  className={cn(
+                    'px-3 py-1.5 border rounded text-sm transition-colors',
+                    editingTask?.schedule?.enabled
+                      ? 'border-primary/30 text-primary hover:bg-primary/5'
+                      : 'border-foreground/20 text-foreground hover:bg-muted/50'
+                  )}
+                >
+                  {editingTask?.schedule?.enabled ? t('Scheduled') : t('Schedule')}
+                </button>
+                {showSchedulePopover && (
+                  <div className="absolute z-20 right-0 mt-1.5 w-80 bg-card border border-border rounded-lg shadow-lg">
+                    <div className="flex items-center justify-between p-4">
+                      <div>
+                        <label className="text-sm font-medium text-foreground">{t('Schedule')}</label>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {editingTask?.schedule?.enabled ? t('Enabled') : t('Not enabled')}
+                        </p>
+                      </div>
+                      <button
+                        onClick={handleScheduleToggle}
+                        className={cn(
+                          'relative w-11 h-6 rounded-full transition-colors',
+                          editingTask?.schedule?.enabled ? 'bg-primary' : 'bg-muted'
+                        )}
+                      >
+                        <div className={cn(
+                          'absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform',
+                          editingTask?.schedule?.enabled ? 'translate-x-[22px]' : 'translate-x-0.5'
+                        )} />
+                      </button>
+                    </div>
+                    {editingTask?.schedule?.enabled && editingTask.schedule && (
+                      <div className="px-4 pb-4 border-t border-border pt-3">
+                        <SchedulePicker schedule={editingTask.schedule} onChange={(schedule) => updateEditing({ schedule })} />
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
-          {/* Story List */}
+          {/* Story List - inline editable */}
           {isGeneratingStories ? (
             <div className="flex flex-col items-center justify-center py-16 gap-3">
               <Loader2 size={24} className="animate-spin text-primary" />
               <p className="text-sm text-muted-foreground">{t('Generating sub-tasks...')}</p>
             </div>
-          ) : localStories.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-center border border-dashed border-border/60 rounded-xl bg-muted/10">
-              <div className="w-16 h-16 rounded-full bg-muted/30 flex items-center justify-center mb-4 text-muted-foreground">
-                <Plus size={32} strokeWidth={1.5} />
-              </div>
-              <h3 className="text-lg font-medium text-foreground mb-1">{t('No sub-tasks yet')}</h3>
-              <p className="text-sm text-muted-foreground max-w-xs mb-6">
-                {t('Add your first sub-task to define what the task should accomplish.')}
-              </p>
-              <button
-                onClick={handleAddStory}
-                className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors flex items-center gap-2"
-              >
-                <Plus size={16} />
-                {t('Add Sub-task')}
-              </button>
-            </div>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-3">
               {localStories.map((story, index) => (
-                <StoryCard
+                <InlineStoryCard
                   key={story.id}
                   story={story}
                   index={index}
                   total={localStories.length}
-                  isExpanded={expandedStories.has(story.id)}
-                  onToggle={() => toggleExpand(story.id)}
-                  onEdit={() => {
-                    setIsCreating(false)
-                    setEditingStory(story)
-                  }}
+                  onChange={(updated) => handleUpdateStory(index, updated)}
                   onRemove={() => handleRemoveStory(story.id)}
                   onMoveUp={() => handleMoveStory(index, 'up')}
                   onMoveDown={() => handleMoveStory(index, 'down')}
-                  onUpdate={(updated) =>
-                    setLocalStories(localStories.map((s) => (s.id === updated.id ? updated : s)))
-                  }
                   loggedInOAuthProviders={loggedInOAuthProviders}
                   configuredCustomProviders={configuredCustomProviders}
+                  defaultModelLogo={getDefaultModelLogo()}
+                  defaultModelName={getDefaultModelName()}
                 />
               ))}
 
+              {/* Add step button */}
               <button
                 onClick={handleAddStory}
-                className="w-full py-3 h-auto border border-dashed border-border hover:border-primary/50 hover:bg-accent/30 rounded-lg text-muted-foreground hover:text-primary transition-all flex items-center justify-center gap-2 text-sm"
+                className="flex items-center justify-center gap-2 w-full px-3 py-2.5 border border-border rounded-md text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors"
               >
                 <Plus size={16} />
-                {t('Add Sub-task')}
+                <span className="text-sm">{t('Add Sub-task')}</span>
               </button>
             </div>
           )}
-
-          {/* Max Iterations Config */}
-          <div className="p-4 border border-border rounded-lg">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <label className="text-sm font-medium text-foreground">
-                  {t('Max Iterations')}
-                </label>
-                <div className="relative group/tooltip">
-                  <Info size={13} className="text-muted-foreground cursor-default" />
-                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-64 bg-popover border border-border text-xs text-muted-foreground rounded-md px-2.5 py-2 shadow-md opacity-0 group-hover/tooltip:opacity-100 pointer-events-none transition-opacity z-10 whitespace-normal">
-                    {t('Maximum number of iterations per sub-task before marking as failed')}
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  value={editingTask?.maxIterations || 10}
-                  onChange={(e) =>
-                    updateEditing({ maxIterations: parseInt(e.target.value) || 10 })
-                  }
-                  min={1}
-                  max={50}
-                  className="w-20 px-3 py-1.5 bg-input border border-border rounded-md text-foreground text-center focus:outline-none focus:ring-0 focus:border-primary/50"
-                />
-                <span className="text-sm text-muted-foreground">{t('iterations')}</span>
-              </div>
-            </div>
-          </div>
 
           {/* Error display */}
           {error && (
@@ -397,58 +496,45 @@ export function Step2PlanEdit({ spaceId, onCancel }: Step2PlanEditProps) {
         </div>
       </div>
 
-      {/* Story Edit Modal */}
-      {editingStory && (
-        <StoryEditModal
-          story={editingStory}
-          isNew={isCreating}
-          onSave={handleSaveStory}
-          onClose={() => {
-            setEditingStory(null)
-            setIsCreating(false)
-          }}
-        />
-      )}
     </div>
   )
 }
 
 // ============================================
-// Story Card Component
+// Inline Story Card - Always editable, auto-save
 // ============================================
 
-interface StoryCardProps {
+interface InlineStoryCardProps {
   story: UserStory
   index: number
   total: number
-  isExpanded: boolean
-  onToggle: () => void
-  onEdit: () => void
+  onChange: (story: UserStory) => void
   onRemove: () => void
   onMoveUp: () => void
   onMoveDown: () => void
-  onUpdate: (story: UserStory) => void
   loggedInOAuthProviders: OAuthProviderInfo[]
   configuredCustomProviders: CustomProviderInfo[]
+  defaultModelLogo: string | null
+  defaultModelName: string
 }
 
-function StoryCard({
+function InlineStoryCard({
   story,
   index,
   total,
-  isExpanded,
-  onToggle,
-  onEdit,
+  onChange,
   onRemove,
   onMoveUp,
   onMoveDown,
-  onUpdate,
   loggedInOAuthProviders,
-  configuredCustomProviders
-}: StoryCardProps) {
+  configuredCustomProviders,
+  defaultModelLogo,
+  defaultModelName
+}: InlineStoryCardProps) {
   const { t } = useTranslation()
   const [showModelDropdown, setShowModelDropdown] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [newCriterion, setNewCriterion] = useState('')
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   // Close dropdown when clicking outside
@@ -465,24 +551,20 @@ function StoryCard({
 
   const hasCustomModel = !!(story.model || story.modelSource)
 
-  // Get logo for the story's model
   const getStoryModelLogo = (): string | null => {
-    if (!hasCustomModel) return null
-    // Check OAuth providers
+    if (!hasCustomModel) return defaultModelLogo
     for (const provider of loggedInOAuthProviders) {
       if (provider.type === story.modelSource) {
         return getModelLogo(story.model || '', story.model || '', provider.type)
       }
     }
-    // Check custom providers
     const customProvider = configuredCustomProviders.find(p => p.id === story.modelSource)
     if (customProvider) return customProvider.logo
-    return null
+    return defaultModelLogo
   }
 
-  // Get display name for the story's model
   const getStoryModelName = (): string => {
-    if (!hasCustomModel) return ''
+    if (!hasCustomModel) return defaultModelName
     for (const provider of loggedInOAuthProviders) {
       if (provider.type === story.modelSource && provider.config?.modelNames?.[story.model || '']) {
         return provider.config.modelNames[story.model || '']
@@ -490,243 +572,200 @@ function StoryCard({
     }
     const customProvider = configuredCustomProviders.find(p => p.id === story.modelSource)
     if (customProvider) return customProvider.model || customProvider.name
-    return story.model || ''
+    return story.model || defaultModelName
+  }
+
+  const handleAddCriterion = () => {
+    if (!newCriterion.trim()) return
+    onChange({ ...story, acceptanceCriteria: [...story.acceptanceCriteria, newCriterion.trim()] })
+    setNewCriterion('')
   }
 
   const storyModelLogo = getStoryModelLogo()
 
   return (
-    <div className="border border-border rounded-lg overflow-hidden bg-card">
-      {/* Header */}
-      <div
-        className="group flex items-center gap-2 p-3 cursor-pointer hover:bg-accent/50 transition-colors"
-        onClick={onToggle}
-      >
-        <Circle className="text-muted-foreground" size={14} />
-        <span className="w-5 h-5 flex items-center justify-center bg-muted rounded text-xs font-medium text-muted-foreground">
-          {story.priority}
+    <div className="border border-border rounded-lg bg-card">
+      {/* Header bar: number + actions */}
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-border/50">
+        <span className="px-2 py-0.5 bg-primary/10 rounded text-xs font-medium text-primary whitespace-nowrap">
+          {t('Step {{number}}', { number: index + 1 })}
         </span>
-        <span className="flex-1 font-medium text-foreground text-sm truncate">{story.title}</span>
+        <span className="flex-1" />
 
         {/* Actions */}
-        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
-          {/* Model selector button */}
+        <div className="flex items-center gap-1">
+          {/* Model selector */}
           <div className="relative" ref={dropdownRef}>
             <button
               onClick={() => setShowModelDropdown(!showModelDropdown)}
               className={cn(
-                'p-1 rounded hover:bg-accent transition-colors',
-                hasCustomModel ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+                'rounded hover:bg-accent transition-colors text-muted-foreground hover:text-foreground',
+                storyModelLogo ? 'p-0.5' : 'p-1.5'
               )}
-              title={hasCustomModel ? getStoryModelName() : t('Model Selection')}
+              title={getStoryModelName()}
             >
               {storyModelLogo ? (
-                <img src={storyModelLogo} alt="" className="w-[14px] h-[14px] rounded object-cover" />
+                <img src={storyModelLogo} alt="" className="w-6 h-6 rounded object-cover" />
               ) : (
-                <Sparkles size={14} />
+                <Sparkles size={16} />
               )}
             </button>
 
-            {/* Model dropdown */}
             {showModelDropdown && (
               <div className="absolute z-20 right-0 mt-1 w-56 bg-card border border-border rounded-lg shadow-lg overflow-hidden max-h-64 overflow-y-auto">
-                {/* Use Default option */}
-                <button
-                  onClick={() => {
-                    onUpdate({ ...story, model: undefined, modelSource: undefined })
-                    setShowModelDropdown(false)
-                  }}
-                  className="w-full px-3 py-2 text-left hover:bg-muted/50 transition-colors flex items-center gap-2.5"
-                >
-                  <RotateCcw size={14} className="text-muted-foreground flex-shrink-0" />
-                  <span className="text-sm text-foreground">{t('Use Default')}</span>
-                </button>
-
-                <div className="my-0.5 border-t border-border" />
-
-                {/* Official / OAuth Models */}
                 {(() => {
                   const seenModelIds = new Set<string>()
                   return loggedInOAuthProviders.map((provider) => (
-                  (provider.config?.availableModels || []).map((modelId) => {
-                    if (seenModelIds.has(modelId)) return null
-                    seenModelIds.add(modelId)
-                    const displayName = provider.config?.modelNames?.[modelId] || modelId
-                    const modelLogo = getModelLogo(modelId, displayName, provider.type)
-                    return (
-                      <button
-                        key={`${provider.type}-${modelId}`}
-                        onClick={() => {
-                          onUpdate({ ...story, model: modelId, modelSource: provider.type })
-                          setShowModelDropdown(false)
-                        }}
-                        className="w-full px-3 py-2 text-left hover:bg-muted/50 transition-colors flex items-center gap-2.5"
-                      >
-                        {modelLogo ? (
-                          <img src={modelLogo} alt="" className="w-4 h-4 rounded object-cover flex-shrink-0" />
-                        ) : (
-                          <div className="w-4 h-4 rounded bg-muted flex items-center justify-center flex-shrink-0">
-                            <span className="text-[10px] text-muted-foreground">AI</span>
-                          </div>
-                        )}
-                        <span className="text-sm text-foreground truncate flex-1">{displayName}</span>
-                      </button>
-                    )
-                  })
-                ))
+                    (provider.config?.availableModels || []).map((modelId) => {
+                      if (seenModelIds.has(modelId)) return null
+                      seenModelIds.add(modelId)
+                      const displayName = provider.config?.modelNames?.[modelId] || modelId
+                      const modelLogo = getModelLogo(modelId, displayName, provider.type)
+                      return (
+                        <button
+                          key={`${provider.type}-${modelId}`}
+                          onClick={() => { onChange({ ...story, model: modelId, modelSource: provider.type }); setShowModelDropdown(false) }}
+                          className="w-full px-3 py-2.5 text-left hover:bg-muted/50 transition-colors flex items-center gap-2.5"
+                        >
+                          {modelLogo ? (
+                            <img src={modelLogo} alt="" className="w-5 h-5 rounded object-cover flex-shrink-0" />
+                          ) : (
+                            <div className="w-5 h-5 rounded bg-muted flex items-center justify-center flex-shrink-0">
+                              <span className="text-xs text-muted-foreground">AI</span>
+                            </div>
+                          )}
+                          <span className="text-sm text-foreground truncate flex-1">{displayName}</span>
+                        </button>
+                      )
+                    })
+                  ))
                 })()}
-
-                {/* Divider between official and custom */}
                 {loggedInOAuthProviders.length > 0 && configuredCustomProviders.length > 0 && (
-                  <div className="my-0.5 border-t border-border" />
+                  <div className="my-1 border-t border-border" />
                 )}
-
-                {/* Custom API Models */}
-                {configuredCustomProviders.map((provider) => {
-                  return (
-                    <button
-                      key={provider.id}
-                      onClick={() => {
-                        onUpdate({ ...story, model: provider.model, modelSource: provider.id })
-                        setShowModelDropdown(false)
-                      }}
-                      className="w-full px-3 py-2 text-left hover:bg-muted/50 transition-colors flex items-center gap-2.5"
-                    >
-                      {provider.logo ? (
-                        <img src={provider.logo} alt="" className="w-4 h-4 rounded object-cover flex-shrink-0" />
-                      ) : (
-                        <div className="w-4 h-4 rounded bg-muted flex items-center justify-center flex-shrink-0">
-                          <span className="text-[10px] text-muted-foreground">AI</span>
-                        </div>
-                      )}
-                      <span className="text-sm text-foreground truncate flex-1">{provider.model || provider.name}</span>
-                    </button>
-                  )
-                })}
-
-                {/* Empty state */}
+                {configuredCustomProviders.map((provider) => (
+                  <button
+                    key={provider.id}
+                    onClick={() => { onChange({ ...story, model: provider.model, modelSource: provider.id }); setShowModelDropdown(false) }}
+                    className="w-full px-3 py-2.5 text-left hover:bg-muted/50 transition-colors flex items-center gap-2.5"
+                  >
+                    {provider.logo ? (
+                      <img src={provider.logo} alt="" className="w-5 h-5 rounded object-cover flex-shrink-0" />
+                    ) : (
+                      <div className="w-5 h-5 rounded bg-muted flex items-center justify-center flex-shrink-0">
+                        <span className="text-xs text-muted-foreground">AI</span>
+                      </div>
+                    )}
+                    <span className="text-sm font-medium text-foreground truncate flex-1">{provider.model || provider.name}</span>
+                  </button>
+                ))}
                 {loggedInOAuthProviders.length === 0 && configuredCustomProviders.length === 0 && (
-                  <div className="px-3 py-4 text-sm text-muted-foreground text-center">
-                    {t('Configure API')}
-                  </div>
+                  <div className="px-3 py-4 text-sm text-muted-foreground text-center">{t('Configure API')}</div>
                 )}
               </div>
             )}
           </div>
 
-          <button
-            onClick={onMoveUp}
-            disabled={index === 0}
-            className="p-1 rounded hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed"
-            title={t('Move up')}
-          >
-            <ChevronUp size={14} />
+          <button onClick={onMoveUp} disabled={index === 0} className="p-1.5 rounded hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed text-muted-foreground hover:text-foreground" title={t('Move priority up')}>
+            <ChevronUp size={16} />
           </button>
-          <button
-            onClick={onMoveDown}
-            disabled={index === total - 1}
-            className="p-1 rounded hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed"
-            title={t('Move down')}
-          >
-            <ChevronDown size={14} />
+          <button onClick={onMoveDown} disabled={index === total - 1} className="p-1.5 rounded hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed text-muted-foreground hover:text-foreground" title={t('Move priority down')}>
+            <ChevronDown size={16} />
           </button>
-          <button
-            onClick={onEdit}
-            className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground"
-            title={t('Edit')}
-          >
-            <Pencil size={14} />
-          </button>
-          <button
-            onClick={() => setShowDeleteConfirm(true)}
-            className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
-            title={t('Remove')}
-          >
-            <Trash2 size={14} />
+          <button onClick={() => setShowDeleteConfirm(true)} className="p-1.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive" title={t('Remove')}>
+            <Trash2 size={16} />
           </button>
         </div>
-
-        <ChevronDown
-          size={14}
-          className={cn(
-            'text-muted-foreground transition-transform',
-            isExpanded && 'rotate-180'
-          )}
-        />
       </div>
 
-      {/* Details */}
-      {isExpanded && (
-        <div className="px-4 pb-3 pt-0 border-t border-border">
-          <div className="pt-3 space-y-2">
-            <div>
-              <div className="text-xs font-medium text-muted-foreground mb-1">
-                {t('Description')}
-              </div>
-              <p className="text-sm text-foreground">{story.description || '-'}</p>
-            </div>
+      {/* Editable fields - always visible */}
+      <div className="p-3 space-y-3">
+        {/* Title */}
+        <div>
+          <div className="text-xs text-muted-foreground mb-1.5">{t('Title')} <span className="text-muted-foreground/60">({t('Optional')})</span></div>
+          <input
+            type="text"
+            value={story.title}
+            onChange={(e) => onChange({ ...story, title: e.target.value })}
+            placeholder={t('Name this step')}
+            className="w-full px-3 py-2 bg-input border border-border rounded text-sm font-medium text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-0 focus:border-primary/50"
+          />
+        </div>
 
-            <div>
-              <div className="text-xs font-medium text-muted-foreground mb-1">
-                {t('Acceptance Criteria')}
-              </div>
-              <ul className="list-disc list-inside space-y-0.5">
-                {story.acceptanceCriteria.map((criterion, i) => (
-                  <li key={i} className="text-sm text-foreground">
-                    {criterion}
-                  </li>
-                ))}
-              </ul>
-            </div>
+        {/* Description */}
+        <div>
+          <div className="text-xs text-muted-foreground mb-1.5">{t('Description')} <span className="text-foreground/60">({t('Required')})</span></div>
+          <textarea
+            value={story.description}
+            onChange={(e) => onChange({ ...story, description: e.target.value })}
+            placeholder={t('Describe what you want AI to do...')}
+            rows={2}
+            className="w-full px-3 py-2 bg-input border border-border rounded text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-0 focus:border-primary/50 resize-none"
+          />
+        </div>
 
-            {story.notes && (
-              <div>
-                <div className="text-xs font-medium text-muted-foreground mb-1">{t('Notes')}</div>
-                <p className="text-sm text-muted-foreground">{story.notes}</p>
-              </div>
-            )}
-
-            {/* Quality Gates */}
-            <div onClick={(e) => e.stopPropagation()}>
-              <div className="flex items-center gap-1.5 mb-1">
-                <div className="text-xs font-medium text-muted-foreground">
-                  {t('Quality Gates')}
+        {/* Acceptance Criteria */}
+        <div>
+          <div className="text-xs text-muted-foreground mb-1.5">{t('Acceptance Criteria')} <span className="text-muted-foreground/60">({t('Optional')})</span></div>
+          <div className="bg-input border border-border rounded overflow-hidden divide-y divide-border">
+            {story.acceptanceCriteria.map((criterion, ci) => (
+              <div key={ci}>
+                <div className="px-3 pt-1.5 pb-0.5">
+                  <span className="text-muted-foreground text-xs">
+                    {ci === 0 ? t('Cond {{n}}', { n: ci + 1 }) : t('And Cond {{n}}', { n: ci + 1 })}
+                  </span>
                 </div>
-                <div className="relative group/tooltip">
-                  <Info size={12} className="text-muted-foreground cursor-default" />
-                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-56 bg-popover border border-border text-xs text-muted-foreground rounded-md px-2.5 py-2 shadow-md opacity-0 group-hover/tooltip:opacity-100 pointer-events-none transition-opacity z-10 whitespace-normal">
-                    {t('Enable when writing code to ensure quality')}
-                  </div>
+                <div className="flex items-center gap-2 px-3 pb-1.5">
+                  <input
+                    type="text"
+                    value={criterion}
+                    onChange={(e) => {
+                      const newCriteria = [...story.acceptanceCriteria]
+                      newCriteria[ci] = e.target.value
+                      onChange({ ...story, acceptanceCriteria: newCriteria })
+                    }}
+                    className="flex-1 bg-transparent text-sm text-foreground focus:outline-none"
+                  />
+                  <button
+                    onClick={() => onChange({ ...story, acceptanceCriteria: story.acceptanceCriteria.filter((_, i) => i !== ci) })}
+                    className="p-0.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
+                  >
+                    <Trash2 size={12} />
+                  </button>
                 </div>
               </div>
-              <div className="flex gap-4">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={story.requireTypecheck ?? false}
-                    onChange={(e) =>
-                      onUpdate({ ...story, requireTypecheck: e.target.checked })
-                    }
-                    className="rounded border-border"
-                  />
-                  <span className="text-sm text-foreground">{t('Typecheck')}</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={story.requireTests ?? false}
-                    onChange={(e) =>
-                      onUpdate({ ...story, requireTests: e.target.checked })
-                    }
-                    className="rounded border-border"
-                  />
-                  <span className="text-sm text-foreground">{t('Tests')}</span>
-                </label>
+            ))}
+            <div>
+              <div className="px-3 pt-1.5 pb-0.5">
+                <span className="text-muted-foreground text-xs">
+                  {story.acceptanceCriteria.length === 0
+                    ? t('Cond {{n}}', { n: 1 })
+                    : t('And Cond {{n}}', { n: story.acceptanceCriteria.length + 1 })}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 px-3 pb-1.5">
+                <input
+                  type="text"
+                  value={newCriterion}
+                  onChange={(e) => setNewCriterion(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAddCriterion() }
+                  }}
+                  placeholder={t('How to know it is done? Press Enter to add...')}
+                  className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
+                />
+                <button
+                  onClick={handleAddCriterion}
+                  disabled={!newCriterion.trim()}
+                  className="text-xs text-primary hover:text-primary/80 disabled:opacity-30 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+                >
+                  {t('Add Condition')}
+                </button>
               </div>
             </div>
           </div>
         </div>
-      )}
+      </div>
 
       <ConfirmDialog
         isOpen={showDeleteConfirm}

@@ -18,7 +18,8 @@ import {
   removeStory,
   reorderStories,
   retryStory,
-  retryFailed
+  retryFailed,
+  listAllScheduledTasks
 } from '../services/loop-task.service'
 import type { CreateLoopTaskConfig, LoopTask, UserStory } from '../../shared/types/loop-task'
 
@@ -210,6 +211,18 @@ export function registerLoopTaskHandlers(window: BrowserWindow | null): void {
       }
     }
   )
+
+  // List all scheduled tasks across all spaces
+  ipcMain.handle('loop-task:list-scheduled', async () => {
+    try {
+      const tasks = listAllScheduledTasks()
+      return { success: true, data: tasks }
+    } catch (error: unknown) {
+      const err = error as Error
+      console.error('[LoopTask IPC] list-scheduled error:', err)
+      return { success: false, error: err.message }
+    }
+  })
 
   // Export prd.json - generate prd.json file for wizard step 2->3
   ipcMain.handle(

@@ -24,7 +24,12 @@ import {
   XCircle,
   ChevronDown,
   Sparkles,
-  AlertCircle
+  AlertCircle,
+  Clock,
+  Calendar,
+  Timer,
+  Pencil,
+  Info
 } from 'lucide-react'
 import { useLoopTaskStore } from '../../stores/loop-task.store'
 import { useChatStore } from '../../stores/chat.store'
@@ -37,7 +42,8 @@ import {
   Step4Execute
 } from './steps'
 import { ConfirmDialog } from '../ui/ConfirmDialog'
-import type { LoopTask, UserStory } from '../../../shared/types/loop-task'
+import { ScheduleEditModal, formatScheduleDescription, formatNextRunTime } from './schedule'
+import type { LoopTask, UserStory, TaskSchedule } from '../../../shared/types/loop-task'
 
 interface LoopTaskPanelProps {
   spaceId: string
@@ -149,6 +155,7 @@ function TaskViewMode({ task, spaceId }: TaskViewModeProps) {
   const [showStopConfirm, setShowStopConfirm] = useState(false)
   const [expandedStories, setExpandedStories] = useState<Set<string>>(new Set())
   const [error, setError] = useState<string | null>(null)
+  const [showScheduleEdit, setShowScheduleEdit] = useState(false)
 
   const [isRetrying, setIsRetrying] = useState(false)
 
@@ -225,6 +232,19 @@ function TaskViewMode({ task, spaceId }: TaskViewModeProps) {
     }
   }
 
+  // Update schedule
+  const handleScheduleUpdate = async (schedule: TaskSchedule) => {
+    try {
+      const result = await api.loopTaskUpdate(spaceId, task.id, { schedule })
+      if (result.success && result.data) {
+        handleTaskUpdate(result.data)
+      }
+    } catch (err) {
+      console.error('Failed to update schedule:', err)
+    }
+    setShowScheduleEdit(false)
+  }
+
   // Stop execution (after confirmation)
   const handleStopConfirm = async () => {
     setShowStopConfirm(false)
@@ -256,6 +276,31 @@ function TaskViewMode({ task, spaceId }: TaskViewModeProps) {
                 </>
               )}
             </p>
+            {/* Schedule info */}
+            {task.schedule && task.schedule.type !== 'manual' && (
+              <div className="flex items-center gap-2 mt-1">
+                <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                  {task.schedule.type === 'cron' ? <Calendar size={11} /> : <Timer size={11} />}
+                  {formatScheduleDescription(task.schedule, t)}
+                </span>
+                {task.schedule.enabled && task.schedule.nextScheduledAt && (
+                  <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <Clock size={11} />
+                    {formatNextRunTime(task.schedule.nextScheduledAt, t)}
+                  </span>
+                )}
+                {!task.schedule.enabled && (
+                  <span className="text-xs text-amber-500">{t('Paused')}</span>
+                )}
+                <button
+                  onClick={() => setShowScheduleEdit(true)}
+                  className="p-0.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                  title={t('Edit Schedule')}
+                >
+                  <Pencil size={11} />
+                </button>
+              </div>
+            )}
           </div>
           {isRunning && (
             <button
@@ -394,9 +439,19 @@ function TaskViewMode({ task, spaceId }: TaskViewModeProps) {
         onConfirm={handleStopConfirm}
         onCancel={() => setShowStopConfirm(false)}
       />
+
+      {/* Schedule Edit Modal */}
+      {showScheduleEdit && (
+        <ScheduleEditModal
+          schedule={task.schedule || { type: 'manual', enabled: false }}
+          onSave={handleScheduleUpdate}
+          onClose={() => setShowScheduleEdit(false)}
+        />
+      )}
     </div>
   )
 }
+
 
 // ============================================
 // Story Card (for view mode)
