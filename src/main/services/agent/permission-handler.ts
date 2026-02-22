@@ -7,7 +7,7 @@
 
 import path from 'path'
 import { getConfig } from '../config.service'
-import { isAIBrowserTool } from '../ai-browser'
+import { isAIBrowserTool } from '../ai-browser/tool-utils'
 import { activeSessions } from './session-manager'
 import { sendToRenderer } from './helpers'
 import type { ToolCall, UserQuestionInfo } from './types'

@@ -19,6 +19,7 @@ import { OnboardingOverlay, OnboardingFlow } from './components/onboarding'
 import { UpdateNotification } from './components/updater/UpdateNotification'
 import { Toaster } from './components/ui/Toaster'
 import { api } from './api'
+import { logger } from './lib/logger'
 import type { AgentEventBase, Thought, ToolCall, HaloConfig } from './types'
 import { hasAnyAISource } from './types'
 
@@ -99,14 +100,14 @@ export default function App() {
   useEffect(() => {
     let initialized = false
     const startTime = Date.now()
-    console.log('[App] Mounted, waiting for bootstrap:extended-ready...')
+    logger.debug('[App] Mounted, waiting for bootstrap:extended-ready...')
 
     const doInit = async (trigger: 'event' | 'timeout') => {
       if (initialized) return
       initialized = true
 
       const waitTime = Date.now() - startTime
-      console.log(`[App] Starting initialization (trigger: ${trigger}, waited: ${waitTime}ms)`)
+      logger.debug(`[App] Starting initialization (trigger: ${trigger}, waited: ${waitTime}ms)`)
 
       await initialize()
       // Initialize onboarding after app config is loaded
@@ -115,7 +116,7 @@ export default function App() {
 
     // Listen for extended services ready event from main process
     const unsubscribe = api.onBootstrapExtendedReady((data) => {
-      console.log('[App] Received bootstrap:extended-ready', data)
+      logger.debug('[App] Received bootstrap:extended-ready', data)
       doInit('event')
     })
 
@@ -123,7 +124,7 @@ export default function App() {
     // This prevents the app from being stuck if something goes wrong
     const fallbackTimeout = setTimeout(() => {
       if (!initialized) {
-        console.warn('[App] Bootstrap timeout after 10000ms, force initializing...')
+        logger.warn('[App] Bootstrap timeout after 10000ms, force initializing...')
         doInit('timeout')
       }
     }, 10000)
@@ -152,14 +153,14 @@ export default function App() {
   // Connect WebSocket for remote mode
   useEffect(() => {
     if (api.isRemoteMode()) {
-      console.log('[App] Remote mode detected, connecting WebSocket...')
+      logger.debug('[App] Remote mode detected, connecting WebSocket...')
       api.connectWebSocket()
     }
   }, [])
 
   // Initialize AI Browser IPC listeners for active view sync
   useEffect(() => {
-    console.log('[App] Initializing AI Browser store listeners')
+    logger.debug('[App] Initializing AI Browser store listeners')
     initPerfStoreListeners()
     const cleanup = initAIBrowserStoreListeners()
     return cleanup
@@ -167,7 +168,7 @@ export default function App() {
 
   // Register agent event listeners (global - handles events for all conversations)
   useEffect(() => {
-    console.log('[App] Registering agent event listeners')
+    logger.debug('[App] Registering agent event listeners')
 
     // Agent start - message actually begins executing (after queue wait)
     const unsubStart = api.onAgentStart((data) => {
@@ -176,54 +177,54 @@ export default function App() {
 
     // Primary thought listener - handles all agent reasoning events
     const unsubThought = api.onAgentThought((data) => {
-      console.log('[App] Received agent:thought event:', data)
+      logger.debug('[App] Received agent:thought event:', data)
       handleAgentThought(data as AgentEventBase & { thought: Thought })
     })
 
     // Message events (with session IDs)
     const unsubMessage = api.onAgentMessage((data) => {
-      console.log('[App] Received agent:message event:', data)
+      logger.debug('[App] Received agent:message event:', data)
       handleAgentMessage(data as AgentEventBase & { content: string; isComplete: boolean })
     })
 
     const unsubToolCall = api.onAgentToolCall((data) => {
-      console.log('[App] Received agent:tool-call event:', data)
+      logger.debug('[App] Received agent:tool-call event:', data)
       handleAgentToolCall(data as AgentEventBase & ToolCall)
     })
 
     const unsubToolResult = api.onAgentToolResult((data) => {
-      console.log('[App] Received agent:tool-result event:', data)
+      logger.debug('[App] Received agent:tool-result event:', data)
       handleAgentToolResult(data as AgentEventBase & { toolId: string; result: string; isError: boolean })
     })
 
     const unsubError = api.onAgentError((data) => {
-      console.log('[App] Received agent:error event:', data)
+      logger.debug('[App] Received agent:error event:', data)
       handleAgentError(data as AgentEventBase & { error: string; errorCode?: number })
     })
 
     const unsubComplete = api.onAgentComplete((data) => {
-      console.log('[App] Received agent:complete event:', data)
+      logger.debug('[App] Received agent:complete event:', data)
       handleAgentComplete(data as AgentEventBase)
     })
 
     const unsubCompact = api.onAgentCompact((data) => {
-      console.log('[App] Received agent:compact event:', data)
+      logger.debug('[App] Received agent:compact event:', data)
       handleAgentCompact(data as AgentEventBase & { trigger: 'manual' | 'auto'; preTokens: number })
     })
 
     const unsubUserQuestion = api.onAgentUserQuestion((data) => {
-      console.log('[App] Received agent:user-question event:', data)
+      logger.debug('[App] Received agent:user-question event:', data)
       handleAgentUserQuestion(data as AgentEventBase & { toolId: string; questions: Array<{ question: string; header: string; options: Array<{ label: string; description: string }>; multiSelect: boolean }> })
     })
 
     const unsubUserQuestionAnswered = api.onAgentUserQuestionAnswered((data) => {
-      console.log('[App] Received agent:user-question-answered event:', data)
+      logger.debug('[App] Received agent:user-question-answered event:', data)
       handleAgentUserQuestionAnswered(data as AgentEventBase)
     })
 
     // MCP status updates (global - not per-conversation)
     const unsubMcpStatus = api.onAgentMcpStatus((data) => {
-      console.log('[App] Received agent:mcp-status event:', data)
+      logger.debug('[App] Received agent:mcp-status event:', data)
       const event = data as { servers: Array<{ name: string; status: string }>; timestamp: number }
       if (event.servers) {
         setMcpStatus(event.servers as any, event.timestamp)
@@ -236,18 +237,18 @@ export default function App() {
     const unsubSkillsFanLogin = api.onSkillsFanLoginSuccess(async () => {
       const currentView = useAppStore.getState().view
       if (currentView === 'setup') {
-        console.log('[App] SkillsFan login success, but SetupFlow is handling it')
+        logger.debug('[App] SkillsFan login success, but SetupFlow is handling it')
         return
       }
 
-      console.log('[App] SkillsFan login success, completing model setup...')
+      logger.debug('[App] SkillsFan login success, completing model setup...')
 
       // Complete login via AISourceManager - fetches models, saves tokens + models to config
       const completeResult = await api.authCompleteLogin('skillsfan-credits', 'skillsfan-credits-login')
       if (completeResult.success) {
-        console.log('[App] SkillsFan model setup complete')
+        logger.debug('[App] SkillsFan model setup complete')
       } else {
-        console.warn('[App] Failed to complete model setup:', completeResult.error)
+        logger.warn('[App] Failed to complete model setup:', completeResult.error)
       }
 
       // Reload config into store (now includes skillsfan-credits with models)
@@ -309,7 +310,7 @@ export default function App() {
 
     // Set new timeout - debounce for 300ms
     navigationDebounceTimerRef.current = setTimeout(() => {
-      console.log('[App] Executing debounced keyboard navigation')
+      logger.debug('[App] Executing debounced keyboard navigation')
       pendingNavigationRef.current?.()
       pendingNavigationRef.current = null
       navigationDebounceTimerRef.current = null
@@ -336,7 +337,7 @@ export default function App() {
       if (e.key === 'ArrowUp') {
         e.preventDefault()
         debouncedNavigate(() => {
-          console.log('[App] Keyboard: navigating to earlier result')
+          logger.debug('[App] Keyboard: navigating to earlier result')
           goToNextResult() // goToNextResult increases index = earlier in time
         })
         return
@@ -347,7 +348,7 @@ export default function App() {
       if (e.key === 'ArrowDown') {
         e.preventDefault()
         debouncedNavigate(() => {
-          console.log('[App] Keyboard: navigating to more recent result')
+          logger.debug('[App] Keyboard: navigating to more recent result')
           goToPreviousResult() // goToPreviousResult decreases index = more recent in time
         })
         return
@@ -380,12 +381,12 @@ export default function App() {
 
       const { messageId, spaceId, conversationId, query } = customEvent.detail
 
-      console.log(`[App] search:navigate-to-result event - space=${spaceId}, conv=${conversationId}, msg=${messageId}`)
+      logger.debug(`[App] search:navigate-to-result event - space=${spaceId}, conv=${conversationId}, msg=${messageId}`)
 
       try {
         // Step 1: If switching spaces, update both stores
         if (spaceId !== currentSpaceId) {
-          console.log(`[App] Switching to space: ${spaceId}`)
+          logger.debug(`[App] Switching to space: ${spaceId}`)
 
           // Find the space object
           let targetSpace = null
@@ -396,12 +397,12 @@ export default function App() {
           }
 
           if (!targetSpace) {
-            console.error(`[App] Space not found: ${spaceId}`)
+            logger.error(`[App] Space not found: ${spaceId}`)
             return
           }
 
           // Update spaceStore
-          console.log(`[App] Updating space to: ${targetSpace.name}`)
+          logger.debug(`[App] Updating space to: ${targetSpace.name}`)
           setSpaceStoreCurrentSpace(targetSpace)
 
           // Update chatStore
@@ -412,47 +413,62 @@ export default function App() {
         }
 
         // Step 2: Load conversations if needed
-        console.log(`[App] Loading conversations for space: ${spaceId}`)
+        logger.debug(`[App] Loading conversations for space: ${spaceId}`)
         await loadConversations(spaceId)
 
         // Step 3: Select conversation
-        console.log(`[App] Selecting conversation: ${conversationId}`)
+        logger.debug(`[App] Selecting conversation: ${conversationId}`)
         await selectConversation(conversationId)
 
         // Step 4: Wait for message element to render and navigate
-        console.log(`[App] Waiting for message element: ${messageId}`)
-        let retries = 0
-        const maxRetries = 50
+        logger.debug(`[App] Waiting for message element: ${messageId}`)
 
-        const waitAndNavigate = async () => {
-          while (retries < maxRetries) {
-            const messageElement = document.querySelector(`[data-message-id="${messageId}"]`)
-            if (messageElement) {
-              console.log(`[App] Message element found, dispatching navigate event`)
-              // Dispatch the actual navigation event
-              const navEvent = new CustomEvent('search:navigate-to-message', {
-                detail: {
-                  messageId,
-                  query
-                }
-              })
-              window.dispatchEvent(navEvent)
+        const waitForMessageElement = (targetMessageId: string, timeoutMs: number): Promise<Element | null> => {
+          return new Promise((resolve) => {
+            const selector = `[data-message-id="${targetMessageId}"]`
+            const existingElement = document.querySelector(selector)
+            if (existingElement) {
+              resolve(existingElement)
               return
             }
 
-            retries++
-            if (retries % 10 === 0) {
-              console.log(`[App] Waiting for message... (${retries}/${maxRetries})`)
-            }
-            await new Promise(resolve => setTimeout(resolve, 100))
-          }
+            let timeoutId: number | null = null
+            const observer = new MutationObserver(() => {
+              const target = document.querySelector(selector)
+              if (target) {
+                observer.disconnect()
+                if (timeoutId !== null) {
+                  window.clearTimeout(timeoutId)
+                }
+                resolve(target)
+              }
+            })
 
-          console.warn(`[App] Message element not found after retries`)
+            observer.observe(document.body, { childList: true, subtree: true })
+
+            timeoutId = window.setTimeout(() => {
+              observer.disconnect()
+              resolve(null)
+            }, timeoutMs)
+          })
         }
 
-        waitAndNavigate()
+        const messageElement = await waitForMessageElement(messageId, 5000)
+        if (!messageElement) {
+          logger.warn(`[App] Message element not found before timeout`)
+          return
+        }
+
+        logger.debug(`[App] Message element found, dispatching navigate event`)
+        const navEvent = new CustomEvent('search:navigate-to-message', {
+          detail: {
+            messageId,
+            query
+          }
+        })
+        window.dispatchEvent(navEvent)
       } catch (error) {
-        console.error(`[App] Error navigating to result:`, error)
+        logger.error(`[App] Error navigating to result:`, error)
       }
     }
 
@@ -462,7 +478,7 @@ export default function App() {
 
   // Handle Git Bash setup completion
   const handleGitBashSetupComplete = async (installed: boolean) => {
-    console.log('[App] Git Bash setup completed, installed:', installed)
+    logger.debug('[App] Git Bash setup completed, installed:', installed)
 
     // Save skip preference if not installed
     if (!installed) {
@@ -487,18 +503,18 @@ export default function App() {
 
   // Handle onboarding login - open SkillsFan web login
   const handleOnboardingLogin = async () => {
-    console.log('[App] Starting SkillsFan login from onboarding')
+    logger.debug('[App] Starting SkillsFan login from onboarding')
     try {
       const result = await api.skillsfanStartLogin()
       if (result.success) {
         // Login flow started, wait for callback
         // The auth flow will trigger initialize() after successful login
-        console.log('[App] SkillsFan login started successfully')
+        logger.debug('[App] SkillsFan login started successfully')
       } else {
-        console.error('[App] Failed to start SkillsFan login:', result.error)
+        logger.error('[App] Failed to start SkillsFan login:', result.error)
       }
     } catch (e) {
-      console.error('[App] Error starting SkillsFan login:', e)
+      logger.error('[App] Error starting SkillsFan login:', e)
     }
   }
 

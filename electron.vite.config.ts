@@ -98,6 +98,50 @@ export default defineConfig({
         input: {
           index: resolve(__dirname, 'src/renderer/index.html'),
           overlay: resolve(__dirname, 'src/renderer/overlay.html')
+        },
+        output: {
+          manualChunks(id) {
+            if (!id.includes('node_modules')) return undefined
+
+            if (
+              id.includes('/react/') ||
+              id.includes('/react-dom/') ||
+              id.includes('/zustand/') ||
+              id.includes('/i18next/') ||
+              id.includes('/react-i18next/')
+            ) {
+              return 'vendor-react'
+            }
+
+            if (
+              id.includes('/react-markdown/') ||
+              id.includes('/remark-gfm/') ||
+              id.includes('/rehype-highlight/') ||
+              id.includes('/rehype-raw/') ||
+              id.includes('/streamdown/') ||
+              id.includes('/@streamdown/')
+            ) {
+              return 'vendor-markdown'
+            }
+
+            if (id.includes('/highlight.js/')) {
+              return 'vendor-highlight'
+            }
+
+            if (
+              id.includes('/xlsx/') ||
+              id.includes('/mammoth/') ||
+              id.includes('/qrcode/')
+            ) {
+              return 'vendor-data'
+            }
+
+            if (id.includes('/lucide-react/')) {
+              return 'vendor-ui'
+            }
+
+            return undefined
+          }
         }
       }
     },

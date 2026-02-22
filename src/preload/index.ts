@@ -5,7 +5,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
 // Type definitions for exposed API
-export interface HaloAPI {
+export interface SkillsFanAPI {
   // Generic Auth (provider-agnostic)
   authGetProviders: () => Promise<IpcResponse>
   authStartLogin: (providerType: string) => Promise<IpcResponse>
@@ -420,25 +420,34 @@ interface IpcResponse<T = unknown> {
   error?: string
 }
 
+const PRELOAD_DEBUG = import.meta.env.DEV && import.meta.env.VITE_DEBUG_LOGS !== 'false'
+
+function preloadDebug(...args: unknown[]): void {
+  if (!PRELOAD_DEBUG) {
+    return
+  }
+  console.log(...args)
+}
+
 // Create event listener with cleanup
 function createEventListener(channel: string, callback: (data: unknown) => void): () => void {
-  console.log(`[Preload] Creating event listener for channel: ${channel}`)
+  preloadDebug(`[Preload] Creating event listener for channel: ${channel}`)
 
   const handler = (_event: Electron.IpcRendererEvent, data: unknown): void => {
-    console.log(`[Preload] Received event on channel: ${channel}`, data)
+    preloadDebug(`[Preload] Received event on channel: ${channel}`, data)
     callback(data)
   }
 
   ipcRenderer.on(channel, handler)
 
   return () => {
-    console.log(`[Preload] Removing event listener for channel: ${channel}`)
+    preloadDebug(`[Preload] Removing event listener for channel: ${channel}`)
     ipcRenderer.removeListener(channel, handler)
   }
 }
 
 // Expose API to renderer
-const api: HaloAPI = {
+const api: SkillsFanAPI = {
   // Generic Auth (provider-agnostic)
   authGetProviders: () => ipcRenderer.invoke('auth:get-providers'),
   authStartLogin: (providerType) => ipcRenderer.invoke('auth:start-login', providerType),
@@ -733,7 +742,7 @@ ipcRenderer.on('analytics:track', (_event, data: {
     if (data.type === 'trackEvent') {
       // _hmt.push(['_trackEvent', category, action, opt_label, opt_value])
       win._hmt.push(['_trackEvent', data.category, data.action, data.label || '', data.value || 0])
-      console.log('[Analytics] Baidu event queued:', data.action)
+      preloadDebug('[Analytics] Baidu event queued:', data.action)
     }
   } catch (error) {
     console.warn('[Analytics] Failed to track Baidu event:', error)
@@ -751,7 +760,7 @@ const platformInfo = {
 contextBridge.exposeInMainWorld('platform', platformInfo)
 
 // Expose basic electron IPC for overlay SPA
-// This is used by the overlay window which doesn't need the full halo API
+// This is used by the overlay window which doesn't need the full SkillsFan API
 const electronAPI = {
   ipcRenderer: {
     on: (channel: string, callback: (...args: unknown[]) => void) => {
@@ -771,7 +780,7 @@ contextBridge.exposeInMainWorld('electron', electronAPI)
 // TypeScript declaration for window.skillsfan and window.platform
 declare global {
   interface Window {
-    halo: HaloAPI
+    skillsfan: SkillsFanAPI
     platform: {
       platform: 'darwin' | 'win32' | 'linux'
       isMac: boolean

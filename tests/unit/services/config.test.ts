@@ -15,7 +15,9 @@ import {
   saveConfig,
   getHaloDir,
   getConfigPath,
-  initializeApp
+  initializeApp,
+  onApiConfigChange,
+  onMemoryConfigChange
 } from '../../../src/main/services/config.service'
 
 describe('Config Service', () => {
@@ -53,6 +55,16 @@ describe('Config Service', () => {
       const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'))
       expect(config.api).toBeDefined()
       expect(config.permissions).toBeDefined()
+    })
+
+    it('should restrict config file permissions on unix systems', async () => {
+      if (process.platform === 'win32') return
+
+      await initializeApp()
+
+      const configPath = getConfigPath()
+      const mode = fs.statSync(configPath).mode & 0o777
+      expect(mode).toBe(0o600)
     })
   })
 
@@ -142,6 +154,46 @@ describe('Config Service', () => {
 
       const config = getConfig()
       expect(config.mcpServers).toEqual({ server2: { command: 'cmd2' } })
+    })
+  })
+
+  describe('change notifications', () => {
+    beforeEach(async () => {
+      await initializeApp()
+    })
+
+    it('should notify API config subscribers on API changes', async () => {
+      const handler = vi.fn()
+      const unsubscribe = onApiConfigChange(handler)
+
+      saveConfig({ api: { apiKey: 'new-key' } } as any)
+      await new Promise(resolve => setTimeout(resolve, 0))
+
+      expect(handler).toHaveBeenCalledTimes(1)
+      unsubscribe()
+    })
+
+    it('should stop notifying API subscriber after unsubscribe', async () => {
+      const handler = vi.fn()
+      const unsubscribe = onApiConfigChange(handler)
+      unsubscribe()
+
+      saveConfig({ api: { apiKey: 'new-key' } } as any)
+      await new Promise(resolve => setTimeout(resolve, 0))
+
+      expect(handler).not.toHaveBeenCalled()
+    })
+
+    it('should notify memory config subscribers with new values', async () => {
+      const handler = vi.fn()
+      const unsubscribe = onMemoryConfigChange(handler)
+
+      saveConfig({ memory: { enabled: false, retentionDays: 30 } } as any)
+      await new Promise(resolve => setTimeout(resolve, 0))
+
+      expect(handler).toHaveBeenCalledTimes(1)
+      expect(handler).toHaveBeenCalledWith(false, 30)
+      unsubscribe()
     })
   })
 })

@@ -45,6 +45,15 @@ let mainWindow: BrowserWindow | null = null
 
 // Default port
 const DEFAULT_PORT = 3847
+const REMOTE_AUTH_COOKIE_KEY = 'skillsfan_authenticated'
+const LEGACY_REMOTE_AUTH_COOKIE_KEY = 'halo_authenticated'
+const REMOTE_TOKEN_STORAGE_KEY = 'skillsfan_remote_token'
+const LEGACY_REMOTE_TOKEN_STORAGE_KEY = 'halo_remote_token'
+
+function hasRemoteAuthCookie(cookies: string): boolean {
+  return cookies.includes(`${REMOTE_AUTH_COOKIE_KEY}=true`)
+    || cookies.includes(`${LEGACY_REMOTE_AUTH_COOKIE_KEY}=true`)
+}
 
 /**
  * Start the HTTP server
@@ -120,7 +129,7 @@ export async function startHttpServer(
 
         // No cookie and no valid header token → show login page
         const cookies = req.headers.cookie || ''
-        const hasToken = cookies.includes('halo_authenticated=true')
+        const hasToken = hasRemoteAuthCookie(cookies)
         if (!hasToken && !headerToken) {
           return res.send(getRemoteLoginPage())
         }
@@ -184,7 +193,7 @@ export async function startHttpServer(
 
       // Check if authenticated via cookie
       const cookies = req.headers.cookie || ''
-      const hasToken = cookies.includes('halo_authenticated=true')
+      const hasToken = hasRemoteAuthCookie(cookies)
 
       // If not authenticated, show login page
       if (!hasToken) {
@@ -472,8 +481,10 @@ function getRemoteLoginPage(): string {
         });
 
         if (res.ok) {
-          localStorage.setItem('halo_remote_token', token);
-          document.cookie = 'halo_authenticated=true; path=/';
+          localStorage.setItem('${REMOTE_TOKEN_STORAGE_KEY}', token);
+          localStorage.setItem('${LEGACY_REMOTE_TOKEN_STORAGE_KEY}', token);
+          document.cookie = '${REMOTE_AUTH_COOKIE_KEY}=true; path=/';
+          document.cookie = '${LEGACY_REMOTE_AUTH_COOKIE_KEY}=true; path=/';
           msg.className = 'msg success';
           msg.textContent = '连接成功，加载中…';
           setTimeout(() => location.reload(), 500);
@@ -516,8 +527,10 @@ function getAutoLoginPage(token: string): string {
 <p class="tip">连接中…</p>
 <script>
   try {
-    localStorage.setItem('halo_remote_token', ${safeToken});
-    document.cookie = 'halo_authenticated=true; path=/';
+    localStorage.setItem('${REMOTE_TOKEN_STORAGE_KEY}', ${safeToken});
+    localStorage.setItem('${LEGACY_REMOTE_TOKEN_STORAGE_KEY}', ${safeToken});
+    document.cookie = '${REMOTE_AUTH_COOKIE_KEY}=true; path=/';
+    document.cookie = '${LEGACY_REMOTE_AUTH_COOKIE_KEY}=true; path=/';
   } catch(e) {}
   location.replace('/');
 </script>

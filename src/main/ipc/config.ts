@@ -2,8 +2,10 @@
  * Config IPC Handlers
  */
 
-import { ipcMain, BrowserWindow } from 'electron'
-import { getConfig, saveConfig, validateApiConnection } from '../services/config.service'
+import { ipcMain, BrowserWindow, app } from 'electron'
+import fs from 'fs-extra'
+import path from 'path'
+import { getConfigAsync, saveConfigAsync, validateApiConnection } from '../services/config.service'
 import { getAISourceManager } from '../services/ai-sources'
 import { setIsQuitting } from '../services/tray.service'
 import { fetchPublicModels } from '../services/skillsfan/models.service'
@@ -12,7 +14,7 @@ export function registerConfigHandlers(): void {
   // Get configuration
   ipcMain.handle('config:get', async () => {
     try {
-      const config = getConfig()
+      const config = await getConfigAsync()
       // No decryption needed - config is already in plaintext after migration
       return { success: true, data: config }
     } catch (error: unknown) {
@@ -28,7 +30,7 @@ export function registerConfigHandlers(): void {
       const processedUpdates = { ...updates }
       const incomingAiSources = processedUpdates.aiSources as Record<string, any> | undefined
       if (incomingAiSources && typeof incomingAiSources === 'object') {
-        const currentConfig = getConfig() as Record<string, any>
+        const currentConfig = await getConfigAsync() as Record<string, any>
         const currentAiSources = currentConfig.aiSources || { current: 'custom' }
         const mergedAiSources: Record<string, any> = {
           ...currentAiSources,
@@ -52,7 +54,7 @@ export function registerConfigHandlers(): void {
       }
 
       // No encryption needed - save API keys in plaintext
-      const config = saveConfig(processedUpdates)
+      const config = await saveConfigAsync(processedUpdates as any)
       return { success: true, data: config }
     } catch (error: unknown) {
       const err = error as Error
@@ -79,7 +81,7 @@ export function registerConfigHandlers(): void {
     try {
       const manager = getAISourceManager()
       await manager.refreshAllConfigs()
-      const config = getConfig()
+      const config = await getConfigAsync()
       return { success: true, data: config }
     } catch (error: unknown) {
       const err = error as Error
@@ -102,10 +104,6 @@ export function registerConfigHandlers(): void {
   // Reset to default settings
   ipcMain.handle('config:reset-to-default', async () => {
     try {
-      const { app } = await import('electron')
-      const fs = await import('fs-extra')
-      const path = await import('path')
-
       // Get app data path
       const isDev = process.env.NODE_ENV === 'development'
       const appDataPath = isDev

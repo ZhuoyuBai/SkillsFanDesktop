@@ -29,6 +29,7 @@ import { registerOverlayHandlers, cleanupOverlayHandlers } from '../ipc/overlay'
 import { initializeSearchHandlers, cleanupSearchHandlers } from '../ipc/search'
 import { registerPerfHandlers } from '../ipc/perf'
 import { registerGitBashHandlers, initializeGitBashOnStartup } from '../ipc/git-bash'
+import { registerSkillHandlers } from '../ipc/skill'
 import { initializeRegistry, startSkillWatcher } from '../services/skill'
 import { registerRalphHandlers } from '../ipc/ralph'
 import { registerLoopTaskHandlers } from '../ipc/loop-task'
@@ -87,6 +88,9 @@ export function initializeExtendedServices(mainWindow: BrowserWindow): void {
 
   // Loop Task: Persistent loop task storage
   registerLoopTaskHandlers(mainWindow)
+
+  // Skill: Settings and slash-command APIs
+  registerSkillHandlers()
 
   // Recover stale running loop tasks after crash/restart
   try {

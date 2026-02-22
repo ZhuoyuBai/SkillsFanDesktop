@@ -16,7 +16,7 @@ import {
 } from 'fs'
 import { tmpdir } from 'os'
 import AdmZip from 'adm-zip'
-import { getSkillsDir } from './skill-registry'
+import { getSkillsDir, getSkill } from './skill-registry'
 import { parseFrontmatter } from './frontmatter'
 
 // Validation errors
@@ -268,7 +268,6 @@ export async function openSkillFolder(skillName: string): Promise<{
 }> {
   try {
     // First, try to find the skill in the registry to get its baseDir
-    const { getSkill } = await import('./skill-registry')
     const skill = getSkill(skillName)
 
     if (skill) {

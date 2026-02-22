@@ -7,6 +7,10 @@ out
 *.tsbuildinfo
 .skillsfan
 
+# Prevent generated artifacts from polluting shared source directory
+src/shared/**/*.js
+src/shared/**/*.d.ts
+
 # Release notes temp file
 .release-notes-current.md
 

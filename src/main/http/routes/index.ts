@@ -14,7 +14,7 @@ import * as agentController from '../../controllers/agent.controller'
 import * as spaceController from '../../controllers/space.controller'
 import * as conversationController from '../../controllers/conversation.controller'
 import * as configController from '../../controllers/config.controller'
-import { listArtifacts } from '../../services/artifact.service'
+import { listArtifacts, listArtifactsTree } from '../../services/artifact.service'
 import { getTempSpacePath, getSpacesDir } from '../../services/config.service'
 import { getSpace, getAllSpacePaths, isExistingDirectory } from '../../services/space.service'
 import * as loopTaskService from '../../services/loop-task.service'
@@ -255,7 +255,6 @@ export function registerApiRoutes(app: Express, mainWindow: BrowserWindow | null
   // Tree view of artifacts
   app.get('/api/spaces/:spaceId/artifacts/tree', async (req: Request, res: Response) => {
     try {
-      const { listArtifactsTree } = await import('../../services/artifact.service')
       const tree = listArtifactsTree(req.params.spaceId)
       res.json({ success: true, data: tree })
     } catch (error) {

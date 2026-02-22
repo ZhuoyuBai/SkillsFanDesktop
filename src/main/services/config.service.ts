@@ -5,24 +5,43 @@
 import { app } from 'electron'
 import { join } from 'path'
 import { homedir } from 'os'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
-import { atomicWriteJsonSync, safeReadJsonSync, cleanupTmpFiles } from '../utils/atomic-write'
+import { chmodSync, existsSync, mkdirSync } from 'fs'
+import { chmod as chmodAsync } from 'fs/promises'
+import { EventEmitter } from 'events'
+import { atomicWriteJsonSync, atomicWriteJson, safeReadJsonSync, safeReadJson, cleanupTmpFiles } from '../utils/atomic-write'
 
 // Import analytics config type
 import type { AnalyticsConfig } from './analytics/types'
 import type { AISourcesConfig, CustomSourceConfig } from '../../shared/types'
 
 // ============================================================================
-// API Config Change Notification (Callback Pattern)
+// Config Change Notification (EventEmitter Pattern)
 // ============================================================================
-// When API config changes (provider/apiKey/apiUrl), subscribers are notified.
-// This allows agent.service to invalidate sessions without circular dependency.
-// agent.service imports onApiConfigChange (agent → config, existing direction)
-// config.service calls registered callbacks (no import from agent)
+// When config changes, subscribers are notified via EventEmitter.
+// This keeps config.service decoupled from downstream services.
 // ============================================================================
 
 type ApiConfigChangeHandler = () => void
-const apiConfigChangeHandlers: ApiConfigChangeHandler[] = []
+type MemoryConfigChangeHandler = (enabled: boolean, retentionDays: number) => void
+
+const CONFIG_EVENTS = {
+  apiConfigChanged: 'api-config-changed',
+  memoryConfigChanged: 'memory-config-changed'
+} as const
+
+const configEvents = new EventEmitter()
+configEvents.setMaxListeners(50)
+
+function emitConfigEventSafely(event: string, ...args: unknown[]): void {
+  const listeners = configEvents.listeners(event)
+  for (const listener of listeners) {
+    try {
+      (listener as (...eventArgs: unknown[]) => void)(...args)
+    } catch (e) {
+      console.error(`[Config] Error in ${event} handler:`, e)
+    }
+  }
+}
 
 /**
  * Register a callback to be notified when API config changes.
@@ -31,19 +50,11 @@ const apiConfigChangeHandlers: ApiConfigChangeHandler[] = []
  * @returns Unsubscribe function
  */
 export function onApiConfigChange(handler: ApiConfigChangeHandler): () => void {
-  apiConfigChangeHandlers.push(handler)
+  configEvents.on(CONFIG_EVENTS.apiConfigChanged, handler)
   return () => {
-    const idx = apiConfigChangeHandlers.indexOf(handler)
-    if (idx >= 0) apiConfigChangeHandlers.splice(idx, 1)
+    configEvents.off(CONFIG_EVENTS.apiConfigChanged, handler)
   }
 }
-
-// ============================================================================
-// Memory Config Change Notification
-// ============================================================================
-
-type MemoryConfigChangeHandler = (enabled: boolean, retentionDays: number) => void
-const memoryConfigChangeHandlers: MemoryConfigChangeHandler[] = []
 
 /**
  * Register a callback to be notified when memory config changes.
@@ -52,10 +63,9 @@ const memoryConfigChangeHandlers: MemoryConfigChangeHandler[] = []
  * @returns Unsubscribe function
  */
 export function onMemoryConfigChange(handler: MemoryConfigChangeHandler): () => void {
-  memoryConfigChangeHandlers.push(handler)
+  configEvents.on(CONFIG_EVENTS.memoryConfigChanged, handler)
   return () => {
-    const idx = memoryConfigChangeHandlers.indexOf(handler)
-    if (idx >= 0) memoryConfigChangeHandlers.splice(idx, 1)
+    configEvents.off(CONFIG_EVENTS.memoryConfigChanged, handler)
   }
 }
 
@@ -219,6 +229,28 @@ const DEFAULT_CONFIG: HaloConfig = {
   }
 }
 
+const CONFIG_FILE_MODE = 0o600
+
+function ensureConfigFilePermissions(configPath: string): void {
+  if (process.platform === 'win32') return
+
+  try {
+    chmodSync(configPath, CONFIG_FILE_MODE)
+  } catch (error) {
+    console.warn('[Config] Failed to set config file permissions:', error)
+  }
+}
+
+async function ensureConfigFilePermissionsAsync(configPath: string): Promise<void> {
+  if (process.platform === 'win32') return
+
+  try {
+    await chmodAsync(configPath, CONFIG_FILE_MODE)
+  } catch (error) {
+    console.warn('[Config] Failed to set config file permissions (async):', error)
+  }
+}
+
 function normalizeAiSources(parsed: Record<string, any>): AISourcesConfig {
   const raw = parsed?.aiSources
   const aiSources: AISourcesConfig = {
@@ -308,74 +340,30 @@ function getAiSourcesSignature(aiSources?: AISourcesConfig): string {
   return current
 }
 
-// Initialize app directories
-export async function initializeApp(): Promise<void> {
-  const haloDir = getHaloDir()
-  const tempDir = getTempSpacePath()
-  const spacesDir = getSpacesDir()
-  const tempArtifactsDir = join(tempDir, 'artifacts')
-  const tempConversationsDir = join(tempDir, 'conversations')
-
-  // Create directories if they don't exist
-  const dirs = [haloDir, tempDir, spacesDir, tempArtifactsDir, tempConversationsDir]
-  for (const dir of dirs) {
-    if (!existsSync(dir)) {
-      mkdirSync(dir, { recursive: true })
-    }
-  }
-
-  // Clean up any residual .tmp files from previous crashes
-  cleanupTmpFiles(haloDir)
-
-  // Create default config if it doesn't exist
-  const configPath = getConfigPath()
-  if (!existsSync(configPath)) {
-    atomicWriteJsonSync(configPath, DEFAULT_CONFIG, { backup: true })
+function mergeConfigWithDefaults(parsed: Record<string, any>): HaloConfig {
+  const aiSources = normalizeAiSources(parsed)
+  return {
+    ...DEFAULT_CONFIG,
+    ...parsed,
+    api: { ...DEFAULT_CONFIG.api, ...parsed.api },
+    aiSources,
+    permissions: { ...DEFAULT_CONFIG.permissions, ...parsed.permissions },
+    appearance: { ...DEFAULT_CONFIG.appearance, ...parsed.appearance },
+    system: { ...DEFAULT_CONFIG.system, ...parsed.system },
+    onboarding: { ...DEFAULT_CONFIG.onboarding, ...parsed.onboarding },
+    // mcpServers is a flat map, just use parsed value or default
+    mcpServers: parsed.mcpServers || DEFAULT_CONFIG.mcpServers,
+    // analytics: keep as-is (managed by analytics.service.ts)
+    analytics: parsed.analytics,
+    // spaces: merge with defaults
+    spaces: { ...DEFAULT_CONFIG.spaces, ...parsed.spaces },
+    // memory: merge with defaults
+    memory: { ...DEFAULT_CONFIG.memory, ...parsed.memory }
   }
 }
 
-// Get configuration
-export function getConfig(): HaloConfig {
-  const configPath = getConfigPath()
-
-  if (!existsSync(configPath)) {
-    return DEFAULT_CONFIG
-  }
-
-  try {
-    const parsed = safeReadJsonSync(configPath, null as any)
-    if (!parsed) return DEFAULT_CONFIG
-    const aiSources = normalizeAiSources(parsed)
-    // Deep merge to ensure all nested defaults are applied
-    return {
-      ...DEFAULT_CONFIG,
-      ...parsed,
-      api: { ...DEFAULT_CONFIG.api, ...parsed.api },
-      aiSources,
-      permissions: { ...DEFAULT_CONFIG.permissions, ...parsed.permissions },
-      appearance: { ...DEFAULT_CONFIG.appearance, ...parsed.appearance },
-      system: { ...DEFAULT_CONFIG.system, ...parsed.system },
-      onboarding: { ...DEFAULT_CONFIG.onboarding, ...parsed.onboarding },
-      // mcpServers is a flat map, just use parsed value or default
-      mcpServers: parsed.mcpServers || DEFAULT_CONFIG.mcpServers,
-      // analytics: keep as-is (managed by analytics.service.ts)
-      analytics: parsed.analytics,
-      // spaces: merge with defaults
-      spaces: { ...DEFAULT_CONFIG.spaces, ...parsed.spaces },
-      // memory: merge with defaults
-      memory: { ...DEFAULT_CONFIG.memory, ...parsed.memory }
-    }
-  } catch (error) {
-    console.error('Failed to read config:', error)
-    return DEFAULT_CONFIG
-  }
-}
-
-// Save configuration
-export function saveConfig(config: Partial<HaloConfig>): HaloConfig {
-  const currentConfig = getConfig()
+function applyConfigUpdates(currentConfig: HaloConfig, config: Partial<HaloConfig>): HaloConfig {
   const newConfig = { ...currentConfig, ...config }
-  const previousAiSourcesSignature = getAiSourcesSignature(currentConfig.aiSources)
 
   // Deep merge for nested objects
   if (config.api) {
@@ -414,55 +402,127 @@ export function saveConfig(config: Partial<HaloConfig>): HaloConfig {
     newConfig.memory = { ...currentConfig.memory, ...config.memory }
   }
 
-  const configPath = getConfigPath()
-  atomicWriteJsonSync(configPath, newConfig, { backup: true })
+  return newConfig
+}
 
-  // Detect API config changes and notify subscribers
-  // This allows agent.service to invalidate sessions when API config changes
+function notifyConfigChange(currentConfig: HaloConfig, newConfig: HaloConfig, updates: Partial<HaloConfig>): void {
+  const previousAiSourcesSignature = getAiSourcesSignature(currentConfig.aiSources)
   const nextAiSourcesSignature = getAiSourcesSignature(newConfig.aiSources)
   const aiSourcesChanged = previousAiSourcesSignature !== nextAiSourcesSignature
 
-  if (config.api || config.aiSources) {
+  if (updates.api || updates.aiSources) {
     const apiChanged =
-      !!config.api &&
-      (config.api.provider !== currentConfig.api.provider ||
-        config.api.apiKey !== currentConfig.api.apiKey ||
-        config.api.apiUrl !== currentConfig.api.apiUrl)
+      !!updates.api &&
+      (updates.api.provider !== currentConfig.api.provider ||
+        updates.api.apiKey !== currentConfig.api.apiKey ||
+        updates.api.apiUrl !== currentConfig.api.apiUrl)
 
-    if ((apiChanged || aiSourcesChanged) && apiConfigChangeHandlers.length > 0) {
+    if ((apiChanged || aiSourcesChanged) && configEvents.listenerCount(CONFIG_EVENTS.apiConfigChanged) > 0) {
       console.log('[Config] API config changed, notifying subscribers...')
-      // Use setTimeout to avoid blocking the save operation
-      // and ensure all handlers are called asynchronously
       setTimeout(() => {
-        apiConfigChangeHandlers.forEach(handler => {
-          try {
-            handler()
-          } catch (e) {
-            console.error('[Config] Error in API config change handler:', e)
-          }
-        })
+        emitConfigEventSafely(CONFIG_EVENTS.apiConfigChanged)
       }, 0)
     }
   }
 
   // Detect memory config changes and notify subscribers
-  if (config.memory && memoryConfigChangeHandlers.length > 0) {
+  if (updates.memory && configEvents.listenerCount(CONFIG_EVENTS.memoryConfigChanged) > 0) {
     const memoryChanged =
-      config.memory.enabled !== currentConfig.memory?.enabled ||
-      config.memory.retentionDays !== currentConfig.memory?.retentionDays
+      updates.memory.enabled !== currentConfig.memory?.enabled ||
+      updates.memory.retentionDays !== currentConfig.memory?.retentionDays
     if (memoryChanged) {
       const m = newConfig.memory!
       setTimeout(() => {
-        memoryConfigChangeHandlers.forEach(handler => {
-          try {
-            handler(m.enabled, m.retentionDays)
-          } catch (e) {
-            console.error('[Config] Error in memory config change handler:', e)
-          }
-        })
+        emitConfigEventSafely(CONFIG_EVENTS.memoryConfigChanged, m.enabled, m.retentionDays)
       }, 0)
     }
   }
+}
+
+// Initialize app directories
+export async function initializeApp(): Promise<void> {
+  const haloDir = getHaloDir()
+  const tempDir = getTempSpacePath()
+  const spacesDir = getSpacesDir()
+  const tempArtifactsDir = join(tempDir, 'artifacts')
+  const tempConversationsDir = join(tempDir, 'conversations')
+
+  // Create directories if they don't exist
+  const dirs = [haloDir, tempDir, spacesDir, tempArtifactsDir, tempConversationsDir]
+  for (const dir of dirs) {
+    if (!existsSync(dir)) {
+      mkdirSync(dir, { recursive: true })
+    }
+  }
+
+  // Clean up any residual .tmp files from previous crashes
+  cleanupTmpFiles(haloDir)
+
+  // Create default config if it doesn't exist
+  const configPath = getConfigPath()
+  if (!existsSync(configPath)) {
+    atomicWriteJsonSync(configPath, DEFAULT_CONFIG, { backup: true })
+  }
+  ensureConfigFilePermissions(configPath)
+}
+
+// Get configuration
+export function getConfig(): HaloConfig {
+  const configPath = getConfigPath()
+
+  if (!existsSync(configPath)) {
+    return DEFAULT_CONFIG
+  }
+
+  try {
+    const parsed = safeReadJsonSync(configPath, null as any)
+    if (!parsed) return DEFAULT_CONFIG
+    return mergeConfigWithDefaults(parsed)
+  } catch (error) {
+    console.error('Failed to read config:', error)
+    return DEFAULT_CONFIG
+  }
+}
+
+// Async config read for non-startup/IPC paths to avoid blocking the main thread.
+export async function getConfigAsync(): Promise<HaloConfig> {
+  const configPath = getConfigPath()
+
+  if (!existsSync(configPath)) {
+    return DEFAULT_CONFIG
+  }
+
+  try {
+    const parsed = await safeReadJson(configPath, null as any)
+    if (!parsed) return DEFAULT_CONFIG
+    return mergeConfigWithDefaults(parsed)
+  } catch (error) {
+    console.error('Failed to read config (async):', error)
+    return DEFAULT_CONFIG
+  }
+}
+
+// Save configuration
+export function saveConfig(config: Partial<HaloConfig>): HaloConfig {
+  const currentConfig = getConfig()
+  const newConfig = applyConfigUpdates(currentConfig, config)
+
+  const configPath = getConfigPath()
+  atomicWriteJsonSync(configPath, newConfig, { backup: true })
+  ensureConfigFilePermissions(configPath)
+  notifyConfigChange(currentConfig, newConfig, config)
+
+  return newConfig
+}
+
+export async function saveConfigAsync(config: Partial<HaloConfig>): Promise<HaloConfig> {
+  const currentConfig = await getConfigAsync()
+  const newConfig = applyConfigUpdates(currentConfig, config)
+  const configPath = getConfigPath()
+
+  await atomicWriteJson(configPath, newConfig, { backup: true })
+  await ensureConfigFilePermissionsAsync(configPath)
+  notifyConfigChange(currentConfig, newConfig, config)
 
   return newConfig
 }

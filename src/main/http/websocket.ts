@@ -75,6 +75,10 @@ const clients = new Map<string, WebSocketClient>()
 // WebSocket server instance
 let wss: WebSocketServer | null = null
 
+interface WsUpgradeRequest extends IncomingMessage {
+  wsAuthenticated?: boolean
+}
+
 // ============================================
 // Slow Consumer Detection
 // ============================================
@@ -222,14 +226,43 @@ function cleanupClientThrottles(client: WebSocketClient): void {
  * Initialize WebSocket server
  */
 export function initWebSocket(server: any): WebSocketServer {
-  wss = new WebSocketServer({ server, path: '/ws' })
+  wss = new WebSocketServer({ noServer: true })
+
+  server.on('upgrade', (req: IncomingMessage, socket: any, head: Buffer) => {
+    let pathname = ''
+    try {
+      const parsed = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`)
+      pathname = parsed.pathname
+    } catch {
+      return
+    }
+
+    if (pathname !== '/ws') {
+      return
+    }
+
+    const token = getUpgradeToken(req)
+    if (!token || !validateToken(token)) {
+      socket.write('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n')
+      socket.destroy()
+      return
+    }
+
+    const wsReq = req as WsUpgradeRequest
+    wsReq.wsAuthenticated = true
+
+    wss?.handleUpgrade(req, socket, head, (ws: WebSocket) => {
+      wss?.emit('connection', ws, wsReq)
+    })
+  })
 
   wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
     const clientId = uuidv4()
+    const authenticated = (req as WsUpgradeRequest).wsAuthenticated === true
     const client: WebSocketClient = {
       id: clientId,
       ws,
-      authenticated: false,
+      authenticated,
       subscriptions: new Set(),
       seq: 0,
       throttleState: new Map(),
@@ -237,7 +270,11 @@ export function initWebSocket(server: any): WebSocketServer {
     }
 
     clients.set(clientId, client)
-    console.log(`[WS] Client connected: ${clientId}`)
+    console.log(`[WS] Client connected: ${clientId}, authenticated=${authenticated}`)
+
+    if (authenticated) {
+      sendToClient(client, { type: 'auth:success' })
+    }
 
     // Handle messages from client
     ws.on('message', (data: Buffer) => {
@@ -281,6 +318,11 @@ function handleClientMessage(
 ): void {
   switch (message.type) {
     case 'auth':
+      if (client.authenticated) {
+        sendToClient(client, { type: 'auth:success' })
+        break
+      }
+
       // Validate the token before marking as authenticated
       if (message.payload?.token && validateToken(message.payload.token)) {
         client.authenticated = true
@@ -403,5 +445,27 @@ export function shutdownWebSocket(): void {
     wss.close()
     wss = null
     console.log('[WS] WebSocket server shutdown')
+  }
+}
+
+/**
+ * Extract token from WebSocket upgrade request.
+ * Supports Authorization header and `?token=` query for browser clients.
+ */
+export function getUpgradeToken(req: IncomingMessage): string | null {
+  const authHeader = req.headers.authorization
+  if (typeof authHeader === 'string' && authHeader.length > 0) {
+    if (authHeader.startsWith('Bearer ')) {
+      return authHeader.slice(7)
+    }
+    return authHeader
+  }
+
+  try {
+    const parsed = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`)
+    const token = parsed.searchParams.get('token')
+    return token && token.length > 0 ? token : null
+  } catch {
+    return null
   }
 }

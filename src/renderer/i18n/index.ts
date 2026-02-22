@@ -27,22 +27,47 @@ import de from './locales/de.json'
 export const SUPPORTED_LOCALES = {
   'en': 'English',
   'zh-CN': '简体中文',
+  'zh-TW': '繁體中文',
+  'ja': '日本語',
+  'es': 'Español',
+  'fr': 'Français',
+  'de': 'Deutsch',
 } as const
 
 export type LocaleCode = keyof typeof SUPPORTED_LOCALES
 
 // Storage key for persisting language preference
-const LOCALE_STORAGE_KEY = 'halo-locale'
+const LOCALE_STORAGE_KEY = 'skillsfan-locale'
+const LEGACY_LOCALE_STORAGE_KEY = 'halo-locale'
 
 /**
  * Detect system language and map to supported locale
  */
 function detectLanguage(): LocaleCode {
-  const lang = navigator.language || 'en'
+  const lang = (navigator.language || 'en').toLowerCase()
 
-  // Chinese variants -> zh-CN
+  // Chinese variants
+  if (lang.startsWith('zh-tw') || lang.startsWith('zh-hk') || lang.startsWith('zh-mo')) {
+    return 'zh-TW'
+  }
   if (lang.startsWith('zh')) {
     return 'zh-CN'
+  }
+
+  if (lang.startsWith('ja')) {
+    return 'ja'
+  }
+
+  if (lang.startsWith('es')) {
+    return 'es'
+  }
+
+  if (lang.startsWith('fr')) {
+    return 'fr'
+  }
+
+  if (lang.startsWith('de')) {
+    return 'de'
   }
 
   // Default to English
@@ -54,8 +79,11 @@ function detectLanguage(): LocaleCode {
  */
 function getInitialLanguage(): LocaleCode {
   try {
-    const saved = localStorage.getItem(LOCALE_STORAGE_KEY)
+    const saved = localStorage.getItem(LOCALE_STORAGE_KEY) || localStorage.getItem(LEGACY_LOCALE_STORAGE_KEY)
     if (saved && saved in SUPPORTED_LOCALES) {
+      // Migrate legacy key to the new key name.
+      localStorage.setItem(LOCALE_STORAGE_KEY, saved)
+      localStorage.removeItem(LEGACY_LOCALE_STORAGE_KEY)
       return saved as LocaleCode
     }
   } catch (e) {
@@ -101,6 +129,7 @@ export function setLanguage(locale: LocaleCode): void {
   i18n.changeLanguage(locale)
   try {
     localStorage.setItem(LOCALE_STORAGE_KEY, locale)
+    localStorage.removeItem(LEGACY_LOCALE_STORAGE_KEY)
   } catch (e) {
     // Ignore localStorage errors
   }

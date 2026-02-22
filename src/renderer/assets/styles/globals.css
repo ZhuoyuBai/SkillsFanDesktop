@@ -1,9 +1,9 @@
+/* Streamdown incremental Markdown renderer styles */
+@import './streamdown.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-/* Streamdown incremental Markdown renderer styles */
-@import './streamdown.css';
 
 /* MiSans Font */
 @font-face {

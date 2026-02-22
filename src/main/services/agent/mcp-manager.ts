@@ -8,16 +8,15 @@
 import { BrowserWindow } from 'electron'
 import { query as claudeQuery } from '@anthropic-ai/claude-agent-sdk'
 import { getConfig, getTempSpacePath } from '../config.service'
-import { ensureOpenAICompatRouter, encodeBackendConfig } from '../../openai-compat-router'
 import type { McpServerStatusInfo, MainWindowRef } from './types'
 import {
   getHeadlessElectronPath,
   getApiCredentials,
   getEnabledMcpServers,
-  inferOpenAIWireApi,
   broadcastToAllClients,
   setMainWindow
 } from './helpers'
+import { resolveSdkTransport } from './sdk-options'
 
 // ============================================
 // MCP Status Cache
@@ -115,29 +114,12 @@ export async function testMcpConnections(
     // Use the same electron path as sendMessage (prevents Dock icon on macOS)
     const electronPath = getHeadlessElectronPath()
 
-    // Route through OpenAI compat router for non-Anthropic providers
-    let anthropicBaseUrl = credentials.baseUrl
-    let anthropicApiKey = credentials.apiKey
-    let sdkModel = credentials.model || 'claude-sonnet-4-20250514'
-
-    // For non-Anthropic providers (openai or oauth), use the OpenAI compat router
-    if (credentials.provider !== 'anthropic') {
-      const router = await ensureOpenAICompatRouter({ debug: false })
-      anthropicBaseUrl = router.baseUrl
-
-      // Use apiType from credentials (set by provider), fallback to inference
-      const apiType = credentials.apiType
-        || (credentials.provider === 'oauth' ? 'chat_completions' : inferOpenAIWireApi(credentials.baseUrl))
-
-      anthropicApiKey = encodeBackendConfig({
-        url: credentials.baseUrl,
-        key: credentials.apiKey,
-        model: credentials.model,
-        headers: credentials.customHeaders,
-        apiType
-      })
-      sdkModel = 'claude-sonnet-4-20250514'
-      console.log(`[Agent] MCP test: ${credentials.provider} provider enabled via ${anthropicBaseUrl}, apiType=${apiType}`)
+    const transport = await resolveSdkTransport(credentials)
+    const anthropicBaseUrl = transport.anthropicBaseUrl
+    const anthropicApiKey = transport.anthropicApiKey
+    const sdkModel = transport.sdkModel
+    if (transport.routed) {
+      console.log(`[Agent] MCP test: ${credentials.provider} provider enabled via ${anthropicBaseUrl}, apiType=${transport.apiType}`)
     }
 
     console.log('[Agent] MCP test config:', JSON.stringify(enabledMcpServers, null, 2))

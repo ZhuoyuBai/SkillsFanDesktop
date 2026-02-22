@@ -3,6 +3,14 @@
  * Automatically selects the appropriate transport based on environment
  */
 
+import { createLogger } from '../lib/logger'
+
+const transportLogger = createLogger('Transport')
+const REMOTE_TOKEN_KEY = 'skillsfan_remote_token'
+const LEGACY_REMOTE_TOKEN_KEY = 'halo_remote_token'
+const REMOTE_AUTH_COOKIE_KEY = 'skillsfan_authenticated'
+const LEGACY_REMOTE_AUTH_COOKIE_KEY = 'halo_authenticated'
+
 // Detect if running in Electron (has window.skillsfan via preload)
 export function isElectron(): boolean {
   return typeof window !== 'undefined' && 'skillsfan' in window
@@ -22,7 +30,13 @@ export function getRemoteServerUrl(): string {
 // Get stored auth token
 export function getAuthToken(): string | null {
   if (typeof localStorage !== 'undefined') {
-    return localStorage.getItem('halo_remote_token')
+    const token = localStorage.getItem(REMOTE_TOKEN_KEY) || localStorage.getItem(LEGACY_REMOTE_TOKEN_KEY)
+    if (token) {
+      // Migrate legacy key to new key name.
+      localStorage.setItem(REMOTE_TOKEN_KEY, token)
+      localStorage.removeItem(LEGACY_REMOTE_TOKEN_KEY)
+    }
+    return token
   }
   return null
 }
@@ -30,14 +44,16 @@ export function getAuthToken(): string | null {
 // Set auth token
 export function setAuthToken(token: string): void {
   if (typeof localStorage !== 'undefined') {
-    localStorage.setItem('halo_remote_token', token)
+    localStorage.setItem(REMOTE_TOKEN_KEY, token)
+    localStorage.removeItem(LEGACY_REMOTE_TOKEN_KEY)
   }
 }
 
 // Clear auth token
 export function clearAuthToken(): void {
   if (typeof localStorage !== 'undefined') {
-    localStorage.removeItem('halo_remote_token')
+    localStorage.removeItem(REMOTE_TOKEN_KEY)
+    localStorage.removeItem(LEGACY_REMOTE_TOKEN_KEY)
   }
 }
 
@@ -52,7 +68,7 @@ export async function httpRequest<T>(
   const token = getAuthToken()
   const url = `${getRemoteServerUrl()}${path}`
 
-  console.log(`[HTTP] ${method} ${path} - token: ${token ? 'present' : 'missing'}`)
+  transportLogger.debug(`[HTTP] ${method} ${path} - token: ${token ? 'present' : 'missing'}`)
 
   try {
     const response = await fetch(url, {
@@ -66,25 +82,26 @@ export async function httpRequest<T>(
 
     // Handle 401 - token expired or invalid, redirect to login
     if (response.status === 401) {
-      console.warn(`[HTTP] ${method} ${path} - 401 Unauthorized, clearing token and redirecting to login`)
+      transportLogger.warn(`[HTTP] ${method} ${path} - 401 Unauthorized, clearing token and redirecting to login`)
       clearAuthToken()
       // Clear the auth cookie
-      document.cookie = 'halo_authenticated=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;'
+      document.cookie = `${REMOTE_AUTH_COOKIE_KEY}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`
+      document.cookie = `${LEGACY_REMOTE_AUTH_COOKIE_KEY}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`
       // Reload page - server will show login page
       window.location.reload()
       return { success: false, error: 'Token expired, please login again' }
     }
 
     const data = await response.json()
-    console.log(`[HTTP] ${method} ${path} - status: ${response.status}, success: ${data.success}`)
+    transportLogger.debug(`[HTTP] ${method} ${path} - status: ${response.status}, success: ${data.success}`)
 
     if (!response.ok) {
-      console.warn(`[HTTP] ${method} ${path} - error:`, data.error)
+      transportLogger.warn(`[HTTP] ${method} ${path} - error:`, data.error)
     }
 
     return data
   } catch (error) {
-    console.error(`[HTTP] ${method} ${path} - exception:`, error)
+    transportLogger.error(`[HTTP] ${method} ${path} - exception:`, error)
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Network error'
@@ -105,19 +122,17 @@ export function connectWebSocket(): void {
 
   const token = getAuthToken()
   if (!token) {
-    console.warn('[WS] No auth token, cannot connect')
+    transportLogger.warn('[WS] No auth token, cannot connect')
     return
   }
 
-  const wsUrl = `${getRemoteServerUrl().replace('http', 'ws')}/ws`
-  console.log('[WS] Connecting to:', wsUrl)
+  const wsUrl = `${getRemoteServerUrl().replace('http', 'ws')}/ws?token=${encodeURIComponent(token)}`
+  transportLogger.debug('[WS] Connecting to remote WebSocket /ws')
 
   wsConnection = new WebSocket(wsUrl)
 
   wsConnection.onopen = () => {
-    console.log('[WS] Connected')
-    // Authenticate
-    wsConnection?.send(JSON.stringify({ type: 'auth', payload: { token } }))
+    transportLogger.debug('[WS] Connected')
   }
 
   wsConnection.onmessage = (event) => {
@@ -125,7 +140,7 @@ export function connectWebSocket(): void {
       const message = JSON.parse(event.data)
 
       if (message.type === 'auth:success') {
-        console.log('[WS] Authenticated')
+        transportLogger.debug('[WS] Authenticated')
         return
       }
 
@@ -139,12 +154,12 @@ export function connectWebSocket(): void {
         }
       }
     } catch (error) {
-      console.error('[WS] Failed to parse message:', error)
+      transportLogger.error('[WS] Failed to parse message:', error)
     }
   }
 
   wsConnection.onclose = () => {
-    console.log('[WS] Disconnected')
+    transportLogger.debug('[WS] Disconnected')
     wsConnection = null
 
     // Attempt to reconnect after 3 seconds
@@ -154,7 +169,7 @@ export function connectWebSocket(): void {
   }
 
   wsConnection.onerror = (error) => {
-    console.error('[WS] Error:', error)
+    transportLogger.error('[WS] Error:', error)
   }
 }
 

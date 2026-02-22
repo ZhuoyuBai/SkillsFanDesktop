@@ -395,6 +395,14 @@ export async function logout(): Promise<void> {
     isLoggedIn: false
   }
 
+  // Clear in-memory credits cache to avoid stale balance after logout.
+  try {
+    const { clearCreditsCache } = await import('./credits.service')
+    clearCreditsCache()
+  } catch (e) {
+    console.warn('[SkillsFan] Failed to clear credits cache on logout:', e)
+  }
+
   pendingAuth = null
 
   // Clear persisted state

@@ -28,7 +28,6 @@ import { registerArtifactHandlers } from '../ipc/artifact'
 import { registerSystemHandlers } from '../ipc/system'
 import { registerUpdaterHandlers, initAutoUpdater } from '../services/updater.service'
 import { registerAuthHandlers } from '../ipc/auth'
-import { registerSkillHandlers } from '../ipc/skill'
 import { registerSkillsFanAuthHandlers } from '../ipc/skillsfan-auth'
 
 /**
@@ -66,9 +65,6 @@ export function initializeEssentialServices(mainWindow: BrowserWindow): void {
 
   // Artifact: File list is displayed in the right sidebar
   registerArtifactHandlers()
-
-  // Skill: Skills list for settings page
-  registerSkillHandlers()
 
   // System: Window controls (maximize, minimize, tray) are basic functionality
   registerSystemHandlers(mainWindow)

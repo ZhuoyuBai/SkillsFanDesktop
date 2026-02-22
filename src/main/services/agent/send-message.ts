@@ -12,13 +12,10 @@
 import { BrowserWindow } from 'electron'
 import { getConfig } from '../config.service'
 import { getConversation, saveSessionId, addMessage, updateLastMessage } from '../conversation.service'
-import { ensureOpenAICompatRouter, encodeBackendConfig } from '../../openai-compat-router'
 import {
-  isAIBrowserTool,
-  AI_BROWSER_SYSTEM_PROMPT,
-  createAIBrowserMcpServer
-} from '../ai-browser'
-import { createSkillMcpServer, hasSkills, ensureSkillsInitialized } from '../skill'
+  isAIBrowserTool
+} from '../ai-browser/tool-utils'
+import { hasSkills, ensureSkillsInitialized } from '../skill'
 import type {
   AgentRequest,
   ToolCall,
@@ -32,8 +29,6 @@ import {
   getWorkingDir,
   getApiCredentials,
   getEnabledMcpServers,
-  buildSystemPromptAppend,
-  inferOpenAIWireApi,
   sendToRenderer,
   setMainWindow
 } from './helpers'
@@ -46,7 +41,7 @@ import {
   v2Sessions
 } from './session-manager'
 import { broadcastMcpStatus } from './mcp-manager'
-import { createCanUseTool } from './permission-handler'
+import { buildSdkOptions, resolveSdkTransport } from './sdk-options'
 import {
   formatCanvasContext,
   buildMessageContent,
@@ -159,30 +154,12 @@ async function sendMessageInternal(
   }
   console.log(`[Agent] sendMessage using: ${credentials.provider}, model: ${credentials.model}${request.model ? ' (task override)' : ''}${request.modelSource ? ` source: ${request.modelSource}` : ''}`)
 
-  // Route through OpenAI compat router for non-Anthropic providers
-  let anthropicBaseUrl = credentials.baseUrl
-  let anthropicApiKey = credentials.apiKey
-  let sdkModel = credentials.model || 'claude-opus-4-5-20251101'
-
-  // For non-Anthropic providers (openai or OAuth), use the OpenAI compat router
-  if (credentials.provider !== 'anthropic') {
-    const router = await ensureOpenAICompatRouter({ debug: false })
-    anthropicBaseUrl = router.baseUrl
-
-    // Use apiType from credentials (set by provider), fallback to inference
-    const apiType = credentials.apiType
-      || (credentials.provider === 'oauth' ? 'chat_completions' : inferOpenAIWireApi(credentials.baseUrl))
-
-    anthropicApiKey = encodeBackendConfig({
-      url: credentials.baseUrl,
-      key: credentials.apiKey,
-      model: credentials.model,
-      headers: credentials.customHeaders,
-      apiType
-    })
-    // Pass a fake Claude model to CC for normal request handling
-    sdkModel = 'claude-sonnet-4-20250514'
-    console.log(`[Agent] ${credentials.provider} provider enabled: routing via ${anthropicBaseUrl}, apiType=${apiType}`)
+  const transport = await resolveSdkTransport(credentials)
+  const anthropicBaseUrl = transport.anthropicBaseUrl
+  const anthropicApiKey = transport.anthropicApiKey
+  const sdkModel = transport.sdkModel
+  if (transport.routed) {
+    console.log(`[Agent] ${credentials.provider} provider enabled: routing via ${anthropicBaseUrl}, apiType=${transport.apiType}`)
   }
 
   // Get conversation for session resumption (skip for Ralph mode - no conversation history needed)
@@ -228,81 +205,32 @@ async function sendMessageInternal(
     await ensureSkillsInitialized()
     const skillsAvailable = hasSkills()
 
-    // Configure SDK options
-    // Note: These parameters require SDK patch to work in V2 Session
-    // Native SDK SDKSessionOptions only supports model, executable, executableArgs
-    // After patch supports full parameter pass-through, see notes in session-manager.ts
-    const sdkOptions: Record<string, any> = {
-      model: sdkModel,
-      cwd: workDir,
-      abortController: abortController,
-      env: {
-        ...process.env,
-        ELECTRON_RUN_AS_NODE: 1,
-        ELECTRON_NO_ATTACH_CONSOLE: 1,
-        ANTHROPIC_API_KEY: anthropicApiKey,
-        ANTHROPIC_BASE_URL: anthropicBaseUrl,
-        // Ensure localhost bypasses proxy
-        NO_PROXY: 'localhost,127.0.0.1',
-        no_proxy: 'localhost,127.0.0.1',
-        // Disable unnecessary API requests
-        CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1',
-        DISABLE_TELEMETRY: '1',
-        DISABLE_COST_WARNINGS: '1'
-      },
-      extraArgs: {
-        'dangerously-skip-permissions': null
-      },
-      stderr: (data: string) => {
+    const { sdkOptions, addedMcpServers } = await buildSdkOptions({
+      conversationId,
+      spaceId,
+      workDir,
+      config: config as Record<string, any>,
+      abortController,
+      sdkModel,
+      credentialsModel: credentials.model,
+      anthropicBaseUrl,
+      anthropicApiKey,
+      electronPath,
+      onStderr: (data: string) => {
         console.error(`[Agent][${conversationId}] CLI stderr:`, data)
-        stderrBuffer += data  // Accumulate for error reporting
+        stderrBuffer += data
       },
-      systemPrompt: {
-        type: 'preset' as const,
-        preset: 'claude_code' as const,
-        // Append AI Browser system prompt if enabled
-        // Pass actual model name so AI knows what model it's running on
-        // Ralph mode appends custom system prompt for autonomous loop tasks
-        append: buildSystemPromptAppend(workDir, credentials.model, config.memory?.enabled)
-          + (aiBrowserEnabled ? AI_BROWSER_SYSTEM_PROMPT : '')
-          + (ralphMode?.systemPromptAppend || '')
-      },
-      maxTurns: 50,
-      allowedTools: ['Read', 'Write', 'Edit', 'Grep', 'Glob', 'Bash'],
-      permissionMode: 'acceptEdits' as const,
-      canUseTool: createCanUseTool(workDir, spaceId, conversationId),
-      includePartialMessages: true,  // Requires SDK patch: enable token-level streaming (stream_event)
-      executable: electronPath,
-      executableArgs: ['--no-warnings'],
-      // Extended thinking: enable when user requests it (10240 tokens, same as Claude Code CLI Tab)
-      ...(thinkingEnabled ? { maxThinkingTokens: 10240 } : {}),
-      // MCP servers configuration
-      // - Pass through enabled user MCP servers
-      // - Add AI Browser MCP server if enabled
-      // - Add Skill MCP server if skills are available
-      //
-      // NOTE: SDK patch adds proper handling of SDK-type MCP servers in SessionImpl,
-      // extracting 'instance' before serialization (mirrors query() behavior).
-      // See patches/@anthropic-ai+claude-agent-sdk+0.1.76.patch
-      ...(await (async () => {
-        const enabledMcp = getEnabledMcpServers(config.mcpServers || {})
-        const mcpServers: Record<string, any> = enabledMcp ? { ...enabledMcp } : {}
+      aiBrowserEnabled: !!aiBrowserEnabled,
+      thinkingEnabled: !!thinkingEnabled,
+      includeSkillMcp: skillsAvailable,
+      ralphSystemPromptAppend: ralphMode?.systemPromptAppend || ''
+    })
 
-        // Add AI Browser as SDK MCP server if enabled
-        if (aiBrowserEnabled) {
-          mcpServers['ai-browser'] = createAIBrowserMcpServer()
-          console.log(`[Agent][${conversationId}] AI Browser MCP server added`)
-        }
-
-        // Add Skill MCP server if skills are available
-        // Note: skills are ensured initialized before this point (see below)
-        if (skillsAvailable) {
-          mcpServers['skill'] = await createSkillMcpServer()
-          console.log(`[Agent][${conversationId}] Skill MCP server added`)
-        }
-
-        return Object.keys(mcpServers).length > 0 ? { mcpServers } : {}
-      })())
+    if (addedMcpServers.includes('ai-browser')) {
+      console.log(`[Agent][${conversationId}] AI Browser MCP server added`)
+    }
+    if (addedMcpServers.includes('skill')) {
+      console.log(`[Agent][${conversationId}] Skill MCP server added`)
     }
 
     const t0 = Date.now()

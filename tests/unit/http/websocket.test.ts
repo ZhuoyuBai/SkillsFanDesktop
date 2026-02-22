@@ -27,6 +27,7 @@ import { WebSocket } from 'ws'
 import type { WebSocketClient, SendStrategy } from '../../../src/main/http/websocket'
 import {
   getSendStrategy,
+  getUpgradeToken,
   checkSlowConsumer,
   sendToClientEnhanced,
   sendThrottled,
@@ -104,6 +105,44 @@ describe('getSendStrategy', () => {
 // ============================================
 // 2. checkSlowConsumer Detection
 // ============================================
+
+describe('getUpgradeToken', () => {
+  it('2.0.1: should read token from Authorization Bearer header', () => {
+    const req = {
+      headers: { authorization: 'Bearer test-token', host: 'localhost:3000' },
+      url: '/ws'
+    } as any
+
+    expect(getUpgradeToken(req)).toBe('test-token')
+  })
+
+  it('2.0.2: should read token from raw Authorization header', () => {
+    const req = {
+      headers: { authorization: 'raw-token', host: 'localhost:3000' },
+      url: '/ws'
+    } as any
+
+    expect(getUpgradeToken(req)).toBe('raw-token')
+  })
+
+  it('2.0.3: should fallback to token query param', () => {
+    const req = {
+      headers: { host: 'localhost:3000' },
+      url: '/ws?token=query-token'
+    } as any
+
+    expect(getUpgradeToken(req)).toBe('query-token')
+  })
+
+  it('2.0.4: should return null when no token provided', () => {
+    const req = {
+      headers: { host: 'localhost:3000' },
+      url: '/ws'
+    } as any
+
+    expect(getUpgradeToken(req)).toBeNull()
+  })
+})
 
 describe('checkSlowConsumer', () => {
   it('2.1: bufferedAmount=0 returns ok', () => {

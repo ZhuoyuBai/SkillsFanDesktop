@@ -159,15 +159,7 @@ class RendererPerfCollector {
   private collectAndReport(): void {
     const metrics = this.collectMetrics()
 
-    // Send to main process via api (dynamic import to avoid circular dependency)
-    import('../api')
-      .then(({ api }) => api.perfReportRendererMetrics(metrics))
-      .catch(() => {
-        // Fallback to direct window.skillsfan if api not available
-        if (typeof window !== 'undefined' && window.skillsfan?.perfReportRendererMetrics) {
-          window.skillsfan.perfReportRendererMetrics(metrics)
-        }
-      })
+    api.perfReportRendererMetrics(metrics)
 
     // Reset counters
     this.renderCount = 0

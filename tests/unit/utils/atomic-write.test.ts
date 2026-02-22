@@ -12,8 +12,11 @@ import path from 'path'
 
 import {
   atomicWriteFileSync,
+  atomicWriteFile,
   atomicWriteJsonSync,
+  atomicWriteJson,
   safeReadJsonSync,
+  safeReadJson,
   cleanupTmpFiles
 } from '../../../src/main/utils/atomic-write'
 
@@ -273,11 +276,125 @@ describe('safeReadJsonSync', () => {
 })
 
 // ============================================
-// 7. cleanupTmpFiles
+// 7. Async APIs
+// ============================================
+
+describe('async APIs', () => {
+  describe('atomicWriteFile', () => {
+    it('7.1: should write file content correctly', async () => {
+      const filePath = path.join(testDir, 'async.txt')
+
+      await atomicWriteFile(filePath, 'hello async')
+
+      expect(fs.readFileSync(filePath, 'utf-8')).toBe('hello async')
+      expect(fs.existsSync(filePath + '.tmp')).toBe(false)
+    })
+
+    it('7.2: backup=true should create .bak file', async () => {
+      const filePath = path.join(testDir, 'async-data.json')
+
+      fs.writeFileSync(filePath, '{"old":true}')
+      await atomicWriteFile(filePath, '{"new":true}', { backup: true })
+
+      expect(fs.readFileSync(filePath, 'utf-8')).toBe('{"new":true}')
+      expect(fs.readFileSync(filePath + '.bak', 'utf-8')).toBe('{"old":true}')
+    })
+
+    it('7.3: should throw for nonexistent directory', async () => {
+      const filePath = path.join(testDir, 'nonexistent', 'dir', 'file.txt')
+
+      await expect(atomicWriteFile(filePath, 'data')).rejects.toThrow()
+    })
+
+    it('7.4: rename failure should clean up .tmp', async () => {
+      const subDir = path.join(testDir, 'async-crash-test')
+      fs.mkdirSync(subDir)
+      const filePath = path.join(subDir, 'target.json')
+
+      fs.mkdirSync(filePath)
+      fs.writeFileSync(path.join(filePath, 'blocker.txt'), 'block')
+
+      await expect(atomicWriteFile(filePath, 'data')).rejects.toThrow()
+      expect(fs.existsSync(filePath + '.tmp')).toBe(false)
+    })
+  })
+
+  describe('atomicWriteJson', () => {
+    it('7.5: should write JSON object with default indent', async () => {
+      const filePath = path.join(testDir, 'async-config.json')
+
+      await atomicWriteJson(filePath, { key: 'value' })
+
+      const content = fs.readFileSync(filePath, 'utf-8')
+      expect(JSON.parse(content)).toEqual({ key: 'value' })
+      expect(content).toBe(JSON.stringify({ key: 'value' }, null, 2))
+    })
+
+    it('7.6: should support custom indent', async () => {
+      const filePath = path.join(testDir, 'async-custom-config.json')
+
+      await atomicWriteJson(filePath, { a: 1 }, { indent: 4 })
+
+      const content = fs.readFileSync(filePath, 'utf-8')
+      expect(content).toBe(JSON.stringify({ a: 1 }, null, 4))
+    })
+  })
+
+  describe('safeReadJson', () => {
+    it('7.7: should read valid JSON file', async () => {
+      const filePath = path.join(testDir, 'async-read.json')
+      fs.writeFileSync(filePath, '{"data":123}')
+
+      const result = await safeReadJson(filePath, {})
+
+      expect(result).toEqual({ data: 123 })
+    })
+
+    it('7.8: should recover from .bak when main file is corrupted', async () => {
+      const filePath = path.join(testDir, 'async-recover-bak.json')
+
+      fs.writeFileSync(filePath, 'corrupted{{{')
+      fs.writeFileSync(filePath + '.bak', '{"recovered":true}')
+
+      const result = await safeReadJson(filePath, {})
+
+      expect(result).toEqual({ recovered: true })
+      expect(JSON.parse(fs.readFileSync(filePath, 'utf-8'))).toEqual({ recovered: true })
+    })
+
+    it('7.9: should recover from .tmp when main and .bak are corrupted', async () => {
+      const filePath = path.join(testDir, 'async-recover-tmp.json')
+
+      fs.writeFileSync(filePath, 'bad')
+      fs.writeFileSync(filePath + '.bak', 'also bad')
+      fs.writeFileSync(filePath + '.tmp', '{"from_tmp":true}')
+
+      const result = await safeReadJson(filePath, {})
+
+      expect(result).toEqual({ from_tmp: true })
+      expect(fs.existsSync(filePath + '.tmp')).toBe(false)
+    })
+
+    it('7.10: should return default value when all sources are corrupted', async () => {
+      const filePath = path.join(testDir, 'async-all-bad.json')
+
+      fs.writeFileSync(filePath, 'bad')
+      fs.writeFileSync(filePath + '.bak', 'bad')
+      fs.writeFileSync(filePath + '.tmp', 'bad')
+
+      const result = await safeReadJson(filePath, { fallback: true })
+
+      expect(result).toEqual({ fallback: true })
+    })
+  })
+})
+
+// ============================================
+// 8. cleanupTmpFiles
 // ============================================
 
 describe('cleanupTmpFiles', () => {
-  it('7.1: should delete orphan .tmp when main file exists', () => {
+  it('8.1: should delete orphan .tmp when main file exists', () => {
     const filePath = path.join(testDir, 'data.json')
     fs.writeFileSync(filePath, '{"original":true}')
     fs.writeFileSync(filePath + '.tmp', '{"orphan":true}')
@@ -289,7 +406,7 @@ describe('cleanupTmpFiles', () => {
     expect(result).toBe(1)
   })
 
-  it('7.2: should recover from .tmp when main file is missing', () => {
+  it('8.2: should recover from .tmp when main file is missing', () => {
     const tmpPath = path.join(testDir, 'data.json.tmp')
     fs.writeFileSync(tmpPath, '{"recovered":true}')
 
@@ -302,7 +419,7 @@ describe('cleanupTmpFiles', () => {
     expect(result).toBe(1)
   })
 
-  it('7.3: should handle mixed .tmp files', () => {
+  it('8.3: should handle mixed .tmp files', () => {
     // a.json exists + a.json.tmp (should delete tmp)
     fs.writeFileSync(path.join(testDir, 'a.json'), '{"a":true}')
     fs.writeFileSync(path.join(testDir, 'a.json.tmp'), '{"a_tmp":true}')
@@ -319,7 +436,7 @@ describe('cleanupTmpFiles', () => {
     expect(result).toBe(2)
   })
 
-  it('7.4: should return 0 for empty directory', () => {
+  it('8.4: should return 0 for empty directory', () => {
     const emptyDir = path.join(testDir, 'empty')
     fs.mkdirSync(emptyDir, { recursive: true })
 
@@ -328,7 +445,7 @@ describe('cleanupTmpFiles', () => {
     expect(result).toBe(0)
   })
 
-  it('7.5: should not affect non-.tmp files', () => {
+  it('8.5: should not affect non-.tmp files', () => {
     fs.writeFileSync(path.join(testDir, 'data.json'), '{"data":true}')
     fs.writeFileSync(path.join(testDir, 'other.bak'), 'backup')
     fs.writeFileSync(path.join(testDir, 'readme.txt'), 'info')

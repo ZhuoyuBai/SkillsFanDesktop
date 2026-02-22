@@ -7,7 +7,7 @@
  */
 
 import { useState, useRef, useEffect } from 'react'
-import { ChevronDown, Plus } from 'lucide-react'
+import { Check, ChevronDown, Plus } from 'lucide-react'
 import { useAppStore } from '../../stores/app.store'
 import { api } from '../../api'
 import {
@@ -68,6 +68,12 @@ export const PROVIDER_NAMES: Record<string, string> = {
   'openai': 'OpenAI',
   'custom': 'Custom',
   'skillsfan-credits': 'SkillsFan',
+}
+
+// Default model by provider when config has no explicit model yet
+const PROVIDER_DEFAULT_MODELS: Record<string, string> = {
+  'glm': 'glm-5',
+  'minimax-oauth': 'MiniMax-M2.1',
 }
 
 /**
@@ -361,6 +367,31 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
   const currentProviderConfig = configuredCustomProviders.find(p => p.id === currentSource)
   const currentSourceConfig = (aiSources as Record<string, any>)[currentSource]
   const currentModelId = currentSourceConfig?.model || ''
+  const getPublicModelProviderType = (model: { owned_by: string }) => {
+    const mappedProvider = OWNED_BY_TO_PROVIDER[model.owned_by]
+    return mappedProvider ||
+      allOAuthProviders.find(p => p.type === model.owned_by)?.type ||
+      'skillsfan-credits'
+  }
+  const effectiveCurrentModelId = (() => {
+    if (currentModelId) return currentModelId
+
+    const currentProvider = allOAuthProviders.find(p => p.type === currentSource)
+    const availableModels = currentProvider?.config?.availableModels || []
+    if (availableModels.length > 0) return availableModels[0]
+
+    const sourcePublicModels = publicModels.filter(m => getPublicModelProviderType(m) === currentSource)
+    if (sourcePublicModels.length === 0) return ''
+
+    const providerDefaultModel = PROVIDER_DEFAULT_MODELS[currentSource]
+    if (providerDefaultModel) {
+      const normalizedDefault = providerDefaultModel.toLowerCase()
+      const defaultMatch = sourcePublicModels.find(m => m.id.toLowerCase() === normalizedDefault)
+      if (defaultMatch) return defaultMatch.id
+    }
+
+    return sourcePublicModels[0].id
+  })()
   const currentModelDisplayName = currentSourceConfig?.modelNames?.[currentModelId] || ''
   const currentProviderLogo = currentProviderConfig?.logo ||
     (currentProviderConfig?.apiUrl ? getProviderLogo(currentProviderConfig.apiUrl) : null) ||
@@ -412,7 +443,7 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
         <div
           className={`
             ${styles.dropdown}
-            min-w-[11rem] max-w-[16rem] max-h-[20rem] overflow-y-auto bg-card border border-border rounded-xl shadow-lg z-50 py-1
+            min-w-[11rem] max-w-[16rem] max-h-[20rem] overflow-y-auto bg-card border border-border rounded-xl shadow-lg z-50 py-0
             animate-in fade-in-0 slide-in-from-top-2 duration-200
           `.trim().replace(/\s+/g, ' ')}
         >
@@ -429,14 +460,16 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
                     if (seenModelIds.has(modelId)) return null
                     seenModelIds.add(modelId)
                     const displayName = provider.config?.modelNames?.[modelId] || modelId
-                    const isSelected = currentSource === provider.type && provider.config?.model === modelId
+                    const isSelected = currentSource === provider.type && effectiveCurrentModelId === modelId
                     const modelLogo = getModelLogo(modelId, displayName, provider.type)
                     return (
                       <button
                         key={modelId}
                         onClick={() => handleSelectModel(provider.type, modelId)}
-                        className={`w-full px-3 py-2 text-left text-sm hover:bg-secondary/80 transition-colors flex items-center gap-2.5 ${
-                          isSelected ? 'text-primary' : 'text-foreground'
+                        className={`w-full px-3 py-2 text-left text-sm transition-colors flex items-center gap-2.5 ${
+                          isSelected
+                            ? 'bg-primary/15 text-primary font-medium hover:bg-primary/20'
+                            : 'text-foreground hover:bg-secondary/80'
                         }`}
                       >
                         {modelLogo ? (
@@ -446,7 +479,8 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
                             <span className="text-xs text-muted-foreground">AI</span>
                           </div>
                         )}
-                        <span className="truncate">{displayName}</span>
+                        <span className="flex-1 truncate">{displayName}</span>
+                        {isSelected && <Check className="w-4 h-4 flex-shrink-0" />}
                       </button>
                     )
                   })}
@@ -459,19 +493,17 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
               .map((model) => {
                 seenModelIds.add(model.id)
                 // Find the best matching provider for this model
-                const mappedProvider = OWNED_BY_TO_PROVIDER[model.owned_by]
-                const providerType = mappedProvider ||
-                  allOAuthProviders.find(p => p.type === model.owned_by)?.type ||
-                  'skillsfan-credits'
-                const providerAiSource = (aiSources as Record<string, any>)[providerType]
-                const isSelected = currentSource === providerType && providerAiSource?.model === model.id
+                const providerType = getPublicModelProviderType(model)
+                const isSelected = currentSource === providerType && effectiveCurrentModelId === model.id
                 const modelLogo = getModelLogo(model.id, model.name, providerType)
                 return (
                   <button
                     key={model.id}
                     onClick={() => handleSelectModel(providerType, model.id)}
-                    className={`w-full px-3 py-2 text-left text-sm hover:bg-secondary/80 transition-colors flex items-center gap-2.5 ${
-                      isSelected ? 'text-primary' : 'text-foreground'
+                    className={`w-full px-3 py-2 text-left text-sm transition-colors flex items-center gap-2.5 ${
+                      isSelected
+                        ? 'bg-primary/15 text-primary font-medium hover:bg-primary/20'
+                        : 'text-foreground hover:bg-secondary/80'
                     }`}
                   >
                     {modelLogo ? (
@@ -481,7 +513,8 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
                         <span className="text-xs text-muted-foreground">AI</span>
                       </div>
                     )}
-                    <span className="truncate">{model.name}</span>
+                    <span className="flex-1 truncate">{model.name}</span>
+                    {isSelected && <Check className="w-4 h-4 flex-shrink-0" />}
                   </button>
                 )
               })
@@ -495,8 +528,10 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
                   <button
                     key={provider.type}
                     onClick={() => handleSelectOAuthProvider(provider.type, provider.displayName)}
-                    className={`w-full px-3 py-2 text-left text-sm hover:bg-secondary/80 transition-colors flex items-center gap-2.5 ${
-                      isSelected ? 'text-primary' : 'text-foreground'
+                    className={`w-full px-3 py-2 text-left text-sm transition-colors flex items-center gap-2.5 ${
+                      isSelected
+                        ? 'bg-primary/15 text-primary font-medium hover:bg-primary/20'
+                        : 'text-foreground hover:bg-secondary/80'
                     }`}
                   >
                     {providerLogo ? (
@@ -506,7 +541,8 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
                         <span className="text-xs text-muted-foreground">AI</span>
                       </div>
                     )}
-                    <span className="truncate">{provider.displayName}</span>
+                    <span className="flex-1 truncate">{provider.displayName}</span>
+                    {isSelected && <Check className="w-4 h-4 flex-shrink-0" />}
                   </button>
                 )
               })
@@ -527,8 +563,10 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
               <button
                 key={provider.id}
                 onClick={() => handleSelectProvider(provider.id)}
-                className={`w-full px-3 py-2 text-left text-sm hover:bg-secondary/80 transition-colors flex items-center gap-2.5 ${
-                  isSelected ? 'text-primary' : 'text-foreground'
+                className={`w-full px-3 py-2 text-left text-sm transition-colors flex items-center gap-2.5 ${
+                  isSelected
+                    ? 'bg-primary/15 text-primary font-medium hover:bg-primary/20'
+                    : 'text-foreground hover:bg-secondary/80'
                 }`}
               >
                 {provider.logo ? (
@@ -538,7 +576,8 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
                     <span className="text-xs text-muted-foreground">AI</span>
                   </div>
                 )}
-                <span className="truncate">{provider.model || provider.name}</span>
+                <span className="flex-1 truncate">{provider.model || provider.name}</span>
+                {isSelected && <Check className="w-4 h-4 flex-shrink-0" />}
               </button>
             )
           })}

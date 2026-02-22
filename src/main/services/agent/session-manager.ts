@@ -11,8 +11,7 @@
 import { unstable_v2_createSession } from '@anthropic-ai/claude-agent-sdk'
 import { getConfig, onApiConfigChange } from '../config.service'
 import { getConversation } from '../conversation.service'
-import { ensureOpenAICompatRouter, encodeBackendConfig } from '../../openai-compat-router'
-import { ensureSkillsInitialized, hasSkills, createSkillMcpServer } from '../skill'
+import { ensureSkillsInitialized, hasSkills } from '../skill'
 import type {
   V2SDKSession,
   V2SessionInfo,
@@ -23,12 +22,9 @@ import type {
 import {
   getHeadlessElectronPath,
   getWorkingDir,
-  getApiCredentials,
-  getEnabledMcpServers,
-  buildSystemPromptAppend,
-  inferOpenAIWireApi
+  getApiCredentials
 } from './helpers'
-import { createCanUseTool } from './permission-handler'
+import { buildSdkOptions, resolveSdkTransport } from './sdk-options'
 
 // ============================================
 // Session Maps
@@ -233,91 +229,40 @@ export async function ensureSessionWarm(
   const credentials = await getApiCredentials(config)
   console.log(`[Agent] Session warm using: ${credentials.provider}, model: ${credentials.model}`)
 
-  // Route through OpenAI compat router for non-Anthropic providers
-  let anthropicBaseUrl = credentials.baseUrl
-  let anthropicApiKey = credentials.apiKey
-  let sdkModel = credentials.model || 'claude-opus-4-5-20251101'
-
-  // For non-Anthropic providers (openai or OAuth), use the OpenAI compat router
-  if (credentials.provider !== 'anthropic') {
-    const router = await ensureOpenAICompatRouter({ debug: false })
-    anthropicBaseUrl = router.baseUrl
-
-    // Use apiType from credentials (set by provider), fallback to inference
-    const apiType = credentials.apiType
-      || (credentials.provider === 'oauth' ? 'chat_completions' : inferOpenAIWireApi(credentials.baseUrl))
-
-    anthropicApiKey = encodeBackendConfig({
-      url: credentials.baseUrl,
-      key: credentials.apiKey,
-      model: credentials.model,
-      headers: credentials.customHeaders,
-      apiType
-    })
-    // Pass a fake Claude model to CC for normal request handling
-    sdkModel = 'claude-sonnet-4-20250514'
-    console.log(`[Agent] ${credentials.provider} provider enabled (warm): routing via ${anthropicBaseUrl}, apiType=${apiType}`)
+  const transport = await resolveSdkTransport(credentials)
+  const anthropicBaseUrl = transport.anthropicBaseUrl
+  const anthropicApiKey = transport.anthropicApiKey
+  const sdkModel = transport.sdkModel
+  if (transport.routed) {
+    console.log(`[Agent] ${credentials.provider} provider enabled (warm): routing via ${anthropicBaseUrl}, apiType=${transport.apiType}`)
   }
 
-  const sdkOptions: Record<string, any> = {
-    model: sdkModel,
-    cwd: workDir,
-    abortController,  // Consistent with sendMessage
-    env: {
-      ...process.env,
-      ELECTRON_RUN_AS_NODE: 1,
-      ELECTRON_NO_ATTACH_CONSOLE: 1,
-      ANTHROPIC_API_KEY: anthropicApiKey,
-      ANTHROPIC_BASE_URL: anthropicBaseUrl,
-      // Ensure localhost bypasses proxy
-      NO_PROXY: 'localhost,127.0.0.1',
-      no_proxy: 'localhost,127.0.0.1',
-      // Disable unnecessary API requests
-      CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1',
-      DISABLE_TELEMETRY: '1',
-      DISABLE_COST_WARNINGS: '1'
-    },
-    extraArgs: {
-      'dangerously-skip-permissions': null
-    },
-    stderr: (data: string) => {  // Consistent with sendMessage
+  await ensureSkillsInitialized()
+  const skillsAvailable = hasSkills()
+
+  const { sdkOptions, addedMcpServers } = await buildSdkOptions({
+    conversationId,
+    spaceId,
+    workDir,
+    config: config as Record<string, any>,
+    abortController,
+    sdkModel,
+    credentialsModel: credentials.model,
+    anthropicBaseUrl,
+    anthropicApiKey,
+    electronPath,
+    onStderr: (data: string) => {
       console.error(`[Agent][${conversationId}] CLI stderr (warm):`, data)
     },
-    systemPrompt: {
-      type: 'preset' as const,
-      preset: 'claude_code' as const,
-      append: buildSystemPromptAppend(workDir, credentials.model, config.memory?.enabled)
-    },
-    maxTurns: 50,
-    allowedTools: ['Read', 'Write', 'Edit', 'Grep', 'Glob', 'Bash'],
-    permissionMode: 'acceptEdits' as const,
-    canUseTool: createCanUseTool(workDir, spaceId, conversationId),  // Consistent with sendMessage
-    includePartialMessages: true,
-    executable: electronPath,
-    executableArgs: ['--no-warnings'],
-    // MCP servers configuration
-    // - Pass through enabled user MCP servers
-    // - Add Skill MCP server if skills are available (must match sendMessage)
-    ...(await (async () => {
-      const enabledMcp = getEnabledMcpServers(config.mcpServers || {})
-      const mcpServers: Record<string, any> = enabledMcp ? { ...enabledMcp } : {}
+    includeSkillMcp: skillsAvailable
+  })
 
-      // Check skills availability and add Skill MCP server
-      await ensureSkillsInitialized()
-      if (hasSkills()) {
-        mcpServers['skill'] = await createSkillMcpServer()
-        console.log(`[Agent] Skill MCP server added for warm-up: ${conversationId}`)
-      }
-
-      return Object.keys(mcpServers).length > 0 ? { mcpServers } : {}
-    })())
+  if (addedMcpServers.includes('skill')) {
+    console.log(`[Agent] Skill MCP server added for warm-up: ${conversationId}`)
   }
 
   try {
     console.log(`[Agent] Warming up V2 session: ${conversationId}`)
-
-    // Skills already initialized in sdkOptions block above
-    const skillsAvailable = hasSkills()
 
     // Session config must match sendMessage to avoid rebuild
     const sessionConfig: SessionConfig = {

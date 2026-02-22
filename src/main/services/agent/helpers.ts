@@ -191,9 +191,21 @@ export async function getApiCredentials(config: ReturnType<typeof getConfig>): P
   // Only check OAuth token for actual OAuth providers (has 'loggedIn' field)
   if (isOAuthProvider) {
     console.log('[AgentService] Checking OAuth token validity for:', currentSource)
+
+    // For SkillsFan Credits: distinguish between not logged in vs token expired
+    if (currentSource === 'skillsfan-credits') {
+      const isLoggedIn = currentConfig?.loggedIn === true
+      if (!isLoggedIn) {
+        throw new Error('Please login to use SkillsFan Credits.')
+      }
+    }
+
     const tokenResult = await manager.ensureValidToken(currentSource)
     console.log('[AgentService] Token check result:', tokenResult.success)
     if (!tokenResult.success) {
+      if (currentSource === 'skillsfan-credits') {
+        throw new Error('Login session expired. Please login again.')
+      }
       throw new Error('OAuth token expired or invalid. Please login again.')
     }
   }

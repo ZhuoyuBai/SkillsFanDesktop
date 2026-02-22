@@ -19,7 +19,8 @@ import {
   unlinkSync,
   copyFileSync,
   readFileSync,
-  readdirSync
+  readdirSync,
+  promises as fsPromises
 } from 'fs'
 import { join } from 'path'
 
@@ -67,6 +68,51 @@ export function atomicWriteJsonSync(
 }
 
 /**
+ * Async version of atomicWriteFileSync.
+ */
+export async function atomicWriteFile(
+  filePath: string,
+  data: string | Buffer,
+  options?: { backup?: boolean; encoding?: BufferEncoding }
+): Promise<void> {
+  const tmpPath = filePath + '.tmp'
+  const bakPath = filePath + '.bak'
+
+  try {
+    await fsPromises.writeFile(tmpPath, data, options?.encoding || 'utf-8')
+
+    if (options?.backup) {
+      try {
+        await fsPromises.copyFile(filePath, bakPath)
+      } catch {
+        // best effort backup
+      }
+    }
+
+    await fsPromises.rename(tmpPath, filePath)
+  } catch (error) {
+    try {
+      await fsPromises.unlink(tmpPath)
+    } catch {
+      // ignore cleanup error
+    }
+    throw error
+  }
+}
+
+/**
+ * Async version of atomicWriteJsonSync.
+ */
+export async function atomicWriteJson(
+  filePath: string,
+  data: any,
+  options?: { backup?: boolean; indent?: number }
+): Promise<void> {
+  const json = JSON.stringify(data, null, options?.indent ?? 2)
+  await atomicWriteFile(filePath, json, { backup: options?.backup })
+}
+
+/**
  * Safely read a JSON file with fallback recovery.
  *
  * Recovery order: main file → .bak → .tmp → defaultValue
@@ -103,6 +149,45 @@ export function safeReadJsonSync<T>(filePath: string, defaultValue: T): T {
       return data
     }
   } catch { /* all recovery failed */ }
+
+  return defaultValue
+}
+
+/**
+ * Async version of safeReadJsonSync.
+ */
+export async function safeReadJson<T>(filePath: string, defaultValue: T): Promise<T> {
+  // 1. Try main file
+  try {
+    const content = await fsPromises.readFile(filePath, 'utf-8')
+    return JSON.parse(content)
+  } catch {
+    // corrupted or missing, try backup
+  }
+
+  // 2. Try .bak recovery
+  try {
+    const bakPath = filePath + '.bak'
+    const content = await fsPromises.readFile(bakPath, 'utf-8')
+    const data = JSON.parse(content)
+    await atomicWriteFile(filePath, content)
+    console.log(`[AtomicWrite] Recovered ${filePath} from .bak`)
+    return data
+  } catch {
+    // corrupted backup, try tmp
+  }
+
+  // 3. Try .tmp recovery
+  try {
+    const tmpPath = filePath + '.tmp'
+    const content = await fsPromises.readFile(tmpPath, 'utf-8')
+    const data = JSON.parse(content)
+    await fsPromises.rename(tmpPath, filePath)
+    console.log(`[AtomicWrite] Recovered ${filePath} from .tmp`)
+    return data
+  } catch {
+    // all recovery failed
+  }
 
   return defaultValue
 }

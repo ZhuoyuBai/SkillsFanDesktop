@@ -15,7 +15,6 @@ import {
   ensureValidToken,
   getAccessToken
 } from '../services/skillsfan/auth.service'
-import { getCredits, fetchCredits, clearCreditsCache } from '../services/skillsfan/credits.service'
 
 /**
  * Register SkillsFan authentication IPC handlers
@@ -67,12 +66,14 @@ export function registerSkillsFanAuthHandlers(): void {
 
   // Get credits balance (cached)
   ipcMain.handle('skillsfan:get-credits', async () => {
+    const { getCredits } = await import('../services/skillsfan/credits.service')
     const credits = await getCredits()
     return { success: credits !== null, data: credits }
   })
 
   // Force refresh credits balance
   ipcMain.handle('skillsfan:refresh-credits', async () => {
+    const { fetchCredits } = await import('../services/skillsfan/credits.service')
     const credits = await fetchCredits()
     return { success: credits !== null, data: credits }
   })

@@ -8,6 +8,7 @@ import i18n from '../i18n'
 import type { HaloConfig, AppView, McpServerStatus } from '../types'
 import { hasAnyAISource } from '../types'
 import { useSpaceStore } from './space.store'
+import { createLogger } from '../lib/logger'
 
 // Settings section type (must match SettingsPage)
 export type SettingsSection = 'ai-model' | 'display' | 'mcp' | 'skills' | 'system' | 'remote' | 'account' | 'spaces' | 'advanced'
@@ -68,6 +69,8 @@ interface AppState {
   // Initialization
   initialize: () => Promise<void>
 }
+
+const appLogger = createLogger('AppStore')
 
 export const useAppStore = create<AppState>((set, get) => ({
   // Initial state
@@ -191,45 +194,45 @@ export const useAppStore = create<AppState>((set, get) => ({
         }
       }
     } catch (e) {
-      console.error('[App] Failed to refresh Git Bash status:', e)
+      appLogger.error('[App] Failed to refresh Git Bash status:', e)
     }
   },
 
   // Initialize app
   initialize: async () => {
-    console.log('[Store] initialize() called')
+    appLogger.debug('[Store] initialize() called')
     try {
       set({ isLoading: true, error: null })
 
       // Windows: Check Git Bash availability first
       if (window.platform?.isWindows) {
-        console.log('[Store] Windows detected, checking Git Bash status...')
+        appLogger.debug('[Store] Windows detected, checking Git Bash status...')
         const gitBashStatus = await api.getGitBashStatus()
-        console.log('[Store] Git Bash status response:', gitBashStatus)
+        appLogger.debug('[Store] Git Bash status response:', gitBashStatus)
         if (gitBashStatus.success && gitBashStatus.data) {
           const { found, source, mockMode } = gitBashStatus.data
 
           // Track mock mode for showing warning banner later
           if (mockMode) {
-            console.log('[Store] Git Bash in mock mode, will show warning banner')
+            appLogger.debug('[Store] Git Bash in mock mode, will show warning banner')
             set({ mockBashMode: true })
           }
 
           // If Git Bash not found and not previously configured, show setup
           if (!found && !mockMode) {
-            console.log('[Store] Git Bash not found, showing setup')
+            appLogger.debug('[Store] Git Bash not found, showing setup')
             set({ view: 'gitBashSetup', isLoading: false })
             return
           }
 
-          console.log('[Store] Git Bash found:', source, mockMode ? '(mock mode)' : '')
+          appLogger.debug('[Store] Git Bash found:', source, mockMode ? '(mock mode)' : '')
         }
       }
 
       // Load config from main process
-      console.log('[Store] Loading config...')
+      appLogger.debug('[Store] Loading config...')
       const response = await api.getConfig()
-      console.log('[Store] Config response:', response.success ? 'success' : 'failed')
+      appLogger.debug('[Store] Config response:', response.success ? 'success' : 'failed')
 
       if (response.success && response.data) {
         const config = response.data as HaloConfig
@@ -240,15 +243,15 @@ export const useAppStore = create<AppState>((set, get) => ({
         // First launch: show onboarding flow
         // No AI source configured: show setup directly
         if (config.isFirstLaunch) {
-          console.log('[Store] First launch, showing onboarding')
+          appLogger.debug('[Store] First launch, showing onboarding')
           set({ view: 'onboarding' })
         } else if (!hasAnyAISource(config)) {
-          console.log('[Store] No AI source configured, showing setup')
+          appLogger.debug('[Store] No AI source configured, showing setup')
           set({ view: 'setup' })
         } else {
           // Go to space directly (skip home page)
           // Load all spaces (including Halo) and set default space
-          console.log('[Store] Loading spaces before showing space view...')
+          appLogger.debug('[Store] Loading spaces before showing space view...')
           await useSpaceStore.getState().loadSpaces()
 
           // Get loaded spaces and configured default
@@ -261,25 +264,25 @@ export const useAppStore = create<AppState>((set, get) => ({
             const customSpace = spaces.find(s => s.id === defaultSpaceId)
             if (customSpace) {
               targetSpace = customSpace
-              console.log('[Store] Using configured default space:', customSpace.name)
+              appLogger.debug('[Store] Using configured default space:', customSpace.name)
             } else {
-              console.warn('[Store] Configured default space not found, falling back to Halo')
+              appLogger.warn('[Store] Configured default space not found, falling back to Halo')
             }
           }
 
           if (targetSpace) {
             useSpaceStore.getState().setCurrentSpace(targetSpace)
-            console.log('[Store] Default space loaded and set:', targetSpace.name)
+            appLogger.debug('[Store] Default space loaded and set:', targetSpace.name)
           } else {
-            console.warn('[Store] No space found, but continuing to space view')
+            appLogger.warn('[Store] No space found, but continuing to space view')
           }
-          console.log('[Store] Config loaded, showing space')
+          appLogger.debug('[Store] Config loaded, showing space')
           set({ view: 'space' })
 
           // Refresh AI sources in background (fetch latest models from backend)
           api.refreshAISourcesConfig().then((refreshResult) => {
             if (refreshResult.success) {
-              console.log('[Store] AI sources refreshed on startup')
+              appLogger.debug('[Store] AI sources refreshed on startup')
               api.getConfig().then((configResult) => {
                 if (configResult.success && configResult.data) {
                   set({ config: configResult.data as HaloConfig })
@@ -294,29 +297,29 @@ export const useAppStore = create<AppState>((set, get) => ({
           api.getPublicModels().then((result) => {
             if (result.success && result.data) {
               set({ publicModels: result.data as Array<{ id: string; name: string; owned_by: string }> })
-              console.log('[Store] Public models pre-loaded:', (result.data as any[]).length)
+              appLogger.debug('[Store] Public models pre-loaded:', (result.data as any[]).length)
             }
           }).catch(() => {})
 
           api.authGetProviders().then((result) => {
             if (result.success && result.data) {
               set({ authProviders: result.data as any[] })
-              console.log('[Store] Auth providers pre-loaded:', (result.data as any[]).length)
+              appLogger.debug('[Store] Auth providers pre-loaded:', (result.data as any[]).length)
             }
           }).catch(() => {})
         }
       } else {
-        console.error('[Store] Failed to load config:', response.error)
+        appLogger.error('[Store] Failed to load config:', response.error)
         set({ error: response.error || i18n.t('Failed to load configuration') })
         set({ view: 'setup' })
       }
     } catch (error) {
-      console.error('[Store] Failed to initialize:', error)
+      appLogger.error('[Store] Failed to initialize:', error)
       set({ error: i18n.t('Failed to initialize application') })
       set({ view: 'setup' })
     } finally {
       set({ isLoading: false })
-      console.log('[Store] initialize() completed')
+      appLogger.debug('[Store] initialize() completed')
     }
   }
 }))

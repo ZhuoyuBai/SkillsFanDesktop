@@ -21,6 +21,7 @@ import { useChatStore } from '@/stores/chat.store'
 import { useSpaceStore } from '@/stores/space.store'
 import { useSearchStore } from '@/stores/search.store'
 import { useTranslation } from '@/i18n'
+import { createLogger } from '@/lib/logger'
 
 export type SearchScope = 'conversation' | 'space' | 'global'
 
@@ -42,6 +43,8 @@ interface SearchPanelProps {
   isOpen: boolean
   onClose: () => void
 }
+
+const searchLogger = createLogger('SearchPanel')
 
 export function SearchPanel({ isOpen, onClose }: SearchPanelProps) {
   const inputRef = useRef<HTMLInputElement>(null)
@@ -151,31 +154,31 @@ export function SearchPanel({ isOpen, onClose }: SearchPanelProps) {
           break
       }
 
-      console.log('[Search] Executing:', { scope: actualScope, spaceId: actualSpaceId, conversationId: actualConvId })
+      searchLogger.debug('[Search] Executing:', { scope: actualScope, spaceId: actualSpaceId, conversationId: actualConvId })
 
       const response = await api.search(query, actualScope, actualConvId, actualSpaceId)
 
       if (response.success && response.data) {
         const results = response.data as SearchResultItem[]
         setResults(results)
-        console.log(`[Search] Found ${results.length} results in ${actualScope} scope`)
+        searchLogger.debug(`[Search] Found ${results.length} results in ${actualScope} scope`)
       } else {
-        console.error('[Search] Error:', response.error)
+        searchLogger.error('[Search] Error:', response.error)
       }
     } catch (error) {
-      console.error('[Search] Exception:', error)
+      searchLogger.error('[Search] Exception:', error)
     } finally {
       setIsSearching(false)
     }
   }
 
   const handleResultClick = async (result: SearchResultItem) => {
-    console.log(`[Search] Clicking result: conv=${result.conversationId}, space=${result.spaceId}, msg=${result.messageId}`)
+    searchLogger.debug(`[Search] Clicking result: conv=${result.conversationId}, space=${result.spaceId}, msg=${result.messageId}`)
 
     try {
       // Step 1: If switching spaces, update BOTH stores to keep UI and chat state in sync
       if (result.spaceId !== currentSpaceId) {
-        console.log(`[Search] Switching to space: ${result.spaceId}`)
+        searchLogger.debug(`[Search] Switching to space: ${result.spaceId}`)
 
         // Find the space object
         let targetSpace = null
@@ -186,16 +189,16 @@ export function SearchPanel({ isOpen, onClose }: SearchPanelProps) {
         }
 
         if (!targetSpace) {
-          console.error(`[Search] Space not found: ${result.spaceId}`)
+          searchLogger.error(`[Search] Space not found: ${result.spaceId}`)
           return
         }
 
         // Update spaceStore (this will trigger UI updates)
-        console.log(`[Search] Updating spaceStore.currentSpace to: ${targetSpace.name}`)
+        searchLogger.debug(`[Search] Updating spaceStore.currentSpace to: ${targetSpace.name}`)
         setSpaceStoreCurrentSpace(targetSpace)
 
         // Update chatStore currentSpaceId
-        console.log(`[Search] Updating chatStore.currentSpaceId to: ${result.spaceId}`)
+        searchLogger.debug(`[Search] Updating chatStore.currentSpaceId to: ${result.spaceId}`)
         setCurrentSpace(result.spaceId)
 
         // Give state time to update
@@ -203,58 +206,69 @@ export function SearchPanel({ isOpen, onClose }: SearchPanelProps) {
       }
 
       // Step 2: Load conversations in the target space
-      console.log(`[Search] Loading conversations in space: ${result.spaceId}`)
+      searchLogger.debug(`[Search] Loading conversations in space: ${result.spaceId}`)
       await loadConversations(result.spaceId)
-      console.log(`[Search] Conversations loaded`)
+      searchLogger.debug('[Search] Conversations loaded')
 
       // Step 3: Navigate to conversation
-      console.log(`[Search] Selecting conversation: ${result.conversationId}`)
+      searchLogger.debug(`[Search] Selecting conversation: ${result.conversationId}`)
       await selectConversation(result.conversationId)
-      console.log(`[Search] Conversation selected`)
+      searchLogger.debug('[Search] Conversation selected')
 
       // Step 4: Show highlight bar with all results (enable navigation)
       const resultsArray = results ?? []
-      console.log(`[Search] Showing highlight bar with ${resultsArray.length} results`)
+      searchLogger.debug(`[Search] Showing highlight bar with ${resultsArray.length} results`)
       showHighlightBar(searchedQuery, resultsArray, resultsArray.findIndex(r => r.messageId === result.messageId))
 
       // Close search panel
       onClose()
 
-      // Step 5: Wait for conversation data to load before navigating to message
-      // Poll for message element until it exists in DOM
-      let retries = 0
-      const maxRetries = 50 // 50 * 100ms = 5 seconds max wait
-
-      const waitForMessageElement = async () => {
-        while (retries < maxRetries) {
-          // Check if message element exists in DOM
-          const messageElement = document.querySelector(`[data-message-id="${result.messageId}"]`)
-          if (messageElement) {
-            console.log(`[Search] Message element found on retry ${retries}, navigating to message`)
-            // Dispatch scroll-to-message event with search query for highlighting
-            const event = new CustomEvent('search:navigate-to-message', {
-              detail: {
-                messageId: result.messageId,
-                query: searchedQuery
-              }
-            })
-            window.dispatchEvent(event)
+      // Step 5: Wait for message element using MutationObserver instead of polling
+      const waitForMessageElement = (targetMessageId: string, timeoutMs: number): Promise<Element | null> => {
+        return new Promise((resolve) => {
+          const selector = `[data-message-id="${targetMessageId}"]`
+          const existingElement = document.querySelector(selector)
+          if (existingElement) {
+            resolve(existingElement)
             return
           }
 
-          retries++
-          if (retries % 10 === 0) {
-            console.log(`[Search] Waiting for message element... (${retries}/${maxRetries})`)
-          }
-          await new Promise(resolve => setTimeout(resolve, 100))
-        }
+          let timeoutId: number | null = null
+          const observer = new MutationObserver(() => {
+            const target = document.querySelector(selector)
+            if (target) {
+              observer.disconnect()
+              if (timeoutId !== null) {
+                window.clearTimeout(timeoutId)
+              }
+              resolve(target)
+            }
+          })
 
-        console.warn(`[Search] Message element not found after ${maxRetries} retries, navigation failed`)
+          observer.observe(document.body, { childList: true, subtree: true })
+
+          timeoutId = window.setTimeout(() => {
+            observer.disconnect()
+            resolve(null)
+          }, timeoutMs)
+        })
       }
 
-      waitForMessageElement()
+      const messageElement = await waitForMessageElement(result.messageId, 5000)
+      if (!messageElement) {
+        searchLogger.warn('[Search] Message element not found before timeout, navigation skipped')
+        return
+      }
+
+      const event = new CustomEvent('search:navigate-to-message', {
+        detail: {
+          messageId: result.messageId,
+          query: searchedQuery
+        }
+      })
+      window.dispatchEvent(event)
     } catch (error) {
-      console.error(`[Search] Error navigating to result:`, error)
+      searchLogger.error('[Search] Error navigating to result:', error)
     }
   }
 

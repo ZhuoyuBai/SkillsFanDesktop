@@ -1,8 +1,0 @@
-/**
- * Shared Types - Cross-process type definitions
- *
- * This module exports all shared types used by both main and renderer processes.
- * Import from this index for clean access to all shared types.
- */
-// AI Sources types
-export * from './ai-sources';

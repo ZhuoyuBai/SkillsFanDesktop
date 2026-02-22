@@ -27,6 +27,7 @@ import { canvasLifecycle } from '../services/canvas-lifecycle'
 import { useAppStore } from './app.store'
 import { useToastStore } from './toast.store'
 import i18n from '../i18n'
+import { logger } from '../lib/logger'
 
 // LRU cache size limit
 const CONVERSATION_CACHE_SIZE = 10
@@ -316,7 +317,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         })
       }
     } catch (error) {
-      console.error('Failed to load conversations:', error)
+      logger.error('Failed to load conversations:', error)
     } finally {
       set({ isLoading: false })
     }
@@ -369,9 +370,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
         // When user sends a message, V2 Session is ready to avoid delay
         try {
           api.ensureSessionWarm(spaceId, newConversation.id)
-            .catch((error) => console.error('[ChatStore] Session warm up failed:', error))
+            .catch((error) => logger.error('[ChatStore] Session warm up failed:', error))
         } catch (error) {
-          console.error('[ChatStore] Failed to trigger session warm up:', error)
+          logger.error('[ChatStore] Failed to trigger session warm up:', error)
         }
 
         return newConversation
@@ -379,7 +380,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       return null
     } catch (error) {
-      console.error('Failed to create conversation:', error)
+      logger.error('Failed to create conversation:', error)
       return null
     }
   },
@@ -411,7 +412,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     // Load full conversation if not in cache
     if (!conversationCache.has(conversationId)) {
       set({ isLoadingConversation: true })
-      console.log(`[ChatStore] Loading full conversation: ${conversationId}`)
+      logger.debug(`[ChatStore] Loading full conversation: ${conversationId}`)
 
       try {
         const response = await api.getConversation(currentSpaceId, conversationId)
@@ -430,12 +431,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
             return { conversationCache: newCache, isLoadingConversation: false }
           })
-          console.log(`[ChatStore] Loaded conversation with ${fullConversation.messages?.length || 0} messages`)
+          logger.debug(`[ChatStore] Loaded conversation with ${fullConversation.messages?.length || 0} messages`)
         } else {
           set({ isLoadingConversation: false })
         }
       } catch (error) {
-        console.error('[ChatStore] Failed to load conversation:', error)
+        logger.error('[ChatStore] Failed to load conversation:', error)
         set({ isLoadingConversation: false })
       }
     }
@@ -447,7 +448,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         const sessionState = response.data as { isActive: boolean; thoughts: Thought[]; spaceId?: string }
 
         if (sessionState.isActive && sessionState.thoughts.length > 0) {
-          console.log(`[ChatStore] Recovering ${sessionState.thoughts.length} thoughts for conversation ${conversationId}`)
+          logger.debug(`[ChatStore] Recovering ${sessionState.thoughts.length} thoughts for conversation ${conversationId}`)
 
           set((state) => {
             const newSessions = new Map(state.sessions)
@@ -465,16 +466,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
         }
       }
     } catch (error) {
-      console.error('[ChatStore] Failed to recover session state:', error)
+      logger.error('[ChatStore] Failed to recover session state:', error)
     }
 
     // Warm up V2 Session in background - non-blocking
     // When user sends a message, V2 Session is ready to avoid delay
     try {
       api.ensureSessionWarm(currentSpaceId, conversationId)
-        .catch((error) => console.error('[ChatStore] Session warm up failed:', error))
+        .catch((error) => logger.error('[ChatStore] Session warm up failed:', error))
     } catch (error) {
-      console.error('[ChatStore] Failed to trigger session warm up:', error)
+      logger.error('[ChatStore] Failed to trigger session warm up:', error)
     }
   },
 
@@ -519,7 +520,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       return false
     } catch (error) {
-      console.error('Failed to delete conversation:', error)
+      logger.error('Failed to delete conversation:', error)
       return false
     }
   },
@@ -570,7 +571,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       return false
     } catch (error) {
-      console.error('Failed to clear all conversations:', error)
+      logger.error('Failed to clear all conversations:', error)
       return false
     }
   },
@@ -618,7 +619,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       return false
     } catch (error) {
-      console.error('Failed to rename conversation:', error)
+      logger.error('Failed to rename conversation:', error)
       return false
     }
   },
@@ -667,7 +668,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       return false
     } catch (error) {
-      console.error('Failed to touch conversation:', error)
+      logger.error('Failed to touch conversation:', error)
       return false
     }
   },
@@ -680,7 +681,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     // Check if space is selected
     if (!currentSpaceId) {
-      console.error('[ChatStore] No space selected')
+      logger.error('[ChatStore] No space selected')
       return
     }
 
@@ -688,7 +689,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     if (!conversation && !conversationMeta) {
       const newConversation = await get().createConversation(currentSpaceId)
       if (!newConversation) {
-        console.error('[ChatStore] Failed to create new conversation')
+        logger.error('[ChatStore] Failed to create new conversation')
         return
       }
       conversation = newConversation
@@ -706,7 +707,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
        ('apiKey' in currentSourceConfig && currentSourceConfig.apiKey))
 
     if (!appConfig || (!hasAnyAISource(appConfig) && !currentAiSource)) {
-      console.error('[ChatStore] No AI source configured')
+      logger.error('[ChatStore] No AI source configured')
       set((state) => {
         const newSessions = new Map(state.sessions)
         const session = newSessions.get(conversationId) || createEmptySessionState()
@@ -729,7 +730,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     // Current source is an OAuth provider but not logged in - show toast prompt
     if (currentAiSource && !isCurrentSourceLoggedIn) {
-      console.log(`[ChatStore] Current source ${currentAiSource} needs login`)
+      logger.debug(`[ChatStore] Current source ${currentAiSource} needs login`)
       useToastStore.getState().addToast(i18n.t('Please log in before using this model'), 'error')
       return
     }
@@ -851,20 +852,21 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       // Handle API-level errors (e.g., credential errors that return { success: false })
       if (!response.success) {
-        console.error('[ChatStore] API returned error:', response.error)
+        logger.error('[ChatStore] API returned error:', response.error)
         set((state) => {
           const newSessions = new Map(state.sessions)
           const session = newSessions.get(conversationId) || createEmptySessionState()
+          const errorMsg = response.error ? i18n.t(response.error, { defaultValue: response.error }) : i18n.t('Failed to send message')
           const errorThought: Thought = {
             id: `thought-error-${Date.now()}`,
             type: 'error',
-            content: response.error || i18n.t('Failed to send message'),
+            content: errorMsg,
             timestamp: new Date().toISOString(),
             isError: true
           }
           newSessions.set(conversationId, {
             ...session,
-            error: response.error || i18n.t('Failed to send message'),
+            error: errorMsg,
             isGenerating: false,
             isThinking: false,
             thoughts: [...session.thoughts, errorThought]
@@ -873,7 +875,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         })
       }
     } catch (error) {
-      console.error('Failed to send message:', error)
+      logger.error('Failed to send message:', error)
       // Update session error state
       set((state) => {
         const newSessions = new Map(state.sessions)
@@ -910,7 +912,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         })
       }
     } catch (error) {
-      console.error('Failed to stop generation:', error)
+      logger.error('Failed to stop generation:', error)
     }
   },
 
@@ -920,12 +922,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const conversation = get().getCurrentConversation()
 
     if (!currentSpaceId || !conversation) {
-      console.error('[ChatStore] Cannot inject: no active conversation')
+      logger.error('[ChatStore] Cannot inject: no active conversation')
       return
     }
 
     const conversationId = conversation.id
-    console.log(`[ChatStore] Injecting message into conversation: ${conversationId}`)
+    logger.debug(`[ChatStore] Injecting message into conversation: ${conversationId}`)
 
     // Extract image attachments for backward-compatible display
     const imageAtts = attachments?.filter(a => a.type === 'image') as ImageAttachment[] | undefined
@@ -964,7 +966,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         attachments
       })
     } catch (error) {
-      console.error('Failed to inject message:', error)
+      logger.error('Failed to inject message:', error)
     }
   },
 
@@ -981,7 +983,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         return { sessions: newSessions }
       })
     } catch (error) {
-      console.error('Failed to approve tool:', error)
+      logger.error('Failed to approve tool:', error)
     }
   },
 
@@ -998,7 +1000,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         return { sessions: newSessions }
       })
     } catch (error) {
-      console.error('Failed to reject tool:', error)
+      logger.error('Failed to reject tool:', error)
     }
   },
 
@@ -1050,7 +1052,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   // This is sent by the backend when a queued message starts processing (not when queued)
   handleAgentStart: (data) => {
     const { conversationId } = data
-    console.log(`[ChatStore] handleAgentStart [${conversationId}]`)
+    logger.debug(`[ChatStore] handleAgentStart [${conversationId}]`)
 
     set((state) => {
       const newSessions = new Map(state.sessions)
@@ -1087,7 +1089,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       // Backend sends full accumulated content, just update directly
       const newContent = content ?? session.streamingContent
 
-      console.log(`[ChatStore] handleAgentMessage [${conversationId}]:`, content?.substring(0, 100), `streaming: ${isStreaming}, length: ${newContent?.length || 0}`)
+      logger.debug(`[ChatStore] handleAgentMessage [${conversationId}]:`, content?.substring(0, 100), `streaming: ${isStreaming}, length: ${newContent?.length || 0}`)
 
       newSessions.set(conversationId, {
         ...session,
@@ -1101,7 +1103,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   // Handle tool call for a specific conversation
   handleAgentToolCall: (data) => {
     const { conversationId, ...toolCall } = data
-    console.log(`[ChatStore] handleAgentToolCall [${conversationId}]:`, toolCall.name)
+    logger.debug(`[ChatStore] handleAgentToolCall [${conversationId}]:`, toolCall.name)
 
     if (toolCall.requiresApproval) {
       set((state) => {
@@ -1119,14 +1121,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
   // Handle tool result for a specific conversation
   handleAgentToolResult: (data) => {
     const { conversationId, toolId } = data
-    console.log(`[ChatStore] handleAgentToolResult [${conversationId}]:`, toolId)
+    logger.debug(`[ChatStore] handleAgentToolResult [${conversationId}]:`, toolId)
     // Tool results are tracked in thoughts, no additional state needed
   },
 
   // Handle error for a specific conversation
   handleAgentError: (data) => {
     const { conversationId, error, errorCode } = data
-    console.log(`[ChatStore] handleAgentError [${conversationId}]:`, error, 'code:', errorCode)
+    logger.debug(`[ChatStore] handleAgentError [${conversationId}]:`, error, 'code:', errorCode)
 
     // Show credits error dialog for 402 (insufficient credits)
     if (errorCode === 402) {
@@ -1160,7 +1162,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   // Key: Only set isGenerating=false AFTER backend data is loaded to prevent flash
   handleAgentComplete: async (data) => {
     const { spaceId, conversationId } = data
-    console.log(`[ChatStore] handleAgentComplete [${conversationId}]`)
+    logger.debug(`[ChatStore] handleAgentComplete [${conversationId}]`)
 
     // Commit streaming content to cache BEFORE async reload.
     // When lane queue pumps the next message, handleAgentStart clears streamingContent.
@@ -1270,10 +1272,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
             conversationCache: newCache
           }
         })
-        console.log(`[ChatStore] Conversation reloaded from backend [${conversationId}]`)
+        logger.debug(`[ChatStore] Conversation reloaded from backend [${conversationId}]`)
       }
     } catch (error) {
-      console.error('[ChatStore] Failed to reload conversation:', error)
+      logger.error('[ChatStore] Failed to reload conversation:', error)
       // Clear state on error — but only if next message hasn't already started
       set((state) => {
         const newSessions = new Map(state.sessions)
@@ -1297,7 +1299,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   // Handle thought for a specific conversation
   handleAgentThought: (data) => {
     const { conversationId, thought } = data
-    console.log(`[ChatStore] handleAgentThought [${conversationId}]:`, thought.type, thought.id)
+    logger.debug(`[ChatStore] handleAgentThought [${conversationId}]:`, thought.type, thought.id)
 
     set((state) => {
       const newSessions = new Map(state.sessions)
@@ -1306,7 +1308,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       // Check if thought with same id already exists (avoid duplicates after recovery)
       const existingIds = new Set(session.thoughts.map(t => t.id))
       if (existingIds.has(thought.id)) {
-        console.log(`[ChatStore] Skipping duplicate thought: ${thought.id}`)
+        logger.debug(`[ChatStore] Skipping duplicate thought: ${thought.id}`)
         return state // No change
       }
 
@@ -1327,7 +1329,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           }
           newTextSegments = [...session.textSegments, segment]
           newLastSegmentIndex = currentContent.length
-          console.log(`[ChatStore] Saved text segment: ${newSegmentContent.slice(0, 50)}...`)
+          logger.debug(`[ChatStore] Saved text segment: ${newSegmentContent.slice(0, 50)}...`)
         }
       }
 
@@ -1346,7 +1348,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   // Handle compact notification - context was compressed
   handleAgentCompact: (data) => {
     const { conversationId, trigger, preTokens } = data
-    console.log(`[ChatStore] handleAgentCompact [${conversationId}]: trigger=${trigger}, preTokens=${preTokens}`)
+    logger.debug(`[ChatStore] handleAgentCompact [${conversationId}]: trigger=${trigger}, preTokens=${preTokens}`)
 
     set((state) => {
       const newSessions = new Map(state.sessions)
@@ -1363,7 +1365,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   // Handle user question from AskUserQuestion tool - pauses execution
   handleAgentUserQuestion: (data) => {
     const { conversationId, toolId, questions } = data
-    console.log(`[ChatStore] handleAgentUserQuestion [${conversationId}]: toolId=${toolId}, questions=${questions.length}`)
+    logger.debug(`[ChatStore] handleAgentUserQuestion [${conversationId}]: toolId=${toolId}, questions=${questions.length}`)
 
     set((state) => {
       const newSessions = new Map(state.sessions)
@@ -1380,7 +1382,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   // Handle user question answered - clear pending question
   handleAgentUserQuestionAnswered: (data) => {
     const { conversationId } = data
-    console.log(`[ChatStore] handleAgentUserQuestionAnswered [${conversationId}]`)
+    logger.debug(`[ChatStore] handleAgentUserQuestionAnswered [${conversationId}]`)
 
     set((state) => {
       const newSessions = new Map(state.sessions)
@@ -1397,7 +1399,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   // Answer user question (AskUserQuestion tool)
   answerUserQuestion: async (conversationId: string, answers: Record<string, string>) => {
-    console.log(`[ChatStore] answerUserQuestion [${conversationId}]:`, Object.keys(answers))
+    logger.debug(`[ChatStore] answerUserQuestion [${conversationId}]:`, Object.keys(answers))
     await api.answerUserQuestion(conversationId, answers)
   },
 
