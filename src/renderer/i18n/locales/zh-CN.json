@@ -592,6 +592,7 @@
   "Projects, long-term tasks": "自定义空间",
   "Public Address": "公开地址",
   "Quality Gates": "自动检查",
+  "Quality Gates Hint": "适用于编码任务，每步完成后自动验证",
   "Require Typecheck": "需要类型检查通过",
   "Require Tests": "需要测试通过",
   "Ran {{command}}": "已执行 {{command}}",

@@ -593,6 +593,7 @@
   "Projects, long-term tasks": "Formal projects, long-term tasks",
   "Public Address": "Public Address",
   "Quality Gates": "Quality Gates",
+  "Quality Gates Hint": "For coding tasks, auto-verified after each step",
   "Require Typecheck": "Require Typecheck",
   "Require Tests": "Require Tests",
   "Ran {{command}}": "Ran {{command}}",
