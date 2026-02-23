@@ -228,6 +228,40 @@ body {
   display: none;
 }
 
+/* Model selector dropdown scrollbar:
+   hidden by default, shown briefly while scrolling */
+.model-selector-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.model-selector-scrollbar::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.model-selector-scrollbar--visible {
+  scrollbar-width: thin;
+}
+
+.model-selector-scrollbar--visible::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.model-selector-scrollbar--visible::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.model-selector-scrollbar--visible::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted));
+  border-radius: 4px;
+}
+
+.model-selector-scrollbar--visible::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.5);
+}
+
 /* ============================================
    Shared Keyframes & Animations
    ============================================ */

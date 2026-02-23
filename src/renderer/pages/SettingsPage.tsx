@@ -773,14 +773,15 @@ export function SettingsPage() {
                   <button
                     key={item.id}
                     onClick={() => setActiveSection(item.id)}
-                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
+                    className={`w-full min-h-[36px] flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
                       isActive
                         ? 'bg-primary/10 text-primary font-medium'
                         : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
                     }`}
+                    title={item.label}
                   >
-                    <Icon className="w-4 h-4" />
-                    <span>{item.label}</span>
+                    <Icon className="w-4 h-4 flex-shrink-0" />
+                    <span className="flex-1 truncate text-left">{item.label}</span>
                   </button>
                 )
               })}
@@ -1138,15 +1139,7 @@ export function SettingsPage() {
                 {/* Auto Launch */}
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium">{t('Auto Launch on Startup')}</p>
-                      <span
-                        className="inline-flex items-center justify-center w-4 h-4 text-xs rounded-full bg-muted text-muted-foreground cursor-help"
-                        title={t('Automatically run Halo when system starts')}
-                      >
-                        ?
-                      </span>
-                    </div>
+                    <p className="font-medium">{t('Auto Launch on Startup')}</p>
                     <p className="text-sm text-muted-foreground">
                       {t('Automatically run Halo when system starts')}
                     </p>
@@ -1170,15 +1163,7 @@ export function SettingsPage() {
                 {/* Minimize to Tray */}
                 <div className="flex items-center justify-between pt-4 border-t border-border">
                   <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium">{t('Background Daemon')}</p>
-                      <span
-                        className="inline-flex items-center justify-center w-4 h-4 text-xs rounded-full bg-muted text-muted-foreground cursor-help"
-                        title={t('Minimize to system tray when closing window, can be awakened anytime')}
-                      >
-                        ?
-                      </span>
-                    </div>
+                    <p className="font-medium">{t('Background Daemon')}</p>
                     <p className="text-sm text-muted-foreground">
                       {t('Minimize to {{trayType}} when closing window, instead of exiting the program', {
                         trayType: window.platform?.isMac ? t('menu bar') : t('system tray')

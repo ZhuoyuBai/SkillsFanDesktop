@@ -129,6 +129,12 @@ function getLocalizedText(value: LocalizedText): string {
   return value[lang] || value['en'] || Object.values(value)[0] || ''
 }
 
+const SectionHeader = ({ label }: { label: string }) => (
+  <div className="px-3 pt-2.5 pb-1 text-left text-xs font-medium text-muted-foreground/70 select-none">
+    {label}
+  </div>
+)
+
 interface ModelSelectorProps {
   variant?: 'header' | 'compact'
   iconOnly?: boolean  // Show only icon without text (for narrow windows)
@@ -142,12 +148,21 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
   const { config, setConfig, setView, publicModels, authProviders: storeAuthProviders, setPublicModels } = useAppStore()
   const authProviders = storeAuthProviders as AuthProviderConfig[]
   const [isOpen, setIsOpen] = useState(false)
+  const [isDropdownScrolling, setIsDropdownScrolling] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const lastRefreshRef = useRef<number>(0)
+  const scrollHideTimeoutRef = useRef<number | null>(null)
 
   // Refresh model list when dropdown opens (throttled: once per 60s)
   useEffect(() => {
-    if (!isOpen) return
+    if (!isOpen) {
+      setIsDropdownScrolling(false)
+      if (scrollHideTimeoutRef.current !== null) {
+        window.clearTimeout(scrollHideTimeoutRef.current)
+        scrollHideTimeoutRef.current = null
+      }
+      return
+    }
 
     const now = Date.now()
     if (now - lastRefreshRef.current < 60_000) return
@@ -169,6 +184,14 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
       }
     })
   }, [isOpen])
+
+  useEffect(() => {
+    return () => {
+      if (scrollHideTimeoutRef.current !== null) {
+        window.clearTimeout(scrollHideTimeoutRef.current)
+      }
+    }
+  }, [])
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -233,7 +256,17 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
         recommended: p.recommended
       }
     })
-    .filter(p => p.isLoggedIn || p.recommended)
+    .filter(p => {
+      // Hide SkillsFan Credits when backend public models are unavailable
+      // (common in local-only runs without website service).
+      if (p.type === 'skillsfan-credits' && !p.isLoggedIn && publicModels.length === 0) {
+        return false
+      }
+      return p.isLoggedIn || p.recommended
+    })
+
+  const hasBuiltInOptions = allOAuthProviders.length > 0 || publicModels.length > 0
+  const showSectionHeaders = hasBuiltInOptions && configuredCustomProviders.length > 0
 
   // Get current model display name
   const rawModelName = getCurrentModelName(config)
@@ -328,6 +361,17 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
   const handleAddSource = () => {
     setIsOpen(false)
     setView('settings')
+  }
+
+  const handleDropdownScroll = () => {
+    setIsDropdownScrolling(true)
+    if (scrollHideTimeoutRef.current !== null) {
+      window.clearTimeout(scrollHideTimeoutRef.current)
+    }
+    scrollHideTimeoutRef.current = window.setTimeout(() => {
+      setIsDropdownScrolling(false)
+      scrollHideTimeoutRef.current = null
+    }, 700)
   }
 
   // Handle selecting a not-logged-in OAuth provider - just switch, login prompted on send
@@ -441,9 +485,11 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
       {/* Dropdown Menu - appears from bottom with animation */}
       {isOpen && (
         <div
+          onScroll={handleDropdownScroll}
           className={`
             ${styles.dropdown}
             min-w-[11rem] max-w-[16rem] max-h-[20rem] overflow-y-auto bg-card border border-border rounded-xl shadow-lg z-50 py-0
+            model-selector-scrollbar ${isDropdownScrolling ? 'model-selector-scrollbar--visible' : ''}
             animate-in fade-in-0 slide-in-from-top-2 duration-200
           `.trim().replace(/\s+/g, ' ')}
         >
@@ -521,7 +567,7 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
 
             // If no models at all (backend empty + not logged in), fall back to provider names
             if (loggedInElements.length === 0 && publicElements.length === 0) {
-              return allOAuthProviders.map((provider) => {
+              const providerElements = allOAuthProviders.map((provider) => {
                 const providerLogo = getProviderLogoById(provider.type)
                 const isSelected = currentSource === provider.type
                 return (
@@ -546,14 +592,27 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
                   </button>
                 )
               })
+
+              return [
+                ...(showSectionHeaders
+                  ? [<SectionHeader key="built-in-models-header" label={t('Built-in Models')} />]
+                  : []),
+                ...providerElements
+              ]
             }
 
-            return [...loggedInElements, ...publicElements]
+            return [
+              ...(showSectionHeaders
+                ? [<SectionHeader key="built-in-models-header" label={t('Built-in Models')} />]
+                : []),
+              ...loggedInElements,
+              ...publicElements
+            ]
           })()}
 
-          {/* Separator between official and custom providers */}
-          {allOAuthProviders.length > 0 && configuredCustomProviders.length > 0 && (
-            <div className="my-1 border-t border-border" />
+          {/* Section header for custom API providers */}
+          {showSectionHeaders && (
+            <SectionHeader label={t('Custom Models')} />
           )}
 
           {/* Custom API Providers - shown after official */}
@@ -584,7 +643,7 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
 
           {/* Divider */}
           {(configuredCustomProviders.length > 0 || allOAuthProviders.length > 0) && (
-            <div className="my-1 border-t border-border" />
+            <div className="border-t border-border" />
           )}
 
           {/* Add custom model - navigate to settings */}

@@ -1,7 +1,7 @@
 /**
  * i18n Configuration for Halo
  *
- * Supports 7 languages with automatic system language detection.
+ * Supports 3 languages with automatic system language detection.
  * English is the source language, translations maintained by AI.
  *
  * Usage:
@@ -18,20 +18,12 @@ import { initReactI18next, useTranslation as useI18nTranslation } from 'react-i1
 import en from './locales/en.json'
 import zhCN from './locales/zh-CN.json'
 import zhTW from './locales/zh-TW.json'
-import ja from './locales/ja.json'
-import es from './locales/es.json'
-import fr from './locales/fr.json'
-import de from './locales/de.json'
 
 // Supported locales with native language names
 export const SUPPORTED_LOCALES = {
   'en': 'English',
   'zh-CN': '简体中文',
-  'zh-TW': '繁體中文',
-  'ja': '日本語',
-  'es': 'Español',
-  'fr': 'Français',
-  'de': 'Deutsch',
+  'zh-TW': '繁體中文'
 } as const
 
 export type LocaleCode = keyof typeof SUPPORTED_LOCALES
@@ -52,22 +44,6 @@ function detectLanguage(): LocaleCode {
   }
   if (lang.startsWith('zh')) {
     return 'zh-CN'
-  }
-
-  if (lang.startsWith('ja')) {
-    return 'ja'
-  }
-
-  if (lang.startsWith('es')) {
-    return 'es'
-  }
-
-  if (lang.startsWith('fr')) {
-    return 'fr'
-  }
-
-  if (lang.startsWith('de')) {
-    return 'de'
   }
 
   // Default to English
@@ -99,14 +75,13 @@ i18n
     resources: {
       'en': { translation: en },
       'zh-CN': { translation: zhCN },
-      'zh-TW': { translation: zhTW },
-      'ja': { translation: ja },
-      'es': { translation: es },
-      'fr': { translation: fr },
-      'de': { translation: de }
+      'zh-TW': { translation: zhTW }
     },
     lng: getInitialLanguage(),
-    fallbackLng: 'en',
+    fallbackLng: {
+      'zh-TW': ['zh-CN', 'en'],
+      default: ['en']
+    },
 
     interpolation: {
       escapeValue: false // React already escapes values

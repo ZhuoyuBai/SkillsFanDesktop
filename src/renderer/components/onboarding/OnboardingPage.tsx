@@ -32,6 +32,9 @@ export function OnboardingPage({
   isActive,
   dots
 }: OnboardingPageProps) {
+  // Windows/Linux use titleBarOverlay, so keep onboarding images away from top overlay controls.
+  const hasOverlayControls = typeof window !== 'undefined' && window.platform && !window.platform.isMac
+
   return (
     <div
       className={`absolute inset-0 flex flex-col transition-all duration-500 ${
@@ -39,11 +42,15 @@ export function OnboardingPage({
       }`}
     >
       {/* Top: Image - takes most of the space */}
-      <div className="flex-1 flex items-center justify-center pt-0 pb-4 min-h-0">
+      <div className={`flex-1 flex items-center justify-center pb-4 min-h-0 ${
+        hasOverlayControls ? 'pt-12' : 'pt-0'
+      }`}>
         <img
           src={image}
           alt={title}
-          className={`max-h-full w-full object-cover object-top transition-all duration-500 ${
+          className={`max-h-full w-full object-top transition-all duration-500 ${
+            hasOverlayControls ? 'object-contain' : 'object-cover'
+          } ${
             isActive ? 'opacity-100 scale-100' : 'opacity-0 scale-[0.96]'
           }`}
         />

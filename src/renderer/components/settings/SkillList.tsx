@@ -16,7 +16,9 @@ import {
   Upload,
   Trash2,
   Compass,
-  FileText
+  FileText,
+  List,
+  LayoutGrid
 } from 'lucide-react'
 import { api } from '../../api'
 import { useTranslation } from '../../i18n'
@@ -42,31 +44,109 @@ interface SkillInfo {
   fileContents: Record<string, string>
 }
 
-// Source label config (used on right panel title)
-const SOURCE_CONFIG: Record<string, { label: string; icon: string }> = {
-  'skillsfan':        { label: 'SkillsFan',   icon: '\u26a1' },
-  'project-commands': { label: 'Project',     icon: '\ud83d\udccc' },
-  'global-commands':  { label: 'Global',      icon: '\ud83c\udf10' },
-  'claude-skills':    { label: 'Claude',      icon: '\ud83e\udd16' },
-  'agents-skills':    { label: 'Agent',       icon: '\ud83d\udd27' },
+type SkillViewMode = 'list' | 'grid'
+
+const SKILL_VIEW_MODE_KEY = 'halo:skill-view-mode'
+
+function getInitialSkillViewMode(): SkillViewMode {
+  if (typeof window === 'undefined') return 'list'
+  const stored = localStorage.getItem(SKILL_VIEW_MODE_KEY)
+  return stored === 'list' || stored === 'grid' ? stored : 'list'
+}
+
+function getSourceLabel(kind: SkillSource['kind']): string {
+  const labels: Record<SkillSource['kind'], string> = {
+    skillsfan: 'SkillsFan',
+    'project-commands': 'Project',
+    'global-commands': 'Global',
+    'claude-skills': 'Claude Skills',
+    'agents-skills': 'Agent Skills'
+  }
+  return labels[kind] || kind
 }
 
 // Shorten path for display
 function shortenPath(p: string): string {
-  return p.replace(/^\/Users\/[^/]+/, '~')
+  const normalized = p.replace(/\\/g, '/')
+  return normalized
+    .replace(/^\/Users\/[^/]+/, '~')
+    .replace(/^\/home\/[^/]+/, '~')
+    .replace(/^[A-Za-z]:\/Users\/[^/]+/, '~')
+}
+
+function getPathBaseName(p: string): string {
+  const normalized = p.replace(/\\/g, '/').replace(/\/+$/, '')
+  return normalized.split('/').pop() || p
 }
 
 // Get the folder/file label for the left sidebar
 function getFolderLabel(skill: SkillInfo): string {
   if (skill.source.kind === 'project-commands' || skill.source.kind === 'global-commands') {
-    return skill.location.split('/').pop() || skill.name
+    return getPathBaseName(skill.location) || skill.name
   }
-  return skill.baseDir.replace(/\/$/, '').split('/').pop() || skill.name
+  return skill.name || getPathBaseName(skill.baseDir)
+}
+
+function getCommandFileName(skill: SkillInfo): string {
+  return getPathBaseName(skill.location) || skill.name
+}
+
+function getSkillHeaderTitle(skill: SkillInfo): string {
+  return getFolderLabel(skill)
 }
 
 // Check if skill is a single-file command (no expandable folder)
 function isCommandSkill(skill: SkillInfo): boolean {
   return skill.source.kind === 'project-commands' || skill.source.kind === 'global-commands'
+}
+
+function SkillCard({ skill, onOpenFolder, onDelete, t }: {
+  skill: SkillInfo
+  onOpenFolder: (name: string) => void
+  onDelete: (skill: SkillInfo) => void
+  t: (key: string) => string
+}) {
+  return (
+    <div className="border border-border rounded-lg p-4 hover:bg-secondary/30 transition-colors flex flex-col justify-between group">
+      <div>
+        <h4 className="text-base font-semibold text-foreground truncate" title={skill.displayName || skill.name}>
+          {skill.displayName || skill.name}
+        </h4>
+        {skill.description ? (
+          <p className="text-xs text-muted-foreground mt-1.5 line-clamp-3" title={skill.description}>
+            {skill.description}
+          </p>
+        ) : (
+          <p className="text-xs text-muted-foreground/50 mt-1.5 italic">
+            {t('No description')}
+          </p>
+        )}
+      </div>
+      <div className="flex items-center justify-between mt-3">
+        <span className="text-[10px] text-muted-foreground/70 bg-secondary/50 px-1.5 py-0.5 rounded">
+          {getSourceLabel(skill.source.kind)}
+        </span>
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button
+            onClick={() => onOpenFolder(skill.name)}
+            className="p-1 text-muted-foreground hover:text-foreground hover:bg-secondary/60 rounded transition-colors"
+            title={t('Open Folder')}
+          >
+            <FolderOpen className="w-3.5 h-3.5" />
+          </button>
+          {skill.source?.kind === 'skillsfan' && (
+            <button
+              onClick={() => onDelete(skill)}
+              className="p-1 text-destructive/60 hover:text-destructive hover:bg-destructive/10 rounded transition-colors"
+              title={t('Delete skill')}
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
 }
 
 // Main component
@@ -75,7 +155,6 @@ export function SkillList() {
   const [skills, setSkills] = useState<SkillInfo[]>([])
   const [skillsDir, setSkillsDir] = useState<string>('')
   const [isLoading, setIsLoading] = useState(true)
-  const [isRefreshing, setIsRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   // Folder tree state
@@ -104,6 +183,7 @@ export function SkillList() {
     message: string
     type: 'success' | 'error'
   } | null>(null)
+  const [viewMode, setViewMode] = useState<SkillViewMode>(getInitialSkillViewMode)
 
   // Derived state
   const selectedSkill = selectedFile
@@ -121,7 +201,7 @@ export function SkillList() {
     if (skills.length > 0 && !selectedFile) {
       const first = skills[0]
       if (isCommandSkill(first)) {
-        const fileName = first.location.split('/').pop() || first.name
+        const fileName = getCommandFileName(first)
         selectFile(first.name, fileName)
       } else {
         handleFolderClick(first)
@@ -146,7 +226,7 @@ export function SkillList() {
   const handleFolderClick = useCallback((skill: SkillInfo) => {
     if (isCommandSkill(skill)) {
       // Command: directly select and preview
-      const fileName = skill.location.split('/').pop() || skill.name
+      const fileName = getCommandFileName(skill)
       selectFile(skill.name, fileName)
       return
     }
@@ -194,29 +274,6 @@ export function SkillList() {
       }
     } catch (err) {
       console.error('Failed to get skills dir:', err)
-    }
-  }
-
-  const handleRefresh = async () => {
-    setIsRefreshing(true)
-    setError(null)
-    setExpandedSkills(new Set())
-    try {
-      const result = await api.reloadSkills()
-      if (result.success && result.data) {
-        const newSkills = result.data as SkillInfo[]
-        setSkills(newSkills)
-        if (selectedFile && !newSkills.find(s => s.name === selectedFile.skillName)) {
-          setSelectedFile(null)
-          setFileContent('')
-        }
-      } else {
-        setError(result.error || t('Failed to reload skills'))
-      }
-    } catch (err) {
-      setError((err as Error).message)
-    } finally {
-      setIsRefreshing(false)
     }
   }
 
@@ -331,7 +388,7 @@ export function SkillList() {
         if (remaining.length > 0) {
           const first = remaining[0]
           if (isCommandSkill(first)) {
-            const fileName = first.location.split('/').pop() || first.name
+            const fileName = getCommandFileName(first)
             selectFile(first.name, fileName)
           } else {
             const files = first.files ?? []
@@ -378,7 +435,7 @@ export function SkillList() {
             onClick={() => {
               api.openExternal(`${getSkillsFanBaseUrl()}/market`)
             }}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-background text-foreground border border-border hover:bg-secondary/60 rounded-md transition-colors"
             title={t('Discover Skills')}
           >
             <Compass className="w-4 h-4" />
@@ -388,7 +445,7 @@ export function SkillList() {
           <button
             onClick={handleAddSkill}
             disabled={isInstalling}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg transition-colors disabled:opacity-50"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-background text-foreground border border-border hover:bg-secondary/60 rounded-md transition-colors disabled:opacity-50"
             title={t('Add Skill')}
           >
             {isInstalling ? (
@@ -404,15 +461,37 @@ export function SkillList() {
             )}
           </button>
 
-          <button
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg transition-colors disabled:opacity-50"
-            title={t('Refresh skill list')}
-          >
-            <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-            {isRefreshing ? t('Refreshing...') : t('Refresh')}
-          </button>
+          <div className="flex items-center bg-secondary/50 rounded-md p-0.5">
+            <button
+              onClick={() => {
+                setViewMode('list')
+                localStorage.setItem(SKILL_VIEW_MODE_KEY, 'list')
+              }}
+              className={`p-1.5 rounded transition-colors ${
+                viewMode === 'list'
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+              title={t('List view')}
+            >
+              <List className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => {
+                setViewMode('grid')
+                localStorage.setItem(SKILL_VIEW_MODE_KEY, 'grid')
+              }}
+              className={`p-1.5 rounded transition-colors ${
+                viewMode === 'grid'
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+              title={t('Grid view')}
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
         </div>
       </div>
 
@@ -452,7 +531,7 @@ export function SkillList() {
             {t('Add skills to the skills directory to see them here')}
           </p>
         </div>
-      ) : (
+      ) : viewMode === 'list' ? (
         /* Left-right split layout */
         <div className="flex border border-border rounded-lg overflow-hidden h-[420px]">
           {/* Left sidebar - folder tree (native file explorer style) */}
@@ -523,11 +602,13 @@ export function SkillList() {
           <div className="flex-1 flex flex-col overflow-hidden">
             {selectedSkill && selectedFile ? (
               <>
-                {/* Title bar with source icon */}
+                {/* Title bar */}
                 <div className="px-5 pt-4 pb-2 flex-shrink-0">
-                  <h4 className="text-sm font-medium text-foreground flex items-center gap-1.5">
-                    <span>{SOURCE_CONFIG[selectedSkill.source?.kind]?.icon || '\u26a1'}</span>
-                    {getFolderLabel(selectedSkill)}
+                  <h4
+                    className="text-sm font-medium text-foreground truncate"
+                    title={getSkillHeaderTitle(selectedSkill)}
+                  >
+                    {getSkillHeaderTitle(selectedSkill)}
                   </h4>
                   {selectedFile.fileName !== 'SKILL.md' && !isCommandSkill(selectedSkill) && (
                     <p className="text-xs text-muted-foreground/60 mt-0.5">
@@ -585,6 +666,18 @@ export function SkillList() {
               </div>
             )}
           </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-3 gap-3 max-h-[420px] overflow-y-auto">
+          {skills.map((skill) => (
+            <SkillCard
+              key={`${skill.source?.kind || 'unknown'}-${skill.name}`}
+              skill={skill}
+              onOpenFolder={handleOpenFolder}
+              onDelete={handleDeleteClick}
+              t={t}
+            />
+          ))}
         </div>
       )}
 
