@@ -161,7 +161,7 @@ interface ChatState {
   touchConversation: (spaceId: string, conversationId: string) => Promise<boolean>
 
   // Messaging
-  sendMessage: (content: string, attachments?: Attachment[], aiBrowserEnabled?: boolean, thinkingEnabled?: boolean) => Promise<void>
+  sendMessage: (content: string, attachments?: Attachment[], aiBrowserEnabled?: boolean, thinkingEffort?: 'off' | 'low' | 'medium' | 'high') => Promise<void>
   stopGeneration: (conversationId?: string) => Promise<void>
   injectMessage: (content: string, attachments?: Attachment[]) => Promise<void>
 
@@ -180,7 +180,7 @@ interface ChatState {
   handleAgentToolCall: (data: AgentEventBase & ToolCall) => void
   handleAgentToolResult: (data: AgentEventBase & { toolId: string; result: string; isError: boolean }) => void
   handleAgentError: (data: AgentEventBase & { error: string; errorCode?: number }) => void
-  handleAgentComplete: (data: AgentEventBase) => void
+  handleAgentComplete: (data: AgentEventBase & { userMessageUuid?: string }) => void
   handleAgentThought: (data: AgentEventBase & { thought: Thought }) => void
   handleAgentCompact: (data: AgentEventBase & { trigger: 'manual' | 'auto'; preTokens: number }) => void
   handleAgentUserQuestion: (data: AgentEventBase & { toolId: string; questions: UserQuestionInfo['questions'] }) => void
@@ -674,7 +674,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   // Send message (with optional attachments for multi-modal, optional AI Browser and thinking mode)
-  sendMessage: async (content, attachments, aiBrowserEnabled, thinkingEnabled) => {
+  sendMessage: async (content, attachments, aiBrowserEnabled, thinkingEffort) => {
     let conversation = get().getCurrentConversation()
     let conversationMeta = get().getCurrentConversationMeta()
     const { currentSpaceId } = get()
@@ -846,7 +846,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         images: imageAtts && imageAtts.length > 0 ? imageAtts : undefined,  // Legacy images for backward compat
         attachments: attachments,  // Pass all attachments to API
         aiBrowserEnabled,  // Pass AI Browser state to API
-        thinkingEnabled,  // Pass thinking mode to API
+        thinkingEffort,   // Pass thinking effort level to API
         canvasContext: buildCanvasContext()  // Pass canvas context for AI awareness
       })
 
@@ -1161,8 +1161,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   // Handle complete - reload conversation from backend (Single Source of Truth)
   // Key: Only set isGenerating=false AFTER backend data is loaded to prevent flash
   handleAgentComplete: async (data) => {
-    const { spaceId, conversationId } = data
-    logger.debug(`[ChatStore] handleAgentComplete [${conversationId}]`)
+    const { spaceId, conversationId, userMessageUuid } = data as AgentEventBase & { userMessageUuid?: string }
+    logger.debug(`[ChatStore] handleAgentComplete [${conversationId}]${userMessageUuid ? ` uuid=${userMessageUuid}` : ''}`)
 
     // Commit streaming content to cache BEFORE async reload.
     // When lane queue pumps the next message, handleAgentStart clears streamingContent.
@@ -1181,7 +1181,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
           role: 'assistant',
           content: session.streamingContent,
           timestamp: new Date().toISOString(),
-          thoughts: session.thoughts?.length > 0 ? session.thoughts : undefined
+          thoughts: session.thoughts?.length > 0 ? session.thoughts : undefined,
+          userMessageUuid  // Store UUID for file rewind support
         }
         const messages = [...cached.messages]
         const lastMsg = messages[messages.length - 1]

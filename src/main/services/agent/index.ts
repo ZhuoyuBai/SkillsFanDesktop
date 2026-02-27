@@ -94,6 +94,6 @@ export {
 export { createCanUseTool } from './permission-handler'
 export { getWorkingDir, getApiCredentials, sendToRenderer } from './helpers'
 export { parseSDKMessage, buildMessageContent, formatCanvasContext } from './message-utils'
-export { getOrCreateV2Session, activeSessions, v2Sessions } from './session-manager'
+export { getOrCreateV2Session, getV2Session, activeSessions, v2Sessions } from './session-manager'
 export { broadcastMcpStatus } from './mcp-manager'
 export { agentQueue } from './lane-queue'

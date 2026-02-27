@@ -1,5 +1,5 @@
 diff --git a/node_modules/@anthropic-ai/claude-agent-sdk/sdk.mjs b/node_modules/@anthropic-ai/claude-agent-sdk/sdk.mjs
-index 1e1c3e4..fb4d469 100755
+index 1e1c3e4..8302196 100755
 --- a/node_modules/@anthropic-ai/claude-agent-sdk/sdk.mjs
 +++ b/node_modules/@anthropic-ai/claude-agent-sdk/sdk.mjs
 @@ -13174,9 +13174,7 @@ class ProcessTransport {
@@ -13,13 +13,17 @@ index 1e1c3e4..fb4d469 100755
        delete env.NODE_OPTIONS;
        if (env.DEBUG_CLAUDE_AGENT_SDK) {
          env.DEBUG = "1";
-@@ -13986,38 +13984,54 @@ class SessionImpl {
+@@ -13986,38 +13984,62 @@ class SessionImpl {
        pathToClaudeCodeExecutable = join4(dirname2, "cli.js");
      }
      const processEnv = { ...options.env ?? process.env };
 -    if (!processEnv.CLAUDE_CODE_ENTRYPOINT) {
 -      processEnv.CLAUDE_CODE_ENTRYPOINT = "sdk-ts";
 +    // [PATCHED] Removed CLAUDE_CODE_ENTRYPOINT to appear as native CLI
++    // [PATCHED] Enable file checkpointing via env var (mirrors query() behavior)
++    if (options.enableFileCheckpointing) {
++      processEnv.CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING = "true";
++    }
 +    // Process SDK-type MCP servers: extract instances to pass to Query
 +    // This mirrors what query() does at lines 26786-26799
 +    const sdkMcpServers = new Map;
@@ -81,15 +85,36 @@ index 1e1c3e4..fb4d469 100755
 +      hooks: options.hooks ?? false,
 +      includePartialMessages: options.includePartialMessages ?? true,
 +      forkSession: options.forkSession ?? false,
-+      resumeSessionAt: options.resumeSessionAt ?? undefined
++      resumeSessionAt: options.resumeSessionAt ?? undefined,
++      additionalDirectories: options.additionalDirectories ?? [],
++      plugins: options.plugins,
++      sandbox: options.sandbox
      });
 -    this.query = new Query(transport, false, undefined, undefined, this.abortController, new Map);
-+    // Pass the extracted SDK MCP server instances to Query
-+    this.query = new Query(transport, false, options.canUseTool, options.hooks, this.abortController, sdkMcpServers);
++    // Pass the extracted SDK MCP server instances and agent definitions to Query
++    const initConfig = options.agents ? { agents: options.agents } : undefined;
++    this.query = new Query(transport, false, options.canUseTool, options.hooks, this.abortController, sdkMcpServers, undefined, initConfig);
      this.query.streamInput(this.inputStream);
    }
    async send(message) {
-@@ -14053,6 +14067,18 @@ class SessionImpl {
+@@ -14027,12 +14049,16 @@ class SessionImpl {
+     const userMessage = typeof message === "string" ? {
+       type: "user",
+       session_id: "",
++      uuid: randomUUID(),
+       message: {
+         role: "user",
+         content: [{ type: "text", text: message }]
+       },
+       parent_tool_use_id: null
+     } : message;
++    if (!userMessage.uuid) {
++      userMessage.uuid = randomUUID();
++    }
+     this.inputStream.enqueue(userMessage);
+   }
+   async* stream() {
+@@ -14053,6 +14079,21 @@ class SessionImpl {
        }
      }
    }
@@ -105,10 +130,13 @@ index 1e1c3e4..fb4d469 100755
 +  async setPermissionMode(mode) {
 +    return this.query.setPermissionMode(mode);
 +  }
++  async rewindFiles(userMessageId) {
++    return this.query.rewindFiles(userMessageId);
++  }
    close() {
      if (this.closed) {
        return;
-@@ -26725,7 +26751,7 @@ function query({
+@@ -26725,7 +26766,7 @@ function query({
      const dirname2 = join5(filename, "..");
      pathToClaudeCodeExecutable = join5(dirname2, "cli.js");
    }
@@ -117,7 +145,7 @@ index 1e1c3e4..fb4d469 100755
    const {
      abortController = createAbortController(),
      additionalDirectories = [],
-@@ -26767,9 +26793,7 @@ function query({
+@@ -26767,9 +26808,7 @@ function query({
    if (!processEnv) {
      processEnv = { ...process.env };
    }

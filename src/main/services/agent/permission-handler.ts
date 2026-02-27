@@ -59,9 +59,9 @@ export function createCanUseTool(
     console.log(`[Agent] canUseTool called - Tool: ${toolName}, Input:`, JSON.stringify(input).substring(0, 200))
 
     // Check file path tools - restrict to working directory
-    const fileTools = ['Read', 'Write', 'Edit', 'Grep', 'Glob']
+    const fileTools = ['Read', 'Write', 'Edit', 'Grep', 'Glob', 'NotebookEdit']
     if (fileTools.includes(toolName)) {
-      const pathParam = (input.file_path || input.path) as string | undefined
+      const pathParam = (input.file_path || input.path || input.notebook_path) as string | undefined
 
       if (pathParam) {
         const absolutePath = path.resolve(pathParam)
@@ -123,9 +123,66 @@ export function createCanUseTool(
       }
     }
 
+    // Task (sub-agent) — requires user approval since it spawns child agents and costs tokens
+    if (toolName === 'Task') {
+      const permission = config.permissions.commandExecution
+
+      if (permission === 'deny') {
+        return {
+          behavior: 'deny' as const,
+          message: 'Sub-agent execution is disabled'
+        }
+      }
+
+      // trust mode or allow: auto-approve
+      if (permission !== 'ask' || config.permissions.trustMode) {
+        return { behavior: 'allow' as const }
+      }
+
+      // ask mode: send approval request to renderer
+      const session = activeSessions.get(conversationId)
+      if (!session) {
+        return { behavior: 'deny' as const, message: 'Session not found' }
+      }
+
+      const toolCall: ToolCall = {
+        id: `tool-${Date.now()}`,
+        name: toolName,
+        status: 'waiting_approval',
+        input,
+        requiresApproval: true,
+        description: `Launch sub-agent: ${(input as Record<string, string>).description || 'task'}`
+      }
+
+      sendToRenderer('agent:tool-call', spaceId, conversationId, toolCall as unknown as Record<string, unknown>)
+
+      return new Promise((resolve) => {
+        session.pendingPermissionResolve = (approved: boolean) => {
+          if (approved) {
+            resolve({ behavior: 'allow' as const })
+          } else {
+            resolve({
+              behavior: 'deny' as const,
+              message: 'User rejected sub-agent execution'
+            })
+          }
+        }
+      })
+    }
+
     // AI Browser tools are always allowed (they run in sandboxed browser context)
     if (isAIBrowserTool(toolName)) {
       console.log(`[Agent] AI Browser tool allowed: ${toolName}`)
+      return { behavior: 'allow' as const }
+    }
+
+    // Agent Teams + planning tools are always allowed (they coordinate sub-agents internally)
+    const teamTools = [
+      'TeamCreate', 'TeamDelete', 'SendMessage',
+      'TaskCreate', 'TaskUpdate', 'TaskList', 'TaskGet',
+      'EnterPlanMode', 'EnterWorktree'
+    ]
+    if (teamTools.includes(toolName)) {
       return { behavior: 'allow' as const }
     }
 

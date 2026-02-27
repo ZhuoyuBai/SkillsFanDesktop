@@ -39,7 +39,7 @@ import type { Attachment } from '../../types'
 import { useTranslation } from '../../i18n'
 
 interface InputAreaProps {
-  onSend: (content: string, attachments?: Attachment[], thinkingEnabled?: boolean) => void
+  onSend: (content: string, attachments?: Attachment[], thinkingEffort?: 'off' | 'low' | 'medium' | 'high') => void
   onStop: () => void
   onInject?: (content: string, attachments?: Attachment[]) => void  // Inject message during generation
   isGenerating: boolean
@@ -181,18 +181,21 @@ export function InputArea({ onSend, onStop, onInject, isGenerating, isCompact = 
   const [isProcessingFiles, setIsProcessingFiles] = useState(false)
   const [fileError, setFileError] = useState<AttachmentError | null>(null)
   const [infoToast, setInfoToast] = useState<string | null>(null)  // Info toast message
-  const [thinkingEnabled, setThinkingEnabled] = useState(false)  // Extended thinking mode
+
+  // AI Browser state
+  const { enabled: aiBrowserEnabled, setEnabled: setAIBrowserEnabled } = useAIBrowserStore()
+
+  // Settings navigation (must be before thinkingEffort init which reads config)
+  const { config, openSettingsWithSection } = useAppStore()
+
+  const [thinkingEffort, setThinkingEffort] = useState<'off' | 'low' | 'medium' | 'high'>(
+    (config?.thinkingEffort as 'off' | 'low' | 'medium' | 'high') || 'off'
+  )
   const [showAttachMenu, setShowAttachMenu] = useState(false)  // Attachment menu visibility
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const imageInputRef = useRef<HTMLInputElement>(null)
   const attachMenuRef = useRef<HTMLDivElement>(null)
-
-  // AI Browser state
-  const { enabled: aiBrowserEnabled, setEnabled: setAIBrowserEnabled } = useAIBrowserStore()
-
-  // Settings navigation
-  const { config, openSettingsWithSection } = useAppStore()
 
   // Current model ID for vision support check
   const currentModelId = (() => {
@@ -561,13 +564,13 @@ export function InputArea({ onSend, onStop, onInject, isGenerating, isCompact = 
       }
     } else if (!isGenerating) {
       // Normal send
-      onSend(finalText, attachments.length > 0 ? attachments : undefined, thinkingEnabled)
+      onSend(finalText, attachments.length > 0 ? attachments : undefined, thinkingEffort)
 
       if (!isOnboardingSendStep) {
         setContent('')
         setAttachments([])  // Clear attachments after send
         setActiveSkillBadge(null)
-        // Don't reset thinkingEnabled - user might want to keep it on
+        // Don't reset thinkingEffort - user might want to keep it on
         // Reset height
         if (textareaRef.current) {
           textareaRef.current.style.height = 'auto'
@@ -874,8 +877,8 @@ export function InputArea({ onSend, onStop, onInject, isGenerating, isCompact = 
             isGenerating={isGenerating}
             isOnboarding={isOnboardingSendStep}
             isProcessingFiles={isProcessingFiles}
-            thinkingEnabled={thinkingEnabled}
-            onThinkingToggle={() => setThinkingEnabled(!thinkingEnabled)}
+            thinkingEffort={thinkingEffort}
+            onThinkingEffortChange={setThinkingEffort}
             aiBrowserEnabled={aiBrowserEnabled}
             onAIBrowserToggle={() => setAIBrowserEnabled(!aiBrowserEnabled)}
             showAttachMenu={showAttachMenu}
@@ -903,12 +906,14 @@ export function InputArea({ onSend, onStop, onInject, isGenerating, isCompact = 
  *
  * Layout: [+attachment] ──────────────────── [⚛ thinking] [send]
  */
+type ThinkingEffort = 'off' | 'low' | 'medium' | 'high'
+
 interface InputToolbarProps {
   isGenerating: boolean
   isOnboarding: boolean
   isProcessingFiles: boolean
-  thinkingEnabled: boolean
-  onThinkingToggle: () => void
+  thinkingEffort: ThinkingEffort
+  onThinkingEffortChange: (effort: ThinkingEffort) => void
   aiBrowserEnabled: boolean
   onAIBrowserToggle: () => void
   showAttachMenu: boolean
@@ -929,8 +934,8 @@ function InputToolbar({
   isGenerating,
   isOnboarding,
   isProcessingFiles,
-  thinkingEnabled,
-  onThinkingToggle,
+  thinkingEffort,
+  onThinkingEffortChange,
   aiBrowserEnabled,
   onAIBrowserToggle,
   showAttachMenu,
@@ -1059,7 +1064,7 @@ function InputToolbar({
                 : 'bg-muted text-muted-foreground/60 cursor-not-allowed'
               }
             `}
-            title={thinkingEnabled ? t('Send (Deep Thinking)') : t('Send')}
+            title={thinkingEffort !== 'off' ? t('Send (Thinking: {{level}})', { level: thinkingEffort }) : t('Send')}
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 10.5L12 3m0 0l7.5 7.5M12 3v18" />

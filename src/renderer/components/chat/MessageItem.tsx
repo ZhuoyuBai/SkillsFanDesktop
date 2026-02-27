@@ -82,10 +82,46 @@ function ThoughtHistory({ thoughts }: { thoughts: Thought[] }) {
   )
 }
 
+// Compact display for web tools (WebFetch / WebSearch)
+function WebToolCompactItem({ thought }: { thought: Thought }) {
+  const { t } = useTranslation()
+  const Icon = getToolIcon(thought.toolName!)
+  const input = thought.toolInput || {}
+
+  let summary = ''
+  if (thought.toolName === 'WebFetch') {
+    const url = String(input.url || '')
+    try {
+      summary = new URL(url).hostname.replace('www.', '')
+    } catch {
+      summary = url.slice(0, 30)
+    }
+  } else {
+    summary = String(input.query || '').slice(0, 30)
+  }
+
+  return (
+    <div className="flex items-center gap-2 text-xs text-muted-foreground/60">
+      <CheckCircle2 size={12} className="text-muted-foreground/50 flex-shrink-0" />
+      <Icon size={12} className="flex-shrink-0" />
+      <span className="truncate">
+        {thought.toolName === 'WebFetch'
+          ? t('Fetched {{url}}', { url: summary })
+          : t('Searched {{query}}', { query: summary })}
+      </span>
+    </div>
+  )
+}
+
 // Single thought item
 function ThoughtItem({ thought }: { thought: Thought }) {
   const [isExpanded, setIsExpanded] = useState(false)
   const { t } = useTranslation()
+
+  // Compact one-line display for web tools
+  if (thought.type === 'tool_use' && (thought.toolName === 'WebFetch' || thought.toolName === 'WebSearch')) {
+    return <WebToolCompactItem thought={thought} />
+  }
 
   const getTypeInfo = () => {
     switch (thought.type) {
@@ -302,17 +338,19 @@ export function MessageItem({ message, hideThoughts = false, isInContainer = fal
     </div>
   )
 
-  // Hover copy button - shown on all messages with content
-  const copyButton = message.content ? (
-    <button
-      onClick={handleCopyMessage}
-      className="absolute -top-2 -right-2 opacity-0 group-hover:opacity-100
-        p-1.5 rounded-lg bg-background border border-border shadow-sm
-        text-muted-foreground hover:text-foreground transition-all z-10"
-      title={t('Copy message')}
-    >
-      {copied ? <Check size={14} className="text-green-400" /> : <Copy size={14} />}
-    </button>
+  // Hover action buttons - shown on all messages with content
+  const actionButtons = message.content ? (
+    <div className="absolute -top-2 -right-2 opacity-0 group-hover:opacity-100
+      flex items-center gap-0.5 bg-background border border-border shadow-sm
+      rounded-lg p-0.5 transition-all z-10">
+      <button
+        onClick={handleCopyMessage}
+        className="p-1 rounded text-muted-foreground hover:text-foreground transition-colors"
+        title={t('Copy message')}
+      >
+        {copied ? <Check size={14} className="text-green-400" /> : <Copy size={14} />}
+      </button>
+    </div>
   ) : null
 
   // Right-click context menu portal
@@ -339,7 +377,7 @@ export function MessageItem({ message, hideThoughts = false, isInContainer = fal
       <div data-message-id={message.id}>
         <div className="relative group">
           {bubble}
-          {copyButton}
+          {actionButtons}
         </div>
         {contextMenuPortal}
       </div>
@@ -354,7 +392,7 @@ export function MessageItem({ message, hideThoughts = false, isInContainer = fal
     >
       <div className="relative group max-w-[85%]">
         {bubble}
-        {copyButton}
+        {actionButtons}
       </div>
       {contextMenuPortal}
     </div>

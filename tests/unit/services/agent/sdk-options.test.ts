@@ -148,7 +148,18 @@ describe('sdk-options', () => {
       expect(sdkOptions.env.ANTHROPIC_API_KEY).toBe('encoded-key')
       expect(sdkOptions.env.ANTHROPIC_BASE_URL).toBe('http://router.local')
       expect(sdkOptions.systemPrompt.append).toBe('[BASE_PROMPT]')
-      expect(sdkOptions.allowedTools).toEqual(['Read', 'Write', 'Edit', 'Grep', 'Glob', 'Bash'])
+      expect(sdkOptions.allowedTools).toEqual([
+        'Read', 'Write', 'Edit', 'Grep', 'Glob',
+        'Bash',
+        'WebFetch', 'WebSearch',
+        'TodoWrite', 'TaskOutput',
+        'NotebookEdit',
+        'Task',
+        'AskUserQuestion',
+        'TeamCreate', 'TeamDelete', 'SendMessage',
+        'TaskCreate', 'TaskUpdate', 'TaskList', 'TaskGet',
+        'EnterPlanMode', 'EnterWorktree',
+      ])
       expect(mocks.createCanUseTool).toHaveBeenCalledWith('/tmp/space-1', 'space-1', 'conv-1')
       expect(mocks.buildSystemPromptAppend).toHaveBeenCalledWith('/tmp/space-1', 'glm-5', true)
 

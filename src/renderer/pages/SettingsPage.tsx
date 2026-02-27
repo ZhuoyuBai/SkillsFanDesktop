@@ -1270,6 +1270,37 @@ export function SettingsPage() {
               <h2 className="text-lg font-medium mb-4">{t('Advanced')}</h2>
 
               <div className="space-y-4">
+                {/* Thinking Effort Level */}
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <p className="font-medium">{t('Thinking Effort')}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {t('Controls depth of reasoning. Higher effort uses more tokens but produces better results for complex tasks.')}
+                    </p>
+                  </div>
+                  <div className="relative">
+                    <select
+                      value={config?.thinkingEffort ?? 'off'}
+                      onChange={async (e) => {
+                        const effort = e.target.value as 'off' | 'low' | 'medium' | 'high'
+                        try {
+                          await api.setConfig({ thinkingEffort: effort })
+                          setConfig({ ...config!, thinkingEffort: effort } as HaloConfig)
+                        } catch (error) {
+                          console.error('[Settings] Failed to update thinking effort:', error)
+                        }
+                      }}
+                      className="appearance-none px-3 pr-8 py-1.5 bg-input rounded-lg border border-border focus:outline-none transition-colors cursor-pointer"
+                    >
+                      <option value="off">{t('Off')}</option>
+                      <option value="low">{t('Low')}</option>
+                      <option value="medium">{t('Medium')}</option>
+                      <option value="high">{t('High')}</option>
+                    </select>
+                    <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+                  </div>
+                </div>
+
                 {/* Cross-conversation Memory Toggle */}
                 <div className="flex items-center justify-between">
                   <div className="flex-1">

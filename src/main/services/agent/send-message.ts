@@ -264,10 +264,15 @@ async function sendMessageInternal(
         console.log(`[Agent][${conversationId}] Model set: ${sdkModel}`)
       }
 
-      // Set thinking tokens dynamically
+      // Set thinking tokens dynamically (support effort levels)
       if (v2Session.setMaxThinkingTokens) {
-        await v2Session.setMaxThinkingTokens(thinkingEnabled ? 10240 : null)
-        console.log(`[Agent][${conversationId}] Thinking mode: ${thinkingEnabled ? 'ON (10240 tokens)' : 'OFF'}`)
+        const effortToTokens: Record<string, number | null> = {
+          off: null, low: 2048, medium: 5120, high: 10240
+        }
+        const effort = request.thinkingEffort || (thinkingEnabled ? 'high' : 'off')
+        const thinkingTokens = effortToTokens[effort] ?? null
+        await v2Session.setMaxThinkingTokens(thinkingTokens)
+        console.log(`[Agent][${conversationId}] Thinking: effort=${effort}, tokens=${thinkingTokens}`)
       }
     } catch (e) {
       console.error(`[Agent][${conversationId}] Failed to set dynamic params:`, e)
@@ -393,6 +398,7 @@ async function processMessageStream(
   let accumulatedTextContent = ''
   let textBlockCount = 0
   let capturedSessionId: string | undefined
+  let lastUserMessageUuid: string | undefined
 
   // Token usage tracking
   // lastSingleUsage: Last API call usage (single call, represents current context size)
@@ -594,6 +600,15 @@ async function processMessageStream(
           : ''
     )
 
+    // Track user message UUID for file rewind support
+    if (sdkMessage.type === 'user') {
+      const uuid = (sdkMessage as any).uuid
+      console.log(`[Agent][${conversationId}] User message UUID: ${uuid ?? 'NOT PRESENT'}`, JSON.stringify(Object.keys(sdkMessage)))
+      if (uuid) {
+        lastUserMessageUuid = uuid
+      }
+    }
+
     // Extract single API call usage from assistant message (represents current context size)
     if (sdkMessage.type === 'assistant') {
       const usage = extractSingleUsage(sdkMessage)
@@ -744,6 +759,17 @@ async function processMessageStream(
         capturedSessionId = sessionIdFromMsg as string
       }
 
+      // Handle budget exceeded error
+      const resultSubtype = msg.subtype as string | undefined
+      if (resultSubtype === 'error_max_budget_usd') {
+        console.log(`[Agent][${conversationId}] Budget exceeded`)
+        sendToRenderer('agent:error', spaceId, conversationId, {
+          type: 'error',
+          error: 'Maximum budget exceeded. Please increase the budget limit in settings.',
+          errorCode: 429
+        })
+      }
+
       // Extract token usage from result message
       tokenUsage = extractResultUsage(msg, lastSingleUsage)
       if (tokenUsage) {
@@ -767,14 +793,16 @@ async function processMessageStream(
       updateLastMessage(spaceId, conversationId, {
         content: accumulatedTextContent,
         thoughts: sessionState.thoughts.length > 0 ? [...sessionState.thoughts] : undefined,
-        tokenUsage: tokenUsage || undefined  // Include token usage if available
+        tokenUsage: tokenUsage || undefined,  // Include token usage if available
+        userMessageUuid: lastUserMessageUuid  // SDK UUID for file rewind
       })
-      console.log(`[Agent][${conversationId}] Saved ${sessionState.thoughts.length} thoughts${tokenUsage ? ' with tokenUsage' : ''} to backend`)
+      console.log(`[Agent][${conversationId}] Saved ${sessionState.thoughts.length} thoughts${tokenUsage ? ' with tokenUsage' : ''} to backend, userMessageUuid=${lastUserMessageUuid ?? 'NONE'}`)
     }
     sendToRenderer('agent:complete', spaceId, conversationId, {
       type: 'complete',
       duration: 0,
-      tokenUsage  // Include token usage data
+      tokenUsage,  // Include token usage data
+      userMessageUuid: lastUserMessageUuid  // For file rewind support
     })
   } else {
     console.log(`[Agent][${conversationId}] WARNING: No text content after SDK query completed`)
@@ -795,7 +823,8 @@ async function processMessageStream(
     sendToRenderer('agent:complete', spaceId, conversationId, {
       type: 'complete',
       duration: 0,
-      tokenUsage  // Include token usage data
+      tokenUsage,  // Include token usage data
+      userMessageUuid: lastUserMessageUuid  // For file rewind support
     })
   }
 

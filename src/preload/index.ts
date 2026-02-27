@@ -94,7 +94,7 @@ export interface SkillsFanAPI {
       language?: string
     }>
     aiBrowserEnabled?: boolean  // Enable AI Browser tools
-    thinkingEnabled?: boolean  // Enable extended thinking mode
+    thinkingEffort?: 'off' | 'low' | 'medium' | 'high'  // Thinking effort level
     canvasContext?: {  // Canvas context for AI awareness
       isOpen: boolean
       tabCount: number
@@ -143,6 +143,7 @@ export interface SkillsFanAPI {
   ensureSessionWarm: (spaceId: string, conversationId: string) => Promise<IpcResponse>
   testMcpConnections: () => Promise<{ success: boolean; servers: unknown[]; error?: string }>
   answerUserQuestion: (conversationId: string, answers: Record<string, string>) => Promise<IpcResponse>
+  rewindFiles: (conversationId: string, userMessageUuid: string) => Promise<IpcResponse>
 
   // Event listeners
   onAgentStart: (callback: (data: unknown) => void) => () => void
@@ -514,6 +515,7 @@ const api: SkillsFanAPI = {
   ensureSessionWarm: (spaceId, conversationId) => ipcRenderer.invoke('agent:ensure-session-warm', spaceId, conversationId),
   testMcpConnections: () => ipcRenderer.invoke('agent:test-mcp'),
   answerUserQuestion: (conversationId, answers) => ipcRenderer.invoke('agent:answer-question', conversationId, answers),
+  rewindFiles: (conversationId, userMessageUuid) => ipcRenderer.invoke('agent:rewind-files', conversationId, userMessageUuid),
 
   // Event listeners
   onAgentStart: (callback) => createEventListener('agent:start', callback),

@@ -197,6 +197,7 @@ export interface HaloConfig {
   mcpServers: McpServersConfig;  // MCP servers configuration
   spaces?: SpacesConfig;  // Space settings (default space, etc.)
   memory?: MemoryConfig;  // Cross-conversation memory settings
+  thinkingEffort?: 'off' | 'low' | 'medium' | 'high';  // Default thinking effort level
   isFirstLaunch: boolean;
 }
 
@@ -356,6 +357,7 @@ export interface Message {
   images?: ImageAttachment[];  // Attached images (legacy, for display)
   attachments?: Attachment[];  // All file attachments (images, PDFs, text/code)
   tokenUsage?: TokenUsage;  // Token usage for this assistant message
+  userMessageUuid?: string;  // SDK user message UUID for file rewind support
 }
 
 // ============================================

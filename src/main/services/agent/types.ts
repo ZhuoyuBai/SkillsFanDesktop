@@ -118,7 +118,8 @@ export interface AgentRequest {
   images?: ImageAttachment[]  // Optional images for multi-modal messages
   attachments?: Attachment[]  // General attachments (PDF, text, code files)
   aiBrowserEnabled?: boolean  // Enable AI Browser tools for this request
-  thinkingEnabled?: boolean   // Enable extended thinking mode (maxThinkingTokens: 10240)
+  thinkingEnabled?: boolean   // Enable extended thinking mode (legacy, use thinkingEffort)
+  thinkingEffort?: 'off' | 'low' | 'medium' | 'high'  // Thinking effort level
   model?: string              // Model to use (for future model switching)
   modelSource?: string        // AI source/provider override (e.g. 'skillsfan-credits', 'deepseek')
   canvasContext?: CanvasContext  // Current canvas state for AI awareness
@@ -217,6 +218,7 @@ export type V2SDKSession = {
   setModel?: (model: string | undefined) => Promise<void>
   setMaxThinkingTokens?: (maxThinkingTokens: number | null) => Promise<void>
   setPermissionMode?: (mode: 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan') => Promise<void>
+  rewindFiles?: (userMessageId: string) => Promise<void>
 }
 
 /**

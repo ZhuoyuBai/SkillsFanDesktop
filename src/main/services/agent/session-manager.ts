@@ -406,6 +406,13 @@ export function getActiveSession(conversationId: string): SessionState | undefin
   return activeSessions.get(conversationId)
 }
 
+/**
+ * Get V2 session for a conversation (for IPC handlers like rewind)
+ */
+export function getV2Session(conversationId: string): V2SessionInfo | undefined {
+  return v2Sessions.get(conversationId)
+}
+
 // ============================================
 // Config Change Handler Registration
 // ============================================

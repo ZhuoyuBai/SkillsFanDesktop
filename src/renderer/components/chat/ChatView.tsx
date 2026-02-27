@@ -19,6 +19,7 @@ import { MessageList } from './MessageList'
 import { InputArea } from './InputArea'
 import { ScrollToBottomButton } from './ScrollToBottomButton'
 import { UserQuestionCard } from './UserQuestionCard'
+import { PromptSuggestions } from './PromptSuggestions'
 import { HaloLogo } from '../brand/HaloLogo'
 import { PenLine, BarChart3, Palette, FolderSearch, ShoppingBag, LucideIcon } from 'lucide-react'
 import {
@@ -255,8 +256,8 @@ export function ChatView({ isCompact = false }: ChatViewProps) {
   // AI Browser state
   const { enabled: aiBrowserEnabled } = useAIBrowserStore()
 
-  // Handle send (with optional attachments for multi-modal messages, optional thinking mode)
-  const handleSend = async (content: string, attachments?: Attachment[], thinkingEnabled?: boolean) => {
+  // Handle send (with optional attachments for multi-modal messages, optional thinking effort)
+  const handleSend = async (content: string, attachments?: Attachment[], thinkingEffort?: 'off' | 'low' | 'medium' | 'high') => {
     // In onboarding mode, intercept and play mock response
     if (isOnboarding && currentStep === 'send-message') {
       handleOnboardingSend()
@@ -267,7 +268,7 @@ export function ChatView({ isCompact = false }: ChatViewProps) {
     if ((!content.trim() && (!attachments || attachments.length === 0)) || isGenerating) return
 
     // Pass both AI Browser and thinking state to sendMessage
-    await sendMessage(content, attachments, aiBrowserEnabled, thinkingEnabled)
+    await sendMessage(content, attachments, aiBrowserEnabled, thinkingEffort)
   }
 
   // Handle stop - stops the current conversation's generation
@@ -282,6 +283,23 @@ export function ChatView({ isCompact = false }: ChatViewProps) {
     if (!isGenerating) return
     await injectMessage(content, attachments)
   }, [isGenerating, injectMessage])
+
+  // Get last assistant message info for PromptSuggestions
+  const lastAssistant = useMemo(() => {
+    const msgs = currentConversation?.messages || []
+    for (let i = msgs.length - 1; i >= 0; i--) {
+      if (msgs[i].role === 'assistant') {
+        return { thoughts: msgs[i].thoughts || [], content: msgs[i].content || '' }
+      }
+    }
+    return { thoughts: [] as import('../../types').Thought[], content: '' }
+  }, [currentConversation?.messages])
+
+  // Handle suggestion selection from PromptSuggestions
+  const handleSuggestionSelect = useCallback(async (suggestion: string) => {
+    if (isGenerating) return
+    await sendMessage(suggestion)
+  }, [isGenerating, sendMessage])
 
   // Combine real messages with mock onboarding messages
   const realMessages = currentConversation?.messages || []
@@ -391,7 +409,18 @@ export function ChatView({ isCompact = false }: ChatViewProps) {
                 taskStatusHistory={taskStatusHistory}
                 textSegments={textSegments}
                 lastSegmentIndex={lastSegmentIndex}
+
               />
+              {/* Prompt Suggestions - tight below last assistant message */}
+              {!isGenerating && (lastAssistant.thoughts.length > 0 || lastAssistant.content) && (
+                <div className={`mt-1 ${isCompact ? '' : 'max-w-3xl mx-auto w-full'}`}>
+                  <PromptSuggestions
+                    thoughts={lastAssistant.thoughts}
+                    content={lastAssistant.content}
+                    onSelect={handleSuggestionSelect}
+                  />
+                </div>
+              )}
               <div ref={bottomRef} />
             </>
           )}

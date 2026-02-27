@@ -209,8 +209,8 @@ export function TodoCard({
             ${isCollapsed ? 'max-h-0 opacity-0' : 'max-h-[500px] opacity-100'}
           `}
         >
-          {/* Todo items */}
-          <div className="p-2 space-y-1">
+          {/* Todo items - scrollable when list is long */}
+          <div className="p-2 space-y-1 max-h-[400px] overflow-y-auto">
             {todos.map((item, index) => (
               <TodoItemRow
                 key={index}

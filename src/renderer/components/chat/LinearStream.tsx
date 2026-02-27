@@ -22,6 +22,7 @@ import {
 import { getToolIcon } from '../icons/ToolIcons'
 import { StreamdownRenderer } from './StreamdownRenderer'
 import { TodoCard, parseTodoInput } from '../tool/TodoCard'
+import { AgentTaskCard } from '../tool/AgentTaskCard'
 import { HaloLogo } from '../brand/HaloLogo'
 import type { Thought, TimelineItem, TextSegment, TodoItem } from '../../types'
 import { useTranslation } from '../../i18n'
@@ -585,7 +586,9 @@ export function LinearStream({
       )}
 
       {/* Timeline items */}
-      {timelineItems.map((item, index) => {
+      {(() => {
+        let taskColorCounter = 0
+        return timelineItems.map((item, index) => {
         switch (item.type) {
           case 'thinking':
             return (
@@ -596,6 +599,22 @@ export function LinearStream({
               />
             )
           case 'tool_use':
+            // Task (sub-agent) gets its own distinctive card with unique color
+            if (item.toolName === 'Task') {
+              const colorIdx = taskColorCounter++
+              return (
+                <AgentTaskCard
+                  key={item.id}
+                  description={String(item.toolInput?.description || 'agent')}
+                  subagentType={String(item.toolInput?.subagent_type || '')}
+                  isRunning={!item.isComplete && !item.isError}
+                  isComplete={item.isComplete || false}
+                  isError={item.isError || false}
+                  duration={item.duration}
+                  colorIndex={colorIdx}
+                />
+              )
+            }
             return (
               <ToolItem
                 key={item.id}
@@ -635,7 +654,8 @@ export function LinearStream({
           default:
             return null
         }
-      })}
+      })
+      })()}
 
       {/* Current streaming text (content after last segment) */}
       {currentText.trim() && (

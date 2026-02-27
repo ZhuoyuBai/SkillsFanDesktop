@@ -3,7 +3,7 @@
  */
 
 import { ipcMain, BrowserWindow } from 'electron'
-import { sendMessage, stopGeneration, interruptAndInject, handleToolApproval, handleUserQuestionAnswer, getSessionState, ensureSessionWarm, testMcpConnections } from '../services/agent'
+import { sendMessage, stopGeneration, interruptAndInject, handleToolApproval, handleUserQuestionAnswer, getSessionState, ensureSessionWarm, testMcpConnections, getV2Session } from '../services/agent'
 import type { Attachment, ImageAttachment } from '../services/agent/types'
 
 let mainWindow: BrowserWindow | null = null
@@ -23,7 +23,7 @@ export function registerAgentHandlers(window: BrowserWindow | null): void {
         resumeSessionId?: string
         images?: ImageAttachment[]
         attachments?: Attachment[]
-        thinkingEnabled?: boolean  // Enable extended thinking mode
+        thinkingEffort?: 'off' | 'low' | 'medium' | 'high'  // Thinking effort level
       }
     ) => {
       try {
@@ -124,6 +124,30 @@ export function registerAgentHandlers(window: BrowserWindow | null): void {
       return { success: true }
     } catch (error: unknown) {
       const err = error as Error
+      return { success: false, error: err.message }
+    }
+  })
+
+  // Rewind files to a specific user message (undo file changes)
+  ipcMain.handle('agent:rewind-files', async (_event, conversationId: string, userMessageUuid: string) => {
+    console.log(`[IPC] agent:rewind-files called: conversationId=${conversationId}, uuid=${userMessageUuid}`)
+    try {
+      const sessionInfo = getV2Session(conversationId)
+      if (!sessionInfo) {
+        console.log('[IPC] agent:rewind-files: No active session found')
+        return { success: false, error: 'No active session for this conversation' }
+      }
+      if (!sessionInfo.session.rewindFiles) {
+        console.log('[IPC] agent:rewind-files: rewindFiles method not available on session')
+        return { success: false, error: 'Rewind not supported by current SDK session' }
+      }
+      console.log(`[IPC] agent:rewind-files: Calling session.rewindFiles(${userMessageUuid})...`)
+      await sessionInfo.session.rewindFiles(userMessageUuid)
+      console.log('[IPC] agent:rewind-files: Success')
+      return { success: true }
+    } catch (error: unknown) {
+      const err = error as Error
+      console.error('[IPC] agent:rewind-files: Error:', err.message, err.stack)
       return { success: false, error: err.message }
     }
   })

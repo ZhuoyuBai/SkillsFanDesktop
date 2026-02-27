@@ -386,7 +386,7 @@ export const api = {
     }>
     attachments?: Attachment[]  // General file attachments (PDF, text, code, images)
     aiBrowserEnabled?: boolean  // Enable AI Browser tools
-    thinkingEnabled?: boolean  // Enable extended thinking mode
+    thinkingEffort?: 'off' | 'low' | 'medium' | 'high'  // Thinking effort level
     canvasContext?: {  // Canvas context for AI awareness
       isOpen: boolean
       tabCount: number
@@ -489,6 +489,13 @@ export const api = {
       return window.skillsfan.answerUserQuestion(conversationId, answers)
     }
     return httpRequest('POST', '/api/agent/answer-question', { conversationId, answers })
+  },
+
+  rewindFiles: async (conversationId: string, userMessageUuid: string): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.skillsfan.rewindFiles(conversationId, userMessageUuid)
+    }
+    return httpRequest('POST', '/api/agent/rewind-files', { conversationId, userMessageUuid })
   },
 
   // ===== Artifact =====
