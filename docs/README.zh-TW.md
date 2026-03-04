@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="../resources/icon.png" alt="技能范 Logo" width="120" height="120">
+
 # 技能范
 
 **讓 AI Agent 不再有門檻**

@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="../resources/icon.png" alt="SkillsFan Logo" width="120" height="120">
+
 # SkillsFan
 
 **AI Agents Without the Barriers**
