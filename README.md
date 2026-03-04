@@ -10,9 +10,7 @@
 
 [🇨🇳 国内下载 skills.fan](https://www.skills.fan/download) · [🌏 海外下载 skillsfan.com](https://skillsfan.com/download)
 
-[下载安装](#下载安装) · [快速上手](#快速上手) · [功能一览](#功能一览) · [参与贡献](#参与贡献)
-
-**[English](./docs/README.en.md)**
+**中文** | [English](./docs/README.en.md)
 
 </div>
 

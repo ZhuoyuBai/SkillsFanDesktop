@@ -10,9 +10,7 @@ No terminal. No coding experience needed. Download, install, and start creating.
 
 [🇨🇳 China Download (skills.fan)](https://www.skills.fan/download) · [🌏 Global Download (skillsfan.com)](https://skillsfan.com/download)
 
-[Download](#download) · [Quick Start](#quick-start) · [Features](#features) · [Contributing](#contributing)
-
-**[中文](../README.md)**
+[中文](../README.md) | **English**
 
 </div>
 
