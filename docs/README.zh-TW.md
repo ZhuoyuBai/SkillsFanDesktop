@@ -1,289 +1,185 @@
 <div align="center">
 
-<img src="../resources/icon.png" alt="SkillsFan Logo" width="120" height="120">
+# 技能范
 
-# SkillsFan
+**讓 AI Agent 不再有門檻**
 
-### Claude Code 的圖形介面
+無需安裝環境，無需配置終端。下載即用。
 
-把 Claude Code 裝進口袋 — 開源桌面用戶端，讓每個人都能輕鬆使用 Claude Code 的強大能力。告別終端機。
+[🇨🇳 國內下載 skills.fan](https://www.skills.fan/download) · [🌏 海外下載 skillsfan.com](https://skillsfan.com/download)
 
-**我們的理念：** 將複雜技術封裝成符合直覺的人類互動。
-
-[![GitHub Stars](https://img.shields.io/github/stars/openkursar/hello-halo?style=social)](https://github.com/openkursar/hello-halo/stargazers)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](../LICENSE)
-[![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux%20%7C%20Web-lightgrey.svg)](#安裝)
-[![Downloads](https://img.shields.io/github/downloads/openkursar/hello-halo/total.svg)](https://github.com/openkursar/hello-halo/releases)
-
-[下載](#安裝) · [文件](#文件) · [參與貢獻](#參與貢獻)
-
-**[English](../README.md)** | **[简体中文](./README.zh-CN.md)** | **[Español](./README.es.md)** | **[Deutsch](./README.de.md)** | **[Français](./README.fr.md)** | **[日本語](./README.ja.md)**
+[简体中文](../README.md) | [English](./README.en.md) | **繁體中文**
 
 </div>
 
 ---
 
-<div align="center">
+## 為什麼選擇技能范？
 
-![Space Home](./assets/space_home.jpg)
+AI Agent 是目前最強大的 AI 使用方式 —— 它不只是回答問題，而是能真正幫你做事：寫程式碼、建立檔案、執行命令、瀏覽網頁，反覆迭代直到任務完成。
 
-</div>
+但問題是，大多數 AI Agent 工具都藏在終端裡。對於不熟悉命令列的人來說，這是一道看不見的牆。
 
----
+**技能范把這道牆拆了。**
 
-## 為什麼選擇 SkillsFan？
+我們把完整的 AI Agent 能力包裝進一個任何人都能用的桌面應用：一鍵安裝，打開就用，支援國內外多種 AI 模型，還能從手機遠端控制。無論你是開發者、設計師、產品經理還是學生，都能用它來完成各種複雜任務。
 
-**Claude Code 是目前最強大的 AI 程式設計助手。** 但有一個問題：
-
-> **它被困在終端機裡。**
-
-對於熟悉命令列的開發者來說，這沒什麼。但對於設計師、產品經理、學生，以及所有希望 AI *幫忙做事* 的人來說，終端機是一道門檻。
-
-**SkillsFan 打破了這道門檻。**
-
-我們把 Claude Code 100% 的 Agent 能力，包裝進一個人人都能用的視覺化介面。同樣的能力，零摩擦。
-
-| | Claude Code CLI | SkillsFan |
+| | 傳統 AI Agent (CLI) | 技能范 |
 |---|:---:|:---:|
 | 完整 Agent 能力 | ✅ | ✅ |
 | 視覺化介面 | ❌ | ✅ |
-| 一鍵安裝 | ❌ | ✅ |
-| 任意裝置遠端存取 | ❌ | ✅ |
-| 檔案預覽與管理 | ❌ | ✅ |
-| 內建 AI 瀏覽器 | ❌ | ✅ |
-
-> 可以這樣理解：
-> **Windows** 把 DOS 變成了視覺化桌面。
-> **SkillsFan** 把 Claude Code CLI 變成了視覺化 AI 夥伴。
+| 一鍵安裝，無需配置環境 | ❌ | ✅ |
+| 國內外多 AI 模型支援 | ❌ | ✅ |
+| 自動化任務編排 | ❌ | ✅ |
+| 手機/平板遠端存取 | ❌ | ✅ |
+| 檔案即時預覽 | ❌ | ✅ |
+| 定時排程 | ❌ | ✅ |
 
 ---
 
-## 功能特性
+<h2 id="功能一覽">功能一覽</h2>
 
-<table>
-<tr>
-<td width="50%">
+### 視覺化 Agent 介面
 
-### 真正的 Agent 迴圈
-不只是聊天。SkillsFan 能**真正做事** — 寫程式碼、建立檔案、執行命令，持續迭代直到任務完成。
+🖥️ **視覺化的 Agent 體驗** — 不再面對終端黑屏。AI 寫程式碼、建立檔案、執行命令的每一步都清晰展現在你面前。
 
-### 空間系統
-隔離的工作空間讓你的專案井井有條。每個空間都有獨立的檔案、對話和上下文。
+📂 **Space 工作空間** — 每個專案一個獨立空間，檔案、對話、上下文完全隔離，互不干擾。
 
-### 優雅的產物欄
-即時查看 AI 建立的每個檔案。預覽程式碼、HTML、圖片 — 無需離開應用程式。
+📎 **檔案即時預覽** — 右側 Artifact Rail 即時展示 AI 建立和修改的所有檔案，點擊即可預覽。支援 HTML 即時渲染、程式碼語法高亮、圖片、Excel、CSV、Markdown 等格式。
 
-</td>
-<td width="50%">
+### 多模型支援
+
+🤖 **國內模型開箱即用** — 內建智譜 GLM、Kimi、DeepSeek、MiniMax 預設配置，輸入 API Key 即可使用。
+
+🌐 **海外模型全面支援** — Claude、OpenAI 一鍵配置，支援 GitHub Copilot OAuth 登入。
+
+🔧 **自訂 API** — 支援 Anthropic / OpenAI / 相容格式接入，滿足各種場景需求。
+
+### 自動化任務（Loop Task）
+
+🔁 **描述目標，AI 自動完成** — 說出你想要的結果，AI 自動拆解為多個子任務並逐一執行，不需要你一步步盯著。
+
+📝 **靈活建立** — 支援 AI 智慧拆解、手動建立、或匯入 JSON 檔案三種方式。
+
+✅ **品質保障** — 為每個子任務設定驗收標準（品質門控），失敗自動重試，應用崩潰後也能自動恢復。
 
 ### 遠端存取
-從手機或任何瀏覽器控制你的桌面 SkillsFan。隨時隨地工作 — 甚至在醫院病床上（真實故事）。
 
-### AI 瀏覽器
-讓 AI 控制真實的內嵌瀏覽器。網頁擷取、表單填寫、測試 — 全部自動化。
+🌍 **跨裝置控制** — 從手機、平板或任何瀏覽器遠端操控桌面上的技能范。開會時用手機給 AI 佈置任務，回到工位成果已就緒。
 
-### MCP 支援
-透過 Model Context Protocol 擴展能力。相容 Claude Desktop MCP 伺服器。
+🔗 **區域網路 + 公網** — 同一網路直接存取，或透過 Cloudflare Tunnel 一鍵生成公網 HTTPS 連結。
 
-</td>
-</tr>
-</table>
+🔒 **安全保護** — Token 認證 + QR Code 掃碼連線，保護遠端存取安全。
 
-### 更多特性...
+### 定時排程
 
-- **多供應商支援** — Anthropic、OpenAI、DeepSeek，以及任何 OpenAI 相容 API
-- **即時思考過程** — 觀看 AI 的思考過程
-- **工具權限控制** — 批准或自動允許檔案/命令操作
-- **深色/淺色主題** — 跟隨系統主題
-- **多語言支援** — 英文、中文、西班牙語等
-- **自動更新** — 一鍵保持最新
+⏰ **自動定時執行** — 支援 Cron 表達式或固定間隔，配合開機自啟動，讓 AI 按時完成重複性工作。
 
----
+### 智慧互動
 
-## 截圖
+⚡ **串流輸出** — 字元級即時展示 AI 回覆。
 
-![Chat Intro](./assets/chat_intro.jpg)
+🧠 **思維過程視覺化** — 展開檢視 AI 每一步的工具呼叫和執行結果。支援 Off / Low / Medium / High 四檔思考深度控制。
 
-![Chat Todo](./assets/chat_todo.jpg)
+🎯 **智慧跟進建議** — AI 回覆後自動提煉 2-3 個可點擊的跟進方向，讓對話更高效。
 
+📄 **檔案理解** — 貼上或拖放上傳圖片、PDF、Word、Excel，AI 直接分析檔案內容。
 
-*遠端存取：從任何地方控制 SkillsFan*
+✏️ **注入訊息** — 生成過程中隨時插入新指令，引導 AI 調整方向。
 
-![Remote Settings](./assets/remote_setting.jpg)
-<p align="center">
-  <img src="./assets/mobile_remote_access.jpg" width="45%" alt="行動端遠端存取">
-  &nbsp;&nbsp;
-  <img src="./assets/mobile_chat.jpg" width="45%" alt="行動端聊天">
-</p>
+### Skills 技能系統
+
+🧩 **可複用的 AI 技能包** — 透過 `/` 命令快速呼叫預設的 AI 工作流，一鍵搞定常見任務。
+
+🗂️ **技能管理** — 列表/網格檢視瀏覽，預覽技能內容，支援安裝和刪除。
+
+### AI Browser
+
+🌐 **內建 AI 瀏覽器** — AI 可控制瀏覽器瀏覽和操作網頁，實現自動化的網頁互動。
+
+### 更多
+
+🌏 3 種語言（簡體中文、繁體中文、英文） · 🌓 深色/淺色主題 · 🧠 跨會話記憶 · 🔍 對話搜尋 · 👥 Agent 團隊協作（實驗性） · 💻 系統匣背景執行 · 📦 自動更新
 
 ---
 
-## 安裝
+<h2 id="下載安裝">下載安裝</h2>
 
-### 下載（推薦）
+<div align="center">
 
-| 平台 | 下載 | 要求 |
-|----------|----------|--------------|
-| **macOS** (Apple Silicon) | [下載 .dmg](https://github.com/openkursar/hello-halo/releases/latest) | macOS 11+ |
-| **macOS** (Intel) | 即將推出 | macOS 11+ |
-| **Windows** | [下載 .exe](https://github.com/openkursar/hello-halo/releases/latest) | Windows 10+ |
-| **Linux** | [下載 .AppImage](https://github.com/openkursar/hello-halo/releases/latest) | Ubuntu 20.04+ |
-| **Web** (PC/行動端) | 在桌面應用程式中啟用遠端存取 | 任何現代瀏覽器 |
+[🇨🇳 國內下載 skills.fan](https://www.skills.fan/download) · [🌏 海外下載 skillsfan.com](https://skillsfan.com/download)
 
-**就這麼簡單。** 下載、安裝、執行。不需要 Node.js，不需要 npm，不需要終端命令。
+支援 **macOS** (Apple Silicon / Intel) · **Windows**
 
-### 從原始碼建置
+</div>
 
-想要貢獻或自訂的開發者：
+下載、安裝、開啟。不需要 Node.js，不需要 npm，不需要任何命令列操作。
+
+### 從原始碼建構
 
 ```bash
-git clone https://github.com/openkursar/hello-halo.git
-cd hello-halo
+git clone https://github.com/skillsfan/desktop.git
+cd desktop
 npm install
 npm run dev
 ```
 
 ---
 
-## 快速開始
+<h2 id="快速上手">快速上手</h2>
 
-1. **啟動 SkillsFan** 並輸入你的 API 金鑰（推薦 Anthropic）
-2. **開始聊天** — 試試「用 React 建立一個簡單的待辦事項應用程式」
-3. **見證魔法** — 看著檔案在產物欄中出現
-4. **預覽和迭代** — 點擊任何檔案預覽，要求修改
+1. **下載並啟動技能范**
+2. **配置 AI 模型** — 選擇你的 AI 服務商（支援智譜、DeepSeek、Kimi、Claude、OpenAI 等），輸入 API Key
+3. **開始對話** — 試試「幫我做一個個人網站」或「幫我整理這份資料」
+4. **檢視成果** — 檔案會即時出現在右側面板，點擊即可預覽和編輯
 
-> **小技巧:** 為獲得最佳效果，使用 Claude Sonnet 4.5 或 Opus 4.5 模型。
+> **小技巧：** 輸入 `/` 可以快速呼叫 Skills 技能包，效率翻倍。
 
 ---
 
-## 運作原理
+## 工作原理
+
+技能范是一個純本地執行的桌面用戶端，不依賴任何後端服務。
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                          SkillsFan 桌面端                             │
-│  ┌─────────────┐    ┌─────────────┐    ┌───────────────────┐   │
-│  │   React UI  │◄──►│    主程序    │◄──►│  Claude Code SDK  │   │
-│  │  (渲染程序)  │IPC │   (Main)    │    │   (Agent 迴圈)    │   │
-│  └─────────────┘    └─────────────┘    └───────────────────┘   │
-│                            │                                    │
-│                            ▼                                    │
-│                    ┌───────────────┐                           │
-│                    │   本機檔案     │                           │
-│                    │   ~/.halo/    │                           │
-│                    └───────────────┘                           │
-└─────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────┐
+│          技能范 Desktop          │
+│                                 │
+│  視覺化介面  ◄──►  Agent 引擎   │
+│       │              │          │
+│       ▼              ▼          │
+│  檔案預覽      工具執行 & 迭代   │
+└───────┬──────────────┬──────────┘
+        │              │
+   本地檔案        AI 模型 API
+ （你的電腦）    （你的 API Key）
 ```
 
-- **100% 本機** — 你的資料永遠不會離開你的電腦（除了 API 呼叫）
-- **無需後端** — 純桌面用戶端，使用你自己的 API 金鑰
-- **真正的 Agent 迴圈** — 工具執行，而不只是文字生成
-
----
-
-## 使用者在用 SkillsFan 做什麼
-
-SkillsFan 不只是給開發者用的。我們看到：
-
-- **金融團隊** 從零開始建構全端應用程式 — 完全沒有程式設計經驗
-- **設計師** 製作互動原型
-- **學生** 以 AI 作為程式設計夥伴學習程式設計
-- **開發者** 以前所未有的速度交付功能
-
-障礙不再是 AI 的能力，**而是可及性**。SkillsFan 消除了這個障礙。
-
----
-
-## 技術棧
-
-| 層 | 技術 |
-|-------|------------|
-| 框架 | Electron + electron-vite |
-| 前端 | React 18 + TypeScript |
-| 樣式 | Tailwind CSS + shadcn/ui 風格 |
-| 狀態管理 | Zustand |
-| Agent 核心 | @anthropic-ai/claude-code SDK |
-| Markdown | react-markdown + highlight.js |
-
----
-
-## 路線圖
-
-- [x] 基於 Claude Code SDK 的核心 Agent 迴圈
-- [x] 空間與對話管理
-- [x] 產物預覽（程式碼、HTML、圖片、Markdown）
-- [x] 遠端存取（瀏覽器控制）
-- [x] AI 瀏覽器（基於 CDP）
-- [x] MCP 伺服器支援
-- [ ] 外掛系統
-- [ ] 語音輸入
-
----
-
-## 參與貢獻
-
-SkillsFan 開源是因為 AI 應該人人可及。
-
-我們歡迎各種貢獻：
-
-- **翻譯** — 幫助我們觸達更多使用者（見 `src/renderer/i18n/`）
-- **Bug 報告** — 發現問題？告訴我們
-- **功能建議** — 什麼能讓 SkillsFan 更好用？
-- **程式碼貢獻** — 歡迎 PR！
-
-```bash
-# 開發環境設定
-git clone https://github.com/openkursar/hello-halo.git
-cd hello-halo
-npm install
-npm run dev
-```
-
-查看 [CONTRIBUTING.md](../CONTRIBUTING.md) 了解詳細指南。
+- **100% 本地執行** — 資料儲存在你的電腦上，僅 API 呼叫會聯網
+- **無需後端服務** — 使用你自己的 API Key，沒有中間伺服器
+- **真正的 Agent** — 工具執行 + 自動迭代，不只是文字生成
 
 ---
 
 ## 社群
 
-- [GitHub Discussions](https://github.com/openkursar/hello-halo/discussions) — 問題與想法
-- [Issues](https://github.com/openkursar/hello-halo/issues) — Bug 報告與功能請求
+- [GitHub Discussions](https://github.com/skillsfan/desktop/discussions) — 提問與交流
+- [Issues](https://github.com/skillsfan/desktop/issues) — Bug 回報與功能建議
 
 ---
 
 ## 授權條款
 
-MIT 授權條款 — 詳見 [LICENSE](../LICENSE)。
-
----
-
-## SkillsFan 背後的故事
-
-幾個月前，一切始於一個簡單的困擾：**我想用 Claude Code，但整天都在開會。**
-
-在無聊的會議中（我們都經歷過），我想：*如果我能從手機控制家裡電腦上的 Claude Code 呢？*
-
-然後又遇到另一個問題 — 我的非技術同事看到 Claude Code 能做什麼後也想試試。但他們卡在了安裝環節。*「什麼是 npm？怎麼安裝 Node.js？」* 有些人花了好幾天也沒搞定。
-
-所以我為自己做了 SkillsFan：
-- **視覺化介面** — 不用再盯著終端輸出
-- **一鍵安裝** — 不需要 Node.js，不需要 npm，下載即用
-- **遠端存取** — 從手機、平板或任何瀏覽器控制
-
-第一版只用了幾個小時。之後的所有功能？**100% 由 SkillsFan 自己建構。** 我們已經日常使用好幾個月了。
-
-AI 建構 AI。現在人人可用。
+MIT License — 詳見 [LICENSE](../LICENSE)。
 
 ---
 
 <div align="center">
 
-### 由 AI 建構，為人類服務。
+**給個 Star ⭐ 讓更多人發現這個專案**
 
-如果 SkillsFan 幫你創造了精彩的東西，我們很想聽聽。
+[![Star History Chart](https://api.star-history.com/svg?repos=skillsfan/desktop&type=Date)](https://star-history.com/#skillsfan/desktop&Date)
 
-**Star 這個儲存庫** 幫助更多人發現 SkillsFan。
-
-[![Star History Chart](https://api.star-history.com/svg?repos=openkursar/hello-halo&type=Date)](https://star-history.com/#openkursar/hello-halo&Date)
-
-[⬆ 返回頂部](#halo)
+[回到頂部](#技能范)
 
 </div>

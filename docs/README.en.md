@@ -1,12 +1,10 @@
 <div align="center">
 
-<img src="../resources/icon.png" alt="SkillsFan Logo" width="120" height="120">
-
 # SkillsFan
 
-**A Desktop Platform That Brings AI Agents to Everyone**
+**AI Agents Without the Barriers**
 
-No terminal. No coding experience needed. Download, install, and start creating.
+No setup required. No terminal needed. Just download and go.
 
 [🇨🇳 China Download (skills.fan)](https://www.skills.fan/download) · [🌏 Global Download (skillsfan.com)](https://skillsfan.com/download)
 
@@ -101,7 +99,7 @@ We've wrapped full AI Agent capabilities into a desktop app that anyone can use:
 
 ### And More
 
-🌏 7 languages (English, Simplified Chinese, Traditional Chinese, Japanese, Spanish, French, German) · 🌓 Dark/light themes · 🧠 Cross-session memory · 🔍 Conversation search · 👥 Agent team collaboration (experimental) · 💻 System tray background mode · 📦 Auto-updates
+🌏 3 languages (English, Simplified Chinese, Traditional Chinese) · 🌓 Dark/light themes · 🧠 Cross-session memory · 🔍 Conversation search · 👥 Agent team collaboration (experimental) · 💻 System tray background mode · 📦 Auto-updates
 
 ---
 
@@ -109,21 +107,13 @@ We've wrapped full AI Agent capabilities into a desktop app that anyone can use:
 
 <div align="center">
 
-<a href="https://www.skills.fan/download"><img src="https://img.shields.io/badge/China_Download-skills.fan-blue?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBhdGggZD0iTTIxIDE1djRhMiAyIDAgMCAxLTIgMkg1YTIgMiAwIDAgMS0yLTJ2LTQiLz48cG9seWxpbmUgcG9pbnRzPSI3IDEwIDEyIDE1IDE3IDEwIi8+PGxpbmUgeDE9IjEyIiB4Mj0iMTIiIHkxPSIxNSIgeTI9IjMiLz48L3N2Zz4=" /></a>
-&nbsp;&nbsp;&nbsp;
-<a href="https://skillsfan.com/download"><img src="https://img.shields.io/badge/Global_Download-skillsfan.com-green?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBhdGggZD0iTTIxIDE1djRhMiAyIDAgMCAxLTIgMkg1YTIgMiAwIDAgMS0yLTJ2LTQiLz48cG9seWxpbmUgcG9pbnRzPSI3IDEwIDEyIDE1IDE3IDEwIi8+PGxpbmUgeDE9IjEyIiB4Mj0iMTIiIHkxPSIxNSIgeTI9IjMiLz48L3N2Zz4=" /></a>
-
-</div>
-
-<br>
-
-<div align="center">
+[🇨🇳 China Download (skills.fan)](https://www.skills.fan/download) · [🌏 Global Download (skillsfan.com)](https://skillsfan.com/download)
 
 Supports **macOS** (Apple Silicon / Intel) · **Windows**
 
 </div>
 
-**That's it.** Download, install, open. No Node.js, no npm, no command line required.
+Download, install, open. No Node.js, no npm, no command line required.
 
 ### Build from Source
 
@@ -149,98 +139,25 @@ npm run dev
 
 ## How It Works
 
+SkillsFan is a purely local desktop client with no backend dependency.
+
 ```
-┌───────────────────────────────────────────────────────────────┐
-│                       SkillsFan Desktop                       │
-│                                                               │
-│  ┌──────────────┐    ┌──────────────┐    ┌────────────────┐   │
-│  │   React UI   │◄──►│ Main Process │◄──►│  Agent Engine  │   │
-│  │  (Visual)    │IPC │  (Electron)  │    │  (AI Agent)    │   │
-│  └──────────────┘    └──────┬───────┘    └────────────────┘   │
-│                             │                                  │
-│              ┌──────────────┼──────────────┐                   │
-│              ▼              ▼              ▼                    │
-│        ┌──────────┐  ┌──────────┐  ┌──────────────┐           │
-│        │  Local   │  │    AI    │  │  HTTP/WS     │           │
-│        │  Files   │  │ Browser  │  │  Server      │           │
-│        │ ~/.sf/   │  │ Chromium │  │ (Remote)     │           │
-│        └──────────┘  └──────────┘  └──────────────┘           │
-└───────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────┐
+│         SkillsFan Desktop        │
+│                                  │
+│  Visual UI  ◄──►  Agent Engine   │
+│      │               │           │
+│      ▼               ▼           │
+│  File Preview   Tool Exec & Loop │
+└──────┬───────────────┬───────────┘
+       │               │
+  Local Files      AI Model API
+ (Your Machine)   (Your API Key)
 ```
 
 - **100% local** — Your data stays on your machine (only API calls go over the network)
-- **No backend required** — Pure desktop client, using your own API keys
+- **No backend required** — Uses your own API keys, no middleman servers
 - **True Agent** — Tool execution + automatic iteration, not just text generation
-
----
-
-## The Story Behind SkillsFan
-
-A few months ago, it all started with a simple frustration: **I wanted to use an AI Agent, but I was stuck in meetings all day.**
-
-During a particularly dull meeting, a thought hit me: wouldn't it be great to control an AI Agent on my computer from my phone?
-
-Then another problem surfaced — several friends who saw what AI Agents could do wanted to try it themselves, but they got stuck at installation. *"What's a terminal? What's npm?"* Some spent days trying and never got it working.
-
-So I started building a tool for myself:
-
-- **Visual interface** — No more staring at white text on a black screen
-- **One-click install** — No Node.js, no npm, just download and run
-- **Remote access** — Control it from your phone, tablet, or any browser
-
-Truth is, I have no coding experience myself. But that's exactly why I understand what it feels like to be locked out by the terminal.
-
-So I did something that might sound a little crazy: I used AI Agents themselves to build SkillsFan from scratch. Every feature since then? Also built using SkillsFan itself. The existence of SkillsFan is the best proof — even without coding skills, AI Agents can help you create real, working products.
-
-But one person can only do so much. I'm not a professional developer, and many technical decisions and optimizations are beyond my expertise. That's why I chose to open source SkillsFan — not because it's perfect, but because I believe that with more passionate developers joining in, it can become far better than anything I could build alone.
-
-If you're interested in AI Agents, come join us and help bring the power of AI to more people.
-
----
-
-## Roadmap
-
-### Completed
-
-- [x] Full Agent Loop capabilities
-- [x] Space workspaces & conversation management
-- [x] File preview (code, HTML, images, Markdown, Excel)
-- [x] Remote access (LAN + public tunnel)
-- [x] AI Browser (browser control)
-- [x] Skills system
-- [x] Loop Task automation
-- [x] Multi-model support (Claude, OpenAI, DeepSeek, Zhipu, Kimi, MiniMax)
-- [x] 7-language support
-- [x] Scheduled execution & crash recovery
-- [x] Agent team collaboration (experimental)
-
-### Planned
-
-- [ ] Plugin system
-- [ ] Voice input
-- [ ] More AI model integrations
-- [ ] Native mobile apps
-
----
-
-<h2 id="contributing">Contributing</h2>
-
-SkillsFan is open source because we believe the power of AI should belong to everyone.
-
-We welcome contributions of all kinds:
-
-- **Translations** — Help us support more languages (see `src/renderer/i18n/`)
-- **Bug Reports** — Found an issue? Please open an Issue
-- **Feature Requests** — What would you like SkillsFan to do next?
-- **Code Contributions** — Pull requests are always welcome!
-
-```bash
-# Set up development environment
-git clone https://github.com/skillsfan/desktop.git
-cd desktop
-npm install
-npm run dev
-```
 
 ---
 
@@ -259,11 +176,7 @@ MIT License — See [LICENSE](../LICENSE) for details.
 
 <div align="center">
 
-### Built by AI, made for people.
-
-If SkillsFan helped you accomplish something interesting, we'd love to hear about it.
-
-**Give it a Star** to help more people discover this project.
+**Give it a Star ⭐ to help more people discover this project**
 
 [![Star History Chart](https://api.star-history.com/svg?repos=skillsfan/desktop&type=Date)](https://star-history.com/#skillsfan/desktop&Date)
 
