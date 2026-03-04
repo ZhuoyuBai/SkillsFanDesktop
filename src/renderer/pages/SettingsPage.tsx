@@ -64,7 +64,7 @@ const PROVIDER_PRESETS: ProviderPreset[] = [
     name: 'Zhipu GLM',
     nameKey: 'Zhipu GLM',
     apiUrl: 'https://open.bigmodel.cn/api/anthropic',
-    defaultModel: 'GLM-4.7',
+    defaultModel: 'GLM-5',
     logo: zhipuLogo,
     apiType: 'anthropic',
     docsUrl: 'https://open.bigmodel.cn/usercenter/apikeys',
@@ -447,12 +447,6 @@ export function SettingsPage() {
       addToast(t('Please log in to use this feature'), 'info')
       return
     }
-    // Permission check: free plan
-    if (!authState.user || authState.user.plan === 'free') {
-      addToast(t('This feature is only available for Pro members'), 'info')
-      return
-    }
-
     console.log('[Settings] handleToggleRemote called, current status:', remoteStatus?.enabled)
 
     if (remoteStatus?.enabled) {
@@ -1535,10 +1529,10 @@ export function SettingsPage() {
                 <div>
                   <div className="flex items-center gap-2">
                     <p className="font-medium">{t('Enable Remote Access')}</p>
-                    {(!authState?.isLoggedIn || authState?.user?.plan === 'free') && (
+                    {!authState?.isLoggedIn && (
                       <span className="flex items-center gap-1 text-xs text-muted-foreground bg-secondary px-1.5 py-0.5 rounded">
                         <Lock className="w-3 h-3" />
-                        Pro
+                        {t('Login Required')}
                       </span>
                     )}
                   </div>

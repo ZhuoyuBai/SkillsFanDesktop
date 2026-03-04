@@ -39,7 +39,7 @@ const PROVIDER_PRESETS: ProviderPreset[] = [
     name: 'Zhipu GLM',
     nameKey: 'Zhipu GLM',
     apiUrl: 'https://open.bigmodel.cn/api/anthropic',
-    defaultModel: 'GLM-4.7',
+    defaultModel: 'GLM-5',
     logo: zhipuLogo,
     apiType: 'anthropic',
     docsUrl: 'https://open.bigmodel.cn/usercenter/apikeys',
@@ -217,7 +217,7 @@ export function ApiSetup({ onBack, showBack = false, initialProviderId }: ApiSet
     <div className="h-full w-full flex flex-col bg-background relative overflow-y-auto">
       {/* Top Bar - Fixed positioning */}
       <div className="sticky top-0 left-0 right-0 z-10 bg-background/80 backdrop-blur-sm">
-        <div className="flex items-center justify-between px-6 py-4">
+        <div className="flex items-center justify-between px-6 pt-8 pb-4">
           {/* Back Button - Top Left (when showBack is true) */}
           {showBack && onBack ? (
             <button

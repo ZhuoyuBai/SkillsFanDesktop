@@ -179,9 +179,9 @@ export function Step1CreateTask(_props: Step1CreateTaskProps) {
 
   // Handle Next button click
   const handleNext = async () => {
-    // Pro membership check (AI generate only)
-    if (createMethod === 'ai' && (!authState?.user || authState.user.plan === 'free')) {
-      addToast(t('This feature is only available for Pro members'), 'info')
+    // Login check (AI generate only)
+    if (createMethod === 'ai' && !authState?.isLoggedIn) {
+      addToast(t('Please log in to use this feature'), 'info')
       return
     }
 
