@@ -8,13 +8,15 @@
 
 No terminal. No coding experience needed. Download, install, and start creating.
 
+[🇨🇳 China Download (skills.fan)](https://www.skills.fan/download) · [🌏 Global Download (skillsfan.com)](https://skillsfan.com/download)
+
 [![GitHub Stars](https://img.shields.io/github/stars/skillsfan/desktop?style=social)](https://github.com/skillsfan/desktop/stargazers)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](../LICENSE)
-[![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux%20%7C%20Web-lightgrey.svg)](#installation)
+[![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux%20%7C%20Web-lightgrey.svg)](#download)
 [![Downloads](https://img.shields.io/github/downloads/skillsfan/desktop/total.svg)](https://github.com/skillsfan/desktop/releases)
 [![Version](https://img.shields.io/badge/version-0.2.4-green.svg)](https://github.com/skillsfan/desktop/releases/latest)
 
-[Download](#installation) · [Quick Start](#quick-start) · [Features](#features) · [Contributing](#contributing)
+[Download](#download) · [Quick Start](#quick-start) · [Features](#features) · [Contributing](#contributing)
 
 **[中文](../README.md)** | **[繁體中文](./README.zh-TW.md)** | **[日本語](./README.ja.md)** | **[Español](./README.es.md)** | **[Français](./README.fr.md)** | **[Deutsch](./README.de.md)**
 
@@ -22,17 +24,9 @@ No terminal. No coding experience needed. Download, install, and start creating.
 
 ---
 
-<div align="center">
-
-![Space Home](./assets/space_home.jpg)
-
-</div>
-
----
-
 ## Why SkillsFan?
 
-AI Agents represent the most powerful way to use AI today -- they don't just answer questions, they actually get things done: writing code, creating files, running commands, browsing the web, and iterating until the task is complete.
+AI Agents represent the most powerful way to use AI today — they don't just answer questions, they actually get things done: writing code, creating files, running commands, browsing the web, and iterating until the task is complete.
 
 The problem? Most AI Agent tools live inside the terminal. For anyone unfamiliar with the command line, that's an invisible wall.
 
@@ -46,130 +40,96 @@ We've wrapped full AI Agent capabilities into a desktop app that anyone can use:
 | Visual interface | ❌ | ✅ |
 | One-click install, no setup required | ❌ | ✅ |
 | Multi-model support | ❌ | ✅ |
+| Automated task orchestration | ❌ | ✅ |
 | Phone/tablet remote access | ❌ | ✅ |
 | Real-time file preview | ❌ | ✅ |
-| Built-in AI Browser | ❌ | ✅ |
-| Automated task orchestration | ❌ | ✅ |
+| Scheduled execution | ❌ | ✅ |
 
 ---
 
-## Features
+<h2 id="features">Features</h2>
 
-### Core Capabilities
+### Visual Agent Interface
 
-🔄 **True Agent Loop** — Not just a chatbot. The AI can write code, create files, run commands, and iterate automatically until the task is done.
+🖥️ **What-you-see-is-what-you-get Agent experience** — No more terminal black screens. Every step the AI takes — writing code, creating files, running commands — is clearly displayed.
 
-📂 **Space Workspaces** — One isolated space per project. Files, conversations, and context are completely separated -- no interference between projects.
+📂 **Space Workspaces** — One isolated space per project. Files, conversations, and context are completely separated.
 
-📎 **Artifact Rail** — A side panel that displays files created and modified by the AI in real time, with preview support for HTML, code, images, Excel, CSV, and Markdown.
+📎 **Real-time File Preview** — The Artifact Rail shows all files created and modified by the AI in real time. Click to preview with live HTML rendering, code syntax highlighting, image viewing, Excel, CSV, and Markdown support.
 
-🖥️ **Content Canvas** — Dual-pane view with syntax highlighting, live HTML preview, and multi-tab switching.
+### Multi-Model Support
+
+🤖 **Chinese AI Models Ready** — Built-in presets for Zhipu GLM, Kimi, DeepSeek, and MiniMax. Just enter your API key.
+
+🌐 **Global Models Fully Supported** — Claude and OpenAI with one-click setup. GitHub Copilot OAuth login supported.
+
+🔧 **Custom API** — Supports Anthropic / OpenAI / compatible formats to fit any scenario.
+
+### Automated Tasks (Loop Task)
+
+🔁 **Describe Your Goal, AI Does the Rest** — Tell it what you want, and the AI automatically breaks it down into subtasks and executes them one by one.
+
+📝 **Flexible Creation** — Three methods: AI-powered decomposition, manual creation, or import from a JSON file.
+
+✅ **Quality Assurance** — Set acceptance criteria (quality gates) for each subtask. Failed tasks retry automatically, and interrupted tasks recover after app restart.
+
+### Remote Access
+
+🌍 **Cross-device Control** — Control SkillsFan on your desktop from your phone, tablet, or any browser. Assign tasks from your phone during a meeting, and the results are ready when you return.
+
+🔗 **LAN + Public Internet** — Direct access on the same network, or generate a public HTTPS link with one click via Cloudflare Tunnel.
+
+🔒 **Secure Access** — Token authentication + QR code scanning to keep your sessions safe.
+
+### Scheduled Execution
+
+⏰ **Automated Scheduling** — Supports Cron expressions or fixed intervals. Combined with launch-at-startup, let AI handle recurring work on schedule.
 
 ### Smart Interactions
 
-⚡ **Streaming Output** — Character-by-character real-time display of AI responses. No more staring at a blank screen.
+⚡ **Streaming Output** — Character-by-character real-time display of AI responses.
 
-🧠 **Thinking Process Panel** — Expand to see every tool call and execution result, so you know exactly what the AI is doing.
+🧠 **Thinking Process Visualization** — Expand to see every tool call and execution result. Supports four depth levels: Off / Low / Medium / High.
 
-💡 **Extended Thinking** — Peek into the AI's internal reasoning process with four depth levels: Off / Low / Medium / High.
+🎯 **Smart Follow-up Suggestions** — After each response, the AI offers 2-3 clickable follow-up directions for more efficient conversations.
 
-🎯 **Smart Follow-up Suggestions** — After each response, the AI offers 2-3 clickable follow-up directions to keep the conversation flowing.
-
-📄 **File Attachments** — Paste or drag-and-drop images, PDFs, Word docs, and Excel files. The AI understands file content directly.
-
-📊 **Token Usage Indicator** — Real-time display of context usage and cost for full transparency.
+📄 **File Understanding** — Paste or drag-and-drop images, PDFs, Word docs, and Excel files. The AI analyzes file content directly.
 
 ✏️ **Inject Messages** — Insert new instructions mid-generation to steer the AI in a different direction.
 
 ### Skills System
 
-🧩 **Skills Packs** — Reusable AI instruction sets triggered via `/` commands for quick access to common workflows.
-
-📦 **Multiple Sources** — SkillsFan official skill library + Claude Code commands + custom skills, flexibly combined.
+🧩 **Reusable AI Skill Packs** — Trigger preset AI workflows via `/` commands for quick access to common tasks.
 
 🗂️ **Skill Management** — Browse in list or grid view, preview content, install and remove with ease.
 
-### Loop Task Automation
-
-🔁 **Loop Task** — Describe a high-level goal and the AI automatically breaks it down into subtasks, executing them one by one.
-
-📝 **Three Creation Methods** — AI-powered decomposition, manual creation, or import from a prd.json file.
-
-✅ **Quality Gates** — Set acceptance criteria for each subtask to ensure output quality.
-
-🔄 **Auto-retry & Crash Recovery** — Failed tasks retry automatically; interrupted tasks resume after app restart.
-
-⏰ **Scheduled Execution** — Supports Cron expressions or fixed intervals for timed task execution.
-
 ### AI Browser
 
-🌐 **Built-in AI Browser** — The AI controls a real Chromium browser: clicking, filling forms, dragging and dropping, taking screenshots, and executing JavaScript.
-
-📡 **Network & Console Monitoring** — Capture network requests and console logs for easier debugging.
-
-📱 **Device Emulation** — Simulate different devices, resolutions, and network conditions.
-
-### Remote Access
-
-🌍 **Cross-device Control** — Control SkillsFan on your desktop from your phone, tablet, or any browser.
-
-🔗 **LAN + Public Internet** — Direct access on the same network, or generate a public HTTPS link with one click via Cloudflare Tunnel.
-
-🔒 **Token Authentication** — Built-in security to keep your remote sessions safe.
-
-### Multi-Model Support
-
-🤖 **Ready Out of the Box** — Pre-configured with Claude, OpenAI, DeepSeek, Zhipu GLM, Kimi, MiniMax, and more.
-
-🔑 **GitHub Copilot** — Sign in with OAuth and start using it right away.
-
-🔧 **Custom API** — Supports Anthropic / OpenAI / compatible formats with automatic protocol conversion.
+🌐 **Built-in AI Browser** — The AI can control a browser to navigate and interact with web pages for automated web interactions.
 
 ### And More
 
-🌏 7 languages (English, Simplified Chinese, Traditional Chinese, Japanese, Spanish, French, German) · 🌓 Dark/light themes · 🧠 Cross-session memory · 🔍 Conversation search (current/Space/global) · 👥 Agent team collaboration (experimental) · 💻 System tray background mode · 🚀 Launch at startup · 📦 Auto-updates
+🌏 7 languages (English, Simplified Chinese, Traditional Chinese, Japanese, Spanish, French, German) · 🌓 Dark/light themes · 🧠 Cross-session memory · 🔍 Conversation search · 👥 Agent team collaboration (experimental) · 💻 System tray background mode · 📦 Auto-updates
 
 ---
 
-## Screenshots
+<h2 id="download">Download</h2>
 
-### Chat & Create
+<div align="center">
 
-![Chat Intro](./assets/chat_intro.jpg)
+<a href="https://www.skills.fan/download"><img src="https://img.shields.io/badge/China_Download-skills.fan-blue?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBhdGggZD0iTTIxIDE1djRhMiAyIDAgMCAxLTIgMkg1YTIgMiAwIDAgMS0yLTJ2LTQiLz48cG9seWxpbmUgcG9pbnRzPSI3IDEwIDEyIDE1IDE3IDEwIi8+PGxpbmUgeDE9IjEyIiB4Mj0iMTIiIHkxPSIxNSIgeTI9IjMiLz48L3N2Zz4=" /></a>
+&nbsp;&nbsp;&nbsp;
+<a href="https://skillsfan.com/download"><img src="https://img.shields.io/badge/Global_Download-skillsfan.com-green?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBhdGggZD0iTTIxIDE1djRhMiAyIDAgMCAxLTIgMkg1YTIgMiAwIDAgMS0yLTJ2LTQiLz48cG9seWxpbmUgcG9pbnRzPSI3IDEwIDEyIDE1IDE3IDEwIi8+PGxpbmUgeDE9IjEyIiB4Mj0iMTIiIHkxPSIxNSIgeTI9IjMiLz48L3N2Zz4=" /></a>
 
-![Chat Todo](./assets/chat_todo.jpg)
+</div>
 
-### Skills Management
+<br>
 
-![Skills Management](./assets/skills_management.jpg)
+<div align="center">
 
-### Loop Task Automation
+Supports **macOS** (Apple Silicon / Intel) · **Windows** · **Linux** · **Web** (via Remote Access)
 
-![Loop Task](./assets/loop_task.jpg)
-
-### Remote Access
-
-![Remote Settings](./assets/remote_setting.jpg)
-
-<p align="center">
-  <img src="./assets/mobile_remote_access.jpg" width="45%" alt="Mobile Remote Access">
-  &nbsp;&nbsp;
-  <img src="./assets/mobile_chat.jpg" width="45%" alt="Mobile Chat">
-</p>
-
----
-
-<h2 id="installation">Installation</h2>
-
-### Direct Download (Recommended)
-
-| Platform | Download | Requirements |
-|----------|----------|-------------|
-| **macOS** (Apple Silicon) | [Download .dmg](https://github.com/skillsfan/desktop/releases/latest) | macOS 11+ |
-| **macOS** (Intel) | [Download .dmg](https://github.com/skillsfan/desktop/releases/latest) | macOS 11+ |
-| **Windows** | [Download .exe](https://github.com/skillsfan/desktop/releases/latest) | Windows 10+ |
-| **Linux** | [Download .AppImage](https://github.com/skillsfan/desktop/releases/latest) | Ubuntu 20.04+ |
-| **Web** (Phone/Tablet) | Enable remote access on desktop | Any modern browser |
+</div>
 
 **That's it.** Download, install, open. No Node.js, no npm, no command line required.
 
@@ -187,11 +147,11 @@ npm run dev
 <h2 id="quick-start">Quick Start</h2>
 
 1. **Download and launch SkillsFan**
-2. **Set up your API** — Enter your API key (Anthropic, OpenAI, DeepSeek, etc.) or sign in with GitHub Copilot
+2. **Set up your AI model** — Choose your AI provider (Zhipu, DeepSeek, Kimi, Claude, OpenAI, etc.) and enter your API key
 3. **Start a conversation** — Try "Create a simple React todo app" or "Analyze this Excel spreadsheet"
-4. **See the results** — Files appear in real time in the Artifact Rail on the right. Click to preview and edit.
+4. **See the results** — Files appear in real time in the side panel. Click to preview and edit.
 
-> **Pro tip:** Use Skills packs (type `/`) to quickly invoke preset AI workflows and supercharge your productivity.
+> **Pro tip:** Type `/` to invoke Skills packs for quick access to preset AI workflows.
 
 ---
 
@@ -228,7 +188,7 @@ A few months ago, it all started with a simple frustration: **I wanted to use an
 
 During a particularly dull meeting, a thought hit me: wouldn't it be great to control an AI Agent on my computer from my phone?
 
-Then another problem surfaced -- several friends who saw what AI Agents could do wanted to try it themselves, but they got stuck at installation. *"What's a terminal? What's npm?"* Some spent days trying and never got it working.
+Then another problem surfaced — several friends who saw what AI Agents could do wanted to try it themselves, but they got stuck at installation. *"What's a terminal? What's npm?"* Some spent days trying and never got it working.
 
 So I started building a tool for myself:
 
@@ -238,7 +198,7 @@ So I started building a tool for myself:
 
 The first version took just a few hours. Everything after that? **Built using SkillsFan itself.**
 
-Over time, something shifted. I realized this shouldn't just be my personal tool. AI Agents are too powerful to be gated behind terminal expertise. Everyone -- regardless of technical background -- deserves to benefit from the productivity gains AI Agents offer.
+Over time, something shifted. I realized this shouldn't just be my personal tool. AI Agents are too powerful to be gated behind terminal expertise. Everyone — regardless of technical background — deserves to benefit from the productivity gains AI Agents offer.
 
 And so SkillsFan was born: an open-source, universal AI Agent desktop platform. It's not tied to any single model or provider. Instead, it lets you choose the AI that works best for you, and do the most complex things in the simplest way possible.
 
@@ -250,12 +210,12 @@ And so SkillsFan was born: an open-source, universal AI Agent desktop platform. 
 
 - [x] Full Agent Loop capabilities
 - [x] Space workspaces & conversation management
-- [x] Artifact file preview (code, HTML, images, Markdown, Excel)
+- [x] File preview (code, HTML, images, Markdown, Excel)
 - [x] Remote access (LAN + public tunnel)
-- [x] AI Browser (CDP-based browser control)
+- [x] AI Browser (browser control)
 - [x] Skills system
 - [x] Loop Task automation
-- [x] Multi-model support (Anthropic, OpenAI, DeepSeek, etc.)
+- [x] Multi-model support (Claude, OpenAI, DeepSeek, Zhipu, Kimi, MiniMax)
 - [x] 7-language support
 - [x] Scheduled execution & crash recovery
 - [x] Agent team collaboration (experimental)
