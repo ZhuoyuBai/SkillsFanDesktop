@@ -57,7 +57,8 @@ interface OnboardingFlowProps {
 
 export function OnboardingFlow({ onComplete, onLogin, onStartNow }: OnboardingFlowProps) {
   const { t } = useTranslation()
-  const [currentStep, setCurrentStep] = useState(0)
+  // Start from last page (step 3) to skip introduction steps
+  const [currentStep, setCurrentStep] = useState(3)
 
   // Hide macOS traffic lights during onboarding
   useEffect(() => {

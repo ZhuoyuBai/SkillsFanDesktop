@@ -15,7 +15,7 @@ import { SetupFlow } from './components/setup/SetupFlow'
 import { GitBashSetup } from './components/setup/GitBashSetup'
 import { SearchPanel } from './components/search/SearchPanel'
 import { SearchHighlightBar } from './components/search/SearchHighlightBar'
-import { OnboardingOverlay, OnboardingFlow } from './components/onboarding'
+import { OnboardingOverlay } from './components/onboarding'
 import { UpdateNotification } from './components/updater/UpdateNotification'
 import { Toaster } from './components/ui/Toaster'
 import { api } from './api'
@@ -501,23 +501,6 @@ export default function App() {
     }
   }
 
-  // Handle onboarding login - open SkillsFan web login
-  const handleOnboardingLogin = async () => {
-    logger.debug('[App] Starting SkillsFan login from onboarding')
-    try {
-      const result = await api.skillsfanStartLogin()
-      if (result.success) {
-        // Login flow started, wait for callback
-        // The auth flow will trigger initialize() after successful login
-        logger.debug('[App] SkillsFan login started successfully')
-      } else {
-        logger.error('[App] Failed to start SkillsFan login:', result.error)
-      }
-    } catch (e) {
-      logger.error('[App] Error starting SkillsFan login:', e)
-    }
-  }
-
   // Render based on current view
   // Heavy pages (HomePage, SpacePage, SettingsPage) are lazy-loaded for better initial performance
   const renderView = () => {
@@ -527,21 +510,8 @@ export default function App() {
       case 'gitBashSetup':
         return <GitBashSetup onComplete={handleGitBashSetupComplete} />
       case 'onboarding':
-        return (
-          <OnboardingFlow
-            onComplete={() => setView('setup')}
-            onLogin={handleOnboardingLogin}
-            onStartNow={async () => {
-              await api.setConfig({ isFirstLaunch: false })
-              await useSpaceStore.getState().loadSpaces()
-              const { haloSpace } = useSpaceStore.getState()
-              if (haloSpace) {
-                useSpaceStore.getState().setCurrentSpace(haloSpace)
-              }
-              setView('space')
-            }}
-          />
-        )
+        // Onboarding is skipped - redirect to setup
+        return <SetupFlow />
       case 'setup':
         return <SetupFlow />
       case 'space':

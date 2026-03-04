@@ -24,11 +24,9 @@ interface DeviceCodeInfo {
 
 export function SetupFlow() {
   const { t } = useTranslation()
-  const { setConfig, initialize, previousView, setView } = useAppStore()
+  const { setConfig, initialize, setView } = useAppStore()
   const [step, setStep] = useState<SetupStep>('select')
 
-  // Check if we came from onboarding (for back button)
-  const fromOnboarding = previousView === 'onboarding'
   const [currentProvider, setCurrentProvider] = useState<string | null>(null)
   const [oauthState, setOauthState] = useState<string | null>(null)
   const [loginStatus, setLoginStatus] = useState<string>('')
@@ -123,11 +121,6 @@ export function SetupFlow() {
     return unsubscribe
   }, [step, currentProvider])
 
-  // Handle back to onboarding
-  const handleBackToOnboarding = () => {
-    setView('onboarding')
-  }
-
   // Handle skip - go directly to space without configuring model
   const handleSkip = async () => {
     console.log('[SetupFlow] Skipping setup, going to chat...')
@@ -150,7 +143,7 @@ export function SetupFlow() {
     return (
       <LoginSelector
         onSelectProvider={handleSelectProvider}
-        onBack={fromOnboarding ? handleBackToOnboarding : undefined}
+        onBack={undefined}
         onSkip={handleSkip}
       />
     )

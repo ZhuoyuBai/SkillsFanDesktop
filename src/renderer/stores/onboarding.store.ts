@@ -53,18 +53,22 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
 
   initialize: async () => {
     try {
+      // Skip onboarding by default - directly set as completed
       // Load onboarding state from backend config
       const response = await api.getConfig()
       if (response.success && response.data) {
         const config = response.data as { onboarding?: { completed?: boolean } }
         const completed = config.onboarding?.completed === true
         set({ hasCompleted: completed })
-        // Note: Don't auto-start onboarding here. HomePage will call startOnboarding
-        // when user navigates there, so the spotlight targets the correct elements.
       }
+
+      // Always mark onboarding as completed to skip the guided tour
+      set({ hasCompleted: true })
+      api.setConfig({ onboarding: { completed: true } }).catch(console.error)
     } catch (error) {
       console.error('[Onboarding] Failed to load state from config:', error)
-      // Don't auto-start on error either
+      // Still mark as completed on error
+      set({ hasCompleted: true })
     }
   },
 

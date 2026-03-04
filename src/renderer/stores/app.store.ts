@@ -240,12 +240,9 @@ export const useAppStore = create<AppState>((set, get) => ({
         set({ config })
 
         // Determine initial view based on config
-        // First launch: show onboarding flow
+        // Skip onboarding - go directly to setup or space
         // No AI source configured: show setup directly
-        if (config.isFirstLaunch) {
-          appLogger.debug('[Store] First launch, showing onboarding')
-          set({ view: 'onboarding' })
-        } else if (!hasAnyAISource(config)) {
+        if (!hasAnyAISource(config)) {
           appLogger.debug('[Store] No AI source configured, showing setup')
           set({ view: 'setup' })
         } else {
