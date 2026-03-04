@@ -10,12 +10,6 @@ No terminal. No coding experience needed. Download, install, and start creating.
 
 [🇨🇳 China Download (skills.fan)](https://www.skills.fan/download) · [🌏 Global Download (skillsfan.com)](https://skillsfan.com/download)
 
-[![GitHub Stars](https://img.shields.io/github/stars/skillsfan/desktop?style=social)](https://github.com/skillsfan/desktop/stargazers)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](../LICENSE)
-[![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux%20%7C%20Web-lightgrey.svg)](#download)
-[![Downloads](https://img.shields.io/github/downloads/skillsfan/desktop/total.svg)](https://github.com/skillsfan/desktop/releases)
-[![Version](https://img.shields.io/badge/version-0.2.4-green.svg)](https://github.com/skillsfan/desktop/releases/latest)
-
 [Download](#download) · [Quick Start](#quick-start) · [Features](#features) · [Contributing](#contributing)
 
 **[中文](../README.md)**
@@ -127,7 +121,7 @@ We've wrapped full AI Agent capabilities into a desktop app that anyone can use:
 
 <div align="center">
 
-Supports **macOS** (Apple Silicon / Intel) · **Windows** · **Linux** · **Web** (via Remote Access)
+Supports **macOS** (Apple Silicon / Intel) · **Windows**
 
 </div>
 
