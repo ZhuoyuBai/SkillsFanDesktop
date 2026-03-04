@@ -18,7 +18,7 @@ No terminal. No coding experience needed. Download, install, and start creating.
 
 [Download](#download) · [Quick Start](#quick-start) · [Features](#features) · [Contributing](#contributing)
 
-**[中文](../README.md)** | **[繁體中文](./README.zh-TW.md)** | **[日本語](./README.ja.md)** | **[Español](./README.es.md)** | **[Français](./README.fr.md)** | **[Deutsch](./README.de.md)**
+**[中文](../README.md)**
 
 </div>
 
@@ -51,7 +51,7 @@ We've wrapped full AI Agent capabilities into a desktop app that anyone can use:
 
 ### Visual Agent Interface
 
-🖥️ **What-you-see-is-what-you-get Agent experience** — No more terminal black screens. Every step the AI takes — writing code, creating files, running commands — is clearly displayed.
+🖥️ **Visual Agent Experience** — No more terminal black screens. Every step the AI takes — writing code, creating files, running commands — is clearly displayed.
 
 📂 **Space Workspaces** — One isolated space per project. Files, conversations, and context are completely separated.
 
@@ -148,7 +148,7 @@ npm run dev
 
 1. **Download and launch SkillsFan**
 2. **Set up your AI model** — Choose your AI provider (Zhipu, DeepSeek, Kimi, Claude, OpenAI, etc.) and enter your API key
-3. **Start a conversation** — Try "Create a simple React todo app" or "Analyze this Excel spreadsheet"
+3. **Start a conversation** — Try "Build me a personal website" or "Help me organize this data"
 4. **See the results** — Files appear in real time in the side panel. Click to preview and edit.
 
 > **Pro tip:** Type `/` to invoke Skills packs for quick access to preset AI workflows.
@@ -196,11 +196,13 @@ So I started building a tool for myself:
 - **One-click install** — No Node.js, no npm, just download and run
 - **Remote access** — Control it from your phone, tablet, or any browser
 
-The first version took just a few hours. Everything after that? **Built using SkillsFan itself.**
+Truth is, I have no coding experience myself. But that's exactly why I understand what it feels like to be locked out by the terminal.
 
-Over time, something shifted. I realized this shouldn't just be my personal tool. AI Agents are too powerful to be gated behind terminal expertise. Everyone — regardless of technical background — deserves to benefit from the productivity gains AI Agents offer.
+So I did something that might sound a little crazy: I used AI Agents themselves to build SkillsFan from scratch. Every feature since then? Also built using SkillsFan itself. The existence of SkillsFan is the best proof — even without coding skills, AI Agents can help you create real, working products.
 
-And so SkillsFan was born: an open-source, universal AI Agent desktop platform. It's not tied to any single model or provider. Instead, it lets you choose the AI that works best for you, and do the most complex things in the simplest way possible.
+But one person can only do so much. I'm not a professional developer, and many technical decisions and optimizations are beyond my expertise. That's why I chose to open source SkillsFan — not because it's perfect, but because I believe that with more passionate developers joining in, it can become far better than anything I could build alone.
+
+If you're interested in AI Agents, come join us and help bring the power of AI to more people.
 
 ---
 
