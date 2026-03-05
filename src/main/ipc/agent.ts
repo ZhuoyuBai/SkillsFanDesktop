@@ -5,130 +5,67 @@
 import { ipcMain, BrowserWindow } from 'electron'
 import { sendMessage, stopGeneration, interruptAndInject, handleToolApproval, handleUserQuestionAnswer, getSessionState, ensureSessionWarm, testMcpConnections, getV2Session } from '../services/agent'
 import type { Attachment, ImageAttachment } from '../services/agent/types'
+import { ipcHandle } from './utils'
 
 let mainWindow: BrowserWindow | null = null
 
 export function registerAgentHandlers(window: BrowserWindow | null): void {
   mainWindow = window
 
-  // Send message to agent (with optional images for multi-modal, optional thinking mode)
-  ipcMain.handle(
-    'agent:send-message',
-    async (
-      _event,
-      request: {
-        spaceId: string
-        conversationId: string
-        message: string
-        resumeSessionId?: string
-        images?: ImageAttachment[]
-        attachments?: Attachment[]
-        thinkingEffort?: 'off' | 'low' | 'medium' | 'high'  // Thinking effort level
-      }
-    ) => {
-      try {
-        await sendMessage(mainWindow, request)
-        return { success: true }
-      } catch (error: unknown) {
-        const err = error as Error
-        return { success: false, error: err.message }
-      }
+  ipcHandle('agent:send-message',
+    async (_e, request: {
+      spaceId: string
+      conversationId: string
+      message: string
+      resumeSessionId?: string
+      images?: ImageAttachment[]
+      attachments?: Attachment[]
+      thinkingEffort?: 'off' | 'low' | 'medium' | 'high'
+    }) => {
+      await sendMessage(mainWindow, request)
     }
   )
 
-  // Stop generation for a specific conversation (or all if not specified)
-  ipcMain.handle('agent:stop', async (_event, conversationId?: string) => {
-    try {
-      stopGeneration(conversationId)
-      return { success: true }
-    } catch (error: unknown) {
-      const err = error as Error
-      return { success: false, error: err.message }
-    }
+  ipcHandle('agent:stop', (_e, conversationId?: string) => {
+    stopGeneration(conversationId)
   })
 
-  // Inject message during generation (pause current, add user message, continue)
-  ipcMain.handle(
-    'agent:inject-message',
-    async (
-      _event,
-      request: {
-        spaceId: string
-        conversationId: string
-        message: string
-        images?: ImageAttachment[]
-        attachments?: Attachment[]
-      }
-    ) => {
-      try {
-        await interruptAndInject(mainWindow, request)
-        return { success: true }
-      } catch (error: unknown) {
-        const err = error as Error
-        return { success: false, error: err.message }
-      }
+  ipcHandle('agent:inject-message',
+    async (_e, request: {
+      spaceId: string
+      conversationId: string
+      message: string
+      images?: ImageAttachment[]
+      attachments?: Attachment[]
+    }) => {
+      await interruptAndInject(mainWindow, request)
     }
   )
 
-  // Approve tool execution for a specific conversation
-  ipcMain.handle('agent:approve-tool', async (_event, conversationId: string) => {
-    try {
-      handleToolApproval(conversationId, true)
-      return { success: true }
-    } catch (error: unknown) {
-      const err = error as Error
-      return { success: false, error: err.message }
-    }
+  ipcHandle('agent:approve-tool', (_e, conversationId: string) => {
+    handleToolApproval(conversationId, true)
   })
 
-  // Reject tool execution for a specific conversation
-  ipcMain.handle('agent:reject-tool', async (_event, conversationId: string) => {
-    try {
-      handleToolApproval(conversationId, false)
-      return { success: true }
-    } catch (error: unknown) {
-      const err = error as Error
-      return { success: false, error: err.message }
-    }
+  ipcHandle('agent:reject-tool', (_e, conversationId: string) => {
+    handleToolApproval(conversationId, false)
   })
 
-  // Answer user question (AskUserQuestion tool)
-  ipcMain.handle('agent:answer-question', async (_event, conversationId: string, answers: Record<string, string>) => {
-    try {
-      handleUserQuestionAnswer(conversationId, answers)
-      return { success: true }
-    } catch (error: unknown) {
-      const err = error as Error
-      return { success: false, error: err.message }
-    }
+  ipcHandle('agent:answer-question', (_e, conversationId: string, answers: Record<string, string>) => {
+    handleUserQuestionAnswer(conversationId, answers)
   })
 
-  // Get current session state for recovery after refresh
-  ipcMain.handle('agent:get-session-state', async (_event, conversationId: string) => {
-    try {
-      const state = getSessionState(conversationId)
-      return { success: true, data: state }
-    } catch (error: unknown) {
-      const err = error as Error
-      return { success: false, error: err.message }
-    }
+  ipcHandle('agent:get-session-state', (_e, conversationId: string) =>
+    getSessionState(conversationId)
+  )
+
+  // Warm up V2 session - non-blocking, fire-and-forget
+  ipcHandle('agent:ensure-session-warm', (_e, spaceId: string, conversationId: string) => {
+    ensureSessionWarm(spaceId, conversationId).catch((error: unknown) => {
+      console.error('[IPC] ensureSessionWarm error:', error)
+    })
   })
 
-  // Warm up V2 session - call when switching conversations to prepare for faster message sending
-  ipcMain.handle('agent:ensure-session-warm', async (_event, spaceId: string, conversationId: string) => {
-    try {
-      // Async initialization, non-blocking IPC call
-      ensureSessionWarm(spaceId, conversationId).catch((error: unknown) => {
-        console.error('[IPC] ensureSessionWarm error:', error)
-      })
-      return { success: true }
-    } catch (error: unknown) {
-      const err = error as Error
-      return { success: false, error: err.message }
-    }
-  })
-
-  // Rewind files to a specific user message (undo file changes)
+  // Rewind files - has custom error handling with logging, keep ipcMain.handle
   ipcMain.handle('agent:rewind-files', async (_event, conversationId: string, userMessageUuid: string) => {
     console.log(`[IPC] agent:rewind-files called: conversationId=${conversationId}, uuid=${userMessageUuid}`)
     try {
@@ -152,7 +89,7 @@ export function registerAgentHandlers(window: BrowserWindow | null): void {
     }
   })
 
-  // Test MCP server connections
+  // Test MCP - returns custom shape with servers array
   ipcMain.handle('agent:test-mcp', async () => {
     try {
       const result = await testMcpConnections(mainWindow)

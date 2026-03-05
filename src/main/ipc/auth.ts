@@ -16,6 +16,7 @@
 import { ipcMain, BrowserWindow } from 'electron'
 import { getAISourceManager, getEnabledAuthProviderConfigs } from '../services/ai-sources'
 import type { AISourceType } from '../../shared/types'
+import { ipcHandle } from './utils'
 
 /**
  * Register all authentication IPC handlers
@@ -23,19 +24,7 @@ import type { AISourceType } from '../../shared/types'
 export function registerAuthHandlers(): void {
   const manager = getAISourceManager()
 
-  /**
-   * Get list of available authentication providers
-   */
-  ipcMain.handle('auth:get-providers', async () => {
-    try {
-      const providers = getEnabledAuthProviderConfigs()
-      return { success: true, data: providers }
-    } catch (error: unknown) {
-      const err = error as Error
-      console.error('[Auth IPC] Get providers error:', err)
-      return { success: false, error: err.message }
-    }
-  })
+  ipcHandle('auth:get-providers', () => getEnabledAuthProviderConfigs())
 
   /**
    * Start OAuth login flow for a provider

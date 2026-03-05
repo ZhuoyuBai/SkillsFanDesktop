@@ -152,7 +152,7 @@ export function SkillsFanAccountSection() {
   const getPlanDisplay = (plan: SkillsFanUser['plan']) => {
     switch (plan) {
       case 'pro':
-        return { badgeLabel: t('Member'), planLabel: t('Membership active'), className: 'bg-primary/20 text-primary' }
+        return { badgeLabel: t('Member'), planLabel: t('Membership active'), className: 'bg-amber-500/20 text-amber-600' }
       case 'enterprise':
         return { badgeLabel: t('Member'), planLabel: t('Membership active'), className: 'bg-purple-500/20 text-purple-500' }
       default:

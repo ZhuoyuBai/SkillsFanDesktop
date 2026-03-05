@@ -9,19 +9,10 @@ import { getConfigAsync, saveConfigAsync, validateApiConnection } from '../servi
 import { getAISourceManager } from '../services/ai-sources'
 import { setIsQuitting } from '../services/tray.service'
 import { fetchPublicModels } from '../services/skillsfan/models.service'
+import { ipcHandle } from './utils'
 
 export function registerConfigHandlers(): void {
-  // Get configuration
-  ipcMain.handle('config:get', async () => {
-    try {
-      const config = await getConfigAsync()
-      // No decryption needed - config is already in plaintext after migration
-      return { success: true, data: config }
-    } catch (error: unknown) {
-      const err = error as Error
-      return { success: false, error: err.message }
-    }
-  })
+  ipcHandle('config:get', () => getConfigAsync())
 
   // Save configuration
   ipcMain.handle('config:set', async (_event, updates: Record<string, unknown>) => {
@@ -62,44 +53,18 @@ export function registerConfigHandlers(): void {
     }
   })
 
-  // Validate API connection
-  ipcMain.handle(
-    'config:validate-api',
-    async (_event, apiKey: string, apiUrl: string, provider: string) => {
-      try {
-        const result = await validateApiConnection(apiKey, apiUrl, provider)
-        return { success: true, data: result }
-      } catch (error: unknown) {
-        const err = error as Error
-        return { success: false, error: err.message }
-      }
-    }
+  ipcHandle('config:validate-api',
+    (_e, apiKey: string, apiUrl: string, provider: string) =>
+      validateApiConnection(apiKey, apiUrl, provider)
   )
 
-  // Refresh AI sources configuration (auto-detects logged-in sources)
-  ipcMain.handle('config:refresh-ai-sources', async () => {
-    try {
-      const manager = getAISourceManager()
-      await manager.refreshAllConfigs()
-      const config = await getConfigAsync()
-      return { success: true, data: config }
-    } catch (error: unknown) {
-      const err = error as Error
-      console.error('[Config IPC] Refresh AI sources error:', err)
-      return { success: false, error: err.message }
-    }
+  ipcHandle('config:refresh-ai-sources', async () => {
+    const manager = getAISourceManager()
+    await manager.refreshAllConfigs()
+    return getConfigAsync()
   })
 
-  // Get public model list (no auth required)
-  ipcMain.handle('config:get-public-models', async () => {
-    try {
-      const models = await fetchPublicModels()
-      return { success: true, data: models }
-    } catch (error: unknown) {
-      const err = error as Error
-      return { success: false, error: err.message }
-    }
-  })
+  ipcHandle('config:get-public-models', () => fetchPublicModels())
 
   // Reset to default settings
   ipcMain.handle('config:reset-to-default', async () => {

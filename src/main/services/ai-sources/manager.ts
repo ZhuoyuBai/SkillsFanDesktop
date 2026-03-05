@@ -38,6 +38,16 @@ import { loadAuthProvidersAsync, isOAuthProvider as isOAuthProviderCheck, type L
 import { decryptString, decryptTokens } from '../secure-storage.service'
 
 /**
+ * Fallback mapping: OAuth provider → custom API provider
+ * When an OAuth provider is not configured (user not logged in),
+ * try the corresponding custom API provider if user has configured an API key.
+ */
+const OAUTH_TO_CUSTOM_FALLBACK: Record<string, string> = {
+  'glm': 'zhipu',
+  'minimax-oauth': 'minimax',
+}
+
+/**
  * Extended OAuth provider interface for token management
  */
 interface OAuthProviderWithTokenManagement extends OAuthAISourceProvider {
@@ -169,12 +179,20 @@ class AISourceManager {
 
     if (!provider.isConfigured(aiSources)) {
       console.warn(`[AISourceManager] Provider ${aiSources.current} is not configured`)
-      return null
+      // Fallback: if OAuth provider is not configured (not logged in),
+      // check for a matching custom API provider with an API key
+      return this.tryCustomApiFallback(aiSources)
     }
 
     console.log('[AISourceManager] Provider is configured, calling getBackendConfig')
     const result = provider.getBackendConfig(aiSources)
     console.log('[AISourceManager] getBackendConfig result:', result ? { url: result.url, model: result.model, hasKey: !!result.key } : null)
+
+    if (!result) {
+      // Provider is configured but returned null (e.g., expired token)
+      // Try custom API fallback
+      return this.tryCustomApiFallback(aiSources)
+    }
 
     return result
   }
@@ -195,6 +213,23 @@ class AISourceManager {
       model: config.model,
       apiType: isAnthropic ? undefined : (baseUrl.includes('/responses') ? 'responses' : 'chat_completions')
     }
+  }
+
+  /**
+   * Try falling back to a custom API provider when an OAuth provider fails.
+   * e.g., when 'glm' OAuth is not configured, try 'zhipu' custom API key.
+   */
+  private tryCustomApiFallback(aiSources: AISourcesConfig): BackendRequestConfig | null {
+    const fallbackKey = OAUTH_TO_CUSTOM_FALLBACK[aiSources.current]
+    if (!fallbackKey) return null
+
+    const fallbackConfig = (aiSources as Record<string, any>)[fallbackKey]
+    if (fallbackConfig && typeof fallbackConfig === 'object' && 'apiKey' in fallbackConfig && fallbackConfig.apiKey) {
+      console.log(`[AISourceManager] OAuth provider ${aiSources.current} unavailable, falling back to custom API: ${fallbackKey}`)
+      return this.getDynamicCustomBackendConfig(fallbackConfig)
+    }
+
+    return null
   }
 
   /**

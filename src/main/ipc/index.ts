@@ -2,6 +2,7 @@
  * IPC Handler Index
  */
 
+export { ipcHandle } from './utils'
 export { registerConfigHandlers } from './config'
 export { registerSpaceHandlers } from './space'
 export { registerConversationHandlers } from './conversation'

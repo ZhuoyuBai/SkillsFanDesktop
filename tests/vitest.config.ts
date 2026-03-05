@@ -34,7 +34,13 @@ export default defineConfig({
         '**/node_modules/**',
         '**/dist/**',
         '**/*.d.ts'
-      ]
+      ],
+      thresholds: {
+        lines: 60,
+        functions: 60,
+        statements: 60,
+        branches: 50
+      }
     },
 
     // Reporter configuration

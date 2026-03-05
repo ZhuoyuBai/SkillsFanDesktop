@@ -2,7 +2,6 @@
  * Conversation IPC Handlers
  */
 
-import { ipcMain } from 'electron'
 import {
   listConversations,
   createConversation,
@@ -14,123 +13,42 @@ import {
   addMessage,
   updateLastMessage
 } from '../services/conversation.service'
+import { ipcHandle } from './utils'
 
 export function registerConversationHandlers(): void {
-  // List conversations for a space
-  ipcMain.handle('conversation:list', async (_event, spaceId: string) => {
-    try {
-      const conversations = listConversations(spaceId)
-      return { success: true, data: conversations }
-    } catch (error: unknown) {
-      const err = error as Error
-      return { success: false, error: err.message }
-    }
-  })
+  ipcHandle('conversation:list', (_e, spaceId: string) => listConversations(spaceId))
 
-  // Create a new conversation
-  ipcMain.handle('conversation:create', async (_event, spaceId: string, title?: string) => {
-    try {
-      const conversation = createConversation(spaceId, title)
-      return { success: true, data: conversation }
-    } catch (error: unknown) {
-      const err = error as Error
-      return { success: false, error: err.message }
-    }
-  })
-
-  // Get a specific conversation
-  ipcMain.handle('conversation:get', async (_event, spaceId: string, conversationId: string) => {
-    try {
-      const conversation = getConversation(spaceId, conversationId)
-      return { success: true, data: conversation }
-    } catch (error: unknown) {
-      const err = error as Error
-      return { success: false, error: err.message }
-    }
-  })
-
-  // Update a conversation
-  ipcMain.handle(
-    'conversation:update',
-    async (_event, spaceId: string, conversationId: string, updates: Record<string, unknown>) => {
-      try {
-        const conversation = updateConversation(spaceId, conversationId, updates)
-        return { success: true, data: conversation }
-      } catch (error: unknown) {
-        const err = error as Error
-        return { success: false, error: err.message }
-      }
-    }
+  ipcHandle('conversation:create', (_e, spaceId: string, title?: string) =>
+    createConversation(spaceId, title)
   )
 
-  // Touch a conversation (update timestamp)
-  ipcMain.handle('conversation:touch', async (_event, spaceId: string, conversationId: string) => {
-    try {
-      const conversation = touchConversation(spaceId, conversationId)
-      return { success: true, data: conversation }
-    } catch (error: unknown) {
-      const err = error as Error
-      return { success: false, error: err.message }
-    }
-  })
-
-  // Delete a conversation
-  ipcMain.handle('conversation:delete', async (_event, spaceId: string, conversationId: string) => {
-    try {
-      const result = deleteConversation(spaceId, conversationId)
-      return { success: true, data: result }
-    } catch (error: unknown) {
-      const err = error as Error
-      return { success: false, error: err.message }
-    }
-  })
-
-  // Clear all conversations for a space
-  ipcMain.handle('conversation:clear-all', async (_event, spaceId: string) => {
-    try {
-      const deletedCount = clearAllConversations(spaceId)
-      return { success: true, data: deletedCount }
-    } catch (error: unknown) {
-      const err = error as Error
-      return { success: false, error: err.message }
-    }
-  })
-
-  // Add a message to a conversation
-  ipcMain.handle(
-    'conversation:add-message',
-    async (
-      _event,
-      spaceId: string,
-      conversationId: string,
-      message: { role: 'user' | 'assistant' | 'system'; content: string }
-    ) => {
-      try {
-        const newMessage = addMessage(spaceId, conversationId, message)
-        return { success: true, data: newMessage }
-      } catch (error: unknown) {
-        const err = error as Error
-        return { success: false, error: err.message }
-      }
-    }
+  ipcHandle('conversation:get', (_e, spaceId: string, conversationId: string) =>
+    getConversation(spaceId, conversationId)
   )
 
-  // Update the last message (for saving content and thoughts)
-  ipcMain.handle(
-    'conversation:update-last-message',
-    async (
-      _event,
-      spaceId: string,
-      conversationId: string,
-      updates: Record<string, unknown>
-    ) => {
-      try {
-        const message = updateLastMessage(spaceId, conversationId, updates)
-        return { success: true, data: message }
-      } catch (error: unknown) {
-        const err = error as Error
-        return { success: false, error: err.message }
-      }
-    }
+  ipcHandle('conversation:update',
+    (_e, spaceId: string, conversationId: string, updates: Record<string, unknown>) =>
+      updateConversation(spaceId, conversationId, updates)
+  )
+
+  ipcHandle('conversation:touch', (_e, spaceId: string, conversationId: string) =>
+    touchConversation(spaceId, conversationId)
+  )
+
+  ipcHandle('conversation:delete', (_e, spaceId: string, conversationId: string) =>
+    deleteConversation(spaceId, conversationId)
+  )
+
+  ipcHandle('conversation:clear-all', (_e, spaceId: string) => clearAllConversations(spaceId))
+
+  ipcHandle('conversation:add-message',
+    (_e, spaceId: string, conversationId: string,
+      message: { role: 'user' | 'assistant' | 'system'; content: string }) =>
+      addMessage(spaceId, conversationId, message)
+  )
+
+  ipcHandle('conversation:update-last-message',
+    (_e, spaceId: string, conversationId: string, updates: Record<string, unknown>) =>
+      updateLastMessage(spaceId, conversationId, updates)
   )
 }

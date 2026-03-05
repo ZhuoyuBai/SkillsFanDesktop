@@ -3,7 +3,7 @@
  * Allows renderer to control remote access features
  */
 
-import { ipcMain, BrowserWindow } from 'electron'
+import { BrowserWindow } from 'electron'
 import {
   enableRemoteAccess,
   disableRemoteAccess,
@@ -15,79 +15,29 @@ import {
   setCustomPassword,
   regeneratePassword
 } from '../services/remote.service'
+import { ipcHandle } from './utils'
 
 let mainWindow: BrowserWindow | null = null
 
 export function registerRemoteHandlers(window: BrowserWindow | null): void {
   mainWindow = window
 
-  // Enable remote access
-  ipcMain.handle('remote:enable', async (_event, port?: number) => {
-    console.log('[IPC] remote:enable called with port:', port)
-    try {
-      const status = await enableRemoteAccess(mainWindow, port)
-      console.log('[IPC] remote:enable success:', status)
-      return { success: true, data: status }
-    } catch (error: unknown) {
-      const err = error as Error
-      console.error('[IPC] remote:enable error:', err.message)
-      return { success: false, error: err.message }
-    }
+  ipcHandle('remote:enable', (_e, port?: number) => enableRemoteAccess(mainWindow, port))
+
+  ipcHandle('remote:disable', () => disableRemoteAccess())
+
+  ipcHandle('remote:tunnel:enable', async () => {
+    const url = await enableTunnel()
+    return { url }
   })
 
-  // Disable remote access
-  ipcMain.handle('remote:disable', async () => {
-    try {
-      await disableRemoteAccess()
-      return { success: true }
-    } catch (error: unknown) {
-      const err = error as Error
-      return { success: false, error: err.message }
-    }
-  })
+  ipcHandle('remote:tunnel:disable', () => disableTunnel())
 
-  // Enable tunnel
-  ipcMain.handle('remote:tunnel:enable', async () => {
-    try {
-      const url = await enableTunnel()
-      return { success: true, data: { url } }
-    } catch (error: unknown) {
-      const err = error as Error
-      return { success: false, error: err.message }
-    }
-  })
+  ipcHandle('remote:status', () => getRemoteAccessStatus())
 
-  // Disable tunnel
-  ipcMain.handle('remote:tunnel:disable', async () => {
-    try {
-      await disableTunnel()
-      return { success: true }
-    } catch (error: unknown) {
-      const err = error as Error
-      return { success: false, error: err.message }
-    }
-  })
-
-  // Get status
-  ipcMain.handle('remote:status', async () => {
-    try {
-      const status = getRemoteAccessStatus()
-      return { success: true, data: status }
-    } catch (error: unknown) {
-      const err = error as Error
-      return { success: false, error: err.message }
-    }
-  })
-
-  // Generate QR code
-  ipcMain.handle('remote:qrcode', async (_event, includeToken?: boolean) => {
-    try {
-      const qrCode = await generateQRCode(includeToken)
-      return { success: true, data: { qrCode } }
-    } catch (error: unknown) {
-      const err = error as Error
-      return { success: false, error: err.message }
-    }
+  ipcHandle('remote:qrcode', async (_e, includeToken?: boolean) => {
+    const qrCode = await generateQRCode(includeToken)
+    return { qrCode }
   })
 
   // Set up status change listener
@@ -97,30 +47,15 @@ export function registerRemoteHandlers(window: BrowserWindow | null): void {
     }
   })
 
-  // Set custom password
-  ipcMain.handle('remote:set-password', async (_event, password: string) => {
-    try {
-      const result = setCustomPassword(password)
-      if (result.success) {
-        return { success: true, data: getRemoteAccessStatus() }
-      } else {
-        return { success: false, error: result.error }
-      }
-    } catch (error: unknown) {
-      const err = error as Error
-      return { success: false, error: err.message }
-    }
+  ipcHandle('remote:set-password', (_e, password: string) => {
+    const result = setCustomPassword(password)
+    if (!result.success) throw new Error(result.error)
+    return getRemoteAccessStatus()
   })
 
-  // Regenerate random password
-  ipcMain.handle('remote:regenerate-password', async () => {
-    try {
-      regeneratePassword()
-      return { success: true, data: getRemoteAccessStatus() }
-    } catch (error: unknown) {
-      const err = error as Error
-      return { success: false, error: err.message }
-    }
+  ipcHandle('remote:regenerate-password', () => {
+    regeneratePassword()
+    return getRemoteAccessStatus()
   })
 
   console.log('[IPC] Remote access handlers registered')

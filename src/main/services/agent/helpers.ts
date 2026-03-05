@@ -189,6 +189,7 @@ export async function getApiCredentials(config: ReturnType<typeof getConfig>): P
   }, null, 2))
 
   // Only check OAuth token for actual OAuth providers (has 'loggedIn' field)
+  let oauthTokenValid = true
   if (isOAuthProvider) {
     console.log('[AgentService] Checking OAuth token validity for:', currentSource)
 
@@ -203,31 +204,39 @@ export async function getApiCredentials(config: ReturnType<typeof getConfig>): P
     const tokenResult = await manager.ensureValidToken(currentSource)
     console.log('[AgentService] Token check result:', tokenResult.success)
     if (!tokenResult.success) {
-      if (currentSource === 'skillsfan-credits') {
-        throw new Error('Login session expired. Please login again.')
-      }
-      throw new Error('OAuth token expired or invalid. Please login again.')
+      oauthTokenValid = false
+      // Don't throw immediately - manager.getBackendConfig() may fall back to custom API
+      console.log('[AgentService] OAuth token invalid, will try fallback in getBackendConfig')
     }
   }
 
-  // Get backend config from manager
+  // Get backend config from manager (handles OAuth → custom API fallback)
   console.log('[AgentService] Calling manager.getBackendConfig()')
   const backendConfig = manager.getBackendConfig()
   console.log('[AgentService] backendConfig:', backendConfig ? { url: backendConfig.url, model: backendConfig.model, hasKey: !!backendConfig.key } : null)
 
   if (!backendConfig) {
+    // No config available and no fallback - give specific error
+    if (isOAuthProvider && !oauthTokenValid) {
+      if (currentSource === 'skillsfan-credits') {
+        throw new Error('Login session expired. Please login again.')
+      }
+      throw new Error('OAuth token expired or invalid. Please login again.')
+    }
     throw new Error('No AI source configured. Please configure an API key or login.')
   }
 
-  // Determine provider type
+  // Determine provider type based on whether we're using OAuth or custom API (including fallback)
   let provider: 'anthropic' | 'openai' | 'oauth'
 
-  if (isOAuthProvider) {
+  if (isOAuthProvider && oauthTokenValid) {
     provider = 'oauth'
     console.log(`[Agent] Using OAuth provider ${currentSource} via AISourceManager`)
   } else {
-    // Custom API - check provider from current config (could be 'zhipu', 'kimi', 'custom', etc.)
-    const providerType = currentConfig?.provider || aiSources?.custom?.provider
+    // Custom API (either direct or fallback from OAuth provider)
+    // Find the actual config that provided the backend config
+    const effectiveConfig = currentConfig?.apiKey ? currentConfig : null
+    const providerType = effectiveConfig?.provider || aiSources?.custom?.provider
     provider = providerType === 'openai' ? 'openai' : 'anthropic'
     console.log(`[Agent] Using custom API (${provider}) for source ${currentSource} via AISourceManager`)
   }
