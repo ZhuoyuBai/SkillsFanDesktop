@@ -18,6 +18,7 @@ import {
   type OAuthSourceConfig
 } from '../../types'
 import { useTranslation, getCurrentLanguage } from '../../i18n'
+import { SKILLSFAN_PROVIDER_META } from '../../../shared/constants/providers'
 
 // Import provider logos
 import zhipuLogo from '../../assets/providers/zhipu.jpg'
@@ -51,31 +52,33 @@ export const PROVIDER_LOGOS_BY_ID: Record<string, string> = {
   'skillsfan-credits': skillsfanLogo,
 }
 
-// Mapping from backend owned_by values to client provider types
-const OWNED_BY_TO_PROVIDER: Record<string, string> = {
-  'zhipu': 'glm',
-  'minimax': 'minimax-oauth',
-}
+// Mapping from backend owned_by values to client provider types (derived from shared config)
+const OWNED_BY_TO_PROVIDER: Record<string, string> = Object.fromEntries(
+  Object.entries(SKILLSFAN_PROVIDER_META)
+    .flatMap(([key, v]) => (v.ownedBy || []).map(ob => [ob, key]))
+)
 
 // Provider display names by ID (exported for reuse)
+// Merge SkillsFan provider names with other static names
 export const PROVIDER_NAMES: Record<string, string> = {
-  'glm': 'GLM-5',
+  ...Object.fromEntries(
+    Object.entries(SKILLSFAN_PROVIDER_META).map(([k, v]) => [k, v.displayName])
+  ),
   'zhipu': 'Zhipu GLM',
   'minimax': 'MiniMax',
-  'minimax-oauth': 'MiniMax',
   'kimi': 'Kimi',
   'deepseek': 'DeepSeek',
   'claude': 'Claude',
   'openai': 'OpenAI',
   'custom': 'Custom',
-  'skillsfan-credits': 'SkillsFan',
 }
 
-// Default model by provider when config has no explicit model yet
-const PROVIDER_DEFAULT_MODELS: Record<string, string> = {
-  'glm': 'glm-5',
-  'minimax-oauth': 'MiniMax-M2.1',
-}
+// Default model by provider when config has no explicit model yet (derived from shared config)
+const PROVIDER_DEFAULT_MODELS: Record<string, string> = Object.fromEntries(
+  Object.entries(SKILLSFAN_PROVIDER_META)
+    .filter(([, v]) => v.defaultModel)
+    .map(([k, v]) => [k, v.defaultModel])
+)
 
 /**
  * Get provider logo by API URL
@@ -146,7 +149,7 @@ interface ModelSelectorProps {
 
 export function ModelSelector({ variant = 'header', iconOnly = false, disabled = false, onDisabledClick, popoverUp = false }: ModelSelectorProps = {}) {
   const { t } = useTranslation()
-  const { config, setConfig, setView, publicModels, authProviders: storeAuthProviders, setPublicModels } = useAppStore()
+  const { config, setConfig, setView, publicModels, authProviders: storeAuthProviders, setPublicModels, skillsfanLoggedIn } = useAppStore()
   const authProviders = storeAuthProviders as AuthProviderConfig[]
   const [isOpen, setIsOpen] = useState(false)
   const [isDropdownScrolling, setIsDropdownScrolling] = useState(false)
@@ -242,36 +245,33 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
       }
     })
 
-  // Get all OAuth providers dynamically (both logged-in and not)
-  // Logged-in: always show. Not-logged-in: only show recommended ones
-  // (recommended = SkillsFan-backed providers like glm, skillsfan-credits)
-  const allOAuthProviders = authProviders
-    .filter(p => p.type !== 'custom' && p.enabled)
-    .map(p => {
-      const providerConfig = (aiSources as Record<string, any>)[p.type] as OAuthSourceConfig | undefined
-      return {
-        type: p.type,
-        displayName: getLocalizedText(p.displayName),
-        config: providerConfig,
-        isLoggedIn: providerConfig?.loggedIn === true,
-        recommended: p.recommended
-      }
-    })
-    .filter(p => {
-      // Hide SkillsFan Credits when backend public models are unavailable
-      // (common in local-only runs without website service).
-      if (p.type === 'skillsfan-credits' && !p.isLoggedIn && publicModels.length === 0) {
-        return false
-      }
-      return p.isLoggedIn || p.recommended
-    })
+  // Get all OAuth providers - only show when SkillsFan account is logged in
+  const allOAuthProviders = skillsfanLoggedIn
+    ? authProviders
+        .filter(p => p.type !== 'custom' && p.enabled)
+        .map(p => {
+          const providerConfig = (aiSources as Record<string, any>)[p.type] as OAuthSourceConfig | undefined
+          return {
+            type: p.type,
+            displayName: getLocalizedText(p.displayName),
+            config: providerConfig,
+            isLoggedIn: providerConfig?.loggedIn === true || skillsfanLoggedIn,
+            recommended: p.recommended
+          }
+        })
+    : []
 
-  const hasBuiltInOptions = allOAuthProviders.length > 0 || publicModels.length > 0
+  const hasBuiltInOptions = allOAuthProviders.length > 0
   const showSectionHeaders = hasBuiltInOptions && configuredCustomProviders.length > 0
 
   // Get current model display name
+  // If logged out and current source is an OAuth provider (has 'loggedIn' field), treat as unconfigured
+  const currentSourceObj = (aiSources as Record<string, any>)[currentSource]
+  const isOAuthSource = currentSourceObj && typeof currentSourceObj === 'object' && 'loggedIn' in currentSourceObj
   const rawModelName = getCurrentModelName(config)
-  const isCurrentConfigured = isSourceConfigured(aiSources, currentSource)
+  const isCurrentConfigured = (isOAuthSource && !skillsfanLoggedIn)
+    ? false
+    : isSourceConfigured(aiSources, currentSource)
   let currentModelName = rawModelName
   if (!isCurrentConfigured || rawModelName === 'No model') {
     currentModelName = t('model.addModel')
@@ -545,7 +545,8 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
               ))
 
             // Then: show public models from backend (deduped against logged-in models)
-            const publicElements = publicModels
+            // Only show when SkillsFan account is logged in
+            const publicElements = (skillsfanLoggedIn ? publicModels : [])
               .filter(m => !seenModelIds.has(m.id))
               .map((model) => {
                 seenModelIds.add(model.id)

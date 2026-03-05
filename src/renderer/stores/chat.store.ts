@@ -702,11 +702,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const appConfig = useAppStore.getState().config
     const currentAiSource = appConfig?.aiSources?.current
     const currentSourceConfig = currentAiSource ? (appConfig?.aiSources as Record<string, any>)?.[currentAiSource] : undefined
-    const isCurrentSourceLoggedIn = currentSourceConfig && typeof currentSourceConfig === 'object' &&
-      (('loggedIn' in currentSourceConfig && currentSourceConfig.loggedIn === true) ||
-       ('apiKey' in currentSourceConfig && currentSourceConfig.apiKey))
+    // Use real SkillsFan login state from store, not persisted config field
+    const sfLoggedIn = useAppStore.getState().skillsfanLoggedIn
+    const isOAuthSource = currentSourceConfig && typeof currentSourceConfig === 'object' && 'loggedIn' in currentSourceConfig
+    const isCustomApiSource = currentSourceConfig && typeof currentSourceConfig === 'object' && 'apiKey' in currentSourceConfig && currentSourceConfig.apiKey
+    const isCurrentSourceAvailable = isCustomApiSource || (isOAuthSource && sfLoggedIn)
 
-    if (!appConfig || (!hasAnyAISource(appConfig) && !currentAiSource)) {
+    if (!appConfig || (!isCurrentSourceAvailable && !currentAiSource)) {
       logger.error('[ChatStore] No AI source configured')
       set((state) => {
         const newSessions = new Map(state.sessions)
@@ -728,10 +730,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
       return
     }
 
-    // Current source is an OAuth provider but not logged in - show toast prompt
-    if (currentAiSource && !isCurrentSourceLoggedIn) {
-      logger.debug(`[ChatStore] Current source ${currentAiSource} needs login`)
-      useToastStore.getState().addToast(i18n.t('Please log in before using this model'), 'error')
+    // Current source is not available - OAuth provider not logged in, or no API key
+    if (currentAiSource && !isCurrentSourceAvailable) {
+      logger.debug(`[ChatStore] Current source ${currentAiSource} not available`)
+      useToastStore.getState().addToast(i18n.t('Please add a model first'), 'error')
       return
     }
 

@@ -10,3 +10,6 @@ export * from './ai-sources'
 
 // Loop Task types
 export * from './loop-task'
+
+// Channel types (Message Normalization Layer)
+export * from './channel'

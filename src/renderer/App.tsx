@@ -235,6 +235,9 @@ export default function App() {
     // Only handles login from non-setup contexts (Settings, Onboarding).
     // SetupFlow handles its own login completion to avoid race conditions.
     const unsubSkillsFanLogin = api.onSkillsFanLoginSuccess(async () => {
+      // Update global login state immediately
+      useAppStore.getState().setSkillsfanLoggedIn(true)
+
       const currentView = useAppStore.getState().view
       if (currentView === 'setup') {
         logger.debug('[App] SkillsFan login success, but SetupFlow is handling it')
@@ -266,6 +269,10 @@ export default function App() {
       setView('space')
     })
 
+    const unsubSkillsFanLogout = api.onSkillsFanLogout(() => {
+      useAppStore.getState().setSkillsfanLoggedIn(false)
+    })
+
     return () => {
       unsubThought()
       unsubMessage()
@@ -279,6 +286,7 @@ export default function App() {
       unsubUserQuestionAnswered()
       unsubMcpStatus()
       unsubSkillsFanLogin()
+      unsubSkillsFanLogout()
     }
   }, [
     handleAgentStart,

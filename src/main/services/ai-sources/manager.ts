@@ -31,21 +31,17 @@ import type {
 import { getConfig, saveConfig } from '../config.service'
 import { getCustomProvider } from './providers/custom.provider'
 import { getGitHubCopilotProvider } from './providers/github-copilot.provider'
-import { getSkillsFanCreditsProvider } from './providers/skillsfan-credits.provider'
-import { getGLMProvider } from './providers/glm.provider'
-import { getMiniMaxProvider } from './providers/minimax.provider'
+import { createAllSkillsFanProviders, getOAuthToCustomFallbackMap } from './providers/skillsfan-providers'
 import { loadAuthProvidersAsync, isOAuthProvider as isOAuthProviderCheck, type LoadedProvider } from './auth-loader'
 import { decryptString, decryptTokens } from '../secure-storage.service'
 
 /**
  * Fallback mapping: OAuth provider → custom API provider
+ * Auto-generated from SkillsFan proxy provider configs.
  * When an OAuth provider is not configured (user not logged in),
  * try the corresponding custom API provider if user has configured an API key.
  */
-const OAUTH_TO_CUSTOM_FALLBACK: Record<string, string> = {
-  'glm': 'zhipu',
-  'minimax-oauth': 'minimax',
-}
+const OAUTH_TO_CUSTOM_FALLBACK = getOAuthToCustomFallbackMap()
 
 /**
  * Extended OAuth provider interface for token management
@@ -71,9 +67,10 @@ class AISourceManager {
     // Register built-in providers immediately
     this.registerProvider(getCustomProvider())
     this.registerProvider(getGitHubCopilotProvider())
-    this.registerProvider(getSkillsFanCreditsProvider())
-    this.registerProvider(getGLMProvider())
-    this.registerProvider(getMiniMaxProvider())
+    // Register all SkillsFan-proxied providers (GLM, MiniMax, SkillsFan Credits, etc.)
+    for (const provider of createAllSkillsFanProviders()) {
+      this.registerProvider(provider)
+    }
 
     // Start async initialization (optional providers + dynamic loading)
     this.initPromise = this.initializeAsync()

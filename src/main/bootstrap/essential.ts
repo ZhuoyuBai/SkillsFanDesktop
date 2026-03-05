@@ -29,6 +29,7 @@ import { registerSystemHandlers } from '../ipc/system'
 import { registerUpdaterHandlers, initAutoUpdater } from '../services/updater.service'
 import { registerAuthHandlers } from '../ipc/auth'
 import { registerSkillsFanAuthHandlers } from '../ipc/skillsfan-auth'
+import { getChannelManager, ElectronChannel, RemoteWebChannel } from '../services/channel'
 
 /**
  * Initialize essential services required for first screen render
@@ -44,6 +45,14 @@ export function initializeEssentialServices(mainWindow: BrowserWindow): void {
   // === ESSENTIAL SERVICES ===
   // Each service below is required for the first screen render.
   // Do NOT add new services without architecture review.
+
+  // ChannelManager: Register communication channels before agent service.
+  // Must be ready before any sendToRenderer() calls.
+  const channelManager = getChannelManager()
+  const electronChannel = new ElectronChannel()
+  electronChannel.setMainWindow(mainWindow)
+  channelManager.registerChannel(electronChannel)
+  channelManager.registerChannel(new RemoteWebChannel())
 
   // Config: Must be first - other services may depend on configuration
   registerConfigHandlers()

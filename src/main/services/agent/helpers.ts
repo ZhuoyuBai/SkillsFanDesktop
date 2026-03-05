@@ -12,7 +12,8 @@ import { existsSync, mkdirSync, symlinkSync, unlinkSync, lstatSync, readlinkSync
 import { getConfig, getTempSpacePath } from '../config.service'
 import { getSpace } from '../space.service'
 import { getAISourceManager } from '../ai-sources'
-import { broadcastToAll, broadcastToWebSocket } from '../../http/websocket'
+import { getChannelManager, createOutboundEvent } from '../channel'
+import type { ElectronChannel } from '../channel'
 import type { ApiCredentials, MainWindowRef } from './types'
 
 // ============================================
@@ -402,10 +403,16 @@ TodoWrite 和 Task 可以组合：先用 TodoWrite 展示整体计划，再用 T
 let currentMainWindow: MainWindowRef = null
 
 /**
- * Set the current main window reference
+ * Set the current main window reference.
+ * Also updates the ElectronChannel adapter if registered.
  */
 export function setMainWindow(window: MainWindowRef): void {
   currentMainWindow = window
+  // Keep ElectronChannel in sync
+  const electron = getChannelManager().getChannel<ElectronChannel>('electron')
+  if (electron) {
+    electron.setMainWindow(window)
+  }
 }
 
 /**
@@ -416,8 +423,9 @@ export function getMainWindow(): MainWindowRef {
 }
 
 /**
- * Send event to renderer with session identifiers
- * Also broadcasts to WebSocket for remote clients
+ * Send event to renderer with session identifiers.
+ * Routes through ChannelManager to dispatch to all registered channels
+ * (Electron IPC, WebSocket, and any future channels).
  */
 export function sendToRenderer(
   channel: string,
@@ -425,36 +433,15 @@ export function sendToRenderer(
   conversationId: string,
   data: Record<string, unknown>
 ): void {
-  // Always include spaceId and conversationId in event data
-  const eventData = { ...data, spaceId, conversationId }
-
-  // 1. Send to Electron renderer via IPC
-  if (currentMainWindow && !currentMainWindow.isDestroyed()) {
-    currentMainWindow.webContents.send(channel, eventData)
-    console.log(`[Agent] Sent to renderer: ${channel}`, JSON.stringify(eventData).substring(0, 200))
-  }
-
-  // 2. Broadcast to remote WebSocket clients
-  try {
-    broadcastToWebSocket(channel, eventData)
-  } catch (error) {
-    // WebSocket module might not be initialized yet, ignore
-  }
+  getChannelManager().dispatchEvent(
+    createOutboundEvent(channel, spaceId, conversationId, data)
+  )
 }
 
 /**
- * Broadcast event to all clients (global event, not conversation-scoped)
+ * Broadcast event to all clients (global event, not conversation-scoped).
+ * Routes through ChannelManager to dispatch to all registered channels.
  */
 export function broadcastToAllClients(channel: string, data: Record<string, unknown>): void {
-  // 1. Send to Electron renderer via IPC (global event)
-  if (currentMainWindow && !currentMainWindow.isDestroyed()) {
-    currentMainWindow.webContents.send(channel, data)
-  }
-
-  // 2. Broadcast to remote WebSocket clients
-  try {
-    broadcastToAll(channel, data)
-  } catch (error) {
-    // WebSocket module might not be initialized yet, ignore
-  }
+  getChannelManager().dispatchGlobal(channel, data)
 }

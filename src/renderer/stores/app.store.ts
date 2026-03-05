@@ -42,6 +42,9 @@ interface AppState {
   // Settings page initial section
   settingsSection: SettingsSection | null
 
+  // SkillsFan account login state (single source of truth for UI)
+  skillsfanLoggedIn: boolean
+
   // Model selector (pre-loaded once during init, cached in store)
   publicModels: Array<{ id: string; name: string; owned_by: string }>
   authProviders: Array<{ type: string; displayName: string | Record<string, string>; enabled: boolean; recommended?: boolean }>
@@ -54,6 +57,7 @@ interface AppState {
   setConfig: (config: HaloConfig) => void
   updateConfig: (updates: Partial<HaloConfig>) => void
   setMcpStatus: (status: McpServerStatus[], timestamp: number) => void
+  setSkillsfanLoggedIn: (loggedIn: boolean) => void
   setPublicModels: (models: Array<{ id: string; name: string; owned_by: string }>) => void
   setAuthProviders: (providers: Array<{ type: string; displayName: string | Record<string, string>; enabled: boolean; recommended?: boolean }>) => void
 
@@ -84,6 +88,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   mockBashMode: false,
   gitBashInstallProgress: { phase: 'idle', progress: 0, message: '' },
   settingsSection: null,
+  skillsfanLoggedIn: false,
   publicModels: [],
   authProviders: [],
 
@@ -118,6 +123,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   setMcpStatus: (status, timestamp) => {
     set({ mcpStatus: status, mcpStatusTimestamp: timestamp })
   },
+  setSkillsfanLoggedIn: (loggedIn) => set({ skillsfanLoggedIn: loggedIn }),
   setPublicModels: (models) => set({ publicModels: models }),
   setAuthProviders: (providers) => set({ authProviders: providers }),
 
@@ -290,7 +296,13 @@ export const useAppStore = create<AppState>((set, get) => ({
             // Non-critical, ignore errors
           })
 
-          // Pre-load public models and auth providers (for model selector)
+          // Pre-load SkillsFan login state, public models, and auth providers (for model selector)
+          api.skillsfanGetAuthState().then((result) => {
+            if (result.success && result.data) {
+              set({ skillsfanLoggedIn: !!(result.data as any).isLoggedIn })
+            }
+          }).catch(() => {})
+
           api.getPublicModels().then((result) => {
             if (result.success && result.data) {
               set({ publicModels: result.data as Array<{ id: string; name: string; owned_by: string }> })

@@ -24,4 +24,7 @@ export {
 // Built-in Providers
 export { getCustomProvider, CustomAISourceProvider } from './providers/custom.provider'
 export { getGitHubCopilotProvider, GitHubCopilotProvider } from './providers/github-copilot.provider'
-export { getGLMProvider, GLMProvider } from './providers/glm.provider'
+
+// SkillsFan Proxy Providers (GLM, MiniMax, SkillsFan Credits, etc.)
+export { createSkillsFanProxyProvider, type SkillsFanProxyConfig } from './providers/skillsfan-proxy-provider'
+export { SKILLSFAN_PROXY_CONFIGS, createAllSkillsFanProviders, getOAuthToCustomFallbackMap } from './providers/skillsfan-providers'
