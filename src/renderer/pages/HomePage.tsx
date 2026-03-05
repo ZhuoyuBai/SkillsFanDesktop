@@ -170,7 +170,7 @@ export function HomePage() {
         </section>
 
         {/* Gradient Divider */}
-        <div className="h-px mx-6 bg-gradient-to-r from-transparent via-border/60 to-transparent" />
+        <div className="h-px mx-6 bg-border/30" />
 
         {/* Spaces Section */}
         <section className="p-8">

@@ -116,7 +116,7 @@ export function LoopTaskItem({
         onClick={onSelect}
         className={`w-full p-1.5 rounded-md transition-colors flex items-center justify-center ${
           isActive
-            ? 'bg-gradient-to-r from-primary/8 via-primary/5 to-transparent'
+            ? 'bg-muted/50'
             : 'hover:bg-secondary/40'
         }`}
         title={task.name}

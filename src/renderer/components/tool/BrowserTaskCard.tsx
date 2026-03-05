@@ -134,7 +134,7 @@ function StepItem({ step, isLatest }: { step: BrowserStep; isLatest: boolean }) 
       {/* Status indicator */}
       <div className="flex-shrink-0 w-5 h-5 flex items-center justify-center">
         {step.status === 'running' ? (
-          <Loader2 size={14} className="text-primary animate-spin" />
+          <Loader2 size={14} className="text-muted-foreground animate-spin" />
         ) : step.status === 'success' ? (
           <CheckCircle2 size={14} className="text-green-500" />
         ) : step.status === 'error' ? (
@@ -301,18 +301,18 @@ export function BrowserTaskCard({ browserToolCalls, isActive }: BrowserTaskCardP
         className={cn(
           'relative rounded-xl border overflow-hidden transition-colors',
           isActive && hasRunningStep
-            ? 'bg-primary/5 border-primary/30 animate-border-glow'
+            ? 'bg-muted/30 border-muted-foreground/30 animate-border-glow'
             : 'bg-card border-border'
         )}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-primary/20">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
           <div className="flex items-center gap-2">
             {/* AI Browser icon */}
             <div className="relative">
               <Globe
                 size={18}
-                className={`text-primary ${isActive && hasRunningStep ? 'animate-pulse-gentle' : ''}`}
+                className={`text-foreground ${isActive && hasRunningStep ? 'animate-pulse-gentle' : ''}`}
               />
               {isActive && hasRunningStep && (
                 <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-green-500 rounded-full animate-pulse" />
@@ -351,7 +351,7 @@ export function BrowserTaskCard({ browserToolCalls, isActive }: BrowserTaskCardP
         </div>
 
         {/* Footer action area */}
-        <div className="flex items-center justify-between px-4 py-3 border-t border-primary/20 bg-primary/5">
+        <div className="flex items-center justify-between px-4 py-3 border-t border-border/50 bg-muted/30">
           {/* URL display */}
           <div className="flex items-center gap-2 flex-1 min-w-0">
             {currentUrl && (
@@ -375,7 +375,7 @@ export function BrowserTaskCard({ browserToolCalls, isActive }: BrowserTaskCardP
               flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium
               transition-all duration-200
               ${currentUrl
-                ? 'bg-primary/20 text-primary hover:bg-primary/30 hover:scale-[1.02] active:scale-[0.98]'
+                ? 'bg-secondary text-foreground hover:bg-secondary/80 hover:scale-[1.02] active:scale-[0.98]'
                 : 'bg-muted/30 text-muted-foreground cursor-not-allowed'
               }
             `}

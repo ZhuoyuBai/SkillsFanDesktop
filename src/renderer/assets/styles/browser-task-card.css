@@ -27,12 +27,12 @@
 @keyframes border-pulse {
   0%,
   100% {
-    border-color: hsl(var(--primary) / 0.3);
-    box-shadow: 0 0 0 1px hsl(var(--primary) / 0.1);
+    border-color: hsl(var(--muted-foreground) / 0.3);
+    box-shadow: 0 0 0 1px hsl(var(--muted-foreground) / 0.1);
   }
   50% {
-    border-color: hsl(var(--primary) / 0.6);
-    box-shadow: 0 0 0 2px hsl(var(--primary) / 0.2);
+    border-color: hsl(var(--muted-foreground) / 0.5);
+    box-shadow: 0 0 0 2px hsl(var(--muted-foreground) / 0.15);
   }
 }
 

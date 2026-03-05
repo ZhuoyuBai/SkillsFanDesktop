@@ -104,7 +104,7 @@ function UnifiedTaskItem({
         transition-all duration-200
         focus:outline-none focus:ring-0
         ${isActive
-          ? 'bg-gradient-to-r from-primary/15 via-primary/10 to-transparent border-l-2 border-primary'
+          ? 'bg-secondary border-l-2 border-foreground/30'
           : 'hover:bg-secondary/40'
         }`}
     >

@@ -198,19 +198,8 @@ export function SettingsPage() {
   const [currentSource, setCurrentSource] = useState<AISourceType>(config?.aiSources?.current || 'custom')
   const [showCustomApiForm, setShowCustomApiForm] = useState(false)
 
-  // Selected provider in the grid - initialize based on current config
-  const [selectedProviderId, setSelectedProviderId] = useState<string>(() => {
-    // First try to use current aiSources setting if it's a valid provider ID
-    const current = config?.aiSources?.current
-    if (current && current !== 'oauth' && PROVIDER_PRESETS.some(p => p.id === current)) {
-      return current
-    }
-
-    // Fallback: try to match current config to a provider preset by URL
-    const currentApiUrl = config?.aiSources?.custom?.apiUrl || config?.api?.apiUrl || ''
-    const matchedPreset = PROVIDER_PRESETS.find(p => p.apiUrl && currentApiUrl.includes(p.apiUrl.replace('https://', '').split('/')[0]))
-    return matchedPreset?.id || 'claude'
-  })
+  // Selected provider in the grid - always default to the first provider
+  const [selectedProviderId, setSelectedProviderId] = useState<string>(PROVIDER_PRESETS[0].id)
 
   // OAuth providers state (dynamic from product.json)
   const [authProviders, setAuthProviders] = useState<AuthProviderConfig[]>([])

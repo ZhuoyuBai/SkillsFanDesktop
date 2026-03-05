@@ -442,7 +442,7 @@ export function ArtifactRail({
         <div
           className={`absolute left-0 top-0 bottom-0 w-1 cursor-col-resize z-20 group/handle
             transition-all duration-200
-            ${isDragging ? 'bg-primary/60' : 'hover:bg-primary/40'}`}
+            ${isDragging ? 'bg-muted-foreground/30' : 'hover:bg-muted-foreground/20'}`}
           onMouseDown={handleMouseDown}
           title={t('Drag to resize')}
         >

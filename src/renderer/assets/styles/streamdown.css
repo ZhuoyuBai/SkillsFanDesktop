@@ -99,7 +99,7 @@
   padding: 0.125rem 0.375rem;
   margin: 0 0.125rem;
   background: hsl(var(--secondary) / 0.8);
-  color: hsl(var(--primary));
+  color: hsl(var(--foreground));
   border-radius: 0.25rem;
   font-size: 0.9em;
   font-family: "SF Mono", "Fira Code", "Consolas", monospace;
@@ -117,7 +117,7 @@
 .streamdown-content blockquote {
   margin: 0.75rem 0;
   padding-left: 1rem;
-  border-left: 2px solid hsl(var(--primary) / 0.4);
+  border-left: 2px solid hsl(var(--border));
   color: hsl(var(--muted-foreground));
   font-style: italic;
 }
@@ -149,7 +149,7 @@
 
 /* ========== Links ========== */
 .streamdown-content a {
-  color: hsl(var(--primary));
+  color: hsl(var(--link));
   text-decoration: none;
 }
 
@@ -168,7 +168,7 @@
 .streamdown-content input[type="checkbox"] {
   margin-right: 0.5rem;
   border-radius: 0.25rem;
-  accent-color: hsl(var(--primary));
+  accent-color: hsl(var(--link));
 }
 
 /* ========== Strong / Emphasis ========== */

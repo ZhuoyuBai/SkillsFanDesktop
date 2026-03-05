@@ -626,6 +626,20 @@ export function hasAnyAISource(config: HaloConfig): boolean {
   return hasProvider || hasLegacyCustom;
 }
 
+// Check if a specific AI source is configured (logged in or has API key)
+export function isSourceConfigured(aiSources: AISourcesConfig, source: AISourceType): boolean {
+  if (source === 'custom') {
+    return !!(aiSources.custom?.apiKey);
+  }
+
+  const config = aiSources[source as keyof typeof aiSources];
+  if (config && typeof config === 'object') {
+    if ('loggedIn' in config && (config as OAuthSourceConfig).loggedIn === true) return true;
+    if ('apiKey' in config && (config as CustomSourceConfig).apiKey) return true;
+  }
+  return false;
+}
+
 // Helper function to get current model display name
 export function getCurrentModelName(config: HaloConfig): string {
   const aiSources = config.aiSources;

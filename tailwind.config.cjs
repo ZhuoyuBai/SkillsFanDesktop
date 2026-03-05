@@ -47,6 +47,7 @@ module.exports = {
           DEFAULT: 'hsl(var(--warning))',
           foreground: 'hsl(var(--warning-foreground))',
         },
+        link: 'hsl(var(--link))',
         // Halo brand colors
         'halo-glow': 'hsl(var(--halo-glow))',
         'halo-success': 'hsl(var(--halo-success))',
@@ -65,7 +66,7 @@ module.exports = {
             '--tw-prose-body': 'hsl(var(--foreground))',
             '--tw-prose-headings': 'hsl(var(--foreground))',
             '--tw-prose-lead': 'hsl(var(--muted-foreground))',
-            '--tw-prose-links': 'hsl(var(--primary))',
+            '--tw-prose-links': 'hsl(var(--link))',
             '--tw-prose-bold': 'hsl(var(--foreground))',
             '--tw-prose-counters': 'hsl(var(--muted-foreground))',
             '--tw-prose-bullets': 'hsl(var(--muted-foreground))',
@@ -82,7 +83,7 @@ module.exports = {
             '--tw-prose-invert-body': 'hsl(var(--foreground))',
             '--tw-prose-invert-headings': 'hsl(var(--foreground))',
             '--tw-prose-invert-lead': 'hsl(var(--muted-foreground))',
-            '--tw-prose-invert-links': 'hsl(var(--primary))',
+            '--tw-prose-invert-links': 'hsl(var(--link))',
             '--tw-prose-invert-bold': 'hsl(var(--foreground))',
             '--tw-prose-invert-counters': 'hsl(var(--muted-foreground))',
             '--tw-prose-invert-bullets': 'hsl(var(--muted-foreground))',
@@ -134,7 +135,7 @@ module.exports = {
             },
             // Links - base styles (component adds target="_blank")
             a: {
-              color: 'hsl(var(--primary))',
+              color: 'hsl(var(--link))',
               textDecoration: 'none',
               '&:hover': {
                 textDecoration: 'underline',

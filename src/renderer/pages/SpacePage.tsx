@@ -417,7 +417,7 @@ export function SpacePage() {
       ) : (
         shouldShowHeader ? (
           <Header
-            className="bg-card backdrop-blur-sm border-b border-border/50"
+            className="bg-card backdrop-blur-sm border-b border-border/20"
             left={
               isMobile ? (
                 <button
@@ -497,7 +497,7 @@ export function SpacePage() {
                 className={`
                   flex min-h-0 flex-col min-w-0 relative
                   ${hasBrowserTab ? '' : 'transition-[border-color] duration-300 ease-out'}
-                  ${isCanvasOpen ? 'border-r border-border/60' : 'flex-1 border-r border-transparent'}
+                  ${isCanvasOpen ? 'border-r border-border/20' : 'flex-1 border-r border-transparent'}
                   ${isCanvasTransitioning ? 'pointer-events-none' : ''}
                 `}
                 style={{
@@ -528,8 +528,8 @@ export function SpacePage() {
                   <div
                     className={`
                       absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize z-20
-                      hover:bg-primary/50 transition-colors
-                      ${isDraggingChat ? 'bg-primary/50' : ''}
+                      hover:bg-muted-foreground/30 transition-colors
+                      ${isDraggingChat ? 'bg-muted-foreground/30' : ''}
                     `}
                     onMouseDown={handleChatDragStart}
                     title={t('Drag to resize')}

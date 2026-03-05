@@ -98,7 +98,7 @@ export function SpaceSelector({ iconOnly = false, disabled = false, onDisabledCl
             h-8 flex items-center gap-1.5 px-2.5 rounded-lg text-xs
             transition-all duration-200 border
             ${isOpen
-              ? 'bg-primary/15 text-primary border-primary/30'
+              ? 'bg-secondary text-foreground border-border'
               : 'text-muted-foreground border-border/60 hover:bg-muted hover:border-border hover:text-foreground'
             }
           `.trim().replace(/\s+/g, ' ')}
@@ -140,7 +140,7 @@ export function SpaceSelector({ iconOnly = false, disabled = false, onDisabledCl
                 <HaloLogo size={18} animated={false} />
                 <span className="flex-1 truncate">{t('SkillsFan')}</span>
                 {currentSpace?.id === haloSpace.id && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-foreground/60 flex-shrink-0" />
                 )}
               </button>
             )}
@@ -162,7 +162,7 @@ export function SpaceSelector({ iconOnly = false, disabled = false, onDisabledCl
                 <SpaceIcon iconId={space.icon} size={18} iconColor={space.iconColor} className="flex-shrink-0" />
                 <span className="flex-1 truncate">{space.name}</span>
                 {currentSpace?.id === space.id && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-foreground/60 flex-shrink-0" />
                 )}
               </button>
             ))}

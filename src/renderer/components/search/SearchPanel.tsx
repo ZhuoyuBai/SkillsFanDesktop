@@ -330,7 +330,7 @@ export function SearchPanel({ isOpen, onClose }: SearchPanelProps) {
               className={cn(
                 'px-4 py-2 border-b-2 text-sm transition-colors',
                 searchScope === s
-                  ? 'border-primary text-foreground'
+                  ? 'border-foreground text-foreground'
                   : 'border-transparent text-muted-foreground hover:text-foreground'
               )}
             >
@@ -349,7 +349,7 @@ export function SearchPanel({ isOpen, onClose }: SearchPanelProps) {
               </div>
               <div className="w-full bg-border rounded-full h-2 mb-4">
                 <div
-                  className="bg-primary h-2 rounded-full transition-all"
+                  className="bg-foreground/60 h-2 rounded-full transition-all"
                   style={{
                     width: `${progress.total ? (progress.current / progress.total) * 100 : 0}%`
                   }}
@@ -389,13 +389,13 @@ export function SearchPanel({ isOpen, onClose }: SearchPanelProps) {
                       </div>
                     </div>
                     {/* Role badge */}
-                    <span className="text-xs px-2 py-1 rounded bg-primary/10 text-primary flex-shrink-0">
+                    <span className="text-xs px-2 py-1 rounded bg-muted text-muted-foreground flex-shrink-0">
                       {result.messageRole === 'user' ? t('You') : 'AI'}
                     </span>
                   </div>
 
                   {/* Highlighted Context - showing where the match is */}
-                  <div className="text-sm text-foreground bg-muted/30 p-2 rounded mt-2 border-l-2 border-primary/50">
+                  <div className="text-sm text-foreground bg-muted/30 p-2 rounded mt-2 border-l-2 border-border">
                     <span className="text-muted-foreground">{result.contextBefore}</span>
                     <span className="bg-yellow-500/30 font-semibold px-0.5 py-0 rounded">{searchedQuery}</span>
                     <span className="text-muted-foreground">{result.contextAfter}</span>

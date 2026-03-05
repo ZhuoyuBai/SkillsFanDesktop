@@ -26,9 +26,11 @@ import {
   CheckCircle2,
   AlertCircle,
   FileJson,
+  Plus,
 } from 'lucide-react'
 import { useLoopTaskStore } from '../../../stores/loop-task.store'
 import { useSpaceStore } from '../../../stores/space.store'
+import { useAppStore } from '../../../stores/app.store'
 import { useToastStore } from '../../../stores/toast.store'
 import { api } from '../../../api'
 import { cn } from '../../../lib/utils'
@@ -64,6 +66,7 @@ export function Step1CreateTask(_props: Step1CreateTaskProps) {
     setWizardStep
   } = useLoopTaskStore()
   const { addToast } = useToastStore()
+  const { setView } = useAppStore()
 
   const {
     loggedInOAuthProviders,
@@ -572,12 +575,22 @@ export function Step1CreateTask(_props: Step1CreateTaskProps) {
                             )
                           })}
 
-                          {/* Empty state */}
-                          {loggedInOAuthProviders.length === 0 && configuredCustomProviders.length === 0 && (
-                            <div className="px-3 py-4 text-sm text-muted-foreground text-center">
-                              {t('Configure API')}
-                            </div>
+                          {/* Divider before add button */}
+                          {(loggedInOAuthProviders.length > 0 || configuredCustomProviders.length > 0) && (
+                            <div className="border-t border-border" />
                           )}
+
+                          {/* Add Model API - navigate to settings */}
+                          <button
+                            onClick={() => {
+                              setShowModelDropdown(false)
+                              setView('settings')
+                            }}
+                            className="w-full px-3 py-2.5 text-left hover:bg-muted/50 transition-colors flex items-center gap-2.5"
+                          >
+                            <Plus size={18} className="text-muted-foreground flex-shrink-0" />
+                            <span className="text-sm text-muted-foreground">{t('Custom Model')}</span>
+                          </button>
                         </div>
                       )}
                     </div>

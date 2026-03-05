@@ -12,6 +12,7 @@ import { useAppStore } from '../../stores/app.store'
 import { api } from '../../api'
 import {
   getCurrentModelName,
+  isSourceConfigured,
   type HaloConfig,
   type AISourceType,
   type OAuthSourceConfig
@@ -270,10 +271,10 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
 
   // Get current model display name
   const rawModelName = getCurrentModelName(config)
-  // If "No model", check if it's a known provider and show its name; otherwise "Add Model"
+  const isCurrentConfigured = isSourceConfigured(aiSources, currentSource)
   let currentModelName = rawModelName
-  if (rawModelName === 'No model') {
-    currentModelName = PROVIDER_NAMES[currentSource] || t('model.addModel')
+  if (!isCurrentConfigured || rawModelName === 'No model') {
+    currentModelName = t('model.addModel')
   }
 
   // Handle model selection for any provider
@@ -437,10 +438,12 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
     return sourcePublicModels[0].id
   })()
   const currentModelDisplayName = currentSourceConfig?.modelNames?.[currentModelId] || ''
-  const currentProviderLogo = currentProviderConfig?.logo ||
-    (currentProviderConfig?.apiUrl ? getProviderLogo(currentProviderConfig.apiUrl) : null) ||
-    (currentModelId ? getModelLogo(currentModelId, currentModelDisplayName, currentSource) : null) ||
-    getProviderLogoById(currentSource)
+  const currentProviderLogo = isCurrentConfigured
+    ? (currentProviderConfig?.logo ||
+       (currentProviderConfig?.apiUrl ? getProviderLogo(currentProviderConfig.apiUrl) : null) ||
+       (currentModelId ? getModelLogo(currentModelId, currentModelDisplayName, currentSource) : null) ||
+       getProviderLogoById(currentSource))
+    : null
 
   return (
     <div className="relative" ref={dropdownRef}>

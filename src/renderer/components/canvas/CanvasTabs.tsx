@@ -410,7 +410,7 @@ const TabItem = forwardRef<HTMLDivElement, TabItemProps>(function TabItem({
       {/* Status indicator / File icon */}
       <div className="canvas-tab-icon">
         {tab.isLoading ? (
-          <Loader2 className="w-4 h-4 animate-spin text-primary" />
+          <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
         ) : tab.error ? (
           <AlertCircle className="w-4 h-4 text-destructive" />
         ) : (

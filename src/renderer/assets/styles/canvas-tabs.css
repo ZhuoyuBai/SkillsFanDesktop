@@ -92,7 +92,7 @@
   left: 0;
   right: 0;
   height: 2px;
-  background: hsl(var(--primary));
+  background: hsl(var(--foreground));
   z-index: 2;
 }
 
@@ -206,7 +206,7 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: hsl(var(--primary));
+  background: hsl(var(--muted-foreground));
   flex-shrink: 0;
   margin-left: 2px;
 }
@@ -225,7 +225,7 @@
   top: 6px;
   bottom: 6px;
   width: 2px;
-  background: hsl(var(--primary));
+  background: hsl(var(--foreground));
   border-radius: 1px;
   z-index: 3;
 }
