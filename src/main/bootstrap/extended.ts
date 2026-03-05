@@ -35,6 +35,9 @@ import { registerRalphHandlers } from '../ipc/ralph'
 import { registerLoopTaskHandlers } from '../ipc/loop-task'
 import { registerMemoryHandlers } from '../ipc/memory'
 import { shutdownMemory } from '../services/memory'
+import { registerFeishuHandlers } from '../ipc/feishu'
+import { FeishuChannel } from '../services/channel/adapters/feishu.channel'
+import { getChannelManager } from '../services/channel'
 import { shutdownScheduler } from '../services/scheduler.service'
 import { recoverInterruptedTasks } from '../services/loop-task.service'
 import { cancelAllRetries } from '../services/retry-handler'
@@ -107,6 +110,14 @@ export function initializeExtendedServices(mainWindow: BrowserWindow): void {
   // Memory: Memory management (clear memory)
   registerMemoryHandlers()
 
+  // Feishu: Chat bot remote control (optional)
+  registerFeishuHandlers()
+  const feishuChannel = new FeishuChannel()
+  getChannelManager().registerChannel(feishuChannel)
+  feishuChannel.initialize().catch((err) => {
+    console.error('[Bootstrap] Feishu initialization failed:', err)
+  })
+
   // Skill: Initialize skill registry and start file watcher
   // Skills are loaded from 5 sources: project commands, SkillsFan, global commands, Claude skills, Agent skills
   initializeRegistry()
@@ -166,6 +177,14 @@ export function cleanupExtendedServices(): void {
 
   // Retry handler: Cancel all pending retry timers
   cancelAllRetries()
+
+  // Feishu: Disconnect bot
+  const feishuChannel = getChannelManager().getChannel<FeishuChannel>('feishu')
+  if (feishuChannel) {
+    feishuChannel.shutdown().catch((err) => {
+      console.error('[Bootstrap] Feishu shutdown error:', err)
+    })
+  }
 
   console.log('[Bootstrap] Extended services cleaned up')
 }

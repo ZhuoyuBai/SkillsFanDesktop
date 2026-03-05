@@ -154,6 +154,13 @@ export const api = {
   },
 
   // ===== Space =====
+  setActiveSpace: async (spaceId: string): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.skillsfan.setActiveSpace(spaceId)
+    }
+    return { success: true }
+  },
+
   getHaloSpace: async (): Promise<ApiResponse> => {
     if (isElectron()) {
       return window.skillsfan.getHaloSpace()
@@ -717,6 +724,48 @@ export const api = {
       return { success: false, error: 'Only available in desktop app' }
     }
     return window.skillsfan.regenerateRemotePassword()
+  },
+
+  // ===== Feishu Bot (Electron only) =====
+  feishuStatus: async (): Promise<ApiResponse> => {
+    if (!isElectron()) return { success: false, error: 'Only available in desktop app' }
+    return window.skillsfan.feishuStatus()
+  },
+  feishuTestConnection: async (appId: string, appSecret: string): Promise<ApiResponse> => {
+    if (!isElectron()) return { success: false, error: 'Only available in desktop app' }
+    return window.skillsfan.feishuTestConnection(appId, appSecret)
+  },
+  feishuSetCredentials: async (appId: string, appSecret: string): Promise<ApiResponse> => {
+    if (!isElectron()) return { success: false, error: 'Only available in desktop app' }
+    return window.skillsfan.feishuSetCredentials(appId, appSecret)
+  },
+  feishuEnable: async (): Promise<ApiResponse> => {
+    if (!isElectron()) return { success: false, error: 'Only available in desktop app' }
+    return window.skillsfan.feishuEnable()
+  },
+  feishuDisable: async (): Promise<ApiResponse> => {
+    if (!isElectron()) return { success: false, error: 'Only available in desktop app' }
+    return window.skillsfan.feishuDisable()
+  },
+  feishuRegeneratePairingCode: async (): Promise<ApiResponse> => {
+    if (!isElectron()) return { success: false, error: 'Only available in desktop app' }
+    return window.skillsfan.feishuRegeneratePairingCode()
+  },
+  feishuRevokeChat: async (chatId: string): Promise<ApiResponse> => {
+    if (!isElectron()) return { success: false, error: 'Only available in desktop app' }
+    return window.skillsfan.feishuRevokeChat(chatId)
+  },
+  feishuGetSessions: async (): Promise<ApiResponse> => {
+    if (!isElectron()) return { success: false, error: 'Only available in desktop app' }
+    return window.skillsfan.feishuGetSessions()
+  },
+  feishuSetGroupPolicy: async (policy: string): Promise<ApiResponse> => {
+    if (!isElectron()) return { success: false, error: 'Only available in desktop app' }
+    return window.skillsfan.feishuSetGroupPolicy(policy)
+  },
+  feishuSetDefaultSpace: async (spaceId: string | null): Promise<ApiResponse> => {
+    if (!isElectron()) return { success: false, error: 'Only available in desktop app' }
+    return window.skillsfan.feishuSetDefaultSpace(spaceId)
   },
 
   // ===== System Settings (Electron only) =====

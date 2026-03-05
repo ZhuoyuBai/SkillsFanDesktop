@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useAppStore } from '../stores/app.store'
 import { useSpaceStore } from '../stores/space.store'
 import { api } from '../api'
-import type { HaloConfig, ThemeMode, McpServersConfig, AISourceType, OAuthSourceConfig } from '../types'
+import type { HaloConfig, ThemeMode, McpServersConfig, AISourceType, OAuthSourceConfig, ApiProvider, CustomSourceConfig } from '../types'
 import { AVAILABLE_MODELS, DEFAULT_MODEL } from '../types'
 
 /**
@@ -31,6 +31,7 @@ import { SkillsFanAccountSection } from '../components/settings/SkillsFanAccount
 import { SpaceManagementSection } from '../components/settings/SpaceManagementSection'
 import { ResetSection } from '../components/settings/ResetSection'
 import { ScheduledTasksSection } from '../components/settings/ScheduledTasksSection'
+import { FeishuSettings } from '../components/settings/FeishuSettings'
 import { useTranslation, setLanguage, getCurrentLanguage, SUPPORTED_LOCALES, type LocaleCode } from '../i18n'
 import { Loader2, LogOut, Plus, Check, Globe, Key, MessageSquare, Bot, Palette, Server, Settings as SettingsIcon, Wifi, ExternalLink, X, Package, User, Layers, Lock, SlidersHorizontal, ChevronDown, Clock, type LucideIcon } from 'lucide-react'
 import { useToastStore } from '../stores/toast.store'
@@ -132,6 +133,70 @@ const PROVIDER_PRESETS: ProviderPreset[] = [
   }
 ]
 
+const OAUTH_PROVIDER_TO_PRESET: Record<string, string> = {
+  'glm': 'zhipu',
+  'minimax-oauth': 'minimax'
+}
+
+function normalizeProviderType(provider?: string, fallback: ApiProvider = 'anthropic'): ApiProvider {
+  if (provider === 'openai') return 'openai'
+  if (provider === 'anthropic') return 'anthropic'
+  return fallback
+}
+
+function resolveInitialSelectedProviderId(config?: HaloConfig): string {
+  const current = config?.aiSources?.current
+  if (current && current !== 'oauth' && PROVIDER_PRESETS.some(p => p.id === current)) {
+    return current
+  }
+
+  if (current && OAUTH_PROVIDER_TO_PRESET[current] && PROVIDER_PRESETS.some(p => p.id === OAUTH_PROVIDER_TO_PRESET[current])) {
+    return OAUTH_PROVIDER_TO_PRESET[current]
+  }
+
+  const currentApiUrl = config?.aiSources?.custom?.apiUrl || config?.api?.apiUrl || ''
+  const matchedPreset = PROVIDER_PRESETS.find(p => p.apiUrl && currentApiUrl.includes(p.apiUrl.replace('https://', '').split('/')[0]))
+  return matchedPreset?.id || PROVIDER_PRESETS[0].id
+}
+
+function resolveProviderFormValues(config: HaloConfig | undefined, providerId: string): {
+  provider: ApiProvider
+  apiKey: string
+  apiUrl: string
+  model: string
+} {
+  const preset = PROVIDER_PRESETS.find(p => p.id === providerId)
+  const savedConfig = config?.aiSources?.[providerId] as Partial<CustomSourceConfig> | undefined
+
+  if (savedConfig?.apiKey) {
+    const fallbackProvider = preset?.apiType === 'openai' ? 'openai' : 'anthropic'
+    return {
+      provider: normalizeProviderType(savedConfig.provider, fallbackProvider),
+      apiKey: savedConfig.apiKey || '',
+      apiUrl: savedConfig.apiUrl || preset?.apiUrl || '',
+      model: savedConfig.model || preset?.defaultModel || DEFAULT_MODEL
+    }
+  }
+
+  if (preset && !preset.isCustom) {
+    return {
+      provider: preset.apiType === 'openai' ? 'openai' : 'anthropic',
+      apiKey: '',
+      apiUrl: preset.apiUrl || '',
+      model: preset.defaultModel || DEFAULT_MODEL
+    }
+  }
+
+  const customConfig = config?.aiSources?.custom
+  const legacyApi = config?.api
+  return {
+    provider: normalizeProviderType(customConfig?.provider || legacyApi?.provider, 'anthropic'),
+    apiKey: customConfig?.apiKey || legacyApi?.apiKey || '',
+    apiUrl: customConfig?.apiUrl || legacyApi?.apiUrl || '',
+    model: customConfig?.model || legacyApi?.model || DEFAULT_MODEL
+  }
+}
+
 /**
  * Get localized text based on current language
  */
@@ -174,7 +239,7 @@ interface RemoteAccessStatus {
 }
 
 // Settings section type
-type SettingsSection = 'ai-model' | 'display' | 'mcp' | 'skills' | 'system' | 'remote' | 'account' | 'spaces' | 'advanced' | 'scheduled'
+type SettingsSection = 'ai-model' | 'display' | 'mcp' | 'skills' | 'system' | 'remote' | 'feishu' | 'account' | 'spaces' | 'advanced' | 'scheduled'
 
 export function SettingsPage() {
   const { t } = useTranslation()
@@ -198,8 +263,9 @@ export function SettingsPage() {
   const [currentSource, setCurrentSource] = useState<AISourceType>(config?.aiSources?.current || 'custom')
   const [showCustomApiForm, setShowCustomApiForm] = useState(false)
 
-  // Selected provider in the grid - always default to the first provider
-  const [selectedProviderId, setSelectedProviderId] = useState<string>(PROVIDER_PRESETS[0].id)
+  // Selected provider in the grid - initialize from current source/config
+  const [selectedProviderId, setSelectedProviderId] = useState<string>(() => resolveInitialSelectedProviderId(config))
+  const initialProviderFormValues = resolveProviderFormValues(config, selectedProviderId)
 
   // OAuth providers state (dynamic from product.json)
   const [authProviders, setAuthProviders] = useState<AuthProviderConfig[]>([])
@@ -212,15 +278,14 @@ export function SettingsPage() {
   const [loggingOutProvider, setLoggingOutProvider] = useState<string | null>(null)
 
   // Custom API local state for editing
-  const [apiKey, setApiKey] = useState(config?.aiSources?.custom?.apiKey || config?.api?.apiKey || '')
-  const [apiUrl, setApiUrl] = useState(config?.aiSources?.custom?.apiUrl || config?.api?.apiUrl || '')
-  const [provider, setProvider] = useState(config?.aiSources?.custom?.provider || config?.api?.provider || 'anthropic')
-  const [model, setModel] = useState(config?.aiSources?.custom?.model || config?.api?.model || DEFAULT_MODEL)
+  const [apiKey, setApiKey] = useState(initialProviderFormValues.apiKey)
+  const [apiUrl, setApiUrl] = useState(initialProviderFormValues.apiUrl)
+  const [provider, setProvider] = useState<ApiProvider>(initialProviderFormValues.provider)
+  const [model, setModel] = useState(initialProviderFormValues.model)
   const [theme, setTheme] = useState<ThemeMode>(config?.appearance?.theme || 'system')
   // Custom model toggle: enable by default if current model is not in preset list
   const [useCustomModel, setUseCustomModel] = useState(() => {
-    const currentModel = config?.aiSources?.custom?.model || config?.api?.model || DEFAULT_MODEL
-    return !AVAILABLE_MODELS.some(m => m.id === currentModel)
+    return !AVAILABLE_MODELS.some(m => m.id === initialProviderFormValues.model)
   })
 
   // Connection status
@@ -683,7 +748,7 @@ export function SettingsPage() {
       const storageKey = selectedProviderId
 
       const providerConfig = {
-        provider: provider as any,
+        provider,
         apiKey,
         apiUrl,
         model
@@ -727,6 +792,7 @@ export function SettingsPage() {
     { id: 'advanced', icon: SlidersHorizontal, label: t('Advanced'), desktopOnly: true },
     { id: 'mcp', icon: Server, label: t('MCP Servers'), hidden: true },
     { id: 'remote', icon: Wifi, label: t('Remote Access'), desktopOnly: true },
+    { id: 'feishu', icon: MessageSquare, label: t('Message Channels'), desktopOnly: true },
   ]
 
   return (
@@ -833,29 +899,12 @@ export function SettingsPage() {
                       type="button"
                       onClick={() => {
                         setSelectedProviderId(preset.id)
-                        // Load saved configuration for this provider if exists
-                        const savedConfig = config?.aiSources?.[preset.id] as { provider?: string; apiKey?: string; apiUrl?: string; model?: string } | undefined
-
-                        if (savedConfig?.apiKey) {
-                          // Provider has saved config - load it
-                          setApiKey(savedConfig.apiKey)
-                          setApiUrl(savedConfig.apiUrl || preset.apiUrl || '')
-                          setModel(savedConfig.model || preset.defaultModel || '')
-                          setProvider(savedConfig.provider as any || (preset.apiType === 'openai' ? 'openai' : 'anthropic'))
-                        } else if (!preset.isCustom) {
-                          // No saved config - use preset defaults
-                          setApiUrl(preset.apiUrl || '')
-                          setModel(preset.defaultModel || '')
-                          setProvider(preset.apiType === 'openai' ? 'openai' : 'anthropic')
-                          setApiKey('')  // Clear API key for new provider
-                        } else {
-                          // Custom provider - try legacy custom config or clear
-                          const customConfig = config?.aiSources?.custom
-                          setApiKey(customConfig?.apiKey || '')
-                          setApiUrl(customConfig?.apiUrl || '')
-                          setModel(customConfig?.model || '')
-                          setProvider(customConfig?.provider || 'anthropic')
-                        }
+                        const values = resolveProviderFormValues(config, preset.id)
+                        setApiKey(values.apiKey)
+                        setApiUrl(values.apiUrl)
+                        setModel(values.model)
+                        setProvider(values.provider)
+                        setUseCustomModel(!AVAILABLE_MODELS.some(m => m.id === values.model))
                       }}
                       className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
                         isSelected
@@ -1492,6 +1541,16 @@ export function SettingsPage() {
             <h2 className="text-lg font-medium mb-4">{t('Space Management')}</h2>
             <SpaceManagementSection />
           </section>
+          )}
+
+          {/* Message Channels Section */}
+          {activeSection === 'feishu' && !api.isRemoteMode() && (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                {t('Connect messaging platforms to control SkillsFan remotely via chat.')}
+              </p>
+              <FeishuSettings config={config as Record<string, unknown>} />
+            </div>
           )}
 
           {/* Remote Access Section */}

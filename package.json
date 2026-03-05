@@ -50,6 +50,7 @@
     "@anthropic-ai/sdk": "0.71.0",
     "@electron-toolkit/preload": "^3.0.0",
     "@electron-toolkit/utils": "^3.0.0",
+    "@larksuiteoapi/node-sdk": "^1.59.0",
     "@streamdown/cjk": "^1.0.2",
     "@streamdown/code": "^1.0.2",
     "@tailwindcss/typography": "^0.5.19",

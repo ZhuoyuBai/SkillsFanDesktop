@@ -8,7 +8,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import type { ConversationMeta } from '../../types'
 import type { LoopTaskMeta } from '../../../shared/types/loop-task'
 import { MessageSquare } from '../icons/ToolIcons'
-import { PanelLeftClose, PanelLeft, SquarePen, Zap, Check } from 'lucide-react'
+import { PanelLeftClose, PanelLeft, SquarePen, Zap } from 'lucide-react'
 import { SpaceSwitcher } from '../space/SpaceSwitcher'
 import { useTranslation } from '../../i18n'
 import { UserAvatarMenu } from './UserAvatarMenu'
@@ -78,10 +78,10 @@ function UnifiedTaskItem({
   const getLoopTaskStatus = () => {
     if (!task.loopTask) return null
     const { status, completedCount, storyCount } = task.loopTask
-    if (status === 'completed') return { icon: <Check className="w-3 h-3 text-green-500" />, text: null }
-    if (status === 'running') return { icon: null, text: `${completedCount}/${storyCount}` }
-    if (status === 'failed') return { icon: null, text: '!' }
-    if (storyCount > 0) return { icon: null, text: `${completedCount}/${storyCount}` }
+    if (status === 'completed') return { text: t('Completed') }
+    if (status === 'running') return { text: `${completedCount}/${storyCount}` }
+    if (status === 'failed') return { text: '!' }
+    if (storyCount > 0) return { text: `${completedCount}/${storyCount}` }
     return null
   }
 
@@ -132,13 +132,6 @@ function UnifiedTaskItem({
         </div>
       ) : (
         <div className="flex items-center gap-2 min-w-0">
-          {/* Type icon */}
-          {task.type === 'conversation' ? (
-            <MessageSquare className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-          ) : (
-            <Zap className="w-4 h-4 text-teal-400 flex-shrink-0" />
-          )}
-
           {/* Title */}
           <span className="text-sm truncate flex-1 min-w-0">
             {task.title}
@@ -147,7 +140,7 @@ function UnifiedTaskItem({
           {/* Loop task status */}
           {loopStatus && (
             <span className="text-xs text-muted-foreground flex-shrink-0">
-              {loopStatus.icon || loopStatus.text}
+              {loopStatus.text}
             </span>
           )}
 

@@ -120,7 +120,7 @@ function removeFromSpaceIndex(path: string): void {
 }
 
 const HALO_SPACE: Space = {
-  id: 'halo-temp',
+  id: 'skillsfan-temp',
   name: '技能范',
   icon: 'skillsfan',  // Uses SkillsFan brand logo
   path: '',
@@ -395,7 +395,7 @@ export function deleteSpace(spaceId: string): boolean {
 
 // Get a specific space by ID
 export function getSpace(spaceId: string): Space | null {
-  if (spaceId === 'halo-temp') {
+  if (spaceId === 'skillsfan-temp') {
     return getHaloSpace()
   }
 

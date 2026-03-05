@@ -272,6 +272,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   // Set current space (called when entering a space)
   setCurrentSpace: (spaceId: string) => {
     set({ currentSpaceId: spaceId })
+    // Notify main process so remote channels (Feishu) create conversations in the active space
+    api.setActiveSpace(spaceId).catch(() => {})
   },
 
   // Set fresh start flag (called after first space entry to disable auto-create)
@@ -1245,11 +1247,24 @@ export const useChatStore = create<ChatState>((set, get) => ({
           const newSpaceStates = new Map(state.spaceStates)
           const currentSpaceState = newSpaceStates.get(spaceId)
           if (currentSpaceState) {
+            const exists = currentSpaceState.conversations.some((c) => c.id === conversationId)
+            const nextConversations = exists
+              ? currentSpaceState.conversations.map((c) =>
+                  c.id === conversationId ? updatedMeta : c
+                )
+              : [updatedMeta, ...currentSpaceState.conversations]
+
             newSpaceStates.set(spaceId, {
               ...currentSpaceState,
-              conversations: currentSpaceState.conversations.map((c) =>
-                c.id === conversationId ? updatedMeta : c
-              )
+              conversations: nextConversations
+            })
+          } else {
+            // Space not yet loaded in renderer (e.g. Feishu conversation targeting a different space).
+            // Lazily create spaceState so the conversation appears when user switches to this space.
+            newSpaceStates.set(spaceId, {
+              conversations: [updatedMeta],
+              currentConversationId: null,
+              selectionType: 'conversation' as SelectionType
             })
           }
 

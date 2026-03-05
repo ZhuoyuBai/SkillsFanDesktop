@@ -16,7 +16,7 @@ import {
   listWorkspaceFiles,
   isExistingDirectory
 } from '../services/space.service'
-import { getSpacesDir } from '../services/config.service'
+import { getSpacesDir, setActiveSpaceId } from '../services/config.service'
 import { ipcHandle } from './utils'
 
 // Import types for preferences
@@ -30,6 +30,10 @@ interface SpacePreferences {
 }
 
 export function registerSpaceHandlers(): void {
+  ipcHandle('space:set-active', (_e, spaceId: string) => {
+    setActiveSpaceId(spaceId)
+  })
+
   ipcHandle('space:get-halo', () => getHaloSpace())
 
   ipcHandle('space:list', () => listSpaces())

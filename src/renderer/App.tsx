@@ -398,7 +398,7 @@ export default function App() {
 
           // Find the space object
           let targetSpace = null
-          if (spaceId === 'halo-temp' && haloSpace) {
+          if (spaceId === 'skillsfan-temp' && haloSpace) {
             targetSpace = haloSpace
           } else {
             targetSpace = spaces.find(s => s.id === spaceId)

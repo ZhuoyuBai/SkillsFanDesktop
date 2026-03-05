@@ -119,6 +119,16 @@ interface HaloConfig {
     enabled: boolean       // Master toggle, default true
     retentionDays: number  // 0 = forever, 7/30/180
   }
+  // Feishu bot integration (remote control via chat)
+  feishu?: {
+    enabled: boolean
+    appId: string
+    appSecret: string
+    pairingCode: string
+    allowedChatIds: string[]
+    defaultSpaceId?: string
+    groupPolicy: 'mention' | 'all' | 'disabled'
+  }
 }
 
 // MCP server configuration types
@@ -227,6 +237,18 @@ const DEFAULT_CONFIG: HaloConfig = {
     enabled: true,
     retentionDays: 0  // 0 = forever
   }
+}
+
+// Active space tracker (in-memory, not persisted)
+// Used by remote channels (Feishu) to create conversations in the user's current space
+let activeSpaceId: string = 'skillsfan-temp'
+
+export function setActiveSpaceId(spaceId: string): void {
+  activeSpaceId = spaceId
+}
+
+export function getActiveSpaceId(): string {
+  return activeSpaceId
 }
 
 const CONFIG_FILE_MODE = 0o600

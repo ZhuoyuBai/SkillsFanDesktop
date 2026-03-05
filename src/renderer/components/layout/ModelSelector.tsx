@@ -413,18 +413,18 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
   const currentSourceConfig = (aiSources as Record<string, any>)[currentSource]
   const currentModelId = currentSourceConfig?.model || ''
   const getPublicModelProviderType = (model: { owned_by: string }) => {
-    // Prefer custom API provider if user has configured an API key for this provider family
-    // e.g., if user configured 'zhipu' custom API key, route to 'zhipu' instead of 'glm' OAuth
-    const ownedBy = model.owned_by
-    const customConfig = (aiSources as Record<string, any>)[ownedBy]
-    if (customConfig && typeof customConfig === 'object' && 'apiKey' in customConfig && customConfig.apiKey) {
-      return ownedBy
-    }
-
+    // Public model list belongs to built-in providers.
+    // Keep routing stable to built-in provider types to avoid silently
+    // switching to similarly named custom API providers (e.g. glm-5 -> zhipu).
     const mappedProvider = OWNED_BY_TO_PROVIDER[model.owned_by]
-    return mappedProvider ||
-      allOAuthProviders.find(p => p.type === model.owned_by)?.type ||
-      'skillsfan-credits'
+    if (mappedProvider) return mappedProvider
+
+    // Fallback: if backend returns provider type directly, use it.
+    const oauthProvider = allOAuthProviders.find(p => p.type === model.owned_by)?.type
+    if (oauthProvider) return oauthProvider
+
+    // Last fallback for legacy/unknown providers.
+    return 'skillsfan-credits'
   }
   const effectiveCurrentModelId = (() => {
     if (currentModelId) return currentModelId

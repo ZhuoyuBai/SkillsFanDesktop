@@ -182,7 +182,7 @@ export function SearchPanel({ isOpen, onClose }: SearchPanelProps) {
 
         // Find the space object
         let targetSpace = null
-        if (result.spaceId === 'halo-temp' && haloSpace) {
+        if (result.spaceId === 'skillsfan-temp' && haloSpace) {
           targetSpace = haloSpace
         } else {
           targetSpace = spaces.find(s => s.id === result.spaceId)

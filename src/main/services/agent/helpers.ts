@@ -135,7 +135,7 @@ export function getWorkingDir(spaceId: string): string {
     return getTempSpacePath()
   }
 
-  if (spaceId === 'halo-temp') {
+  if (spaceId === 'skillsfan-temp') {
     const artifactsDir = join(getTempSpacePath(), 'artifacts')
     if (!existsSync(artifactsDir)) {
       mkdirSync(artifactsDir, { recursive: true })

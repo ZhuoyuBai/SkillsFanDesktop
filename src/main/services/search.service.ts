@@ -142,10 +142,10 @@ export class SearchService {
       const searchRegex = new RegExp(query, 'gi')
 
       // Get space name
-      let spaceName = data.spaceId === 'halo-temp' ? 'Halo' : data.spaceId
+      let spaceName = data.spaceId === 'skillsfan-temp' ? 'Halo' : data.spaceId
 
       try {
-        if (data.spaceId !== 'halo-temp') {
+        if (data.spaceId !== 'skillsfan-temp') {
           const space = getSpace(data.spaceId)
           if (space) {
             spaceName = space.name
@@ -219,7 +219,7 @@ export class SearchService {
 
     if (scope === 'space' && spaceId) {
       // Search all conversations in a space
-      if (spaceId === 'halo-temp') {
+      if (spaceId === 'skillsfan-temp') {
         const tempPath = getTempSpacePath()
         return this.scanConversationFiles(join(tempPath, 'conversations'))
       } else {
@@ -299,7 +299,7 @@ export class SearchService {
 
     // If spaceId is provided, search in that space first
     if (spaceId) {
-      if (spaceId === 'halo-temp') {
+      if (spaceId === 'skillsfan-temp') {
         const tempPath = getTempSpacePath()
         const filePath = join(tempPath, 'conversations', `${conversationId}.json`)
         if (existsSync(filePath)) {

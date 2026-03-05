@@ -28,7 +28,7 @@ describe('Space Service', () => {
     it('should return the Halo temp space', () => {
       const haloSpace = getHaloSpace()
 
-      expect(haloSpace.id).toBe('halo-temp')
+      expect(haloSpace.id).toBe('skillsfan-temp')
       expect(haloSpace.name).toBe('技能范')
       expect(haloSpace.isTemp).toBe(true)
       expect(haloSpace.icon).toBe('skillsfan')
@@ -145,11 +145,11 @@ describe('Space Service', () => {
       expect(space).toBeFalsy() // null or undefined
     })
 
-    it('should return Halo space for halo-temp id', () => {
-      const space = getSpace('halo-temp')
+    it('should return Halo space for skillsfan-temp id', () => {
+      const space = getSpace('skillsfan-temp')
 
       expect(space).toBeDefined()
-      expect(space?.id).toBe('halo-temp')
+      expect(space?.id).toBe('skillsfan-temp')
       expect(space?.isTemp).toBe(true)
     })
   })
@@ -173,7 +173,7 @@ describe('Space Service', () => {
     it('should not allow deleting Halo temp space', async () => {
       // deleteSpace may return false or throw for temp space
       try {
-        const result = await deleteSpace('halo-temp')
+        const result = await deleteSpace('skillsfan-temp')
         // If it returns without throwing, result should be false
         expect(result).toBeFalsy()
       } catch {

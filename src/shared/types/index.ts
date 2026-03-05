@@ -13,3 +13,6 @@ export * from './loop-task'
 
 // Channel types (Message Normalization Layer)
 export * from './channel'
+
+// Feishu types
+export * from './feishu'

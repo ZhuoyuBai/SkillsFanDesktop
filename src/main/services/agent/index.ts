@@ -92,7 +92,7 @@ export {
 // during the transition period
 
 export { createCanUseTool } from './permission-handler'
-export { getWorkingDir, getApiCredentials, sendToRenderer } from './helpers'
+export { getWorkingDir, getApiCredentials, sendToRenderer, getMainWindow } from './helpers'
 export { parseSDKMessage, buildMessageContent, formatCanvasContext } from './message-utils'
 export { getOrCreateV2Session, getV2Session, activeSessions, v2Sessions } from './session-manager'
 export { broadcastMcpStatus } from './mcp-manager'

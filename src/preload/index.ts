@@ -27,6 +27,7 @@ export interface SkillsFanAPI {
   clearMemory: (scope: 'space' | 'all', spaceId?: string) => Promise<IpcResponse>
 
   // Space
+  setActiveSpace: (spaceId: string) => Promise<IpcResponse>
   getHaloSpace: () => Promise<IpcResponse>
   listSpaces: () => Promise<IpcResponse>
   createSpace: (input: { name: string; icon: string; customPath?: string }) => Promise<IpcResponse>
@@ -195,6 +196,18 @@ export interface SkillsFanAPI {
   setRemotePassword: (password: string) => Promise<IpcResponse>
   regenerateRemotePassword: () => Promise<IpcResponse>
   onRemoteStatusChange: (callback: (data: unknown) => void) => () => void
+
+  // Feishu Bot
+  feishuStatus: () => Promise<IpcResponse>
+  feishuTestConnection: (appId: string, appSecret: string) => Promise<IpcResponse>
+  feishuSetCredentials: (appId: string, appSecret: string) => Promise<IpcResponse>
+  feishuEnable: () => Promise<IpcResponse>
+  feishuDisable: () => Promise<IpcResponse>
+  feishuRegeneratePairingCode: () => Promise<IpcResponse>
+  feishuRevokeChat: (chatId: string) => Promise<IpcResponse>
+  feishuGetSessions: () => Promise<IpcResponse>
+  feishuSetGroupPolicy: (policy: string) => Promise<IpcResponse>
+  feishuSetDefaultSpace: (spaceId: string | null) => Promise<IpcResponse>
 
   // System Settings
   getAutoLaunch: () => Promise<IpcResponse>
@@ -472,6 +485,7 @@ const api: SkillsFanAPI = {
     ipcRenderer.invoke('memory:clear', scope, spaceId),
 
   // Space
+  setActiveSpace: (spaceId) => ipcRenderer.invoke('space:set-active', spaceId),
   getHaloSpace: () => ipcRenderer.invoke('space:get-halo'),
   listSpaces: () => ipcRenderer.invoke('space:list'),
   createSpace: (input) => ipcRenderer.invoke('space:create', input),
@@ -568,6 +582,18 @@ const api: SkillsFanAPI = {
   setRemotePassword: (password) => ipcRenderer.invoke('remote:set-password', password),
   regenerateRemotePassword: () => ipcRenderer.invoke('remote:regenerate-password'),
   onRemoteStatusChange: (callback) => createEventListener('remote:status-change', callback),
+
+  // Feishu Bot
+  feishuStatus: () => ipcRenderer.invoke('feishu:status'),
+  feishuTestConnection: (appId, appSecret) => ipcRenderer.invoke('feishu:test-connection', appId, appSecret),
+  feishuSetCredentials: (appId, appSecret) => ipcRenderer.invoke('feishu:set-credentials', appId, appSecret),
+  feishuEnable: () => ipcRenderer.invoke('feishu:enable'),
+  feishuDisable: () => ipcRenderer.invoke('feishu:disable'),
+  feishuRegeneratePairingCode: () => ipcRenderer.invoke('feishu:regenerate-pairing-code'),
+  feishuRevokeChat: (chatId) => ipcRenderer.invoke('feishu:revoke-chat', chatId),
+  feishuGetSessions: () => ipcRenderer.invoke('feishu:get-sessions'),
+  feishuSetGroupPolicy: (policy) => ipcRenderer.invoke('feishu:set-group-policy', policy),
+  feishuSetDefaultSpace: (spaceId) => ipcRenderer.invoke('feishu:set-default-space', spaceId),
 
   // System Settings
   getAutoLaunch: () => ipcRenderer.invoke('system:get-auto-launch'),
