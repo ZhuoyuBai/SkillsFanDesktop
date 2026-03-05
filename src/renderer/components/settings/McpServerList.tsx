@@ -5,6 +5,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react'
+import { Select } from '../ui/Select'
 import {
   Server,
   Plus,
@@ -383,10 +384,9 @@ function ServerItem({
                   <label className="block text-sm font-medium text-muted-foreground mb-1">
                     {t('Type')}
                   </label>
-                  <select
+                  <Select
                     value={serverType}
-                    onChange={e => {
-                      const newType = e.target.value as 'stdio' | 'http' | 'sse'
+                    onChange={(newType) => {
                       let newConfig: McpServerConfig
                       if (newType === 'stdio') {
                         newConfig = { type: 'stdio', command: '' }
@@ -399,12 +399,12 @@ function ServerItem({
                       setHasChanges(true)
                       setJsonText(JSON.stringify(newConfig, null, 2))
                     }}
-                    className="w-full px-3 py-2 border border-border rounded-lg bg-input text-foreground focus:ring-0 focus:border-primary/50 transition-colors"
-                  >
-                    <option value="stdio">{t('Command line (stdio)')}</option>
-                    <option value="http">HTTP</option>
-                    <option value="sse">SSE (Server-Sent Events)</option>
-                  </select>
+                    options={[
+                      { value: 'stdio', label: t('Command line (stdio)') },
+                      { value: 'http', label: 'HTTP' },
+                      { value: 'sse', label: 'SSE (Server-Sent Events)' }
+                    ]}
+                  />
                 </div>
 
                 {/* Type-specific fields */}
@@ -685,15 +685,15 @@ function AddServerDialog({
               <label className="block text-sm font-medium text-muted-foreground mb-1">
                 {t('Type')}
               </label>
-              <select
+              <Select
                 value={serverType}
-                onChange={e => setServerType(e.target.value as 'stdio' | 'http' | 'sse')}
-                className="w-full px-3 py-2 border border-border rounded-lg bg-input text-foreground focus:ring-0 focus:border-primary/50 transition-colors"
-              >
-                <option value="stdio">{t('Command line (stdio)')}</option>
-                <option value="http">HTTP</option>
-                <option value="sse">SSE (Server-Sent Events)</option>
-              </select>
+                onChange={(v) => setServerType(v as 'stdio' | 'http' | 'sse')}
+                options={[
+                  { value: 'stdio', label: t('Command line (stdio)') },
+                  { value: 'http', label: 'HTTP' },
+                  { value: 'sse', label: 'SSE (Server-Sent Events)' }
+                ]}
+              />
             </div>
 
             {/* Type-specific fields */}

@@ -11,6 +11,7 @@ import { api } from '../../api'
 import { Globe, ChevronDown, ArrowLeft, Eye, EyeOff, Settings, ExternalLink } from 'lucide-react'
 import { AVAILABLE_MODELS, DEFAULT_MODEL } from '../../types'
 import { useTranslation, setLanguage, getCurrentLanguage, SUPPORTED_LOCALES, type LocaleCode } from '../../i18n'
+import { Select } from '../ui/Select'
 
 // Import provider logos
 import zhipuLogo from '../../assets/providers/zhipu.jpg'
@@ -376,17 +377,11 @@ export function ApiSetup({ onBack, showBack = false, initialProviderId }: ApiSet
                       className="w-full px-4 py-2 bg-input rounded-lg border border-border focus:border-primary focus:outline-none transition-colors"
                     />
                   ) : (
-                    <select
+                    <Select
                       value={model}
-                      onChange={(e) => setModel(e.target.value)}
-                      className="w-full px-4 py-2 bg-input rounded-lg border border-border focus:border-primary focus:outline-none transition-colors"
-                    >
-                      {AVAILABLE_MODELS.map((m) => (
-                        <option key={m.id} value={m.id}>
-                          {m.name}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={setModel}
+                      options={AVAILABLE_MODELS.map((m) => ({ value: m.id, label: m.name }))}
+                    />
                   )}
                   <div className="mt-1 flex items-center justify-between gap-4">
                     <span className="text-xs text-muted-foreground">

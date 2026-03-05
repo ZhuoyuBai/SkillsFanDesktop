@@ -12,7 +12,7 @@ export function buildThinkingCard(): Record<string, unknown> {
   return {
     config: { wide_screen_mode: true },
     header: {
-      title: { tag: 'plain_text', content: 'Agent' },
+      title: { tag: 'plain_text', content: '任务状态' },
       template: 'blue'
     },
     elements: [
@@ -119,7 +119,7 @@ export function buildUserQuestionCard(
   return {
     config: { wide_screen_mode: true },
     header: {
-      title: { tag: 'plain_text', content: 'Agent 提问' },
+      title: { tag: 'plain_text', content: '任务提问' },
       template: 'purple'
     },
     elements: [
@@ -153,7 +153,7 @@ export function buildCompleteCard(): Record<string, unknown> {
   return {
     config: { wide_screen_mode: true },
     header: {
-      title: { tag: 'plain_text', content: 'Agent' },
+      title: { tag: 'plain_text', content: '任务状态' },
       template: 'green'
     },
     elements: [
@@ -172,7 +172,7 @@ export function buildFailedCard(): Record<string, unknown> {
   return {
     config: { wide_screen_mode: true },
     header: {
-      title: { tag: 'plain_text', content: 'Agent' },
+      title: { tag: 'plain_text', content: '任务状态' },
       template: 'red'
     },
     elements: [

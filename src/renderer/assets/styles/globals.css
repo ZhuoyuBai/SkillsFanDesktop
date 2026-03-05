@@ -803,7 +803,8 @@ body {
 }
 
 .message-assistant {
-  background: transparent;
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
 }
 
 /* Streaming message style */

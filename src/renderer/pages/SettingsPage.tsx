@@ -8,6 +8,7 @@ import { useSpaceStore } from '../stores/space.store'
 import { api } from '../api'
 import type { HaloConfig, ThemeMode, McpServersConfig, AISourceType, OAuthSourceConfig, ApiProvider, CustomSourceConfig } from '../types'
 import { AVAILABLE_MODELS, DEFAULT_MODEL } from '../types'
+import { Select } from '../components/ui/Select'
 
 /**
  * Localized text - either a simple string or object with language codes
@@ -33,7 +34,7 @@ import { ResetSection } from '../components/settings/ResetSection'
 import { ScheduledTasksSection } from '../components/settings/ScheduledTasksSection'
 import { FeishuSettings } from '../components/settings/FeishuSettings'
 import { useTranslation, setLanguage, getCurrentLanguage, SUPPORTED_LOCALES, type LocaleCode } from '../i18n'
-import { Loader2, LogOut, Plus, Check, Globe, Key, MessageSquare, Bot, Palette, Server, Settings as SettingsIcon, Wifi, ExternalLink, X, Package, User, Layers, Lock, SlidersHorizontal, ChevronDown, Clock, type LucideIcon } from 'lucide-react'
+import { Loader2, LogOut, Plus, Check, Globe, Key, MessageSquare, Bot, Palette, Server, Settings as SettingsIcon, Wifi, ExternalLink, X, Package, User, Layers, Lock, SlidersHorizontal, Clock, type LucideIcon } from 'lucide-react'
 import { useToastStore } from '../stores/toast.store'
 import type { SkillsFanAuthState } from '../../shared/types/skillsfan'
 
@@ -786,13 +787,13 @@ export function SettingsPage() {
     { id: 'ai-model', icon: Bot, label: t('AI Model') },
     { id: 'skills', icon: Package, label: t('Skills') },
     { id: 'spaces', icon: Layers, label: t('Spaces'), desktopOnly: true },
-    { id: 'display', icon: Palette, label: t('Display & Language') },
     { id: 'system', icon: SettingsIcon, label: t('System'), desktopOnly: true },
-    { id: 'scheduled', icon: Clock, label: t('Scheduled Tasks'), desktopOnly: true },
     { id: 'advanced', icon: SlidersHorizontal, label: t('Advanced'), desktopOnly: true },
     { id: 'mcp', icon: Server, label: t('MCP Servers'), hidden: true },
-    { id: 'remote', icon: Wifi, label: t('Remote Access'), desktopOnly: true },
+    { id: 'display', icon: Palette, label: t('Display & Language') },
     { id: 'feishu', icon: MessageSquare, label: t('Message Channels'), desktopOnly: true },
+    { id: 'scheduled', icon: Clock, label: t('Scheduled Tasks'), desktopOnly: true },
+    { id: 'remote', icon: Wifi, label: t('Remote Access'), desktopOnly: true },
   ]
 
   return (
@@ -1035,18 +1036,11 @@ export function SettingsPage() {
                             className="w-full px-3 py-2 text-sm bg-input rounded-lg border border-border focus:outline-none transition-colors"
                           />
                         ) : (
-                          <div className="relative">
-                            <select
-                              value={model}
-                              onChange={(e) => setModel(e.target.value)}
-                              className="appearance-none w-full px-3 pr-8 py-2 text-sm bg-input rounded-lg border border-border focus:outline-none transition-colors cursor-pointer"
-                            >
-                              {AVAILABLE_MODELS.map((m) => (
-                                <option key={m.id} value={m.id}>{m.name}</option>
-                              ))}
-                            </select>
-                            <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
-                          </div>
+                          <Select
+                            value={model}
+                            onChange={setModel}
+                            options={AVAILABLE_MODELS.map((m) => ({ value: m.id, label: m.name }))}
+                          />
                         )}
                         <div className="mt-1 flex items-center justify-between gap-4">
                           <span className="text-xs text-muted-foreground">
@@ -1143,20 +1137,14 @@ export function SettingsPage() {
               {/* Language */}
               <div className="pt-4 border-t border-border">
                 <label className="block text-sm text-muted-foreground mb-2">{t('Language')}</label>
-                <div className="relative">
-                  <select
-                    value={getCurrentLanguage()}
-                    onChange={(e) => setLanguage(e.target.value as LocaleCode)}
-                    className="appearance-none w-full px-4 pr-8 py-2 bg-input rounded-lg border border-border focus:outline-none transition-colors cursor-pointer"
-                  >
-                    {Object.entries(SUPPORTED_LOCALES).map(([code, name]) => (
-                      <option key={code} value={code}>
-                        {name}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
-                </div>
+                <Select
+                  value={getCurrentLanguage()}
+                  onChange={(v) => setLanguage(v as LocaleCode)}
+                  options={Object.entries(SUPPORTED_LOCALES).map(([code, name]) => ({
+                    value: code,
+                    label: name
+                  }))}
+                />
               </div>
             </div>
           </section>
@@ -1310,27 +1298,24 @@ export function SettingsPage() {
                       {t('Controls depth of reasoning. Higher effort uses more tokens but produces better results for complex tasks.')}
                     </p>
                   </div>
-                  <div className="relative">
-                    <select
-                      value={config?.thinkingEffort ?? 'off'}
-                      onChange={async (e) => {
-                        const effort = e.target.value as 'off' | 'low' | 'medium' | 'high'
-                        try {
-                          await api.setConfig({ thinkingEffort: effort })
-                          setConfig({ ...config!, thinkingEffort: effort } as HaloConfig)
-                        } catch (error) {
-                          console.error('[Settings] Failed to update thinking effort:', error)
-                        }
-                      }}
-                      className="appearance-none px-3 pr-8 py-1.5 bg-input rounded-lg border border-border focus:outline-none transition-colors cursor-pointer"
-                    >
-                      <option value="off">{t('Off')}</option>
-                      <option value="low">{t('Low')}</option>
-                      <option value="medium">{t('Medium')}</option>
-                      <option value="high">{t('High')}</option>
-                    </select>
-                    <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
-                  </div>
+                  <Select
+                    variant="compact"
+                    value={config?.thinkingEffort ?? 'off'}
+                    onChange={async (effort) => {
+                      try {
+                        await api.setConfig({ thinkingEffort: effort as 'off' | 'low' | 'medium' | 'high' })
+                        setConfig({ ...config!, thinkingEffort: effort as 'off' | 'low' | 'medium' | 'high' } as HaloConfig)
+                      } catch (error) {
+                        console.error('[Settings] Failed to update thinking effort:', error)
+                      }
+                    }}
+                    options={[
+                      { value: 'off', label: t('Off') },
+                      { value: 'low', label: t('Low') },
+                      { value: 'medium', label: t('Medium') },
+                      { value: 'high', label: t('High') }
+                    ]}
+                  />
                 </div>
 
                 {/* Cross-conversation Memory Toggle */}
@@ -1367,19 +1352,17 @@ export function SettingsPage() {
                         {t('How far back AI can recall conversations')}
                       </p>
                     </div>
-                    <div className="relative">
-                      <select
-                        value={config?.memory?.retentionDays ?? 0}
-                        onChange={(e) => handleRetentionChange(Number(e.target.value))}
-                        className="appearance-none px-3 pr-8 py-1.5 bg-input rounded-lg border border-border focus:outline-none transition-colors cursor-pointer"
-                      >
-                        <option value={7}>{t('7 days')}</option>
-                        <option value={30}>{t('30 days')}</option>
-                        <option value={180}>{t('180 days')}</option>
-                        <option value={0}>{t('Forever')}</option>
-                      </select>
-                      <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
-                    </div>
+                    <Select<number>
+                      variant="compact"
+                      value={config?.memory?.retentionDays ?? 0}
+                      onChange={handleRetentionChange}
+                      options={[
+                        { value: 7, label: t('7 days') },
+                        { value: 30, label: t('30 days') },
+                        { value: 180, label: t('180 days') },
+                        { value: 0, label: t('Forever') }
+                      ]}
+                    />
                   </div>
                 </div>
 

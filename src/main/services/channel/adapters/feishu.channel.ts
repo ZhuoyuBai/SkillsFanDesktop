@@ -373,6 +373,29 @@ export class FeishuChannel implements Channel {
     await this.botService.sendCard(event.chatId, buildPairingPromptCard())
   }
 
+  private t(key: string, params?: Record<string, string | number | boolean>): string {
+    const locale = this.getLocaleTag()
+    const translations: Record<string, Record<'zh-CN' | 'zh-TW' | 'en', string>> = {
+      'status.bot': { 'zh-CN': '机器人', 'zh-TW': '機器人', en: 'Bot' },
+      'status.connected': { 'zh-CN': '已连接', 'zh-TW': '已連線', en: 'Connected' },
+      'status.activeSessions': { 'zh-CN': '活跃会话', 'zh-TW': '活躍對話', en: 'Active sessions' },
+      'stop.done': { 'zh-CN': '已停止执行。', 'zh-TW': '已停止執行。', en: 'Agent execution stopped.' },
+      'new.created': { 'zh-CN': '已创建新对话：{id}', 'zh-TW': '已建立新對話：{id}', en: 'New conversation created: {id}' },
+      'commands.help': {
+        'zh-CN': '可用命令：/status, /stop, /new',
+        'zh-TW': '可用指令：/status, /stop, /new',
+        en: 'Available commands: /status, /stop, /new'
+      }
+    }
+    let text = translations[key]?.[locale] ?? translations[key]?.en ?? key
+    if (params) {
+      for (const [k, v] of Object.entries(params)) {
+        text = text.replace(`{${k}}`, String(v))
+      }
+    }
+    return text
+  }
+
   private async handleCommand(text: string, chatId: string): Promise<void> {
     const [command, ...args] = text.split(' ')
 
@@ -380,9 +403,9 @@ export class FeishuChannel implements Channel {
       case '/status': {
         const status = this.botService.getStatus()
         await this.botService.sendText(chatId,
-          `Bot: ${status.botName || 'unknown'}\n` +
-          `Connected: ${status.connected}\n` +
-          `Active sessions: ${this.sessionRouter.getSessionCount()}`
+          `${this.t('status.bot')}: ${status.botName || 'unknown'}\n` +
+          `${this.t('status.connected')}: ${status.connected}\n` +
+          `${this.t('status.activeSessions')}: ${this.sessionRouter.getSessionCount()}`
         )
         break
       }
@@ -392,7 +415,7 @@ export class FeishuChannel implements Channel {
           // Import dynamically to avoid circular deps
           const { stopGeneration } = await import('../../agent')
           stopGeneration(session.conversationId)
-          await this.botService.sendText(chatId, 'Agent execution stopped.')
+          await this.botService.sendText(chatId, this.t('stop.done'))
         }
         break
       }
@@ -403,12 +426,12 @@ export class FeishuChannel implements Channel {
           const conv = createConversation(session.spaceId, title)
           session.conversationId = conv.id
           this.sessionRouter.setSession(session)
-          await this.botService.sendText(chatId, `New conversation created: ${conv.id.slice(0, 8)}`)
+          await this.botService.sendText(chatId, this.t('new.created', { id: conv.id.slice(0, 8) }))
         }
         break
       }
       default:
-        await this.botService.sendText(chatId, 'Available commands: /status, /stop, /new')
+        await this.botService.sendText(chatId, this.t('commands.help'))
     }
   }
 
@@ -544,7 +567,7 @@ export class FeishuChannel implements Channel {
             buildToolApprovalCard(toolName, toolInput, convId, toolCallId)
           )
         } else {
-          await this.botService.sendText(chatId, `🔧 Using tool: ${toolName}`)
+          await this.botService.sendText(chatId, `🔧 调用工具: ${toolName}`)
         }
         break
       }

@@ -12,6 +12,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Select } from '../../ui/Select'
 import {
   Plus,
   ChevronLeft,
@@ -390,15 +391,14 @@ export function Step2PlanEdit({ spaceId, onCancel }: Step2PlanEditProps) {
                       {(editingTask?.stepRetryConfig?.onFailure ?? 'retry') === 'retry' && (
                         <div className="flex items-center gap-2">
                           <span className="text-xs text-muted-foreground">{t('Max retries per step')}</span>
-                          <select
+                          <Select<number>
+                            variant="mini"
                             value={editingTask?.stepRetryConfig?.maxRetries ?? 3}
-                            onChange={(e) => updateEditing({
-                              stepRetryConfig: { onFailure: 'retry', maxRetries: parseInt(e.target.value) }
+                            onChange={(v) => updateEditing({
+                              stepRetryConfig: { onFailure: 'retry', maxRetries: v }
                             })}
-                            className="w-14 px-1.5 py-1 bg-input border border-border rounded text-foreground text-sm text-center focus:outline-none focus:ring-0 focus:border-primary/50"
-                          >
-                            {[1, 2, 3, 5, 10].map(n => <option key={n} value={n}>{n}</option>)}
-                          </select>
+                            options={[1, 2, 3, 5, 10].map(n => ({ value: n, label: String(n) }))}
+                          />
                           <span className="text-xs text-muted-foreground">{t('times')}</span>
                         </div>
                       )}
@@ -431,15 +431,14 @@ export function Step2PlanEdit({ spaceId, onCancel }: Step2PlanEditProps) {
                       {editingTask?.loopConfig?.enabled && (
                         <div className="flex items-center gap-2">
                           <span className="text-xs text-muted-foreground">{t('Number of loops')}</span>
-                          <select
+                          <Select<number>
+                            variant="mini"
                             value={editingTask?.loopConfig?.maxLoops ?? 3}
-                            onChange={(e) => updateEditing({
-                              loopConfig: { enabled: true, maxLoops: parseInt(e.target.value) }
+                            onChange={(v) => updateEditing({
+                              loopConfig: { enabled: true, maxLoops: v }
                             })}
-                            className="w-14 px-1.5 py-1 bg-input border border-border rounded text-foreground text-sm text-center focus:outline-none focus:ring-0 focus:border-primary/50"
-                          >
-                            {[2, 3, 5, 10, 20, 50, 100].map(n => <option key={n} value={n}>{n}</option>)}
-                          </select>
+                            options={[2, 3, 5, 10, 20, 50, 100].map(n => ({ value: n, label: String(n) }))}
+                          />
                           <span className="text-xs text-muted-foreground">{t('times')}</span>
                         </div>
                       )}

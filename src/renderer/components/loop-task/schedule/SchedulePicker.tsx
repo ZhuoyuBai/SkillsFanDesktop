@@ -13,6 +13,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Calendar, Timer } from 'lucide-react'
 import { cn } from '../../../lib/utils'
+import { Select } from '../../ui/Select'
 import {
   DAY_KEYS,
   ALL_DAYS,
@@ -94,25 +95,27 @@ export function SchedulePicker({ schedule, onChange }: SchedulePickerProps) {
               <div>
                 <label className="text-xs text-muted-foreground mb-1.5 block">{t('Run time')}</label>
                 <div className="flex items-center gap-1.5">
-                  <select
+                  <Select<number>
+                    variant="mini"
                     value={state.hour}
-                    onChange={(e) => emitChange({ ...state, hour: Number(e.target.value) })}
-                    className="px-2 py-1.5 bg-input border border-border rounded-md text-foreground text-sm focus:outline-none focus:ring-0 focus:border-primary/50 tabular-nums"
-                  >
-                    {Array.from({ length: 24 }, (_, i) => (
-                      <option key={i} value={i}>{String(i).padStart(2, '0')}</option>
-                    ))}
-                  </select>
+                    onChange={(v) => emitChange({ ...state, hour: v })}
+                    options={Array.from({ length: 24 }, (_, i) => ({
+                      value: i,
+                      label: String(i).padStart(2, '0')
+                    }))}
+                    className="tabular-nums"
+                  />
                   <span className="text-muted-foreground font-medium">:</span>
-                  <select
+                  <Select<number>
+                    variant="mini"
                     value={state.minute}
-                    onChange={(e) => emitChange({ ...state, minute: Number(e.target.value) })}
-                    className="px-2 py-1.5 bg-input border border-border rounded-md text-foreground text-sm focus:outline-none focus:ring-0 focus:border-primary/50 tabular-nums"
-                  >
-                    {Array.from({ length: 12 }, (_, i) => i * 5).map(m => (
-                      <option key={m} value={m}>{String(m).padStart(2, '0')}</option>
-                    ))}
-                  </select>
+                    onChange={(v) => emitChange({ ...state, minute: v })}
+                    options={Array.from({ length: 12 }, (_, i) => i * 5).map(m => ({
+                      value: m,
+                      label: String(m).padStart(2, '0')
+                    }))}
+                    className="tabular-nums"
+                  />
                 </div>
               </div>
 
