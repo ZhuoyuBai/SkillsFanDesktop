@@ -196,7 +196,7 @@ export function InputArea({ onSend, onStop, onInject, isGenerating, isCompact = 
   const { config, setConfig, openSettingsWithSection } = useAppStore()
 
   const [thinkingEffort, setThinkingEffort] = useState<ThinkingEffort>(
-    (config?.thinkingEffort as ThinkingEffort) || 'off'
+    (config?.thinkingEffort as ThinkingEffort) || 'medium'
   )
   const [showAttachMenu, setShowAttachMenu] = useState(false)  // Attachment menu visibility
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -220,15 +220,13 @@ export function InputArea({ onSend, onStop, onInject, isGenerating, isCompact = 
   const thinkingEffortOptions = useMemo(
     () => getSupportedThinkingEfforts(currentModelId).map((effort) => ({
       value: effort,
-      label: effort === 'off'
-        ? t('Off')
-        : effort === 'low'
-          ? t('Low')
-          : effort === 'medium'
-            ? t('Medium')
-            : effort === 'high'
-              ? t('High')
-              : t('Very High')
+      label: effort === 'low'
+        ? t('Low')
+        : effort === 'medium'
+          ? t('Medium')
+          : effort === 'high'
+            ? t('High')
+            : t('Very High')
     })),
     [currentModelId, t]
   )
@@ -1068,7 +1066,24 @@ function InputToolbar({
 
         {/* Model Selector - icon only on narrow windows */}
         {!isOnboarding && (
-          <ModelSelector variant="compact" iconOnly={isMobile} disabled={isGenerating} onDisabledClick={onDisabledClick} popoverUp={popoverUp} />
+          <div title={t('Select model')}>
+            <ModelSelector variant="compact" iconOnly={isMobile} disabled={isGenerating} onDisabledClick={onDisabledClick} popoverUp={popoverUp} />
+          </div>
+        )}
+
+        {/* Thinking Effort Selector - after model selector */}
+        {!isOnboarding && showThinkingEffortSelector && (
+          <div title={t('Select reasoning effort')}>
+            <Select
+              value={thinkingEffort}
+              onChange={(value) => onThinkingEffortChange(value as ThinkingEffort)}
+              options={thinkingEffortOptions}
+              variant="compact"
+              disabled={isGenerating}
+              header={t('Reasoning Effort')}
+              className="h-8 text-xs"
+            />
+          </div>
         )}
 
         {/* Space Selector - icon only on narrow windows */}
@@ -1100,16 +1115,6 @@ function InputToolbar({
       <div className="flex items-center gap-1.5">
         {/* Credits Display - only shown when using SkillsFan Credits */}
         {!isOnboarding && <CreditsDisplay />}
-        {!isOnboarding && showThinkingEffortSelector && (
-          <Select
-            value={thinkingEffort}
-            onChange={(value) => onThinkingEffortChange(value as ThinkingEffort)}
-            options={thinkingEffortOptions}
-            variant="compact"
-            disabled={isGenerating}
-            className="h-8 min-w-[5.5rem] border-border/60 bg-background text-xs"
-          />
-        )}
         {isGenerating ? (
           <button
             onClick={onStop}

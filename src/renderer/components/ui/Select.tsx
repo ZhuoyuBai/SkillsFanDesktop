@@ -16,11 +16,12 @@ interface SelectProps<T extends string | number = string> {
   className?: string
   placeholder?: string
   disabled?: boolean
+  header?: string
 }
 
 const triggerStyles = {
   default: 'w-full px-3 py-2 text-sm',
-  compact: 'px-3 pr-7 py-1.5 text-sm',
+  compact: 'px-2.5 py-1.5 text-sm',
   mini: 'px-1.5 py-1 text-sm text-center'
 }
 
@@ -31,7 +32,8 @@ export function Select<T extends string | number = string>({
   variant = 'default',
   className,
   placeholder,
-  disabled = false
+  disabled = false,
+  header
 }: SelectProps<T>) {
   const [isOpen, setIsOpen] = useState(false)
   const [highlightedIndex, setHighlightedIndex] = useState(-1)
@@ -171,19 +173,24 @@ export function Select<T extends string | number = string>({
         onClick={() => (isOpen ? setIsOpen(false) : open())}
         onKeyDown={handleKeyDown}
         className={cn(
-          'flex items-center justify-between gap-1 bg-input rounded-lg border border-border',
-          'focus:outline-none focus:ring-1 focus:ring-ring transition-colors cursor-pointer',
+          'flex items-center justify-between gap-1 rounded-lg border',
+          'focus:outline-none transition-all duration-200 cursor-pointer',
           'disabled:opacity-50 disabled:cursor-not-allowed',
+          variant === 'compact'
+            ? isOpen
+              ? 'bg-primary/15 text-primary border-primary/30'
+              : 'text-muted-foreground border-border/60 hover:bg-muted hover:border-border hover:text-foreground'
+            : 'bg-input border-border focus:ring-1 focus:ring-ring',
           triggerStyles[variant],
           className
         )}
       >
-        <span className={cn('truncate', !selectedOption && 'text-muted-foreground')}>
+        <span className={cn('truncate font-normal', !selectedOption && 'text-muted-foreground')}>
           {selectedOption?.label ?? placeholder ?? ''}
         </span>
         <ChevronDown
           className={cn(
-            'flex-shrink-0 w-3.5 h-3.5 text-muted-foreground transition-transform',
+            'flex-shrink-0 w-3.5 h-3.5 text-muted-foreground transition-transform ml-auto',
             isOpen && 'rotate-180',
             variant === 'mini' && 'w-3 h-3'
           )}
@@ -201,6 +208,11 @@ export function Select<T extends string | number = string>({
             variant === 'mini' ? 'min-w-[5rem]' : ''
           )}
         >
+          {header && (
+            <div className="px-3 pt-2 pb-1 text-xs font-medium text-muted-foreground/70 select-none">
+              {header}
+            </div>
+          )}
           {options.map((option, index) => (
             <div
               key={String(option.value)}

@@ -159,9 +159,14 @@ function resolveInitialSelectedProviderId(config?: HaloConfig): string {
     return OAUTH_PROVIDER_TO_PRESET[current]
   }
 
-  const currentApiUrl = config?.aiSources?.custom?.apiUrl || config?.api?.apiUrl || ''
-  const matchedPreset = PROVIDER_PRESETS.find(p => p.apiUrl && currentApiUrl.includes(p.apiUrl.replace('https://', '').split('/')[0]))
-  return matchedPreset?.id || PROVIDER_PRESETS[0].id
+  // Only try URL matching when no current source is set (fresh install with legacy config)
+  if (!current) {
+    const currentApiUrl = config?.aiSources?.custom?.apiUrl || config?.api?.apiUrl || ''
+    const matchedPreset = PROVIDER_PRESETS.find(p => p.apiUrl && currentApiUrl.includes(p.apiUrl.replace('https://', '').split('/')[0]))
+    if (matchedPreset) return matchedPreset.id
+  }
+
+  return PROVIDER_PRESETS[0].id
 }
 
 function resolveProviderFormValues(config: HaloConfig | undefined, providerId: string): {
@@ -897,7 +902,7 @@ export function SettingsPage() {
           <section className="space-y-6">
             {/* Account Login - OAuth Providers */}
             {authProviders.filter(p => p.type !== 'custom' && p.enabled).length > 0 && (
-              <div className="bg-card rounded-xl border border-border p-5">
+              <div>
                 <h3 className="text-sm text-muted-foreground mb-4">{t('Account Login')}</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {authProviders
@@ -983,7 +988,7 @@ export function SettingsPage() {
             )}
 
             {/* Provider Grid */}
-            <div className="bg-card rounded-xl border border-border p-5">
+            <div>
               <h3 className="text-sm text-muted-foreground mb-4">{t('Select AI Provider')}</h3>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                 {PROVIDER_PRESETS.map((preset) => {

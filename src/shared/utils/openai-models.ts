@@ -1,12 +1,12 @@
 export type ThinkingEffort = 'off' | 'low' | 'medium' | 'high' | 'xhigh'
 
-const DEFAULT_REASONING_OPTIONS: ThinkingEffort[] = ['off']
-const GPT5_REASONING_OPTIONS: ThinkingEffort[] = ['off', 'low', 'medium', 'high']
-const GPT5_1_REASONING_OPTIONS: ThinkingEffort[] = ['off', 'low', 'medium', 'high']
-const GPT5_2_REASONING_OPTIONS: ThinkingEffort[] = ['off', 'low', 'medium', 'high', 'xhigh']
-const GPT5_1_CODEX_MAX_REASONING_OPTIONS: ThinkingEffort[] = ['off', 'medium', 'high', 'xhigh']
-const GPT5_1_CODEX_MINI_REASONING_OPTIONS: ThinkingEffort[] = ['off', 'low', 'medium', 'high']
-const GPT5_1_CODEX_REASONING_OPTIONS: ThinkingEffort[] = ['off', 'medium', 'high']
+const DEFAULT_REASONING_OPTIONS: ThinkingEffort[] = []
+const GPT5_REASONING_OPTIONS: ThinkingEffort[] = ['low', 'medium', 'high']
+const GPT5_1_REASONING_OPTIONS: ThinkingEffort[] = ['low', 'medium', 'high']
+const GPT5_2_REASONING_OPTIONS: ThinkingEffort[] = ['low', 'medium', 'high', 'xhigh']
+const GPT5_1_CODEX_MAX_REASONING_OPTIONS: ThinkingEffort[] = ['medium', 'high', 'xhigh']
+const GPT5_1_CODEX_MINI_REASONING_OPTIONS: ThinkingEffort[] = ['low', 'medium', 'high']
+const GPT5_1_CODEX_REASONING_OPTIONS: ThinkingEffort[] = ['medium', 'high']
 
 function normalizeModelId(modelId?: string | null): string {
   return modelId?.trim().toLowerCase() || ''
@@ -62,7 +62,7 @@ export function getSupportedThinkingEfforts(modelId?: string | null): ThinkingEf
 }
 
 export function supportsThinkingEffortSelector(modelId?: string | null): boolean {
-  return getSupportedThinkingEfforts(modelId).length > 1
+  return getSupportedThinkingEfforts(modelId).length > 0
 }
 
 export function normalizeThinkingEffortForModel(
@@ -83,7 +83,7 @@ export function normalizeThinkingEffortForModel(
     return effort
   }
 
-  return supported[1] || 'off'
+  return supported[0] || 'off'
 }
 
 export function thinkingEffortToBudgetTokens(effort: ThinkingEffort | null | undefined): number | null {

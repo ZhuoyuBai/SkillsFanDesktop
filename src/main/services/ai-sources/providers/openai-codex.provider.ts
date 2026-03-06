@@ -395,20 +395,20 @@ class OpenAICodexProvider implements OAuthAISourceProvider {
           const message = errorDescription || error
           console.error('[OpenAICodex] OAuth callback error:', message)
           res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
-          res.end(`<html><body><h2>Login Failed</h2><p>${escapeHtml(message)}</p><p>You can close this window.</p></body></html>`)
+          res.end(buildCallbackPage('error', 'Login Failed', message))
           pendingAuth?.rejectCallback?.(new Error(message))
           return
         }
 
         if (!code) {
           res.writeHead(400, { 'Content-Type': 'text/html; charset=utf-8' })
-          res.end('<html><body><h2>Error</h2><p>Missing authorization code.</p></body></html>')
+          res.end(buildCallbackPage('error', 'Error', 'Missing authorization code.'))
           return
         }
 
         // Return success page
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
-        res.end('<html><body><h2>Login Successful!</h2><p>You can close this window and return to SkillsFan.</p></body></html>')
+        res.end(buildCallbackPage('success', 'Login Successful!', 'You can close this window and return to SkillsFan.'))
 
         // Resolve the callback promise
         pendingAuth?.resolveCallback?.({ code, state: callbackState || '' })
@@ -940,6 +940,36 @@ function escapeHtml(str: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;')
+}
+
+function buildCallbackPage(type: 'success' | 'error', title: string, message: string): string {
+  const icon = type === 'success'
+    ? '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>'
+    : '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>'
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${escapeHtml(title)}</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#f9fafb;display:flex;align-items:center;justify-content:center;min-height:100vh}
+.card{background:#fff;border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,.08);padding:48px;text-align:center;max-width:400px;width:90%}
+.icon{margin-bottom:20px}
+h2{font-size:22px;font-weight:600;color:#111827;margin-bottom:8px}
+p{font-size:14px;color:#6b7280;line-height:1.5}
+.countdown{margin-top:16px;font-size:12px;color:#9ca3af}
+</style></head><body>
+<div class="card">
+<div class="icon">${icon}</div>
+<h2>${escapeHtml(title)}</h2>
+<p>${escapeHtml(message)}</p>
+<p class="countdown" id="cd"></p>
+</div>
+<script>
+let s=3;const el=document.getElementById('cd');
+function tick(){if(s<=0){window.close();el.textContent='You can close this window now.';return}
+el.textContent='This window will close in '+s+'s...';s--;setTimeout(tick,1000)}
+tick();
+</script></body></html>`
 }
 
 // ============================================================================

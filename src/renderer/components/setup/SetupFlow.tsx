@@ -33,13 +33,18 @@ export function SetupFlow() {
   const [error, setError] = useState<string | null>(null)
   const [deviceCodeInfo, setDeviceCodeInfo] = useState<DeviceCodeInfo | null>(null)
   // Track selected provider for ApiSetup
-  const [selectedProviderId, setSelectedProviderId] = useState<string>('claude')
+  const [selectedProviderId, setSelectedProviderId] = useState<string>('zhipu')
 
   // OAuth provider types that use SkillsFan login flow
   const OAUTH_PROVIDER_TYPES = new Set(['glm', 'minimax-oauth', 'skillsfan-credits', 'github-copilot'])
 
   // Handle provider selection from grid
-  const handleSelectProvider = (providerId: string) => {
+  const handleSelectProvider = async (providerId: string) => {
+    if (providerId === 'openai-codex') {
+      // OpenAI OAuth is handled inline in LoginSelector, go directly to home
+      await handleSkip()
+      return
+    }
     if (OAUTH_PROVIDER_TYPES.has(providerId)) {
       // OAuth providers go through the login flow
       handleOAuthLogin(providerId)

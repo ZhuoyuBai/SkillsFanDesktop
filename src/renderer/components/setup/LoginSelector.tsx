@@ -4,9 +4,10 @@
  */
 
 import { useState } from 'react'
-import { Globe, ChevronDown, Settings, ChevronLeft } from 'lucide-react'
+import { Globe, ChevronDown, Settings, ChevronLeft, Loader2 } from 'lucide-react'
 import { useTranslation, setLanguage, getCurrentLanguage, SUPPORTED_LOCALES, type LocaleCode } from '../../i18n'
 import { HaloLogo } from '../brand/HaloLogo'
+import { api } from '../../api'
 
 // Import provider logos
 import zhipuLogo from '../../assets/providers/zhipu.jpg'
@@ -15,7 +16,7 @@ import kimiLogo from '../../assets/providers/kimi.jpg'
 import deepseekLogo from '../../assets/providers/deepseek.jpg'
 import claudeLogo from '../../assets/providers/claude.jpg'
 import openaiLogo from '../../assets/providers/openai.jpg'
-import skillsfanLogo from '../../assets/logo.png'
+
 
 /**
  * Provider preset configuration
@@ -26,42 +27,7 @@ interface ProviderPreset {
   nameKey: string
   logo?: string
   isCustom?: boolean
-  isOAuth?: boolean  // OAuth provider (uses SkillsFan login, not API key)
 }
-
-/**
- * OAuth-based providers (shown as recommended section)
- */
-const OAUTH_PROVIDERS: ProviderPreset[] = [
-  {
-    id: 'glm',
-    name: 'GLM-5',
-    nameKey: 'GLM-5',
-    logo: zhipuLogo,
-    isOAuth: true,
-  },
-  {
-    id: 'minimax-oauth',
-    name: 'MiniMax',
-    nameKey: 'MiniMax',
-    logo: minimaxLogo,
-    isOAuth: true,
-  },
-  {
-    id: 'skillsfan-credits',
-    name: 'SkillsFan',
-    nameKey: 'SkillsFan Credits',
-    logo: skillsfanLogo,
-    isOAuth: true,
-  },
-  {
-    id: 'openai-codex',
-    name: 'OpenAI',
-    nameKey: 'OpenAI (ChatGPT)',
-    logo: openaiLogo,
-    isOAuth: true,
-  },
-]
 
 /**
  * Custom API providers (user brings their own API key)
@@ -123,6 +89,59 @@ export function LoginSelector({ onSelectProvider, onBack, onSkip }: LoginSelecto
   // Language selector state
   const [isLangDropdownOpen, setIsLangDropdownOpen] = useState(false)
   const [currentLang, setCurrentLang] = useState<LocaleCode>(getCurrentLanguage())
+
+  // OAuth login state
+  const [loginState, setLoginState] = useState<{
+    provider: string
+    status: string
+    userCode?: string
+    verificationUri?: string
+    error?: boolean
+  } | null>(null)
+
+  const handleOAuthLogin = async (providerType: string) => {
+    try {
+      setLoginState({ provider: providerType, status: t('Starting login...') })
+      const result = await api.authStartLogin(providerType)
+      if (!result.success) {
+        console.error('[LoginSelector] OAuth login start failed:', result.error)
+        setLoginState({ provider: providerType, status: t(result.error || 'Login failed'), error: true })
+        setTimeout(() => setLoginState(null), 3000)
+        return
+      }
+
+      const { state, userCode, verificationUri } = result.data as {
+        loginUrl: string
+        state: string
+        userCode?: string
+        verificationUri?: string
+      }
+
+      setLoginState({
+        provider: providerType,
+        status: userCode ? t('Enter the code in your browser') : t('Waiting for login...'),
+        userCode,
+        verificationUri
+      })
+
+      const completeResult = await api.authCompleteLogin(providerType, state)
+      if (!completeResult.success) {
+        setLoginState({
+          provider: providerType,
+          status: t(completeResult.error || 'Login failed'),
+          error: true
+        })
+        setTimeout(() => setLoginState(null), 3000)
+        return
+      }
+
+      setLoginState(null)
+      onSelectProvider(providerType)
+    } catch (err) {
+      console.error('[LoginSelector] OAuth login error:', err)
+      setLoginState(null)
+    }
+  }
 
   // Handle language change
   const handleLanguageChange = (lang: LocaleCode) => {
@@ -192,6 +211,35 @@ export function LoginSelector({ onSelectProvider, onBack, onSkip }: LoginSelecto
 
       {/* Main content */}
       <div className="w-full max-w-xl">
+        {/* OpenAI Subscription Login */}
+        <div className="bg-gray-50 rounded-xl p-5 border border-gray-200 mb-4">
+          <h3 className="text-sm text-gray-500 mb-4">{t('Subscription Models')}</h3>
+          <button
+            type="button"
+            disabled={!!loginState}
+            onClick={() => handleOAuthLogin('openai-codex')}
+            className="w-full flex items-center gap-3 p-4 rounded-xl border-2 border-gray-200 bg-white hover:border-primary hover:bg-primary/5 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <div className="w-10 h-10 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0">
+              <img src={openaiLogo} alt="OpenAI" className="w-full h-full object-cover rounded-lg" />
+            </div>
+            <div className="flex flex-col items-start min-w-0">
+              <span className="text-sm font-medium text-gray-700">
+                {t('OpenAI (ChatGPT)')}
+              </span>
+              <span className="text-xs text-gray-400">
+                {t('ChatGPT Plus / Pro subscription')}
+              </span>
+            </div>
+            {loginState?.provider === 'openai-codex' && (
+              <span className={`ml-auto text-xs flex items-center gap-1 ${loginState?.error ? 'text-red-500' : 'text-gray-400'}`}>
+                {!loginState?.error && <Loader2 className="w-3 h-3 animate-spin" />}
+                {loginState?.status}
+              </span>
+            )}
+          </button>
+        </div>
+
         {/* Custom API Provider Grid */}
         <div className="bg-gray-50 rounded-xl p-5 border border-gray-200">
           <h3 className="text-sm text-gray-500 mb-4">{t('Custom API Key')}</h3>
