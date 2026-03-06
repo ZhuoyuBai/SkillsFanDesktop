@@ -8,6 +8,7 @@ import { useChatStore } from './stores/chat.store'
 import { useOnboardingStore } from './stores/onboarding.store'
 import { initAIBrowserStoreListeners } from './stores/ai-browser.store'
 import { initPerfStoreListeners } from './stores/perf.store'
+import { useUpdaterStore, simulateUpdater } from './stores/updater.store'
 import { useSpaceStore } from './stores/space.store'
 import { useSearchStore } from './stores/search.store'
 import { SplashScreen } from './components/splash/SplashScreen'
@@ -163,6 +164,18 @@ export default function App() {
     logger.debug('[App] Initializing AI Browser store listeners')
     initPerfStoreListeners()
     const cleanup = initAIBrowserStoreListeners()
+    return cleanup
+  }, [])
+
+  // Initialize updater store listeners
+  useEffect(() => {
+    const cleanup = useUpdaterStore.getState().init()
+
+    // Expose simulate function in dev mode for testing
+    if (import.meta.env.DEV) {
+      ;(window as any).__updaterSimulate = simulateUpdater
+    }
+
     return cleanup
   }, [])
 

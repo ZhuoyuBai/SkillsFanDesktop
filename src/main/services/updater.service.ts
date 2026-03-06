@@ -61,6 +61,9 @@ const UPDATER_CONFIG = {
   /** Timeout for update check (ms) */
   CHECK_TIMEOUT: 15000,
 
+  /** Interval for periodic update checks (ms) - 4 hours */
+  PERIODIC_CHECK_INTERVAL: 4 * 60 * 60 * 1000,
+
   /** Fallback download page URL (uses SKILLSFAN_BASE_URL for region awareness) */
   get DOWNLOAD_PAGE_URL() {
     try {
@@ -244,6 +247,14 @@ export function initAutoUpdater(window: BrowserWindow): void {
   setTimeout(() => {
     checkForUpdates()
   }, UPDATER_CONFIG.STARTUP_DELAY)
+
+  // Periodic update checks (only when idle/not-available/error)
+  setInterval(() => {
+    if (['idle', 'not-available', 'error'].includes(state.status)) {
+      console.log('[Updater] Periodic update check...')
+      checkForUpdates()
+    }
+  }, UPDATER_CONFIG.PERIODIC_CHECK_INTERVAL)
 }
 
 /**

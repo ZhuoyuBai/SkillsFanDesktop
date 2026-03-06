@@ -5,6 +5,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAppStore } from '../stores/app.store'
 import { useSpaceStore } from '../stores/space.store'
+import { useUpdaterStore } from '../stores/updater.store'
 import { api } from '../api'
 import type { HaloConfig, ThemeMode, McpServersConfig, AISourceType, OAuthSourceConfig, ApiProvider, CustomSourceConfig } from '../types'
 import { AVAILABLE_MODELS, DEFAULT_MODEL } from '../types'
@@ -332,12 +333,9 @@ export function SettingsPage() {
   // API Key visibility state
   const [showApiKey, setShowApiKey] = useState(false)
 
-  // Version update state
-  const [appVersion, setAppVersion] = useState<string>('0.1.0')
-  const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'error'>('idle')
-  const [latestVersion, setLatestVersion] = useState<string | null>(null)
+  // Version update state (from shared store)
+  const { status: updateStatus, currentVersion: appVersion, latestVersion, downloadProgress } = useUpdaterStore()
   const [isCheckingUpdate, setIsCheckingUpdate] = useState(false)
-  const [downloadProgress, setDownloadProgress] = useState<{ percent: number; bytesPerSecond: number; transferred: number; total: number } | null>(null)
 
   // Load SkillsFan auth state for permission checks
   useEffect(() => {
@@ -367,41 +365,26 @@ export function SettingsPage() {
     }
   }, [])
 
-  // Load app version and listen for update status
+  // Reset checking state when update status changes
   useEffect(() => {
-    // Get current app version
-    api.getVersion().then((result) => {
-      if (result.success && result.data) {
-        setAppVersion(result.data as string)
-      }
-    })
-
-    // Listen for update status changes
-    const unsubscribe = api.onUpdaterStatus((data) => {
-      setUpdateStatus(data.status)
-      if (data.latestVersion) {
-        setLatestVersion(data.latestVersion)
-      }
-      if (data.downloadProgress) {
-        setDownloadProgress(data.downloadProgress)
-      }
+    if (updateStatus !== 'checking') {
       setIsCheckingUpdate(false)
-    })
-
-    return () => {
-      unsubscribe()
     }
-  }, [])
+  }, [updateStatus])
 
   // Handler for check updates button
   const handleCheckForUpdates = async () => {
     setIsCheckingUpdate(true)
-    await api.checkForUpdates()
+    try {
+      await api.checkForUpdates()
+    } finally {
+      // Reset after a short delay to ensure status event has time to arrive
+      setTimeout(() => setIsCheckingUpdate(false), 3000)
+    }
   }
 
   // Handler for download update button
   const handleDownloadUpdate = async () => {
-    setDownloadProgress({ percent: 0, bytesPerSecond: 0, transferred: 0, total: 0 })
     await api.downloadUpdate()
   }
 
@@ -1368,13 +1351,23 @@ export function SettingsPage() {
                         {t('Download Update')}
                       </button>
                     ) : (
-                      <button
-                        onClick={handleCheckForUpdates}
-                        disabled={isCheckingUpdate}
-                        className="px-4 py-2 bg-secondary text-secondary-foreground text-sm rounded-lg hover:bg-secondary/80 transition-colors disabled:opacity-50"
-                      >
-                        {isCheckingUpdate ? t('Checking...') : t('Check for Updates')}
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={handleCheckForUpdates}
+                          disabled={isCheckingUpdate}
+                          className="px-4 py-2 bg-secondary text-secondary-foreground text-sm rounded-lg hover:bg-secondary/80 transition-colors disabled:opacity-50"
+                        >
+                          {isCheckingUpdate ? t('Checking...') : t('Check for Updates')}
+                        </button>
+                        {updateStatus === 'error' && (
+                          <button
+                            onClick={handleOpenDownloadPage}
+                            className="px-4 py-2 text-muted-foreground hover:text-foreground text-sm transition-colors"
+                          >
+                            {t('Download from website')}
+                          </button>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>
