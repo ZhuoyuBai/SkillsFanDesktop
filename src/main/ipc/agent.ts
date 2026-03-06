@@ -5,6 +5,7 @@
 import { ipcMain, BrowserWindow } from 'electron'
 import { sendMessage, stopGeneration, interruptAndInject, handleToolApproval, handleUserQuestionAnswer, getSessionState, ensureSessionWarm, testMcpConnections, getV2Session } from '../services/agent'
 import type { Attachment, ImageAttachment } from '../services/agent/types'
+import type { ThinkingEffort } from '../../shared/utils/openai-models'
 import { ipcHandle } from './utils'
 
 let mainWindow: BrowserWindow | null = null
@@ -20,7 +21,7 @@ export function registerAgentHandlers(window: BrowserWindow | null): void {
       resumeSessionId?: string
       images?: ImageAttachment[]
       attachments?: Attachment[]
-      thinkingEffort?: 'off' | 'low' | 'medium' | 'high'
+      thinkingEffort?: ThinkingEffort
     }) => {
       await sendMessage(mainWindow, request)
     }

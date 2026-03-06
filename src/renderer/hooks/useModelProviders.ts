@@ -26,6 +26,10 @@ interface AuthProviderConfig {
   enabled: boolean
 }
 
+function isOAuthProviderConfig(value: unknown): value is OAuthSourceConfig {
+  return !!value && typeof value === 'object' && 'loggedIn' in value
+}
+
 export interface OAuthProviderInfo {
   type: string
   displayName: string
@@ -104,13 +108,31 @@ export function useModelProviders(options: UseModelProvidersOptions = {}): UseMo
       }
     })
 
-  const loggedInOAuthProviders: OAuthProviderInfo[] = authProviders
-    .filter(p => p.type !== 'custom' && p.enabled)
-    .map(p => {
-      const providerConfig = (aiSources as Record<string, any>)[p.type] as OAuthSourceConfig | undefined
+  const providerMetaByType = new Map(
+    authProviders
+      .filter(p => p.type !== 'custom')
+      .map(provider => [provider.type, provider])
+  )
+  const oauthProviderTypes = Array.from(new Set([
+    ...Array.from(providerMetaByType.keys()),
+    ...Object.keys(aiSources).filter(key => {
+      if (key === 'current' || key === 'oauth' || key === 'custom') return false
+      return isOAuthProviderConfig((aiSources as Record<string, unknown>)[key])
+    })
+  ]))
+
+  const loggedInOAuthProviders: OAuthProviderInfo[] = oauthProviderTypes
+    .filter(type => {
+      const meta = providerMetaByType.get(type)
+      const providerConfig = (aiSources as Record<string, any>)[type] as OAuthSourceConfig | undefined
+      return meta?.enabled !== false || providerConfig?.loggedIn === true
+    })
+    .map(type => {
+      const meta = providerMetaByType.get(type)
+      const providerConfig = (aiSources as Record<string, any>)[type] as OAuthSourceConfig | undefined
       return {
-        type: p.type,
-        displayName: getLocalizedText(p.displayName),
+        type,
+        displayName: meta ? getLocalizedText(meta.displayName) : (PROVIDER_NAMES[type] || type),
         config: providerConfig,
         isLoggedIn: providerConfig?.loggedIn === true
       }

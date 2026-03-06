@@ -175,13 +175,30 @@ describe('Request Converters', () => {
       const result = convertAnthropicToOpenAIResponses(request)
 
       expect(result.request.model).toBe('claude-3-opus')
-      expect(result.request.max_output_tokens).toBe(1024)
+      expect(result.request.instructions).toBe('Follow the provided system and user instructions. Use tools when needed.')
       expect(result.request.input).toHaveLength(1)
       expect((result.request.input as any)[0].role).toBe('user')
       expect((result.request.input as any)[0].content[0]).toEqual({
         type: 'input_text',
         text: 'Hello!'
       })
+    })
+
+    it('should map system prompt to top-level Responses instructions', () => {
+      const request: AnthropicRequest = {
+        model: 'claude-3-opus',
+        max_tokens: 1024,
+        system: 'You are a helpful assistant.',
+        messages: [
+          { role: 'user', content: 'Hello!' }
+        ]
+      }
+
+      const result = convertAnthropicToOpenAIResponses(request)
+
+      expect(result.request.instructions).toBe('You are a helpful assistant.')
+      expect(result.request.input).toHaveLength(1)
+      expect((result.request.input as any)[0].role).toBe('user')
     })
 
     it('should convert tool_use to function_call', () => {

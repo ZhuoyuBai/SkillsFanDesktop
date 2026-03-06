@@ -17,7 +17,13 @@ import {
   streamOpenAIChatToAnthropic,
   streamOpenAIResponsesToAnthropic
 } from '../stream'
-import { getApiTypeFromUrl, isValidEndpointUrl, getEndpointUrlError, shouldForceStream } from './api-type'
+import {
+  getApiTypeFromUrl,
+  isValidEndpointUrl,
+  getEndpointUrlError,
+  isChatGPTCodexResponsesUrl,
+  shouldForceStream
+} from './api-type'
 import { withRequestQueue, generateQueueKey } from './request-queue'
 
 export interface RequestHandlerOptions {
@@ -26,6 +32,21 @@ export interface RequestHandlerOptions {
 }
 
 const DEFAULT_TIMEOUT_MS = 10 * 60 * 1000 // 10 minutes
+
+function applyProviderRequestRequirements(
+  backendUrl: string,
+  apiType: 'responses' | 'chat_completions',
+  openaiRequest: any
+): any {
+  if (apiType === 'responses' && isChatGPTCodexResponsesUrl(backendUrl)) {
+    return {
+      ...openaiRequest,
+      store: false
+    }
+  }
+
+  return openaiRequest
+}
 
 /**
  * Send error response in Anthropic format
@@ -125,9 +146,10 @@ export async function handleMessagesRequest(
 
       // Convert request
       const requestToSend = { ...anthropicRequest, stream: wantStream }
-      const openaiRequest = apiType === 'responses'
+      const convertedRequest = apiType === 'responses'
         ? convertAnthropicToOpenAIResponses(requestToSend).request
         : convertAnthropicToOpenAIChat(requestToSend).request
+      const openaiRequest = applyProviderRequestRequirements(backendUrl, apiType, convertedRequest)
 
       const toolCount = (openaiRequest as any).tools?.length ?? 0
       console.log(`[RequestHandler] wire=${apiType} tools=${toolCount}`)
@@ -158,8 +180,9 @@ export async function handleMessagesRequest(
           const retryRequest = apiType === 'responses'
             ? convertAnthropicToOpenAIResponses({ ...anthropicRequest, stream: true }).request
             : convertAnthropicToOpenAIChat({ ...anthropicRequest, stream: true }).request
+          const retryOpenAIRequest = applyProviderRequestRequirements(backendUrl, apiType, retryRequest)
 
-          upstreamResp = await fetchUpstream(backendUrl, apiKey, retryRequest, timeoutMs, undefined, customHeaders)
+          upstreamResp = await fetchUpstream(backendUrl, apiKey, retryOpenAIRequest, timeoutMs, undefined, customHeaders)
 
           if (!upstreamResp.ok) {
             const retryErrorText = await upstreamResp.text().catch(() => '')

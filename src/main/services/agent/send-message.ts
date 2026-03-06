@@ -51,6 +51,49 @@ import {
 } from './message-utils'
 import { getMemoryIndexManager } from '../memory'
 import { agentQueue } from './lane-queue'
+import {
+  normalizeThinkingEffortForModel,
+  thinkingEffortToBudgetTokens
+} from '../../../shared/utils/openai-models'
+
+function getRuntimeModelDisplayName(config: Record<string, any>, modelId: string): string {
+  const aiSources = config.aiSources || {}
+  const currentSource = aiSources.current
+  const currentSourceConfig = currentSource ? aiSources[currentSource] : undefined
+  return currentSourceConfig?.modelNames?.[modelId] || modelId
+}
+
+function getDirectRuntimeModelReply(
+  message: string,
+  config: Record<string, any>,
+  modelId: string
+): string | null {
+  const compact = message
+    .toLowerCase()
+    .replace(/[`"'“”‘’\s]/g, '')
+    .replace(/[，。！？、,:：;；（）()【】[\]{}]/g, '')
+
+  const isDirectModelQuestion =
+    /^(你(现在|当前)?(用的是|正在用的|是)?什么模型|当前(运行|使用|用的)?(的是)?什么模型|现在(运行|使用|用的)?(的是)?什么模型)$/.test(compact) ||
+    /^(whatmodelareyou|whichmodelareyou|whatmodelareyouusing|whichmodelareyouusing|whatmodelisrunning|whichmodelisrunning)$/.test(compact)
+
+  if (!isDirectModelQuestion) {
+    return null
+  }
+
+  const displayName = getRuntimeModelDisplayName(config, modelId)
+  const prefersEnglish = /[a-z]/i.test(message) && !/[\u4e00-\u9fff]/.test(message)
+
+  if (prefersEnglish) {
+    return displayName === modelId
+      ? `The current runtime model is \`${modelId}\`.`
+      : `The current runtime model is ${displayName} (ID: \`${modelId}\`).`
+  }
+
+  return displayName === modelId
+    ? `当前运行模型是 \`${modelId}\`。`
+    : `当前运行模型是 ${displayName}（ID: \`${modelId}\`）。`
+}
 
 // ============================================
 // Send Message
@@ -154,6 +197,42 @@ async function sendMessageInternal(
   }
   console.log(`[Agent] sendMessage using: ${credentials.provider}, model: ${credentials.model}${request.model ? ' (task override)' : ''}${request.modelSource ? ` source: ${request.modelSource}` : ''}`)
 
+  const directRuntimeModelReply = !ralphMode?.enabled &&
+    !messagePrefix &&
+    (!images || images.length === 0) &&
+    (!attachments || attachments.length === 0)
+      ? getDirectRuntimeModelReply(message, config as Record<string, any>, credentials.model)
+      : null
+
+  if (directRuntimeModelReply) {
+    addMessage(spaceId, conversationId, {
+      role: 'user',
+      content: message,
+      images
+    })
+
+    addMessage(spaceId, conversationId, {
+      role: 'assistant',
+      content: '',
+      toolCalls: []
+    })
+
+    updateLastMessage(spaceId, conversationId, {
+      content: directRuntimeModelReply
+    })
+
+    sendToRenderer('agent:message', spaceId, conversationId, {
+      type: 'message',
+      content: directRuntimeModelReply,
+      isComplete: true
+    })
+    sendToRenderer('agent:complete', spaceId, conversationId, {
+      type: 'complete',
+      duration: 0
+    })
+    return
+  }
+
   const transport = await resolveSdkTransport(credentials)
   const anthropicBaseUrl = transport.anthropicBaseUrl
   const anthropicApiKey = transport.anthropicApiKey
@@ -256,21 +335,23 @@ async function sendMessageInternal(
     // Dynamic runtime parameter adjustment (via SDK patch)
     // These can be changed without rebuilding the session
     try {
-      // Set model dynamically (allows model switching without session rebuild)
-      // Note: For OpenAI-compat/OAuth providers, model is encoded in apiKey and always fresh
-      // This setModel call is mainly for pure Anthropic API sessions
-      if (v2Session.setModel) {
+      // Only push model changes into the SDK for native Anthropic sessions.
+      // Routed OpenAI/Codex sessions use a Claude-compatible transport model internally,
+      // and surfacing that internal model name causes the assistant to misreport itself.
+      if (v2Session.setModel && !transport.routed) {
         await v2Session.setModel(sdkModel)
         console.log(`[Agent][${conversationId}] Model set: ${sdkModel}`)
+      } else if (transport.routed) {
+        console.log(`[Agent][${conversationId}] Routed provider active, keeping runtime display model: ${credentials.model}`)
       }
 
       // Set thinking tokens dynamically (support effort levels)
       if (v2Session.setMaxThinkingTokens) {
-        const effortToTokens: Record<string, number | null> = {
-          off: null, low: 2048, medium: 5120, high: 10240
-        }
-        const effort = request.thinkingEffort || (thinkingEnabled ? 'high' : 'off')
-        const thinkingTokens = effortToTokens[effort] ?? null
+        const effort = normalizeThinkingEffortForModel(
+          credentials.model,
+          request.thinkingEffort ?? (thinkingEnabled ? 'high' : undefined)
+        )
+        const thinkingTokens = thinkingEffortToBudgetTokens(effort)
         await v2Session.setMaxThinkingTokens(thinkingTokens)
         console.log(`[Agent][${conversationId}] Thinking: effort=${effort}, tokens=${thinkingTokens}`)
       }

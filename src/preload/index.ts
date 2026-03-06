@@ -3,6 +3,7 @@
  */
 
 import { contextBridge, ipcRenderer } from 'electron'
+import type { ThinkingEffort } from '../shared/utils/openai-models'
 
 // Type definitions for exposed API
 export interface SkillsFanAPI {
@@ -95,7 +96,7 @@ export interface SkillsFanAPI {
       language?: string
     }>
     aiBrowserEnabled?: boolean  // Enable AI Browser tools
-    thinkingEffort?: 'off' | 'low' | 'medium' | 'high'  // Thinking effort level
+    thinkingEffort?: ThinkingEffort  // Thinking effort level
     canvasContext?: {  // Canvas context for AI awareness
       isOpen: boolean
       tabCount: number

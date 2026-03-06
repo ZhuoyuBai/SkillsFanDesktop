@@ -131,7 +131,7 @@ export function SpaceSwitcher({ collapsed = false }: SpaceSwitcherProps) {
       {/* Trigger button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-2 py-1.5 hover:bg-muted rounded-lg transition-colors w-full"
+        className="flex items-center gap-2 pl-0 pr-2 py-1.5 hover:bg-muted rounded-lg transition-colors w-full"
       >
         {currentSpace?.isTemp ? (
           <HaloLogo size={22} hoverOnly={true} />

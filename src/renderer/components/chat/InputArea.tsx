@@ -33,13 +33,20 @@ import type { SlashCommand } from './CommandPopover'
 import { ModelSelector } from '../layout/ModelSelector'
 import { CreditsDisplay } from '../layout/CreditsDisplay'
 import { SpaceSelector } from '../layout/SpaceSelector'
+import { Select } from '../ui/select'
 import { processFile, isSupportedFile, checkFileSize, getAcceptedExtensions } from '../../utils/fileProcessor'
 import { api } from '../../api'
-import type { Attachment } from '../../types'
+import type { Attachment, HaloConfig } from '../../types'
 import { useTranslation } from '../../i18n'
+import {
+  type ThinkingEffort,
+  getSupportedThinkingEfforts,
+  normalizeThinkingEffortForModel,
+  supportsThinkingEffortSelector
+} from '../../../shared/utils/openai-models'
 
 interface InputAreaProps {
-  onSend: (content: string, attachments?: Attachment[], thinkingEffort?: 'off' | 'low' | 'medium' | 'high') => void
+  onSend: (content: string, attachments?: Attachment[], thinkingEffort?: ThinkingEffort) => void
   onStop: () => void
   onInject?: (content: string, attachments?: Attachment[]) => void  // Inject message during generation
   isGenerating: boolean
@@ -186,10 +193,10 @@ export function InputArea({ onSend, onStop, onInject, isGenerating, isCompact = 
   const { enabled: aiBrowserEnabled, setEnabled: setAIBrowserEnabled } = useAIBrowserStore()
 
   // Settings navigation (must be before thinkingEffort init which reads config)
-  const { config, openSettingsWithSection } = useAppStore()
+  const { config, setConfig, openSettingsWithSection } = useAppStore()
 
-  const [thinkingEffort, setThinkingEffort] = useState<'off' | 'low' | 'medium' | 'high'>(
-    (config?.thinkingEffort as 'off' | 'low' | 'medium' | 'high') || 'off'
+  const [thinkingEffort, setThinkingEffort] = useState<ThinkingEffort>(
+    (config?.thinkingEffort as ThinkingEffort) || 'off'
   )
   const [showAttachMenu, setShowAttachMenu] = useState(false)  // Attachment menu visibility
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -202,8 +209,57 @@ export function InputArea({ onSend, onStop, onInject, isGenerating, isCompact = 
     const aiSources = config?.aiSources
     if (!aiSources?.current) return ''
     const providerConfig = (aiSources as any)[aiSources.current]
-    return (providerConfig?.model as string) || ''
+    if (providerConfig?.model) return providerConfig.model as string
+    if (Array.isArray(providerConfig?.availableModels) && providerConfig.availableModels.length > 0) {
+      return providerConfig.availableModels[0] as string
+    }
+    return ''
   })()
+
+  const showThinkingEffortSelector = supportsThinkingEffortSelector(currentModelId)
+  const thinkingEffortOptions = useMemo(
+    () => getSupportedThinkingEfforts(currentModelId).map((effort) => ({
+      value: effort,
+      label: effort === 'off'
+        ? t('Off')
+        : effort === 'low'
+          ? t('Low')
+          : effort === 'medium'
+            ? t('Medium')
+            : effort === 'high'
+              ? t('High')
+              : t('Very High')
+    })),
+    [currentModelId, t]
+  )
+
+  useEffect(() => {
+    if (config?.thinkingEffort && config.thinkingEffort !== thinkingEffort) {
+      setThinkingEffort(config.thinkingEffort as ThinkingEffort)
+    }
+  }, [config?.thinkingEffort, thinkingEffort])
+
+  useEffect(() => {
+    const normalized = normalizeThinkingEffortForModel(currentModelId, thinkingEffort)
+    if (normalized !== thinkingEffort) {
+      setThinkingEffort(normalized)
+    }
+  }, [currentModelId, thinkingEffort])
+
+  const handleThinkingEffortChange = useCallback(async (effort: ThinkingEffort) => {
+    const normalized = normalizeThinkingEffortForModel(currentModelId, effort)
+    setThinkingEffort(normalized)
+
+    if (!config) return
+
+    const newConfig = {
+      ...config,
+      thinkingEffort: normalized
+    }
+
+    await api.setConfig(newConfig)
+    setConfig(newConfig as HaloConfig)
+  }, [config, currentModelId, setConfig])
 
   // Current space for @ file reference
   const { currentSpace } = useSpaceStore()
@@ -747,7 +803,7 @@ export function InputArea({ onSend, onStop, onInject, isGenerating, isCompact = 
         <div
           className={`
             relative flex flex-col rounded-2xl
-            border border-border bg-card/95 shadow-lg ring-1 ring-inset ring-white/5
+            border border-border/60 bg-card shadow-sm
             ${isGenerating && !onInject ? 'opacity-60' : ''}
             ${isDragOver ? 'ring-2 ring-primary/50 bg-primary/5' : ''}
           `}
@@ -878,9 +934,11 @@ export function InputArea({ onSend, onStop, onInject, isGenerating, isCompact = 
             isOnboarding={isOnboardingSendStep}
             isProcessingFiles={isProcessingFiles}
             thinkingEffort={thinkingEffort}
-            onThinkingEffortChange={setThinkingEffort}
+            showThinkingEffortSelector={showThinkingEffortSelector}
+            thinkingEffortOptions={thinkingEffortOptions}
             aiBrowserEnabled={aiBrowserEnabled}
             onAIBrowserToggle={() => setAIBrowserEnabled(!aiBrowserEnabled)}
+            onThinkingEffortChange={handleThinkingEffortChange}
             showAttachMenu={showAttachMenu}
             onAttachMenuToggle={() => setShowAttachMenu(!showAttachMenu)}
             onAttachClick={handleAttachButtonClick}
@@ -906,16 +964,16 @@ export function InputArea({ onSend, onStop, onInject, isGenerating, isCompact = 
  *
  * Layout: [+attachment] ──────────────────── [⚛ thinking] [send]
  */
-type ThinkingEffort = 'off' | 'low' | 'medium' | 'high'
-
 interface InputToolbarProps {
   isGenerating: boolean
   isOnboarding: boolean
   isProcessingFiles: boolean
   thinkingEffort: ThinkingEffort
-  onThinkingEffortChange: (effort: ThinkingEffort) => void
+  showThinkingEffortSelector: boolean
+  thinkingEffortOptions: Array<{ value: ThinkingEffort; label: string }>
   aiBrowserEnabled: boolean
   onAIBrowserToggle: () => void
+  onThinkingEffortChange: (effort: ThinkingEffort) => void
   showAttachMenu: boolean
   onAttachMenuToggle: () => void
   onAttachClick: () => void
@@ -935,9 +993,11 @@ function InputToolbar({
   isOnboarding,
   isProcessingFiles,
   thinkingEffort,
-  onThinkingEffortChange,
+  showThinkingEffortSelector,
+  thinkingEffortOptions,
   aiBrowserEnabled,
   onAIBrowserToggle,
+  onThinkingEffortChange,
   showAttachMenu,
   onAttachMenuToggle,
   onAttachClick,
@@ -1036,10 +1096,20 @@ function InputToolbar({
 
       </div>
 
-      {/* Right section: credits + action button */}
+      {/* Right section: credits + thinking effort + action button */}
       <div className="flex items-center gap-1.5">
         {/* Credits Display - only shown when using SkillsFan Credits */}
         {!isOnboarding && <CreditsDisplay />}
+        {!isOnboarding && showThinkingEffortSelector && (
+          <Select
+            value={thinkingEffort}
+            onChange={(value) => onThinkingEffortChange(value as ThinkingEffort)}
+            options={thinkingEffortOptions}
+            variant="compact"
+            disabled={isGenerating}
+            className="h-8 min-w-[5.5rem] border-border/60 bg-background text-xs"
+          />
+        )}
         {isGenerating ? (
           <button
             onClick={onStop}

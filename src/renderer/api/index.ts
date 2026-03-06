@@ -16,6 +16,7 @@ import {
   getAuthToken
 } from './transport'
 import type { ImageAttachment, Attachment } from '../types'
+import type { ThinkingEffort } from '../../shared/utils/openai-models'
 
 // Response type
 interface ApiResponse<T = unknown> {
@@ -393,7 +394,7 @@ export const api = {
     }>
     attachments?: Attachment[]  // General file attachments (PDF, text, code, images)
     aiBrowserEnabled?: boolean  // Enable AI Browser tools
-    thinkingEffort?: 'off' | 'low' | 'medium' | 'high'  // Thinking effort level
+    thinkingEffort?: ThinkingEffort  // Thinking effort level
     canvasContext?: {  // Canvas context for AI awareness
       isOpen: boolean
       tabCount: number

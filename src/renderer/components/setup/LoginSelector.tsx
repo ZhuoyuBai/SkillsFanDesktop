@@ -54,6 +54,13 @@ const OAUTH_PROVIDERS: ProviderPreset[] = [
     logo: skillsfanLogo,
     isOAuth: true,
   },
+  {
+    id: 'openai-codex',
+    name: 'OpenAI',
+    nameKey: 'OpenAI (ChatGPT)',
+    logo: openaiLogo,
+    isOAuth: true,
+  },
 ]
 
 /**

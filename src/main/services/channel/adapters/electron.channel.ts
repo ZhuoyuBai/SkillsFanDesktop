@@ -72,7 +72,7 @@ export class ElectronChannel implements Channel {
       model: {
         name: request.model,
         source: request.modelSource,
-        thinkingEffort: request.thinkingEffort || (request.thinkingEnabled ? 'high' : undefined)
+        thinkingEffort: request.thinkingEffort ?? (request.thinkingEnabled ? 'high' : undefined)
       },
       features: {
         aiBrowser: request.aiBrowserEnabled

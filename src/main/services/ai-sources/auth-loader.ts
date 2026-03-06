@@ -132,9 +132,19 @@ function getDefaultProductConfig(): ProductConfig {
     version: '1.0.0',
     authProviders: [
       {
+        type: 'openai-codex',
+        displayName: { en: 'OpenAI (ChatGPT)', 'zh-CN': 'OpenAI (ChatGPT)', 'zh-TW': 'OpenAI (ChatGPT)' },
+        description: { en: 'Use your ChatGPT Plus/Pro subscription', 'zh-CN': '使用您的 ChatGPT Plus/Pro 订阅', 'zh-TW': '使用您的 ChatGPT Plus/Pro 訂閱' },
+        icon: 'sparkles',
+        iconBgColor: '#10a37f',
+        recommended: false,
+        builtin: true,
+        enabled: true
+      },
+      {
         type: 'custom',
-        displayName: { en: 'Custom API', 'zh-CN': '自定义 API' },
-        description: { en: 'Claude / OpenAI compatible', 'zh-CN': '兼容 Claude / OpenAI' },
+        displayName: { en: 'Custom API', 'zh-CN': '自定义 API', 'zh-TW': '自訂 API' },
+        description: { en: 'Claude / OpenAI compatible', 'zh-CN': '兼容 Claude / OpenAI', 'zh-TW': '相容 Claude / OpenAI' },
         icon: 'key',
         iconBgColor: '#da7756',
         recommended: true,

@@ -153,14 +153,16 @@ export function convertAnthropicToolChoiceToResponses(
 // Reasoning/Thinking Conversion
 // ============================================================================
 
+import {
+  budgetTokensToChatReasoningEffort,
+  budgetTokensToResponsesReasoningEffort
+} from '../../../shared/utils/openai-models'
+
 /**
  * Map Anthropic thinking budget_tokens to OpenAI reasoning effort
  */
 export function budgetTokensToReasoningEffort(budgetTokens: number | undefined): 'low' | 'medium' | 'high' {
-  if (!budgetTokens) return 'medium'
-  if (budgetTokens > 10000) return 'high'
-  if (budgetTokens > 5000) return 'medium'
-  return 'low'
+  return budgetTokensToChatReasoningEffort(budgetTokens)
 }
 
 /**
@@ -182,11 +184,11 @@ export function convertAnthropicThinkingToOpenAIReasoning(
  */
 export function convertAnthropicThinkingToResponsesReasoning(
   thinking: { type: 'enabled' | 'disabled'; budget_tokens?: number } | undefined
-): { effort?: 'low' | 'medium' | 'high'; enabled?: boolean } | undefined {
+): { effort?: 'low' | 'medium' | 'high' | 'xhigh'; enabled?: boolean } | undefined {
   if (!thinking) return undefined
 
   return {
     enabled: thinking.type === 'enabled',
-    effort: budgetTokensToReasoningEffort(thinking.budget_tokens)
+    effort: budgetTokensToResponsesReasoningEffort(thinking.budget_tokens)
   }
 }

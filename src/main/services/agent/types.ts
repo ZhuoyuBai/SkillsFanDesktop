@@ -108,6 +108,8 @@ export interface RalphModeConfig {
   onError?: (error: string) => void       // Error callback
 }
 
+import type { ThinkingEffort } from '../../../shared/utils/openai-models'
+
 export interface AgentRequest {
   spaceId: string
   conversationId: string
@@ -119,7 +121,7 @@ export interface AgentRequest {
   attachments?: Attachment[]  // General attachments (PDF, text, code files)
   aiBrowserEnabled?: boolean  // Enable AI Browser tools for this request
   thinkingEnabled?: boolean   // Enable extended thinking mode (legacy, use thinkingEffort)
-  thinkingEffort?: 'off' | 'low' | 'medium' | 'high'  // Thinking effort level
+  thinkingEffort?: ThinkingEffort  // Thinking effort level
   model?: string              // Model to use (for future model switching)
   modelSource?: string        // AI source/provider override (e.g. 'skillsfan-credits', 'deepseek')
   canvasContext?: CanvasContext  // Current canvas state for AI awareness

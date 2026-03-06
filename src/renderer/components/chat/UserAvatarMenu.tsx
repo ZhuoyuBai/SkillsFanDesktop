@@ -129,7 +129,7 @@ export function UserAvatarMenu({ collapsed = false }: UserAvatarMenuProps) {
 
   if (isLoading) {
     return (
-      <div className="px-4 py-3 border-t border-border/50">
+      <div className="px-4 py-3 border-t border-border">
         <div className="flex items-center justify-center py-1.5">
           <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
         </div>
@@ -138,7 +138,7 @@ export function UserAvatarMenu({ collapsed = false }: UserAvatarMenuProps) {
   }
 
   return (
-    <div className="relative px-4 py-3 border-t border-border/50">
+    <div className="relative px-4 py-3 border-t border-border">
       {/* Dropdown Menu - positioned above the button */}
       {isMenuOpen && (
         <div

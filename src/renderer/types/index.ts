@@ -2,6 +2,8 @@
 // Halo Type Definitions
 // ============================================
 
+import type { ThinkingEffort } from '../../shared/utils/openai-models'
+
 // API Provider Configuration
 export type ApiProvider = 'anthropic' | 'openai';
 
@@ -197,7 +199,7 @@ export interface HaloConfig {
   mcpServers: McpServersConfig;  // MCP servers configuration
   spaces?: SpacesConfig;  // Space settings (default space, etc.)
   memory?: MemoryConfig;  // Cross-conversation memory settings
-  thinkingEffort?: 'off' | 'low' | 'medium' | 'high';  // Default thinking effort level
+  thinkingEffort?: ThinkingEffort;  // Default thinking effort level
   isFirstLaunch: boolean;
 }
 

@@ -3,7 +3,10 @@
  */
 
 import type { AnthropicRequest, OpenAIResponsesRequest } from '../../types'
-import { convertAnthropicMessagesToResponsesInput } from '../messages'
+import {
+  convertAnthropicMessagesToResponsesInput,
+  extractAnthropicSystemText
+} from '../messages'
 import {
   convertAnthropicToolsToResponses,
   convertAnthropicToolChoiceToResponses,
@@ -16,15 +19,15 @@ export interface ConversionResult {
   hasTools: boolean
 }
 
+const DEFAULT_RESPONSES_INSTRUCTIONS = 'Follow the provided system and user instructions. Use tools when needed.'
+
 /**
  * Convert Anthropic request to OpenAI Responses API request
  */
 export function convertAnthropicToOpenAIResponses(anthropicRequest: AnthropicRequest): ConversionResult {
   // Convert messages to input items
-  const inputItems = convertAnthropicMessagesToResponsesInput(
-    anthropicRequest.messages,
-    anthropicRequest.system
-  )
+  const inputItems = convertAnthropicMessagesToResponsesInput(anthropicRequest.messages)
+  const instructions = extractAnthropicSystemText(anthropicRequest.system) || DEFAULT_RESPONSES_INSTRUCTIONS
 
   // Check for images in the input
   const hasImages = inputItems.some((item) => {
@@ -43,6 +46,7 @@ export function convertAnthropicToOpenAIResponses(anthropicRequest: AnthropicReq
   const request: OpenAIResponsesRequest = {
     model: anthropicRequest.model,
     input: inputItems,
+    instructions,
     stream: anthropicRequest.stream
   }
 

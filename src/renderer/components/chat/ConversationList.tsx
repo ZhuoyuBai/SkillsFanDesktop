@@ -100,12 +100,12 @@ function UnifiedTaskItem({
           onSelect()
         }
       }}
-      className={`w-full px-4 py-2 text-left cursor-pointer group relative
-        transition-all duration-200
+      className={`w-full px-3 py-2 text-left cursor-pointer group relative
+        transition-all duration-200 rounded-lg mx-1
         focus:outline-none focus:ring-0
         ${isActive
-          ? 'bg-secondary border-l-2 border-foreground/30'
-          : 'hover:bg-secondary/40'
+          ? 'bg-secondary'
+          : 'hover:bg-secondary/60'
         }`}
     >
       {isEditing ? (
@@ -184,7 +184,7 @@ function UnifiedTaskItem({
 }
 
 // Width constraints (in pixels)
-const MIN_WIDTH = 160 // Allow smaller width
+const MIN_WIDTH = 220 // Match space switcher header width
 const MAX_WIDTH = 320
 const COLLAPSED_WIDTH = 48 // Width when collapsed (icon only)
 const WIDTH_RATIO = 0.2 // 20% of window width
@@ -415,7 +415,7 @@ export function ConversationList({
   if (isCollapsed) {
     return (
       <div
-        className="border-r border-border/50 flex flex-col bg-card relative"
+        className="border-r border-border/30 flex flex-col bg-accent/40 relative"
         style={{ width: COLLAPSED_WIDTH }}
       >
         {/* Space switcher and toggle button in collapsed state */}
@@ -527,7 +527,7 @@ export function ConversationList({
   return (
     <div
       ref={containerRef}
-      className={`flex flex-col relative ${isMobileOverlay ? 'bg-background flex-1' : 'border-r border-border/50 bg-card'}`}
+      className={`flex flex-col relative ${isMobileOverlay ? 'bg-background flex-1' : 'border-r border-border/30 bg-accent/40'}`}
       style={isMobileOverlay ? undefined : {
         width,
         transition: isDragging ? 'none' : 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -536,8 +536,8 @@ export function ConversationList({
     >
       {/* Header with space switcher and toggle button - hidden in mobile overlay (header is provided by parent) */}
       {!isMobileOverlay && (
-      <div className={`px-3 py-3 border-b border-border flex items-center gap-2 ${macTrafficLightPadding ? 'pt-10 drag-region' : ''}`}>
-        <div className="no-drag"><SpaceSwitcher /></div>
+      <div className={`px-4 py-3 border-b border-border flex items-center gap-2 ${macTrafficLightPadding ? 'pt-10 drag-region' : ''}`}>
+        <div className="no-drag flex-1"><SpaceSwitcher /></div>
         {onToggleCollapse && (
           <div className="relative flex-shrink-0 no-drag">
             <button
@@ -547,11 +547,11 @@ export function ConversationList({
               }}
               onMouseEnter={() => setShowCollapseTooltip(true)}
               onMouseLeave={() => setShowCollapseTooltip(false)}
-              className="p-1 hover:bg-muted rounded-lg transition-colors text-muted-foreground hover:text-foreground"
+              className="p-2 hover:bg-muted rounded-lg transition-colors text-muted-foreground hover:text-foreground"
               aria-label={t('Collapse sidebar')}
               aria-expanded={true}
             >
-              <PanelLeftClose size={18} />
+              <PanelLeftClose size={16} />
             </button>
             {showCollapseTooltip && (
               <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2 z-50 pointer-events-none">
@@ -574,7 +574,7 @@ export function ConversationList({
               setSelectionType('conversation')
               onNew()
             }}
-            className="flex-1 flex items-center justify-start gap-2 px-3 py-1.5
+            className="flex-1 flex items-center justify-start gap-3 pl-0 pr-3 py-1.5
               text-sm font-semibold text-foreground bg-muted/40 hover:bg-muted/60
               rounded-lg transition-all duration-150
               active:scale-[0.98]"
@@ -603,7 +603,7 @@ export function ConversationList({
       </div>
 
       {/* Unified task list */}
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden">
         {unifiedTasks.length === 0 ? (
           <div className="px-4 py-8 text-center text-sm text-muted-foreground">
             {t('No tasks yet')}

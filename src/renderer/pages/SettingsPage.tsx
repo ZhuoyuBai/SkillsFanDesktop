@@ -34,8 +34,12 @@ import { ResetSection } from '../components/settings/ResetSection'
 import { ScheduledTasksSection } from '../components/settings/ScheduledTasksSection'
 import { FeishuSettings } from '../components/settings/FeishuSettings'
 import { useTranslation, setLanguage, getCurrentLanguage, SUPPORTED_LOCALES, type LocaleCode } from '../i18n'
-import { Loader2, LogOut, Plus, Check, Globe, Key, MessageSquare, Bot, Palette, Server, Settings as SettingsIcon, Wifi, ExternalLink, X, Package, User, Layers, Lock, SlidersHorizontal, Clock, type LucideIcon } from 'lucide-react'
+import { Loader2, LogOut, Plus, Check, Globe, Key, MessageSquare, Bot, Palette, Server, Settings as SettingsIcon, Wifi, ExternalLink, X, Package, User, Layers, Lock, SlidersHorizontal, Clock, ArrowLeft, type LucideIcon } from 'lucide-react'
+import { usePlatform } from '../components/layout/Header'
+import { isElectron } from '../api/transport'
 import { useToastStore } from '../stores/toast.store'
+import type { ThinkingEffort } from '../../shared/utils/openai-models'
+import { getProviderLogoById } from '../components/layout/ModelSelector'
 import type { SkillsFanAuthState } from '../../shared/types/skillsfan'
 
 // Import provider logos
@@ -247,6 +251,9 @@ export function SettingsPage() {
   const { config, setConfig, goBack, settingsSection, setSettingsSection } = useAppStore()
   const { currentSpace } = useSpaceStore()
   const { addToast } = useToastStore()
+  const platform = usePlatform()
+  const isInElectron = isElectron()
+  const macTrafficLightPadding = isInElectron && platform.isMac
 
   // Active section state - use settingsSection from store if available
   const [activeSection, setActiveSection] = useState<SettingsSection>(() => {
@@ -275,6 +282,7 @@ export function SettingsPage() {
     status: string
     userCode?: string
     verificationUri?: string
+    error?: boolean
   } | null>(null)
   const [loggingOutProvider, setLoggingOutProvider] = useState<string | null>(null)
 
@@ -683,7 +691,11 @@ export function SettingsPage() {
       const completeResult = await api.authCompleteLogin(providerType, state)
       if (!completeResult.success) {
         console.error('[Settings] OAuth login complete failed:', completeResult.error)
-        setLoginState(null)
+        setLoginState({
+          provider: providerType,
+          status: t(completeResult.error || 'Login failed'),
+          error: true
+        })
         return
       }
 
@@ -797,80 +809,75 @@ export function SettingsPage() {
   ]
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-        onClick={handleBack}
-      />
+    <div className="h-full w-full flex bg-card">
+      {/* Left sidebar navigation */}
+      <nav className={`w-56 border-r border-border/50 flex flex-col bg-accent/40 ${macTrafficLightPadding ? 'pt-8' : ''}`}>
+        {/* macOS drag region */}
+        {macTrafficLightPadding && <div className="h-2 drag-region" />}
 
-      {/* Modal - responsive sizing based on viewport */}
-      <div className="relative w-[90vw] max-w-[1000px] h-[85vh] max-h-[800px] bg-background rounded-xl shadow-2xl flex overflow-hidden">
-        {/* Left sidebar navigation */}
-        <nav className="w-48 border-r border-border flex flex-col bg-card/30">
-          {/* Header */}
-          <div className="px-4 py-4 border-b border-border">
-            <h2 className="text-base font-medium">{t('Settings')}</h2>
-          </div>
+        {/* Back button */}
+        <div className="px-4 py-3">
+          <button
+            onClick={handleBack}
+            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors no-drag"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            {t('Back to app')}
+          </button>
+        </div>
 
-          <div className="flex-1 p-2 space-y-0.5">
-            {navItems
-              .filter(item => !item.hidden && (!item.desktopOnly || !api.isRemoteMode()))
-              .map(item => {
-                const Icon = item.icon
-                const isActive = activeSection === item.id
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => setActiveSection(item.id)}
-                    className={`w-full min-h-[36px] flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
-                      isActive
-                        ? 'bg-primary/10 text-primary font-medium'
-                        : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
-                    }`}
-                    title={item.label}
-                  >
-                    <Icon className="w-4 h-4 flex-shrink-0" />
-                    <span className="flex-1 truncate text-left">{item.label}</span>
-                  </button>
-                )
-              })}
-          </div>
+        <div className="flex-1 p-2 space-y-0.5">
+          {navItems
+            .filter(item => !item.hidden && (!item.desktopOnly || !api.isRemoteMode()))
+            .map(item => {
+              const Icon = item.icon
+              const isActive = activeSection === item.id
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveSection(item.id)}
+                  className={`w-full min-h-[36px] flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
+                    isActive
+                      ? 'bg-secondary text-foreground font-medium'
+                      : 'text-muted-foreground hover:bg-secondary/60 hover:text-foreground'
+                  }`}
+                  title={item.label}
+                >
+                  <Icon className="w-4 h-4 flex-shrink-0" />
+                  <span className="flex-1 truncate text-left">{item.label}</span>
+                </button>
+              )
+            })}
+        </div>
 
-          {/* About section at bottom */}
-          <div className="p-3 border-t border-border">
-            <div className="text-xs text-muted-foreground space-y-1">
-              <div className="flex justify-between items-center">
-                <span>{t('Version')}</span>
-                <span className="font-mono flex items-center gap-1.5">
-                  {appVersion}
-                  {updateStatus === 'available' && (
-                    <span className="w-2 h-2 rounded-full bg-primary animate-pulse" title={t('New version available')} />
-                  )}
-                </span>
-              </div>
+        {/* About section at bottom */}
+        <div className="p-3 border-t border-border/50">
+          <div className="text-xs text-muted-foreground space-y-1">
+            <div className="flex justify-between items-center">
+              <span>{t('Version')}</span>
+              <span className="font-mono flex items-center gap-1.5">
+                {appVersion}
+                {updateStatus === 'available' && (
+                  <span className="w-2 h-2 rounded-full bg-primary animate-pulse" title={t('New version available')} />
+                )}
+              </span>
             </div>
           </div>
-        </nav>
+        </div>
+      </nav>
 
-        {/* Right content area */}
-        <main className="flex-1 flex flex-col overflow-hidden">
-          {/* Content header with title and close button */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-            <h2 className="text-lg font-medium">
-              {navItems.find(item => item.id === activeSection)?.label}
-            </h2>
-            <button
-              onClick={handleBack}
-              className="p-1.5 hover:bg-secondary rounded-lg transition-colors text-muted-foreground hover:text-foreground"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
+      {/* Right content area */}
+      <main className="flex-1 flex flex-col overflow-hidden">
+        {/* Content header with title */}
+        <div className={`flex items-center px-8 py-5 border-b border-border/50 ${macTrafficLightPadding ? 'pt-12 drag-region' : ''}`}>
+          <h2 className="text-xl font-semibold no-drag">
+            {navItems.find(item => item.id === activeSection)?.label}
+          </h2>
+        </div>
 
           {/* Scrollable content */}
-          <div className="flex-1 overflow-auto p-6">
-            <div className="max-w-2xl">
+          <div className="flex-1 overflow-auto p-8">
+            <div className="max-w-3xl">
 
           {/* SkillsFan Account Section */}
           {activeSection === 'account' && !api.isRemoteMode() && (
@@ -888,6 +895,93 @@ export function SettingsPage() {
           {/* AI Model Section - Grid Layout */}
           {activeSection === 'ai-model' && (
           <section className="space-y-6">
+            {/* Account Login - OAuth Providers */}
+            {authProviders.filter(p => p.type !== 'custom' && p.enabled).length > 0 && (
+              <div className="bg-card rounded-xl border border-border p-5">
+                <h3 className="text-sm text-muted-foreground mb-4">{t('Account Login')}</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {authProviders
+                    .filter(p => p.type !== 'custom' && p.enabled)
+                    .map(p => {
+                      const providerConfig = config?.aiSources?.[p.type] as OAuthSourceConfig | undefined
+                      const isLoggedIn = providerConfig?.loggedIn === true
+                      const isLoggingIn = loginState?.provider === p.type
+                      const isLoggingOut = loggingOutProvider === p.type
+                      const displayName = typeof p.displayName === 'string'
+                        ? p.displayName
+                        : (p.displayName as Record<string, string>)[getCurrentLanguage()] || (p.displayName as Record<string, string>)['en'] || p.type
+                      const description = typeof p.description === 'string'
+                        ? p.description
+                        : (p.description as Record<string, string>)[getCurrentLanguage()] || (p.description as Record<string, string>)['en'] || ''
+                      const logo = getProviderLogoById(p.type)
+
+                      return (
+                        <div key={p.type}
+                          className="flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-border">
+                          <div className="w-10 h-10 rounded-lg overflow-hidden">
+                            {logo ? (
+                              <img src={logo} alt={displayName}
+                                className="w-full h-full object-cover rounded-lg" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center rounded-lg"
+                                style={{ backgroundColor: p.iconBgColor }}>
+                                <span className="text-white text-xs font-bold">
+                                  {displayName.slice(0, 2)}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                          <span className="text-sm font-medium">{displayName}</span>
+                          <span className="text-xs text-muted-foreground text-center">
+                            {isLoggedIn && providerConfig?.userEmail
+                              ? providerConfig.userEmail
+                              : description}
+                          </span>
+                          {isLoggedIn ? (
+                            <button onClick={() => handleOAuthLogout(p.type)} disabled={isLoggingOut}
+                              className="mt-1 px-4 py-1.5 text-xs text-muted-foreground hover:text-foreground border border-border rounded-lg transition-colors">
+                              {isLoggingOut ? <Loader2 className="w-3 h-3 animate-spin" /> : t('Log Out')}
+                            </button>
+                          ) : (
+                            <button onClick={() => handleOAuthLogin(p.type)} disabled={isLoggingIn}
+                              className="mt-1 px-4 py-1.5 text-xs bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors">
+                              {isLoggingIn ? <Loader2 className="w-3 h-3 animate-spin" /> : t('Log In')}
+                            </button>
+                          )}
+                        </div>
+                      )
+                    })}
+                </div>
+                {loginState && (
+                  <div className={`mt-3 rounded-lg p-3 text-sm ${
+                    loginState.error
+                      ? 'bg-destructive/10 text-destructive'
+                      : 'bg-secondary/50 text-muted-foreground'
+                  }`}>
+                    {loginState.error ? (
+                      <div className="space-y-2">
+                        <p>{loginState.status}</p>
+                        <button
+                          onClick={() => setLoginState(null)}
+                          className="text-xs text-muted-foreground hover:text-foreground underline"
+                        >{t('Dismiss')}</button>
+                      </div>
+                    ) : loginState.userCode ? (
+                      <div className="space-y-1">
+                        <p>{loginState.status}</p>
+                        <code className="text-primary font-mono text-lg">{loginState.userCode}</code>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>{loginState.status}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Provider Grid */}
             <div className="bg-card rounded-xl border border-border p-5">
               <h3 className="text-sm text-muted-foreground mb-4">{t('Select AI Provider')}</h3>
@@ -1303,8 +1397,8 @@ export function SettingsPage() {
                     value={config?.thinkingEffort ?? 'off'}
                     onChange={async (effort) => {
                       try {
-                        await api.setConfig({ thinkingEffort: effort as 'off' | 'low' | 'medium' | 'high' })
-                        setConfig({ ...config!, thinkingEffort: effort as 'off' | 'low' | 'medium' | 'high' } as HaloConfig)
+                        await api.setConfig({ thinkingEffort: effort as ThinkingEffort })
+                        setConfig({ ...config!, thinkingEffort: effort as ThinkingEffort } as HaloConfig)
                       } catch (error) {
                         console.error('[Settings] Failed to update thinking effort:', error)
                       }
@@ -1313,7 +1407,8 @@ export function SettingsPage() {
                       { value: 'off', label: t('Off') },
                       { value: 'low', label: t('Low') },
                       { value: 'medium', label: t('Medium') },
-                      { value: 'high', label: t('High') }
+                      { value: 'high', label: t('High') },
+                      { value: 'xhigh', label: t('Very High') }
                     ]}
                   />
                 </div>
@@ -1803,7 +1898,6 @@ export function SettingsPage() {
             </div>
           </div>
         </main>
-      </div>
     </div>
   )
 }

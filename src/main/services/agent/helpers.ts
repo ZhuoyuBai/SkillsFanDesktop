@@ -311,6 +311,16 @@ export function buildSystemPromptAppend(
   memoryEnabled?: boolean
 ): string {
   const modelLine = modelInfo ? `You are powered by ${modelInfo}.` : ''
+  const normalizedModel = modelInfo?.trim().toLowerCase() || ''
+  const isClaudeRuntimeModel = normalizedModel.includes('claude')
+  const modelIdentitySection = modelInfo ? `
+## Runtime Model Identity
+
+- The user-selected runtime model for this conversation is exactly: ${modelInfo}
+- If the user asks what model is running, answer with exactly that runtime model.
+- Never claim to be a different model just because an internal SDK, transport, router, or fallback model uses another name.
+${isClaudeRuntimeModel ? '' : '- Do not say you are Claude or mention Anthropic model IDs unless the user-selected runtime model is actually a Claude model.\n'}- Do not expose internal transport model names such as compatibility or fallback model IDs.
+` : ''
 
   // Read or auto-create MEMORY.md (long-term memory)
   // Skip temp space (artifacts dir) - only for real workspaces
@@ -365,6 +375,7 @@ You are SkillsFan (技能范), an AI assistant that helps users accomplish real 
 ${modelLine}
 All created files will be saved in the user's workspace. Current workspace: ${workDir}.
 ${memorySection}
+${modelIdentitySection}
 ## 任务规划工具
 
 你有两个关键的任务管理工具，根据场景灵活使用：

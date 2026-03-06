@@ -7,6 +7,7 @@ import {
   getApiTypeFromUrl,
   isValidEndpointUrl,
   getEndpointUrlError,
+  isChatGPTCodexResponsesUrl,
   shouldForceStream
 } from '../server/api-type'
 import {
@@ -47,6 +48,20 @@ describe('API Type Resolution', () => {
     it('should return false for invalid endpoint URLs', () => {
       expect(isValidEndpointUrl('https://api.openai.com')).toBe(false)
       expect(isValidEndpointUrl('https://api.openai.com/v1')).toBe(false)
+    })
+  })
+
+  describe('isChatGPTCodexResponsesUrl', () => {
+    it('should return true for ChatGPT Codex responses endpoint', () => {
+      expect(isChatGPTCodexResponsesUrl('https://chatgpt.com/backend-api/codex/responses')).toBe(true)
+    })
+
+    it('should return false for standard OpenAI responses endpoint', () => {
+      expect(isChatGPTCodexResponsesUrl('https://api.openai.com/v1/responses')).toBe(false)
+    })
+
+    it('should return false for non-responses ChatGPT Codex URLs', () => {
+      expect(isChatGPTCodexResponsesUrl('https://chatgpt.com/backend-api/codex/models')).toBe(false)
     })
   })
 

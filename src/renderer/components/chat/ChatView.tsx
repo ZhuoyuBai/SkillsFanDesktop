@@ -17,6 +17,7 @@ import { useAIBrowserStore } from '../../stores/ai-browser.store'
 import { useSmartScroll } from '../../hooks/useSmartScroll'
 import { MessageList } from './MessageList'
 import { InputArea } from './InputArea'
+import type { ThinkingEffort } from '../../../shared/utils/openai-models'
 import { ScrollToBottomButton } from './ScrollToBottomButton'
 import { UserQuestionCard } from './UserQuestionCard'
 import { PromptSuggestions } from './PromptSuggestions'
@@ -257,7 +258,7 @@ export function ChatView({ isCompact = false }: ChatViewProps) {
   const { enabled: aiBrowserEnabled } = useAIBrowserStore()
 
   // Handle send (with optional attachments for multi-modal messages, optional thinking effort)
-  const handleSend = async (content: string, attachments?: Attachment[], thinkingEffort?: 'off' | 'low' | 'medium' | 'high') => {
+  const handleSend = async (content: string, attachments?: Attachment[], thinkingEffort?: ThinkingEffort) => {
     // In onboarding mode, intercept and play mock response
     if (isOnboarding && currentStep === 'send-message') {
       handleOnboardingSend()

@@ -28,6 +28,7 @@ import { useAppStore } from './app.store'
 import { useToastStore } from './toast.store'
 import i18n from '../i18n'
 import { logger } from '../lib/logger'
+import type { ThinkingEffort } from '../../shared/utils/openai-models'
 
 // LRU cache size limit
 const CONVERSATION_CACHE_SIZE = 10
@@ -161,7 +162,7 @@ interface ChatState {
   touchConversation: (spaceId: string, conversationId: string) => Promise<boolean>
 
   // Messaging
-  sendMessage: (content: string, attachments?: Attachment[], aiBrowserEnabled?: boolean, thinkingEffort?: 'off' | 'low' | 'medium' | 'high') => Promise<void>
+  sendMessage: (content: string, attachments?: Attachment[], aiBrowserEnabled?: boolean, thinkingEffort?: ThinkingEffort) => Promise<void>
   stopGeneration: (conversationId?: string) => Promise<void>
   injectMessage: (content: string, attachments?: Attachment[]) => Promise<void>
 
@@ -708,7 +709,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const sfLoggedIn = useAppStore.getState().skillsfanLoggedIn
     const isOAuthSource = currentSourceConfig && typeof currentSourceConfig === 'object' && 'loggedIn' in currentSourceConfig
     const isCustomApiSource = currentSourceConfig && typeof currentSourceConfig === 'object' && 'apiKey' in currentSourceConfig && currentSourceConfig.apiKey
-    const isCurrentSourceAvailable = isCustomApiSource || (isOAuthSource && sfLoggedIn)
+    const isCurrentSourceAvailable = isCustomApiSource || (
+      isOAuthSource && (
+        currentAiSource === 'skillsfan-credits'
+          ? sfLoggedIn
+          : currentSourceConfig.loggedIn === true
+      )
+    )
 
     if (!appConfig || (!isCurrentSourceAvailable && !currentAiSource)) {
       logger.error('[ChatStore] No AI source configured')

@@ -6,6 +6,8 @@
  * enabling the agent service to remain channel-agnostic.
  */
 
+import type { ThinkingEffort } from '../utils/openai-models'
+
 // ============================================
 // Normalized Attachments
 // ============================================
@@ -18,8 +20,6 @@ export type NormalizedAttachment =
 // ============================================
 // Inbound Message (User → Agent)
 // ============================================
-
-export type ThinkingEffort = 'off' | 'low' | 'medium' | 'high'
 
 /**
  * Channel-agnostic inbound message.

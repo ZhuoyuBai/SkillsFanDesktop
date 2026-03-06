@@ -50,3 +50,11 @@ export function shouldForceStream(): boolean {
   const envValue = process.env.HALO_OPENAI_FORCE_STREAM
   return envValue === '1' || envValue === 'true' || envValue === 'yes'
 }
+
+/**
+ * ChatGPT-backed Codex Responses endpoint has extra request requirements
+ * compared to the public OpenAI Responses API.
+ */
+export function isChatGPTCodexResponsesUrl(url: string): boolean {
+  return url.startsWith('https://chatgpt.com/backend-api/codex/') && url.endsWith('/responses')
+}

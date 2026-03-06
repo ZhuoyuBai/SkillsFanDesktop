@@ -107,7 +107,7 @@ function SkillCard({ skill, onOpenFolder, onDelete, t }: {
   t: (key: string) => string
 }) {
   return (
-    <div className="border border-border rounded-lg p-4 hover:bg-secondary/30 transition-colors flex flex-col justify-between group">
+    <div className="border border-border/60 rounded-xl p-5 hover:bg-secondary/30 hover:shadow-sm transition-all flex flex-col justify-between group">
       <div>
         <h4 className="text-base font-semibold text-foreground truncate" title={skill.displayName || skill.name}>
           {skill.displayName || skill.name}
@@ -668,7 +668,7 @@ export function SkillList() {
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-3 gap-3 max-h-[420px] overflow-y-auto">
+        <div className="grid grid-cols-3 gap-4 max-h-[420px] overflow-y-auto">
           {skills.map((skill) => (
             <SkillCard
               key={`${skill.source?.kind || 'unknown'}-${skill.name}`}

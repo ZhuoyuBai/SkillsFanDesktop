@@ -19,6 +19,10 @@ import {
 } from '../../types'
 import { useTranslation, getCurrentLanguage } from '../../i18n'
 import { SKILLSFAN_PROVIDER_META } from '../../../shared/constants/providers'
+import {
+  normalizeThinkingEffortForModel,
+  type ThinkingEffort
+} from '../../../shared/utils/openai-models'
 
 // Import provider logos
 import zhipuLogo from '../../assets/providers/zhipu.jpg'
@@ -49,6 +53,7 @@ export const PROVIDER_LOGOS_BY_ID: Record<string, string> = {
   'deepseek': deepseekLogo,
   'claude': claudeLogo,
   'openai': openaiLogo,
+  'openai-codex': openaiLogo,
   'skillsfan-credits': skillsfanLogo,
 }
 
@@ -70,6 +75,7 @@ export const PROVIDER_NAMES: Record<string, string> = {
   'deepseek': 'DeepSeek',
   'claude': 'Claude',
   'openai': 'OpenAI',
+  'openai-codex': 'OpenAI (ChatGPT)',
   'custom': 'Custom',
 }
 
@@ -120,6 +126,22 @@ interface AuthProviderConfig {
   displayName: LocalizedText
   enabled: boolean
   recommended?: boolean
+}
+
+function isOAuthProviderConfig(value: unknown): value is OAuthSourceConfig {
+  return !!value && typeof value === 'object' && 'loggedIn' in value
+}
+
+function getOAuthModelIds(providerConfig?: OAuthSourceConfig): string[] {
+  if (!providerConfig) return []
+
+  const candidates = [
+    ...(Array.isArray(providerConfig.availableModels) ? providerConfig.availableModels : []),
+    ...Object.keys(providerConfig.modelNames || {}),
+    ...(providerConfig.model ? [providerConfig.model] : [])
+  ]
+
+  return Array.from(new Set(candidates.filter(Boolean)))
 }
 
 /**
@@ -245,36 +267,58 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
       }
     })
 
-  // Get all OAuth providers - only show when SkillsFan account is logged in
-  const allOAuthProviders = skillsfanLoggedIn
-    ? authProviders
-        .filter(p => p.type !== 'custom' && p.enabled)
-        .map(p => {
-          const providerConfig = (aiSources as Record<string, any>)[p.type] as OAuthSourceConfig | undefined
-          return {
-            type: p.type,
-            displayName: getLocalizedText(p.displayName),
-            config: providerConfig,
-            isLoggedIn: providerConfig?.loggedIn === true || skillsfanLoggedIn,
-            recommended: p.recommended
-          }
-        })
-    : []
+  // Get all OAuth providers - show regardless of SkillsFan login status
+  const providerMetaByType = new Map(
+    authProviders
+      .filter(p => p.type !== 'custom')
+      .map(provider => [provider.type, provider])
+  )
+  const oauthProviderTypes = Array.from(new Set([
+    ...Array.from(providerMetaByType.keys()),
+    ...Object.keys(aiSources).filter(key => {
+      if (key === 'current' || key === 'oauth' || key === 'custom') return false
+      return isOAuthProviderConfig((aiSources as Record<string, unknown>)[key])
+    })
+  ]))
 
-  const hasBuiltInOptions = allOAuthProviders.length > 0
-  const showSectionHeaders = hasBuiltInOptions && configuredCustomProviders.length > 0
+  const allOAuthProviders = oauthProviderTypes
+    .filter(type => {
+      const meta = providerMetaByType.get(type)
+      const providerConfig = (aiSources as Record<string, any>)[type] as OAuthSourceConfig | undefined
+      return meta?.enabled !== false || providerConfig?.loggedIn === true || currentSource === type
+    })
+    .map(type => {
+      const meta = providerMetaByType.get(type)
+      const providerConfig = (aiSources as Record<string, any>)[type] as OAuthSourceConfig | undefined
+      return {
+        type,
+        displayName: meta ? getLocalizedText(meta.displayName) : (PROVIDER_NAMES[type] || type),
+        config: providerConfig,
+        isLoggedIn: providerConfig?.loggedIn === true,
+        recommended: meta?.recommended
+      }
+    })
+
+  const hasPublicModels = skillsfanLoggedIn && publicModels.length > 0
+  const hasLoggedInOAuth = allOAuthProviders.some(p => p.isLoggedIn && p.config)
+  const hasCustomOrOAuth = configuredCustomProviders.length > 0 || hasLoggedInOAuth
+  const showBuiltInSectionHeader = hasPublicModels && hasCustomOrOAuth
+  const showCustomSectionHeader = hasCustomOrOAuth
 
   // Get current model display name
   // If logged out and current source is an OAuth provider (has 'loggedIn' field), treat as unconfigured
   const currentSourceObj = (aiSources as Record<string, any>)[currentSource]
   const isOAuthSource = currentSourceObj && typeof currentSourceObj === 'object' && 'loggedIn' in currentSourceObj
+  const isSkillsFanCreditsSource = currentSource === 'skillsfan-credits'
   const rawModelName = getCurrentModelName(config)
-  const isCurrentConfigured = (isOAuthSource && !skillsfanLoggedIn)
-    ? false
+  const isCurrentConfigured = isSkillsFanCreditsSource
+    ? skillsfanLoggedIn
     : isSourceConfigured(aiSources, currentSource)
   let currentModelName = rawModelName
   if (!isCurrentConfigured || rawModelName === 'No model') {
     currentModelName = t('model.addModel')
+  } else if (variant === 'header' && isOAuthSource && currentSourceObj?.loggedIn) {
+    currentModelName = `${rawModelName} (${t('Subscription')})`
   }
 
   // Handle model selection for any provider
@@ -282,7 +326,7 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
     const newAiSources = {
       ...aiSources,
       current: source
-    }
+    } as Record<string, any>
 
     // Get current provider config
     const providerConfig = aiSources[source] as OAuthSourceConfig | undefined
@@ -322,6 +366,10 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
 
     const newConfig = {
       ...config,
+      thinkingEffort: normalizeThinkingEffortForModel(
+        modelId,
+        (config.thinkingEffort as ThinkingEffort | undefined) ?? 'off'
+      ),
       aiSources: newAiSources
     }
 
@@ -335,7 +383,7 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
     const newAiSources = {
       ...aiSources,
       current: providerId
-    }
+    } as Record<string, any>
 
     // Get provider config and update legacy api field for compatibility
     const providerConfig = (aiSources as Record<string, any>)[providerId]
@@ -350,6 +398,10 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
 
     const newConfig = {
       ...config,
+      thinkingEffort: normalizeThinkingEffortForModel(
+        providerConfig?.model,
+        (config.thinkingEffort as ThinkingEffort | undefined) ?? 'off'
+      ),
       aiSources: newAiSources
     }
 
@@ -380,7 +432,7 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
     const newAiSources = {
       ...aiSources,
       current: providerType
-    }
+    } as Record<string, any>
 
     const newConfig = {
       ...config,
@@ -430,7 +482,7 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
     if (currentModelId) return currentModelId
 
     const currentProvider = allOAuthProviders.find(p => p.type === currentSource)
-    const availableModels = currentProvider?.config?.availableModels || []
+    const availableModels = getOAuthModelIds(currentProvider?.config)
     if (availableModels.length > 0) return availableModels[0]
 
     const sourcePublicModels = publicModels.filter(m => getPublicModelProviderType(m) === currentSource)
@@ -499,58 +551,24 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
           onScroll={handleDropdownScroll}
           className={`
             ${styles.dropdown}
-            min-w-[11rem] max-w-[16rem] max-h-[20rem] overflow-y-auto bg-card border border-border rounded-xl shadow-lg z-50 py-0
+            min-w-[13rem] max-w-[20rem] max-h-[20rem] overflow-y-auto bg-card border border-border rounded-xl shadow-lg z-50 py-0
             model-selector-scrollbar ${isDropdownScrolling ? 'model-selector-scrollbar--visible' : ''}
             animate-in fade-in-0 slide-in-from-top-2 duration-200
           `.trim().replace(/\s+/g, ' ')}
         >
-          {/* Public models from backend (shown for all users, no login required) */}
+          {/* Built-in models from backend (SkillsFan login required) */}
           {(() => {
-            const seenModelIds = new Set<string>()
+            if (!skillsfanLoggedIn || publicModels.length === 0) return null
 
-            // First: show models from logged-in providers (with full availableModels)
-            const loggedInElements = allOAuthProviders
+            // Collect model IDs from logged-in OAuth providers to dedup
+            const oauthModelIds = new Set<string>()
+            allOAuthProviders
               .filter(p => p.isLoggedIn && p.config?.availableModels?.length)
-              .map((provider) => (
-                <div key={provider.type}>
-                  {provider.config!.availableModels.map((modelId) => {
-                    if (seenModelIds.has(modelId)) return null
-                    seenModelIds.add(modelId)
-                    const displayName = provider.config?.modelNames?.[modelId] || modelId
-                    const isSelected = currentSource === provider.type && effectiveCurrentModelId === modelId
-                    const modelLogo = getModelLogo(modelId, displayName, provider.type)
-                    return (
-                      <button
-                        key={modelId}
-                        onClick={() => handleSelectModel(provider.type, modelId)}
-                        className={`w-full px-3 py-2 text-left text-sm transition-colors flex items-center gap-2.5 ${
-                          isSelected
-                            ? 'bg-primary/15 text-primary font-medium hover:bg-primary/20'
-                            : 'text-foreground hover:bg-secondary/80'
-                        }`}
-                      >
-                        {modelLogo ? (
-                          <img src={modelLogo} alt="" className="w-5 h-5 rounded object-cover flex-shrink-0" />
-                        ) : (
-                          <div className="w-5 h-5 rounded bg-muted flex items-center justify-center flex-shrink-0">
-                            <span className="text-xs text-muted-foreground">AI</span>
-                          </div>
-                        )}
-                        <span className="flex-1 truncate">{displayName}</span>
-                        {isSelected && <Check className="w-4 h-4 flex-shrink-0" />}
-                      </button>
-                    )
-                  })}
-                </div>
-              ))
+              .forEach(p => p.config!.availableModels.forEach((id: string) => oauthModelIds.add(id)))
 
-            // Then: show public models from backend (deduped against logged-in models)
-            // Only show when SkillsFan account is logged in
-            const publicElements = (skillsfanLoggedIn ? publicModels : [])
-              .filter(m => !seenModelIds.has(m.id))
+            const publicElements = publicModels
+              .filter(m => !oauthModelIds.has(m.id))
               .map((model) => {
-                seenModelIds.add(model.id)
-                // Find the best matching provider for this model
                 const providerType = getPublicModelProviderType(model)
                 const isSelected = currentSource === providerType && effectiveCurrentModelId === model.id
                 const modelLogo = getModelLogo(model.id, model.name, providerType)
@@ -558,17 +576,17 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
                   <button
                     key={model.id}
                     onClick={() => handleSelectModel(providerType, model.id)}
-                    className={`w-full px-3 py-2 text-left text-sm transition-colors flex items-center gap-2.5 ${
+                    className={`w-full px-3 py-2 text-left text-sm transition-colors flex items-center gap-2 ${
                       isSelected
                         ? 'bg-primary/15 text-primary font-medium hover:bg-primary/20'
                         : 'text-foreground hover:bg-secondary/80'
                     }`}
                   >
                     {modelLogo ? (
-                      <img src={modelLogo} alt="" className="w-5 h-5 rounded object-cover flex-shrink-0" />
+                      <img src={modelLogo} alt="" className="w-4 h-4 rounded object-cover flex-shrink-0" />
                     ) : (
-                      <div className="w-5 h-5 rounded bg-muted flex items-center justify-center flex-shrink-0">
-                        <span className="text-xs text-muted-foreground">AI</span>
+                      <div className="w-4 h-4 rounded bg-muted flex items-center justify-center flex-shrink-0">
+                        <span className="text-[10px] text-muted-foreground">AI</span>
                       </div>
                     )}
                     <span className="flex-1 truncate">{model.name}</span>
@@ -577,74 +595,73 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
                 )
               })
 
-            // If no models at all (backend empty + not logged in), fall back to provider names
-            if (loggedInElements.length === 0 && publicElements.length === 0) {
-              const providerElements = allOAuthProviders.map((provider) => {
-                const providerLogo = getProviderLogoById(provider.type)
-                const isSelected = currentSource === provider.type
+            if (publicElements.length === 0) return null
+
+            return [
+              ...(showBuiltInSectionHeader
+                ? [<SectionHeader key="built-in-models-header" label={t('Built-in Models')} />]
+                : []),
+              ...publicElements
+            ]
+          })()}
+
+          {/* Section header for custom API / OAuth providers */}
+          {showCustomSectionHeader && (
+            <SectionHeader label={t('Custom Models')} />
+          )}
+
+          {/* Logged-in OAuth providers as custom model entries */}
+          {allOAuthProviders
+            .filter(p => p.isLoggedIn && p.config)
+            .flatMap(provider => {
+              const logo = getProviderLogoById(provider.type)
+              const modelIds = getOAuthModelIds(provider.config)
+
+              return modelIds.map(modelId => {
+                const modelName = provider.config!.modelNames?.[modelId] || modelId
+                const isSelected = currentSource === provider.type && effectiveCurrentModelId === modelId
                 return (
                   <button
-                    key={provider.type}
-                    onClick={() => handleSelectOAuthProvider(provider.type, provider.displayName)}
-                    className={`w-full px-3 py-2 text-left text-sm transition-colors flex items-center gap-2.5 ${
+                    key={`${provider.type}:${modelId}`}
+                    onClick={() => handleSelectModel(provider.type, modelId)}
+                    className={`w-full px-3 py-2 text-left text-sm transition-colors flex items-center gap-2 ${
                       isSelected
                         ? 'bg-primary/15 text-primary font-medium hover:bg-primary/20'
                         : 'text-foreground hover:bg-secondary/80'
                     }`}
                   >
-                    {providerLogo ? (
-                      <img src={providerLogo} alt="" className="w-5 h-5 rounded object-cover flex-shrink-0" />
+                    {logo ? (
+                      <img src={logo} alt="" className="w-4 h-4 rounded object-cover flex-shrink-0" />
                     ) : (
-                      <div className="w-5 h-5 rounded bg-muted flex items-center justify-center flex-shrink-0">
-                        <span className="text-xs text-muted-foreground">AI</span>
+                      <div className="w-4 h-4 rounded bg-muted flex items-center justify-center flex-shrink-0">
+                        <span className="text-[10px] text-muted-foreground">AI</span>
                       </div>
                     )}
-                    <span className="flex-1 truncate">{provider.displayName}</span>
+                    <span className="flex-1 truncate">{modelName}</span>
                     {isSelected && <Check className="w-4 h-4 flex-shrink-0" />}
                   </button>
                 )
               })
+            })}
 
-              return [
-                ...(showSectionHeaders
-                  ? [<SectionHeader key="built-in-models-header" label={t('Built-in Models')} />]
-                  : []),
-                ...providerElements
-              ]
-            }
-
-            return [
-              ...(showSectionHeaders
-                ? [<SectionHeader key="built-in-models-header" label={t('Built-in Models')} />]
-                : []),
-              ...loggedInElements,
-              ...publicElements
-            ]
-          })()}
-
-          {/* Section header for custom API providers */}
-          {showSectionHeaders && (
-            <SectionHeader label={t('Custom Models')} />
-          )}
-
-          {/* Custom API Providers - shown after official */}
+          {/* Custom API Providers - shown after OAuth */}
           {configuredCustomProviders.map((provider, index) => {
             const isSelected = currentSource === provider.id
             return (
               <button
                 key={provider.id}
                 onClick={() => handleSelectProvider(provider.id)}
-                className={`w-full px-3 py-2 text-left text-sm transition-colors flex items-center gap-2.5 ${
+                className={`w-full px-3 py-2 text-left text-sm transition-colors flex items-center gap-2 ${
                   isSelected
                     ? 'bg-primary/15 text-primary font-medium hover:bg-primary/20'
                     : 'text-foreground hover:bg-secondary/80'
                 }`}
               >
                 {provider.logo ? (
-                  <img src={provider.logo} alt="" className="w-5 h-5 rounded object-cover flex-shrink-0" />
+                  <img src={provider.logo} alt="" className="w-4 h-4 rounded object-cover flex-shrink-0" />
                 ) : (
-                  <div className="w-5 h-5 rounded bg-muted flex items-center justify-center flex-shrink-0">
-                    <span className="text-xs text-muted-foreground">AI</span>
+                  <div className="w-4 h-4 rounded bg-muted flex items-center justify-center flex-shrink-0">
+                    <span className="text-[10px] text-muted-foreground">AI</span>
                   </div>
                 )}
                 <span className="flex-1 truncate">{provider.model || provider.name}</span>
@@ -661,9 +678,9 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
           {/* Add custom model - navigate to settings */}
           <button
             onClick={handleAddSource}
-            className="w-full px-3 py-2 text-left text-sm text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors flex items-center gap-2.5"
+            className="w-full px-3 py-2 text-left text-sm text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors flex items-center gap-2"
           >
-            <Plus className="w-5 h-5 flex-shrink-0" />
+            <Plus className="w-4 h-4 flex-shrink-0" />
             <span>{t('Custom Model')}</span>
           </button>
         </div>

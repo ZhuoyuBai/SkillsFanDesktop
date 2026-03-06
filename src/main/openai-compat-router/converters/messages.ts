@@ -191,15 +191,14 @@ export function convertAnthropicMessagesToOpenAIChat(
 // ============================================================================
 
 /**
- * Convert Anthropic system prompt to OpenAI Responses input item
- * Note: Responses API uses 'developer' role instead of 'system' for system-level instructions
+ * Extract Anthropic system prompt text for OpenAI Responses instructions.
  */
-export function convertAnthropicSystemToResponsesInput(
+export function extractAnthropicSystemText(
   system: string | AnthropicSystemBlock[] | undefined
-): OpenAIResponsesInputMessage | null {
+) : string | null {
   if (!system) return null
 
-  let sysText: string
+  let sysText = ''
 
   if (typeof system === 'string') {
     sysText = system
@@ -212,29 +211,17 @@ export function convertAnthropicSystemToResponsesInput(
     return null
   }
 
-  if (!sysText) return null
-
-  // Use 'system' role for compatibility (some providers don't support 'developer')
-  return {
-    role: 'system',
-    content: [{ type: 'input_text', text: sysText }]
-  }
+  const normalized = sysText.trim()
+  return normalized || null
 }
 
 /**
  * Convert Anthropic messages array to OpenAI Responses input items
  */
 export function convertAnthropicMessagesToResponsesInput(
-  messages: AnthropicMessage[] | undefined,
-  system: string | AnthropicSystemBlock[] | undefined
+  messages: AnthropicMessage[] | undefined
 ): OpenAIResponsesInputItem[] {
   const result: OpenAIResponsesInputItem[] = []
-
-  // Add system message if present
-  const systemMessage = convertAnthropicSystemToResponsesInput(system)
-  if (systemMessage) {
-    result.push(systemMessage)
-  }
 
   if (!messages || !Array.isArray(messages)) {
     return result

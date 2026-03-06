@@ -31,6 +31,7 @@ import type {
 import { getConfig, saveConfig } from '../config.service'
 import { getCustomProvider } from './providers/custom.provider'
 import { getGitHubCopilotProvider } from './providers/github-copilot.provider'
+import { getOpenAICodexProvider } from './providers/openai-codex.provider'
 import { createAllSkillsFanProviders, getOAuthToCustomFallbackMap } from './providers/skillsfan-providers'
 import { loadAuthProvidersAsync, isOAuthProvider as isOAuthProviderCheck, type LoadedProvider } from './auth-loader'
 import { decryptString, decryptTokens } from '../secure-storage.service'
@@ -67,6 +68,7 @@ class AISourceManager {
     // Register built-in providers immediately
     this.registerProvider(getCustomProvider())
     this.registerProvider(getGitHubCopilotProvider())
+    this.registerProvider(getOpenAICodexProvider())
     // Register all SkillsFan-proxied providers (GLM, MiniMax, SkillsFan Credits, etc.)
     for (const provider of createAllSkillsFanProviders()) {
       this.registerProvider(provider)
@@ -344,6 +346,11 @@ class AISourceManager {
       oauthConfig.modelPricing = data._modelPricing
     }
 
+    // Store ChatGPT account ID (for OpenAI ChatGPT backend-api auth)
+    if (data._chatgptAccountId) {
+      oauthConfig.chatgptAccountId = data._chatgptAccountId
+    }
+
     // Store as the active OAuth source
     aiSources.current = type
     aiSources[type] = oauthConfig
@@ -469,6 +476,10 @@ class AISourceManager {
           providerConfig.accessToken = refreshResult.data.accessToken
           providerConfig.refreshToken = refreshResult.data.refreshToken
           providerConfig.tokenExpires = refreshResult.data.expiresAt
+          // Update chatgptAccountId if provided (OpenAI Codex)
+          if ((refreshResult.data as any).chatgptAccountId !== undefined) {
+            providerConfig.chatgptAccountId = (refreshResult.data as any).chatgptAccountId
+          }
 
           saveConfig({ aiSources: freshAiSources } as any)
           console.log('[AISourceManager] Token refreshed and saved')

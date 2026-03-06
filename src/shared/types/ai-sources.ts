@@ -103,6 +103,8 @@ export interface OAuthSourceConfig extends AISourceBaseConfig {
   accessToken?: string
   refreshToken?: string
   tokenExpires?: number
+  /** ChatGPT account ID for backend-api auth (extracted from JWT) */
+  chatgptAccountId?: string
 }
 
 /**
