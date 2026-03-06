@@ -19,6 +19,7 @@ import { TodoCard, parseTodoInput } from '../tool/TodoCard'
 import { InlineActivity } from './InlineActivity'
 import type { Thought } from '../../types'
 import { useTranslation } from '../../i18n'
+import { getMatchingToolResult } from '../../../shared/utils/thought-dedupe'
 
 interface CollapsedThoughtProcessProps {
   thoughts: Thought[]
@@ -82,10 +83,7 @@ export function CollapsedThoughtProcess({
   const stats = useMemo(() => {
     const toolUses = thoughts.filter(t => t.type === 'tool_use' && !t.parentToolId && t.toolName !== 'TodoWrite')
     const completed = toolUses.filter(toolUse => {
-      return thoughts.some(t =>
-        t.type === 'tool_result' &&
-        t.id.includes(toolUse.id.replace('tool_use_', ''))
-      )
+      return !!getMatchingToolResult(thoughts, toolUse)
     }).length
     const running = toolUses.length - completed
 

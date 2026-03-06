@@ -495,9 +495,9 @@ export function SpacePage() {
               <div
                 ref={chatContainerRef}
                 className={`
-                  flex min-h-0 flex-col min-w-0 relative
+                  flex min-h-0 flex-col relative
                   ${hasBrowserTab ? '' : 'transition-[border-color] duration-300 ease-out'}
-                  ${isCanvasOpen ? 'border-r border-border/20' : 'flex-1 border-r border-transparent'}
+                  ${isCanvasOpen ? 'border-r border-border/20 min-w-0' : 'flex-1 border-r border-transparent min-w-[360px]'}
                   ${isCanvasTransitioning ? 'pointer-events-none' : ''}
                 `}
                 style={{

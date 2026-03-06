@@ -11,6 +11,7 @@ import { isAIBrowserTool } from '../ai-browser/tool-utils'
 import { activeSessions } from './session-manager'
 import { sendToRenderer } from './helpers'
 import type { ToolCall, UserQuestionInfo } from './types'
+import { sanitizeWebSearchInput } from './tool-input-utils'
 
 // ============================================
 // Tool Permission Types
@@ -57,6 +58,11 @@ export function createCanUseTool(
     _options: { signal: AbortSignal }
   ): Promise<ToolPermissionResult> => {
     console.log(`[Agent] canUseTool called - Tool: ${toolName}, Input:`, JSON.stringify(input).substring(0, 200))
+
+    if (toolName === 'WebSearch') {
+      const updatedInput = sanitizeWebSearchInput(input)
+      return { behavior: 'allow' as const, updatedInput }
+    }
 
     // Check file path tools - restrict to working directory
     const fileTools = ['Read', 'Write', 'Edit', 'Grep', 'Glob', 'NotebookEdit']

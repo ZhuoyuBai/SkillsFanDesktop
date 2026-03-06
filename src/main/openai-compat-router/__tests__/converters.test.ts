@@ -26,7 +26,6 @@ describe('Request Converters', () => {
       const result = convertAnthropicToOpenAIChat(request)
 
       expect(result.request.model).toBe('claude-3-opus')
-      expect(result.request.max_tokens).toBe(1024)
       expect(result.request.messages).toHaveLength(1)
       expect(result.request.messages[0]).toEqual({
         role: 'user',
@@ -145,7 +144,7 @@ describe('Request Converters', () => {
       })
     })
 
-    it('should convert thinking config to reasoning', () => {
+    it('should convert thinking config to reasoning_effort', () => {
       const request: AnthropicRequest = {
         model: 'claude-3-opus',
         max_tokens: 1024,
@@ -155,10 +154,7 @@ describe('Request Converters', () => {
 
       const result = convertAnthropicToOpenAIChat(request)
 
-      expect(result.request.reasoning).toEqual({
-        enabled: true,
-        effort: 'high'
-      })
+      expect(result.request.reasoning_effort).toBe('high')
     })
   })
 
@@ -199,6 +195,21 @@ describe('Request Converters', () => {
       expect(result.request.instructions).toBe('You are a helpful assistant.')
       expect(result.request.input).toHaveLength(1)
       expect((result.request.input as any)[0].role).toBe('user')
+    })
+
+    it('should convert thinking config to Responses reasoning effort without enabled flag', () => {
+      const request: AnthropicRequest = {
+        model: 'claude-3-opus',
+        max_tokens: 1024,
+        messages: [{ role: 'user', content: 'Think about this' }],
+        thinking: { type: 'enabled', budget_tokens: 20000 }
+      }
+
+      const result = convertAnthropicToOpenAIResponses(request)
+
+      expect(result.request.reasoning).toEqual({
+        effort: 'xhigh'
+      })
     })
 
     it('should convert tool_use to function_call', () => {

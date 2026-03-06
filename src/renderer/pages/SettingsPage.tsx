@@ -38,7 +38,6 @@ import { Loader2, LogOut, Plus, Check, Globe, Key, MessageSquare, Bot, Palette, 
 import { usePlatform } from '../components/layout/Header'
 import { isElectron } from '../api/transport'
 import { useToastStore } from '../stores/toast.store'
-import type { ThinkingEffort } from '../../shared/utils/openai-models'
 import { getProviderLogoById } from '../components/layout/ModelSelector'
 import type { SkillsFanAuthState } from '../../shared/types/skillsfan'
 
@@ -1389,35 +1388,6 @@ export function SettingsPage() {
               <h2 className="text-lg font-medium mb-4">{t('Advanced')}</h2>
 
               <div className="space-y-4">
-                {/* Thinking Effort Level */}
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <p className="font-medium">{t('Thinking Effort')}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {t('Controls depth of reasoning. Higher effort uses more tokens but produces better results for complex tasks.')}
-                    </p>
-                  </div>
-                  <Select
-                    variant="compact"
-                    value={config?.thinkingEffort ?? 'off'}
-                    onChange={async (effort) => {
-                      try {
-                        await api.setConfig({ thinkingEffort: effort as ThinkingEffort })
-                        setConfig({ ...config!, thinkingEffort: effort as ThinkingEffort } as HaloConfig)
-                      } catch (error) {
-                        console.error('[Settings] Failed to update thinking effort:', error)
-                      }
-                    }}
-                    options={[
-                      { value: 'off', label: t('Off') },
-                      { value: 'low', label: t('Low') },
-                      { value: 'medium', label: t('Medium') },
-                      { value: 'high', label: t('High') },
-                      { value: 'xhigh', label: t('Very High') }
-                    ]}
-                  />
-                </div>
-
                 {/* Cross-conversation Memory Toggle */}
                 <div className="flex items-center justify-between">
                   <div className="flex-1">

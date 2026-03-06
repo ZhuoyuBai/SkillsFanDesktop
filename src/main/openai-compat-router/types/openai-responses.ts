@@ -183,7 +183,6 @@ export interface OpenAIResponsesReasoningConfig {
   effort?: 'none' | 'low' | 'medium' | 'high' | 'xhigh'
   summary?: 'none' | 'concise' | 'detailed'
   include?: ('encrypted_content')[]
-  enabled?: boolean // Some providers use this
 }
 
 export interface OpenAIResponsesTextFormat {

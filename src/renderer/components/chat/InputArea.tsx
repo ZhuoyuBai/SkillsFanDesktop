@@ -194,9 +194,10 @@ export function InputArea({ onSend, onStop, onInject, isGenerating, isCompact = 
 
   // Settings navigation (must be before thinkingEffort init which reads config)
   const { config, setConfig, openSettingsWithSection } = useAppStore()
+  const storedThinkingEffort = (config?.thinkingEffort as ThinkingEffort | undefined) ?? 'off'
 
   const [thinkingEffort, setThinkingEffort] = useState<ThinkingEffort>(
-    (config?.thinkingEffort as ThinkingEffort) || 'medium'
+    storedThinkingEffort
   )
   const [showAttachMenu, setShowAttachMenu] = useState(false)  // Attachment menu visibility
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -217,6 +218,9 @@ export function InputArea({ onSend, onStop, onInject, isGenerating, isCompact = 
   })()
 
   const showThinkingEffortSelector = supportsThinkingEffortSelector(currentModelId)
+  const resolvedThinkingEffort = showThinkingEffortSelector
+    ? normalizeThinkingEffortForModel(currentModelId, storedThinkingEffort)
+    : 'off'
   const thinkingEffortOptions = useMemo(
     () => getSupportedThinkingEfforts(currentModelId).map((effort) => ({
       value: effort,
@@ -232,17 +236,10 @@ export function InputArea({ onSend, onStop, onInject, isGenerating, isCompact = 
   )
 
   useEffect(() => {
-    if (config?.thinkingEffort && config.thinkingEffort !== thinkingEffort) {
-      setThinkingEffort(config.thinkingEffort as ThinkingEffort)
+    if (resolvedThinkingEffort !== thinkingEffort) {
+      setThinkingEffort(resolvedThinkingEffort)
     }
-  }, [config?.thinkingEffort, thinkingEffort])
-
-  useEffect(() => {
-    const normalized = normalizeThinkingEffortForModel(currentModelId, thinkingEffort)
-    if (normalized !== thinkingEffort) {
-      setThinkingEffort(normalized)
-    }
-  }, [currentModelId, thinkingEffort])
+  }, [resolvedThinkingEffort, thinkingEffort])
 
   const handleThinkingEffortChange = useCallback(async (effort: ThinkingEffort) => {
     const normalized = normalizeThinkingEffortForModel(currentModelId, effort)

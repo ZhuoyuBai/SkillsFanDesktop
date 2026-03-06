@@ -20,6 +20,10 @@ import { CompactNotice } from './CompactNotice'
 import { BrowserTaskCard, isBrowserTool } from '../tool/BrowserTaskCard'
 import type { Message, Thought, CompactInfo, TextSegment } from '../../types'
 import { useTranslation } from '../../i18n'
+import {
+  getLatestVisibleActiveToolUseIds,
+  getMatchingToolResult
+} from '../../../shared/utils/thought-dedupe'
 
 interface MessageListProps {
   messages: Message[]
@@ -70,16 +74,20 @@ export function MessageList({
   // Extract real-time browser tool calls from streaming thoughts
   // This enables BrowserTaskCard to show operations as they happen
   const streamingBrowserToolCalls = useMemo(() => {
+    const visibleActiveToolUseIds = getLatestVisibleActiveToolUseIds(thoughts)
     return thoughts
-      .filter(t => t.type === 'tool_use' && t.toolName && isBrowserTool(t.toolName))
+      .filter(t =>
+        t.type === 'tool_use' &&
+        t.toolName &&
+        isBrowserTool(t.toolName) &&
+        (getMatchingToolResult(thoughts, t) || visibleActiveToolUseIds.has(t.id))
+      )
       .map(t => ({
         id: t.id,
         name: t.toolName!,
-        // Determine status: if there's a subsequent tool_result for this tool, it's complete
-        // Otherwise it's still running
-        status: thoughts.some(
-          r => r.type === 'tool_result' && r.id.startsWith(t.id.replace('_use', '_result'))
-        ) ? 'success' as const : 'running' as const,
+        status: getMatchingToolResult(thoughts, t)
+          ? 'success' as const
+          : 'running' as const,
         input: t.toolInput || {},
       }))
   }, [thoughts])

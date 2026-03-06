@@ -23,6 +23,10 @@ import {
 import { getToolIcon } from '../icons/ToolIcons'
 import type { Thought } from '../../types'
 import { useTranslation } from '../../i18n'
+import {
+  getLatestVisibleActiveToolUseIds,
+  getMatchingToolResult
+} from '../../../shared/utils/thought-dedupe'
 
 interface InlineActivityProps {
   thoughts: Thought[]
@@ -283,29 +287,24 @@ export function InlineActivity({
   const handleToggle = onToggleCollapse || (() => setInternalCollapsed(prev => !prev))
 
   // Helper: check if a tool_use has a corresponding tool_result
-  const hasResult = (toolUse: Thought) => {
-    return thoughts.some(t =>
-      t.type === 'tool_result' &&
-      t.id.includes(toolUse.id.replace('tool_use_', ''))
-    )
-  }
+  const hasResult = (toolUse: Thought) => !!getMatchingToolResult(thoughts, toolUse)
 
   // Helper: check if result is an error
   const isErrorResult = (toolUse: Thought) => {
-    const result = thoughts.find(t =>
-      t.type === 'tool_result' &&
-      t.id.includes(toolUse.id.replace('tool_use_', ''))
-    )
+    const result = getMatchingToolResult(thoughts, toolUse)
     return result?.isError || false
   }
 
   // Filter and process thoughts for display
   const activityItems = useMemo(() => {
+    const visibleActiveToolUseIds = getLatestVisibleActiveToolUseIds(thoughts)
+
     // Get all top-level tool_use thoughts (excluding TodoWrite which is shown separately)
     const topLevelTools = thoughts.filter(t =>
       t.type === 'tool_use' &&
       !t.parentToolId &&
-      t.toolName !== 'TodoWrite'  // TodoCard is rendered separately
+      t.toolName !== 'TodoWrite' &&  // TodoCard is rendered separately
+      (hasResult(t) || visibleActiveToolUseIds.has(t.id))
     )
 
     // For each tool_use, determine if it's complete and collect child tools for Skills
@@ -318,13 +317,13 @@ export function InlineActivity({
       let childTools: ChildToolItem[] = []
       if (isSkill) {
         // Find all child tool_use that belong to this Skill
-        const skillToolId = toolUse.id.replace('tool_use_', '')
         childTools = thoughts
           .filter(t =>
             t.type === 'tool_use' &&
             t.parentToolId &&
-            (t.parentToolId === toolUse.id || t.parentToolId.includes(skillToolId)) &&
-            t.toolName !== 'TodoWrite'
+            t.parentToolId === toolUse.id &&
+            t.toolName !== 'TodoWrite' &&
+            (hasResult(t) || visibleActiveToolUseIds.has(t.id))
           )
           .map(childTool => ({
             thought: childTool,

@@ -30,13 +30,21 @@ const VIEW_MODE_STORAGE_KEY = 'halo:artifact-view-mode'
 // Width constraints (in pixels) - Desktop only
 const MIN_WIDTH = 180 // Allow smaller width
 const MAX_WIDTH = 480
+const MAX_WIDTH_RATIO = 0.4 // Never exceed 40% of window width
 const COLLAPSED_WIDTH = 48
 const WIDTH_RATIO = 0.18 // 18% of window width
 
+// Get effective max width (capped by both absolute max and window ratio)
+function getEffectiveMaxWidth(): number {
+  if (typeof window === 'undefined') return MAX_WIDTH
+  return Math.min(MAX_WIDTH, Math.round(window.innerWidth * MAX_WIDTH_RATIO))
+}
+
 // Calculate width based on window width (clamped to constraints)
 function calculateWidth(windowWidth: number): number {
+  const effectiveMax = Math.min(MAX_WIDTH, Math.round(windowWidth * MAX_WIDTH_RATIO))
   const targetWidth = Math.round(windowWidth * WIDTH_RATIO)
-  return Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, targetWidth))
+  return Math.max(MIN_WIDTH, Math.min(effectiveMax, targetWidth))
 }
 
 function getDefaultWidth(): number {
@@ -187,7 +195,7 @@ export function ArtifactRail({
     const handleMouseMove = (e: MouseEvent) => {
       if (!railRef.current) return
       const newWidth = window.innerWidth - e.clientX
-      const clampedWidth = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, newWidth))
+      const clampedWidth = Math.min(getEffectiveMaxWidth(), Math.max(MIN_WIDTH, newWidth))
       setWidth(clampedWidth)
     }
 
@@ -429,7 +437,7 @@ export function ArtifactRail({
   return (
     <div
       ref={railRef}
-      className="h-full border-l border-border bg-card flex flex-col relative"
+      className="h-full border-l border-border bg-card flex flex-col relative flex-shrink-0"
       style={{
         width: displayWidth,
         // Disable transition when: dragging OR browser tab exists (to sync with native BrowserView)

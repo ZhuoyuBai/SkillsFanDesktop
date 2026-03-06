@@ -166,17 +166,14 @@ export function budgetTokensToReasoningEffort(budgetTokens: number | undefined):
 }
 
 /**
- * Convert Anthropic thinking config to OpenAI Chat reasoning config
+ * Convert Anthropic thinking config to OpenAI Chat reasoning_effort value.
  */
-export function convertAnthropicThinkingToOpenAIReasoning(
+export function convertAnthropicThinkingToOpenAIReasoningEffort(
   thinking: { type: 'enabled' | 'disabled'; budget_tokens?: number } | undefined
-): { enabled?: boolean; effort?: 'low' | 'medium' | 'high' } | undefined {
-  if (!thinking) return undefined
+): 'low' | 'medium' | 'high' | undefined {
+  if (!thinking || thinking.type !== 'enabled') return undefined
 
-  return {
-    enabled: thinking.type === 'enabled',
-    effort: budgetTokensToReasoningEffort(thinking.budget_tokens)
-  }
+  return budgetTokensToReasoningEffort(thinking.budget_tokens)
 }
 
 /**
@@ -184,11 +181,10 @@ export function convertAnthropicThinkingToOpenAIReasoning(
  */
 export function convertAnthropicThinkingToResponsesReasoning(
   thinking: { type: 'enabled' | 'disabled'; budget_tokens?: number } | undefined
-): { effort?: 'low' | 'medium' | 'high' | 'xhigh'; enabled?: boolean } | undefined {
-  if (!thinking) return undefined
+): { effort?: 'low' | 'medium' | 'high' | 'xhigh' } | undefined {
+  if (!thinking || thinking.type !== 'enabled') return undefined
 
   return {
-    enabled: thinking.type === 'enabled',
     effort: budgetTokensToResponsesReasoningEffort(thinking.budget_tokens)
   }
 }

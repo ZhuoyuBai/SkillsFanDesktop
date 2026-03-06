@@ -25,6 +25,7 @@ import {
   getApiCredentials
 } from './helpers'
 import { buildSdkOptions, resolveSdkTransport } from './sdk-options'
+import { isUsageLimitActive } from '../../openai-compat-router/server/request-handler'
 
 // ============================================
 // Session Maps
@@ -216,6 +217,12 @@ export async function ensureSessionWarm(
   spaceId: string,
   conversationId: string
 ): Promise<void> {
+  // Skip warm-up if provider is currently rate-limited (usage limit reached)
+  if (isUsageLimitActive()) {
+    console.log(`[Agent] Skipping session warm-up: provider usage limit active`)
+    return
+  }
+
   const config = getConfig()
   const workDir = getWorkingDir(spaceId)
   const conversation = getConversation(spaceId, conversationId)

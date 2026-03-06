@@ -145,6 +145,7 @@ describe('sdk-options', () => {
       expect(sdkOptions.abortController).toBe(abortController)
       expect(sdkOptions.maxThinkingTokens).toBeUndefined()
       expect(sdkOptions.mcpServers).toBeUndefined()
+      expect(sdkOptions.extraArgs).toBeUndefined()
       expect(sdkOptions.env.ANTHROPIC_API_KEY).toBe('encoded-key')
       expect(sdkOptions.env.ANTHROPIC_BASE_URL).toBe('http://router.local')
       expect(sdkOptions.systemPrompt.append).toBe('[BASE_PROMPT]')

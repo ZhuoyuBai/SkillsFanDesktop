@@ -26,6 +26,22 @@ import {
 } from './api-type'
 import { withRequestQueue, generateQueueKey } from './request-queue'
 
+// Track usage limit state to prevent unnecessary requests during rate limit periods
+let usageLimitResetsAt: number | null = null
+
+/**
+ * Check if the provider is currently rate-limited due to usage limit.
+ * Used by session warm-up to skip unnecessary API calls.
+ */
+export function isUsageLimitActive(): boolean {
+  if (!usageLimitResetsAt) return false
+  if (Date.now() / 1000 >= usageLimitResetsAt) {
+    usageLimitResetsAt = null
+    return false
+  }
+  return true
+}
+
 export interface RequestHandlerOptions {
   debug?: boolean
   timeoutMs?: number
@@ -38,14 +54,21 @@ function applyProviderRequestRequirements(
   apiType: 'responses' | 'chat_completions',
   openaiRequest: any
 ): any {
+  const sanitizedRequest = { ...openaiRequest }
+
+  if (apiType === 'responses' && sanitizedRequest.reasoning && typeof sanitizedRequest.reasoning === 'object') {
+    const { enabled: _enabled, ...reasoning } = sanitizedRequest.reasoning
+    sanitizedRequest.reasoning = Object.keys(reasoning).length > 0 ? reasoning : undefined
+  }
+
   if (apiType === 'responses' && isChatGPTCodexResponsesUrl(backendUrl)) {
     return {
-      ...openaiRequest,
+      ...sanitizedRequest,
       store: false
     }
   }
 
-  return openaiRequest
+  return sanitizedRequest
 }
 
 /**
@@ -115,6 +138,15 @@ export async function handleMessagesRequest(
   const { debug = false, timeoutMs = DEFAULT_TIMEOUT_MS } = options
   const { url: backendUrl, key: apiKey, model, headers: customHeaders, apiType: configApiType } = config
 
+  // Short-circuit if provider is in a known usage-limit period (avoid hitting upstream)
+  if (isUsageLimitActive()) {
+    const remainingSec = usageLimitResetsAt! - Math.floor(Date.now() / 1000)
+    const minutesLeft = Math.ceil(remainingSec / 60)
+    console.log(`[RequestHandler] Usage limit active, rejecting request (resets in ~${minutesLeft}min)`)
+    return sendError(res, 402, 'billing_error',
+      `Usage limit reached. Resets in ~${minutesLeft} minutes.`)
+  }
+
   // Validate URL has valid endpoint suffix
   if (!isValidEndpointUrl(backendUrl)) {
     return sendError(res, 400, 'invalid_request_error', getEndpointUrlError(backendUrl))
@@ -163,9 +195,31 @@ export async function handleMessagesRequest(
       if (!upstreamResp.ok) {
         const errorText = await upstreamResp.text().catch(() => '')
 
-        // Rate limit - return immediately
+        // Rate limit handling
         if (upstreamResp.status === 429) {
           console.error(`[RequestHandler] Provider 429: ${errorText.slice(0, 200)}`)
+
+          // Check if this is a hard usage limit (not transient rate limit)
+          // Return 402 instead of 429 to prevent SDK from retrying indefinitely
+          try {
+            const parsed = JSON.parse(errorText)
+            if (parsed?.error?.type === 'usage_limit_reached') {
+              // Record rate limit expiry for warm-up skip
+              if (parsed.error.resets_at) {
+                usageLimitResetsAt = parsed.error.resets_at
+              }
+              const resetsIn = parsed.error.resets_in_seconds
+              const minutesLeft = resetsIn ? Math.ceil(resetsIn / 60) : undefined
+              const msg = minutesLeft
+                ? `Usage limit reached. Resets in ~${minutesLeft} minutes.`
+                : `Usage limit reached.`
+              return sendError(res, 402, 'billing_error', msg)
+            }
+          } catch {
+            // JSON parse failed - treat as transient rate limit
+          }
+
+          // Transient rate limit - pass through 429 (SDK will retry with backoff)
           return sendError(res, 429, 'rate_limit_error', `Provider error: ${errorText || 'HTTP 429'}`)
         }
 

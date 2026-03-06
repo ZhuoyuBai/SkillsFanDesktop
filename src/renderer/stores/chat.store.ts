@@ -1142,7 +1142,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
     logger.debug(`[ChatStore] handleAgentError [${conversationId}]:`, error, 'code:', errorCode)
 
     // Show credits error dialog for 402 (insufficient credits)
-    if (errorCode === 402) {
+    // Skip for usage limit errors from third-party providers (e.g., OpenAI Codex)
+    if (errorCode === 402 && !error.includes('Usage limit reached')) {
       set({ showCreditsError: true })
     }
 
@@ -1330,10 +1331,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const newSessions = new Map(state.sessions)
       const session = newSessions.get(conversationId) || createEmptySessionState()
 
-      // Check if thought with same id already exists (avoid duplicates after recovery)
-      const existingIds = new Set(session.thoughts.map(t => t.id))
-      if (existingIds.has(thought.id)) {
-        logger.debug(`[ChatStore] Skipping duplicate thought: ${thought.id}`)
+      // Check if the same thought event already exists (avoid duplicates after recovery)
+      const thoughtKey = `${thought.type}:${thought.id}`
+      const existingKeys = new Set(session.thoughts.map(t => `${t.type}:${t.id}`))
+      if (existingKeys.has(thoughtKey)) {
+        logger.debug(`[ChatStore] Skipping duplicate thought: ${thoughtKey}`)
         return state // No change
       }
 

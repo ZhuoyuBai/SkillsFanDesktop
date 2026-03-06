@@ -154,9 +154,6 @@ export async function buildSdkOptions(params: BuildSdkOptionsParams): Promise<{
       // Enable Agent Teams (experimental feature)
       CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: '1'
     },
-    extraArgs: {
-      'dangerously-skip-permissions': null
-    },
     stderr: (data: string) => {
       onStderr(data)
     },

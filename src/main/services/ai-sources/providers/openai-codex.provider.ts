@@ -15,7 +15,7 @@
 
 import http from 'http'
 import crypto from 'crypto'
-import { shell } from 'electron'
+import { app, shell } from 'electron'
 import type {
   OAuthAISourceProvider,
   ProviderResult
@@ -395,20 +395,20 @@ class OpenAICodexProvider implements OAuthAISourceProvider {
           const message = errorDescription || error
           console.error('[OpenAICodex] OAuth callback error:', message)
           res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
-          res.end(buildCallbackPage('error', 'Login Failed', message))
+          res.end(buildCallbackPage('error', 'loginFailed', '', message))
           pendingAuth?.rejectCallback?.(new Error(message))
           return
         }
 
         if (!code) {
           res.writeHead(400, { 'Content-Type': 'text/html; charset=utf-8' })
-          res.end(buildCallbackPage('error', 'Error', 'Missing authorization code.'))
+          res.end(buildCallbackPage('error', 'error', 'missingCode'))
           return
         }
 
         // Return success page
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
-        res.end(buildCallbackPage('success', 'Login Successful!', 'You can close this window and return to SkillsFan.'))
+        res.end(buildCallbackPage('success', 'loginSuccess', 'successMessage'))
 
         // Resolve the callback promise
         pendingAuth?.resolveCallback?.({ code, state: callbackState || '' })
@@ -942,7 +942,52 @@ function escapeHtml(str: string): string {
     .replace(/'/g, '&#39;')
 }
 
-function buildCallbackPage(type: 'success' | 'error', title: string, message: string): string {
+const callbackPageI18n: Record<string, Record<string, string>> = {
+  en: {
+    loginSuccess: 'Login Successful!',
+    loginFailed: 'Login Failed',
+    error: 'Error',
+    successMessage: 'You can close this window and return to SkillsFan.',
+    missingCode: 'Missing authorization code.',
+    closeNow: 'You can close this window now.',
+    closeIn: 'This window will close in {s}s...',
+  },
+  'zh-CN': {
+    loginSuccess: '登录成功！',
+    loginFailed: '登录失败',
+    error: '错误',
+    successMessage: '您可以关闭此窗口并返回 SkillsFan。',
+    missingCode: '缺少授权码。',
+    closeNow: '您现在可以关闭此窗口。',
+    closeIn: '此窗口将在 {s} 秒后关闭...',
+  },
+  'zh-TW': {
+    loginSuccess: '登入成功！',
+    loginFailed: '登入失敗',
+    error: '錯誤',
+    successMessage: '您可以關閉此視窗並返回 SkillsFan。',
+    missingCode: '缺少授權碼。',
+    closeNow: '您現在可以關閉此視窗。',
+    closeIn: '此視窗將在 {s} 秒後關閉...',
+  },
+}
+
+function getCallbackLocale(): string {
+  const locale = app.getLocale().toLowerCase()
+  if (locale.startsWith('zh')) {
+    return locale.includes('tw') || locale.includes('hk') || locale.includes('hant') ? 'zh-TW' : 'zh-CN'
+  }
+  return 'en'
+}
+
+function buildCallbackPage(type: 'success' | 'error', titleKey: string, messageKey: string, rawMessage?: string): string {
+  const locale = getCallbackLocale()
+  const t = callbackPageI18n[locale] || callbackPageI18n.en
+  const title = t[titleKey] || titleKey
+  const message = rawMessage || t[messageKey] || messageKey
+  const closeNow = t.closeNow
+  const closeIn = t.closeIn
+
   const icon = type === 'success'
     ? '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>'
     : '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>'
@@ -966,8 +1011,10 @@ p{font-size:14px;color:#6b7280;line-height:1.5}
 </div>
 <script>
 let s=3;const el=document.getElementById('cd');
-function tick(){if(s<=0){window.close();el.textContent='You can close this window now.';return}
-el.textContent='This window will close in '+s+'s...';s--;setTimeout(tick,1000)}
+const closeNow=${JSON.stringify(closeNow)};
+const closeIn=${JSON.stringify(closeIn)};
+function tick(){if(s<=0){window.close();el.textContent=closeNow;return}
+el.textContent=closeIn.replace('{s}',s);s--;setTimeout(tick,1000)}
 tick();
 </script></body></html>`
 }

@@ -55,6 +55,7 @@ import {
   normalizeThinkingEffortForModel,
   thinkingEffortToBudgetTokens
 } from '../../../shared/utils/openai-models'
+import { isDuplicateActiveToolUse } from '../../../shared/utils/thought-dedupe'
 
 function getRuntimeModelDisplayName(config: Record<string, any>, modelId: string): string {
   const aiSources = config.aiSources || {}
@@ -426,6 +427,21 @@ async function sendMessageInternal(
       }
     }
 
+    // Try to extract friendly message from JSON error body embedded in error string
+    // e.g., 'API Error: 402 {"type":"error","error":{"type":"billing_error","message":"Usage limit reached. Resets in ~40 minutes."}}'
+    const jsonMatch = errorMessage.match(/\{[\s\S]*\}/)
+    if (jsonMatch) {
+      try {
+        const parsed = JSON.parse(jsonMatch[0])
+        const innerMsg = parsed?.error?.message || parsed?.message
+        if (innerMsg) {
+          errorMessage = innerMsg
+        }
+      } catch {
+        // Not valid JSON, keep original
+      }
+    }
+
     // Parse HTTP error codes from error messages (e.g., "402", "401", "503")
     let errorCode: number | undefined
     const httpCodeMatch = errorMessage.match(/\b(4\d{2}|5\d{2})\b/)
@@ -707,6 +723,20 @@ async function processMessageStream(
     const thought = parseSDKMessage(sdkMessage, displayModel, currentParentId)
 
     if (thought) {
+      if (sessionState.thoughts.some(
+        (existingThought) => existingThought.id === thought.id && existingThought.type === thought.type
+      )) {
+        console.log(`[Agent][${conversationId}] Skipping duplicate thought: ${thought.type} ${thought.id}`)
+        continue
+      }
+
+      if (thought.type === 'tool_use' && isDuplicateActiveToolUse(sessionState.thoughts, thought)) {
+        console.log(
+          `[Agent][${conversationId}] Skipping duplicate active tool_use: ${thought.toolName} ${JSON.stringify(thought.toolInput || {})}`
+        )
+        continue
+      }
+
       // Track Skill tool calls in stack (for parent-child relationship)
       if (thought.type === 'tool_use' && thought.isSkillInvocation) {
         activeToolStack.push({ id: thought.id, toolName: thought.toolName! })

@@ -8,6 +8,7 @@
  */
 
 import type { Thought, ImageAttachment, CanvasContext, Attachment, PdfAttachment, TextAttachment } from './types'
+import { sanitizeWebSearchInput } from './tool-input-utils'
 
 // ============================================
 // Canvas Context Formatting
@@ -211,13 +212,16 @@ export function parseSDKMessage(message: any, displayModel?: string, parentToolI
         // Tool use blocks
         if (block.type === 'tool_use') {
           const isSkillInvocation = block.name === 'Skill'
+          const toolInput = block.name === 'WebSearch' && block.input && typeof block.input === 'object'
+            ? sanitizeWebSearchInput(block.input as Record<string, unknown>)
+            : block.input
           return {
             id: block.id || generateThoughtId(),
             type: 'tool_use',
             content: `Tool call: ${block.name}`,
             timestamp,
             toolName: block.name,
-            toolInput: block.input,
+            toolInput,
             parentToolId,
             isSkillInvocation
           }

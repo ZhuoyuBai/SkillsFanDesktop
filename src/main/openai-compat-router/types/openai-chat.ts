@@ -199,11 +199,8 @@ export interface OpenAIChatRequest {
   logprobs?: boolean
   top_logprobs?: number
 
-  // Extended - Reasoning (some providers)
-  reasoning?: {
-    enabled?: boolean
-    effort?: 'low' | 'medium' | 'high'
-  }
+  // GPT-5 reasoning controls
+  reasoning_effort?: 'low' | 'medium' | 'high'
 }
 
 // ============================================================================

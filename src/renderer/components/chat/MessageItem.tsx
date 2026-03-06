@@ -30,6 +30,10 @@ import { MessageImages } from './ImageAttachmentPreview'
 import { HaloLogo } from '../brand/HaloLogo'
 import type { Message, Thought } from '../../types'
 import { useTranslation } from '../../i18n'
+import {
+  getLatestVisibleActiveToolUseIds,
+  getMatchingToolResult
+} from '../../../shared/utils/thought-dedupe'
 
 interface MessageItemProps {
   message: Message
@@ -241,12 +245,22 @@ export function MessageItem({ message, hideThoughts = false, isInContainer = fal
   // Note: Tool calls are stored in thoughts, not in message.toolCalls
   const browserToolCalls = useMemo(() => {
     const thoughts = message.thoughts || []
+    const visibleActiveToolUseIds = getLatestVisibleActiveToolUseIds(thoughts)
     return thoughts
-      .filter(t => t.type === 'tool_use' && t.toolName && isBrowserTool(t.toolName))
+      .filter(t =>
+        t.type === 'tool_use' &&
+        t.toolName &&
+        isBrowserTool(t.toolName) &&
+        (getMatchingToolResult(thoughts, t) || visibleActiveToolUseIds.has(t.id))
+      )
       .map(t => ({
         id: t.id,
         name: t.toolName!,
-        status: 'success' as const,  // Thoughts are recorded after completion
+        status: getMatchingToolResult(thoughts, t)?.isError
+          ? 'error' as const
+          : getMatchingToolResult(thoughts, t)
+            ? 'success' as const
+            : 'running' as const,
         input: t.toolInput || {},
       }))
   }, [message.thoughts])

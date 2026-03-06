@@ -26,6 +26,10 @@ import { AgentTaskCard } from '../tool/AgentTaskCard'
 import { HaloLogo } from '../brand/HaloLogo'
 import type { Thought, TimelineItem, TextSegment, TodoItem } from '../../types'
 import { useTranslation } from '../../i18n'
+import {
+  getLatestVisibleActiveToolUseIds,
+  getMatchingToolResult
+} from '../../../shared/utils/thought-dedupe'
 
 interface LinearStreamProps {
   thoughts: Thought[]
@@ -410,37 +414,13 @@ export function LinearStream({
   // Build timeline items from thoughts
   const timelineItems = useMemo(() => {
     const items: TimelineItem[] = []
-    const toolResultMap = new Map<string, { isError: boolean; duration?: number }>()
-
-    // First pass: collect all tool results
-    for (const thought of thoughts) {
-      if (thought.type === 'tool_result') {
-        // Extract tool_use id from tool_result id (e.g., 'tool_result_abc' -> 'abc')
-        const baseId = thought.id.replace('tool_result_', '').replace('_result', '')
-        toolResultMap.set(baseId, {
-          isError: thought.isError || false,
-          duration: thought.duration,
-        })
-      }
-    }
+    const visibleActiveToolUseIds = getLatestVisibleActiveToolUseIds(thoughts)
 
     // Helper to check if a tool_use is complete
-    const isToolComplete = (thought: Thought): boolean => {
-      const baseId = thought.id.replace('tool_use_', '')
-      return toolResultMap.has(baseId) || thoughts.some(
-        t => t.type === 'tool_result' && t.id.includes(baseId)
-      )
-    }
+    const isToolComplete = (thought: Thought): boolean => !!getMatchingToolResult(thoughts, thought)
 
     const getToolResult = (thought: Thought) => {
-      const baseId = thought.id.replace('tool_use_', '')
-      const result = toolResultMap.get(baseId)
-      if (result) return result
-
-      // Fallback: search in thoughts
-      const resultThought = thoughts.find(
-        t => t.type === 'tool_result' && t.id.includes(baseId)
-      )
+      const resultThought = getMatchingToolResult(thoughts, thought)
       if (resultThought) {
         return { isError: resultThought.isError || false, duration: resultThought.duration }
       }
@@ -472,6 +452,11 @@ export function LinearStream({
         // Skip TodoWrite - we'll render TodoCard separately
         if (thought.toolName === 'TodoWrite') continue
 
+        const isComplete = isToolComplete(thought)
+        if (!isComplete && !visibleActiveToolUseIds.has(thought.id)) {
+          continue
+        }
+
         // Check if this is a child of a Skill
         if (thought.parentToolId) {
           // Find the parent skill
@@ -484,7 +469,7 @@ export function LinearStream({
               type: 'tool_use',
               toolName: thought.toolName,
               toolInput: thought.toolInput,
-              isComplete: isToolComplete(thought),
+              isComplete,
               isError: result?.isError || false,
               duration: result?.duration,
               parentToolId: parentId,
@@ -502,7 +487,7 @@ export function LinearStream({
             timestamp: thought.timestamp,
             type: 'skill',
             skillName: String(thought.toolInput?.skill || 'skill'),
-            isComplete: isToolComplete(thought),
+            isComplete,
             isError: result?.isError || false,
             duration: result?.duration,
             childItems: childToolMap.get(thought.id) || [],
@@ -516,7 +501,7 @@ export function LinearStream({
             type: 'tool_use',
             toolName: thought.toolName,
             toolInput: thought.toolInput,
-            isComplete: isToolComplete(thought),
+            isComplete,
             isError: result?.isError || false,
             duration: result?.duration,
           })
@@ -644,13 +629,22 @@ export function LinearStream({
                 isLast={false}
               />
             )
-          case 'error':
+          case 'error': {
+            // Translate known error patterns
+            let errorContent = item.content || ''
+            const usageLimitMatch = errorContent.match(/^Usage limit reached\. Resets in ~(\d+) minutes\.$/)
+            if (usageLimitMatch) {
+              errorContent = t('Usage limit reached. Resets in ~{{minutes}} minutes.', { minutes: usageLimitMatch[1] })
+            } else if (errorContent === 'Usage limit reached.') {
+              errorContent = t('Usage limit reached.')
+            }
             return (
               <div key={item.id} className="py-1 text-xs text-destructive/70">
                 <XCircle size={14} className="inline mr-1" />
-                {item.content}
+                {errorContent}
               </div>
             )
+          }
           default:
             return null
         }
