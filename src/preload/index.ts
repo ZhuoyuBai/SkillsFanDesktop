@@ -26,6 +26,9 @@ export interface SkillsFanAPI {
 
   // Memory
   clearMemory: (scope: 'space' | 'all', spaceId?: string) => Promise<IpcResponse>
+  readMemoryMd: (spaceId: string) => Promise<IpcResponse>
+  saveMemoryMd: (spaceId: string, content: string) => Promise<IpcResponse>
+  getMemoryStats: (spaceId: string) => Promise<IpcResponse>
 
   // Space
   setActiveSpace: (spaceId: string) => Promise<IpcResponse>
@@ -484,6 +487,12 @@ const api: SkillsFanAPI = {
   // Memory
   clearMemory: (scope: 'space' | 'all', spaceId?: string) =>
     ipcRenderer.invoke('memory:clear', scope, spaceId),
+  readMemoryMd: (spaceId: string) =>
+    ipcRenderer.invoke('memory:read-md', spaceId),
+  saveMemoryMd: (spaceId: string, content: string) =>
+    ipcRenderer.invoke('memory:save-md', spaceId, content),
+  getMemoryStats: (spaceId: string) =>
+    ipcRenderer.invoke('memory:get-stats', spaceId),
 
   // Space
   setActiveSpace: (spaceId) => ipcRenderer.invoke('space:set-active', spaceId),

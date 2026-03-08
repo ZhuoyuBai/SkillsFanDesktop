@@ -9,6 +9,7 @@
 import type { Channel } from '../channel.interface'
 import type { NormalizedInboundMessage, NormalizedOutboundEvent } from '@shared/types/channel'
 import type { FeishuConfig, FeishuSessionMapping } from '@shared/types/feishu'
+import type { FeishuCardLocale } from '../../feishu'
 import type { ElectronChannel } from './electron.channel'
 import { app } from 'electron'
 import { getConfig, saveConfig, getActiveSpaceId } from '../../config.service'
@@ -29,9 +30,11 @@ import {
   buildPairingSuccessCard,
   buildRateLimitCard,
   buildCompleteCard,
-  buildFailedCard
+  buildFailedCard,
+  buildThinkingCardWithTools
 } from '../../feishu'
 import type { FeishuMessageEvent } from '../../feishu'
+import { summarizeToolCall, upsertToolSummary } from '../../feishu/tool-status'
 import { getChannelManager } from '../channel-manager'
 
 export class FeishuChannel implements Channel {
@@ -51,6 +54,13 @@ export class FeishuChannel implements Channel {
   private typingIntervals = new Map<string, ReturnType<typeof setInterval>>()
   /** Whether we have already sent final content/error for a conversation */
   private deliveredOutputs = new Set<string>()
+  /** Track tool call IDs that already triggered an approval card, to prevent duplicate notifications */
+  private approvedToolCalls = new Set<string>()
+  /** Track active tools per conversation for aggregated thinking card */
+  private activeTools = new Map<string, Array<{ key: string; text: string }>>()
+  /** Dedup inbound messages by messageId (飞书 WebSocket may retry) */
+  private processedMessages = new Map<string, number>()
+  private static readonly DEDUP_TTL_MS = 5 * 60 * 1000
 
   async initialize(): Promise<void> {
     const config = getConfig()
@@ -77,7 +87,7 @@ export class FeishuChannel implements Channel {
     }
   }
 
-  private getLocaleTag(): 'zh-CN' | 'zh-TW' | 'en' {
+  private getLocaleTag(): FeishuCardLocale {
     const locale = app.getLocale().toLowerCase()
     if (locale.startsWith('zh-tw') || locale.startsWith('zh-hk') || locale.startsWith('zh-mo')) {
       return 'zh-TW'
@@ -181,6 +191,7 @@ export class FeishuChannel implements Channel {
     this.typingIntervals.clear()
     this.thinkingCardIds.clear()
     this.messageBuffers.clear()
+    this.activeTools.clear()
 
     await this.botService.stop()
     this.messageHandler = null
@@ -242,24 +253,26 @@ export class FeishuChannel implements Channel {
 
       switch (actionType) {
         case 'tool_approve': {
+          const locale = this.getLocaleTag()
           handleToolApproval(conversationId, true)
           // Update card to show result
           if (action.messageId) {
             const toolName = value.toolName || 'Tool'
             await this.botService.updateCard(
               action.messageId,
-              buildToolApprovalResultCard(toolName, true)
+              buildToolApprovalResultCard(toolName, true, locale)
             ).catch(() => { /* ignore */ })
           }
           break
         }
         case 'tool_reject': {
+          const locale = this.getLocaleTag()
           handleToolApproval(conversationId, false)
           if (action.messageId) {
             const toolName = value.toolName || 'Tool'
             await this.botService.updateCard(
               action.messageId,
-              buildToolApprovalResultCard(toolName, false)
+              buildToolApprovalResultCard(toolName, false, locale)
             ).catch(() => { /* ignore */ })
           }
           break
@@ -282,6 +295,14 @@ export class FeishuChannel implements Channel {
   // ============================================
 
   private async handleIncomingMessage(event: FeishuMessageEvent): Promise<void> {
+    // Dedup: Feishu WebSocket may redeliver the same message on timeout/retry
+    if (this.processedMessages.has(event.messageId)) {
+      console.log(`[FeishuChannel] Duplicate message ignored: ${event.messageId}`)
+      return
+    }
+    this.processedMessages.set(event.messageId, Date.now())
+    this.cleanupProcessedMessages()
+
     const config = getConfig()
     const feishuConfig = (config as Record<string, unknown>).feishu as FeishuConfig | undefined
     if (!feishuConfig) return
@@ -342,7 +363,8 @@ export class FeishuChannel implements Channel {
     } catch (err) {
       console.error('[FeishuChannel] Failed to send message to agent:', err)
       await this.botService.sendCard(chatId, buildErrorCard(
-        err instanceof Error ? err.message : 'Failed to process message'
+        err instanceof Error ? err.message : 'Failed to process message',
+        this.getLocaleTag()
       ))
     }
   }
@@ -355,7 +377,7 @@ export class FeishuChannel implements Channel {
       const result = this.accessControl.verifyPairingCode(event.chatId, text, config)
 
       if (result.rateLimited) {
-        await this.botService.sendCard(event.chatId, buildRateLimitCard())
+        await this.botService.sendCard(event.chatId, buildRateLimitCard(this.getLocaleTag()))
         return
       }
 
@@ -364,13 +386,13 @@ export class FeishuChannel implements Channel {
         const newAllowed = [...config.allowedChatIds, event.chatId]
         saveConfig({ feishu: { ...config, allowedChatIds: newAllowed } } as Record<string, unknown>)
 
-        await this.botService.sendCard(event.chatId, buildPairingSuccessCard())
+        await this.botService.sendCard(event.chatId, buildPairingSuccessCard(this.getLocaleTag()))
         return
       }
     }
 
     // Send pairing prompt
-    await this.botService.sendCard(event.chatId, buildPairingPromptCard())
+    await this.botService.sendCard(event.chatId, buildPairingPromptCard(this.getLocaleTag()))
   }
 
   private t(key: string, params?: Record<string, string | number | boolean>): string {
@@ -516,13 +538,16 @@ export class FeishuChannel implements Channel {
     switch (event.type) {
       case 'agent:start': {
         // Send thinking card
-        const msgId = await this.botService.sendCard(chatId, buildThinkingCard())
+        const locale = this.getLocaleTag()
+        const msgId = await this.botService.sendCard(chatId, buildThinkingCard(locale))
         if (msgId) {
           this.thinkingCardIds.set(convId, msgId)
         }
         // Reset message buffer
         this.messageBuffers.set(convId, '')
         this.deliveredOutputs.delete(convId)
+        this.approvedToolCalls.clear()
+        this.activeTools.set(convId, [])
         break
       }
 
@@ -556,18 +581,50 @@ export class FeishuChannel implements Channel {
       }
 
       case 'agent:tool-call': {
+        const locale = this.getLocaleTag()
         const toolName = payload.name as string || 'unknown'
-        const toolInput = payload.input as string || ''
+        const toolInput = payload.input as Record<string, unknown> | undefined
         const requiresApproval = payload.requiresApproval as boolean
+        const toolCallId = payload.id as string || ''
+
+        // Skip tools that already have an approval card (prevents duplicate notification
+        // from permission-handler + SDK stream both emitting agent:tool-call)
+        if (this.approvedToolCalls.has(toolName)) {
+          break
+        }
 
         if (requiresApproval) {
-          const toolCallId = payload.id as string || ''
+          this.approvedToolCalls.add(toolName)
+          const inputStr = toolInput ? JSON.stringify(toolInput, null, 2) : ''
           await this.botService.sendCard(
             chatId,
-            buildToolApprovalCard(toolName, toolInput, convId, toolCallId)
+            buildToolApprovalCard(toolName, inputStr, convId, toolCallId, locale)
           )
         } else {
-          await this.botService.sendText(chatId, `🔧 调用工具: ${toolName}`)
+          // Suppress notifications for internal/high-frequency tools to reduce noise
+          const SILENT_TOOLS = new Set([
+            'TodoWrite', 'Read', 'Grep', 'Glob', 'Write', 'Edit',
+            'ToolSearch', 'Skill', 'NotebookEdit'
+          ])
+          if (!SILENT_TOOLS.has(toolName)) {
+            // Aggregate tool calls into the thinking card instead of sending separate messages
+            const tools = upsertToolSummary(
+              this.activeTools.get(convId) || [],
+              summarizeToolCall(locale, toolName, toolInput)
+            )
+            this.activeTools.set(convId, tools)
+
+            const thinkingMsgId = this.thinkingCardIds.get(convId)
+            if (thinkingMsgId) {
+              await this.botService.updateCard(
+                thinkingMsgId,
+                buildThinkingCardWithTools(
+                  tools.map((tool) => tool.text),
+                  locale
+                )
+              ).catch(() => { /* ignore update errors */ })
+            }
+          }
         }
         break
       }
@@ -580,7 +637,7 @@ export class FeishuChannel implements Channel {
         if (options.length > 0) {
           await this.botService.sendCard(
             chatId,
-            buildUserQuestionCard(question, options, convId, questionId)
+            buildUserQuestionCard(question, options, convId, questionId, this.getLocaleTag())
           )
         } else {
           await this.botService.sendText(chatId, `❓ ${question}`)
@@ -590,8 +647,9 @@ export class FeishuChannel implements Channel {
 
       case 'agent:error': {
         const errorMsg = payload.error as string || payload.message as string || 'Unknown error'
-        await this.botService.sendCard(chatId, buildErrorCard(errorMsg))
+        await this.botService.sendCard(chatId, buildErrorCard(errorMsg, this.getLocaleTag()))
         this.deliveredOutputs.add(convId)
+        this.activeTools.delete(convId)
         await this.clearThinkingCard(convId, 'error')
         break
       }
@@ -608,6 +666,7 @@ export class FeishuChannel implements Channel {
             this.deliveredOutputs.add(convId)
           }
         }
+        this.activeTools.delete(convId)
         await this.clearThinkingCard(convId)
         this.deliveredOutputs.delete(convId)
         break
@@ -637,12 +696,23 @@ export class FeishuChannel implements Channel {
       try {
         await this.botService.updateCard(
           thinkingMsgId,
-          status === 'error' ? buildFailedCard() : buildCompleteCard()
+          status === 'error'
+            ? buildFailedCard(this.getLocaleTag())
+            : buildCompleteCard(this.getLocaleTag())
         )
       } catch {
         // Ignore errors updating the thinking card
       }
       this.thinkingCardIds.delete(conversationId)
+    }
+  }
+
+  private cleanupProcessedMessages(): void {
+    const now = Date.now()
+    for (const [id, ts] of this.processedMessages) {
+      if (now - ts > FeishuChannel.DEDUP_TTL_MS) {
+        this.processedMessages.delete(id)
+      }
     }
   }
 }

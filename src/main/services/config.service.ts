@@ -12,7 +12,8 @@ import { atomicWriteJsonSync, atomicWriteJson, safeReadJsonSync, safeReadJson, c
 
 // Import analytics config type
 import type { AnalyticsConfig } from './analytics/types'
-import type { AISourcesConfig, CustomSourceConfig } from '../../shared/types'
+import type { AISourcesConfig, CustomSourceConfig, WebToolsConfig } from '../../shared/types'
+import { DEFAULT_WEB_TOOLS_CONFIG, normalizeWebToolsConfig } from './web-tools/config'
 
 // ============================================================================
 // Config Change Notification (EventEmitter Pattern)
@@ -119,6 +120,13 @@ interface HaloConfig {
     enabled: boolean       // Master toggle, default true
     retentionDays: number  // 0 = forever, 7/30/180
   }
+  // Custom instructions appended to system prompt
+  customInstructions?: {
+    enabled: boolean
+    content: string
+  }
+  // Local web tool settings (search/fetch provider configuration)
+  tools?: WebToolsConfig
   // Feishu bot integration (remote control via chat)
   feishu?: {
     enabled: boolean
@@ -236,7 +244,12 @@ const DEFAULT_CONFIG: HaloConfig = {
   memory: {
     enabled: true,
     retentionDays: 0  // 0 = forever
-  }
+  },
+  customInstructions: {
+    enabled: false,
+    content: ''
+  },
+  tools: DEFAULT_WEB_TOOLS_CONFIG
 }
 
 // Active space tracker (in-memory, not persisted)
@@ -380,7 +393,8 @@ function mergeConfigWithDefaults(parsed: Record<string, any>): HaloConfig {
     // spaces: merge with defaults
     spaces: { ...DEFAULT_CONFIG.spaces, ...parsed.spaces },
     // memory: merge with defaults
-    memory: { ...DEFAULT_CONFIG.memory, ...parsed.memory }
+    memory: { ...DEFAULT_CONFIG.memory, ...parsed.memory },
+    tools: normalizeWebToolsConfig(parsed.tools)
   }
 }
 
@@ -422,6 +436,24 @@ function applyConfigUpdates(currentConfig: HaloConfig, config: Partial<HaloConfi
   // memory: merge with current config
   if (config.memory) {
     newConfig.memory = { ...currentConfig.memory, ...config.memory }
+  }
+  if (config.tools) {
+    newConfig.tools = normalizeWebToolsConfig({
+      ...currentConfig.tools,
+      ...config.tools,
+      web: {
+        ...currentConfig.tools?.web,
+        ...config.tools.web,
+        search: {
+          ...currentConfig.tools?.web?.search,
+          ...config.tools.web?.search
+        },
+        fetch: {
+          ...currentConfig.tools?.web?.fetch,
+          ...config.tools.web?.fetch
+        }
+      }
+    })
   }
 
   return newConfig

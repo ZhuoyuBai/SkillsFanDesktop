@@ -43,6 +43,8 @@ export interface BuildSdkOptionsParams {
   thinkingEnabled?: boolean
   includeSkillMcp?: boolean
   ralphSystemPromptAppend?: string
+  /** Whether the API goes through the OpenAI-compat router (non-Anthropic backend) */
+  routed?: boolean
 }
 
 /**
@@ -110,7 +112,8 @@ export async function buildSdkOptions(params: BuildSdkOptionsParams): Promise<{
     aiBrowserEnabled = false,
     thinkingEnabled = false,
     includeSkillMcp = false,
-    ralphSystemPromptAppend = ''
+    ralphSystemPromptAppend = '',
+    routed = false
   } = params
 
   // Load custom agent definitions from .claude/agents/*.md
@@ -123,6 +126,10 @@ export async function buildSdkOptions(params: BuildSdkOptionsParams): Promise<{
   const mcpServers: Record<string, any> = enabledMcp ? { ...enabledMcp } : {}
   const addedMcpServers: string[] = []
 
+  const { createWebToolsMcpServer } = await import('../web-tools/sdk-mcp-server')
+  mcpServers['web-tools'] = createWebToolsMcpServer()
+  addedMcpServers.push('web-tools')
+
   if (aiBrowserEnabled) {
     const { createAIBrowserMcpServer } = await import('../ai-browser/sdk-mcp-server')
     mcpServers['ai-browser'] = createAIBrowserMcpServer()
@@ -133,6 +140,26 @@ export async function buildSdkOptions(params: BuildSdkOptionsParams): Promise<{
     mcpServers['skill'] = await createSkillMcpServer()
     addedMcpServers.push('skill')
   }
+
+  const builtInTools = [
+    // Core file tools
+    'Read', 'Write', 'Edit', 'Grep', 'Glob',
+    // Execution
+    'Bash',
+    // Task management — let Claude create visual task checklists
+    'TodoWrite', 'TaskOutput',
+    // Notebook — let Claude edit Jupyter notebooks
+    'NotebookEdit',
+    // Sub-agent — parallel task execution (permission via canUseTool)
+    'Task',
+    // User interaction — let Claude ask clarifying questions
+    'AskUserQuestion',
+    // Agent Teams — multi-agent coordination
+    'TeamCreate', 'TeamDelete', 'SendMessage',
+    'TaskCreate', 'TaskUpdate', 'TaskList', 'TaskGet',
+    // Planning and isolation
+    'EnterPlanMode', 'EnterWorktree',
+  ]
 
   const sdkOptions: Record<string, any> = {
     model: sdkModel,
@@ -163,29 +190,14 @@ export async function buildSdkOptions(params: BuildSdkOptionsParams): Promise<{
       append: buildSystemPromptAppend(workDir, credentialsModel, config.memory?.enabled)
         + (aiBrowserEnabled ? AI_BROWSER_SYSTEM_PROMPT : '')
         + ralphSystemPromptAppend
+        + (config.customInstructions?.enabled && config.customInstructions?.content
+          ? `\n\n## User Custom Instructions\n\n${config.customInstructions.content}\n`
+          : '')
     },
     maxTurns: 50,
-    allowedTools: [
-      // Core file tools
-      'Read', 'Write', 'Edit', 'Grep', 'Glob',
-      // Execution
-      'Bash',
-      // Web access — let Claude search and fetch from the internet
-      'WebFetch', 'WebSearch',
-      // Task management — let Claude create visual task checklists
-      'TodoWrite', 'TaskOutput',
-      // Notebook — let Claude edit Jupyter notebooks
-      'NotebookEdit',
-      // Sub-agent — parallel task execution (permission via canUseTool)
-      'Task',
-      // User interaction — let Claude ask clarifying questions
-      'AskUserQuestion',
-      // Agent Teams — multi-agent coordination
-      'TeamCreate', 'TeamDelete', 'SendMessage',
-      'TaskCreate', 'TaskUpdate', 'TaskList', 'TaskGet',
-      // Planning and isolation
-      'EnterPlanMode', 'EnterWorktree',
-    ],
+    allowedTools: builtInTools,
+    tools: builtInTools,
+    disallowedTools: ['WebSearch', 'WebFetch'],
     permissionMode: 'acceptEdits' as const,
     canUseTool: createCanUseTool(workDir, spaceId, conversationId),
     includePartialMessages: true,

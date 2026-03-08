@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   ensureOpenAICompatRouter: vi.fn(),
   encodeBackendConfig: vi.fn(),
   createAIBrowserMcpServer: vi.fn(),
+  createWebToolsMcpServer: vi.fn(),
   createSkillMcpServer: vi.fn(),
   createCanUseTool: vi.fn(),
   buildSystemPromptAppend: vi.fn(),
@@ -22,6 +23,10 @@ vi.mock('../../../../src/main/services/ai-browser/prompt', () => ({
 
 vi.mock('../../../../src/main/services/ai-browser/sdk-mcp-server', () => ({
   createAIBrowserMcpServer: mocks.createAIBrowserMcpServer
+}))
+
+vi.mock('../../../../src/main/services/web-tools/sdk-mcp-server', () => ({
+  createWebToolsMcpServer: mocks.createWebToolsMcpServer
 }))
 
 vi.mock('../../../../src/main/services/skill', () => ({
@@ -46,6 +51,7 @@ describe('sdk-options', () => {
     mocks.ensureOpenAICompatRouter.mockResolvedValue({ baseUrl: 'http://router.local' })
     mocks.encodeBackendConfig.mockReturnValue('encoded-backend-config')
     mocks.createAIBrowserMcpServer.mockReturnValue({ type: 'stdio', command: 'ai-browser' })
+    mocks.createWebToolsMcpServer.mockReturnValue({ type: 'stdio', command: 'web-tools' })
     mocks.createSkillMcpServer.mockResolvedValue({ type: 'stdio', command: 'skill' })
     mocks.createCanUseTool.mockReturnValue(vi.fn())
     mocks.buildSystemPromptAppend.mockReturnValue('[BASE_PROMPT]')
@@ -54,18 +60,38 @@ describe('sdk-options', () => {
   })
 
   describe('resolveSdkTransport', () => {
-    it('returns raw anthropic transport when provider is anthropic', async () => {
+    it('returns raw anthropic transport only for native anthropic server tools', async () => {
       const result = await resolveSdkTransport({
         provider: 'anthropic',
         baseUrl: 'https://api.anthropic.com',
         apiKey: 'anthropic-key',
-        model: 'claude-3-7-sonnet'
+        model: 'claude-3-7-sonnet',
+        nativeAnthropicServerTools: true
       })
 
       expect(result).toEqual({
         anthropicBaseUrl: 'https://api.anthropic.com',
         anthropicApiKey: 'anthropic-key',
         sdkModel: 'claude-3-7-sonnet',
+        routed: false
+      })
+      expect(mocks.ensureOpenAICompatRouter).not.toHaveBeenCalled()
+      expect(mocks.encodeBackendConfig).not.toHaveBeenCalled()
+    })
+
+    it('keeps anthropic-compatible providers on direct anthropic transport', async () => {
+      const result = await resolveSdkTransport({
+        provider: 'anthropic',
+        baseUrl: 'https://api.minimaxi.com/anthropic',
+        apiKey: 'minimax-key',
+        model: 'MiniMax-M2.1',
+        nativeAnthropicServerTools: false
+      })
+
+      expect(result).toEqual({
+        anthropicBaseUrl: 'https://api.minimaxi.com/anthropic',
+        anthropicApiKey: 'minimax-key',
+        sdkModel: 'MiniMax-M2.1',
         routed: false
       })
       expect(mocks.ensureOpenAICompatRouter).not.toHaveBeenCalled()
@@ -139,12 +165,14 @@ describe('sdk-options', () => {
         onStderr
       })
 
-      expect(addedMcpServers).toEqual([])
+      expect(addedMcpServers).toEqual(['web-tools'])
       expect(sdkOptions.model).toBe('claude-sonnet-4-20250514')
       expect(sdkOptions.cwd).toBe('/tmp/space-1')
       expect(sdkOptions.abortController).toBe(abortController)
       expect(sdkOptions.maxThinkingTokens).toBeUndefined()
-      expect(sdkOptions.mcpServers).toBeUndefined()
+      expect(sdkOptions.mcpServers).toEqual({
+        'web-tools': { type: 'stdio', command: 'web-tools' }
+      })
       expect(sdkOptions.extraArgs).toBeUndefined()
       expect(sdkOptions.env.ANTHROPIC_API_KEY).toBe('encoded-key')
       expect(sdkOptions.env.ANTHROPIC_BASE_URL).toBe('http://router.local')
@@ -152,7 +180,6 @@ describe('sdk-options', () => {
       expect(sdkOptions.allowedTools).toEqual([
         'Read', 'Write', 'Edit', 'Grep', 'Glob',
         'Bash',
-        'WebFetch', 'WebSearch',
         'TodoWrite', 'TaskOutput',
         'NotebookEdit',
         'Task',
@@ -161,6 +188,8 @@ describe('sdk-options', () => {
         'TaskCreate', 'TaskUpdate', 'TaskList', 'TaskGet',
         'EnterPlanMode', 'EnterWorktree',
       ])
+      expect(sdkOptions.tools).toEqual(sdkOptions.allowedTools)
+      expect(sdkOptions.disallowedTools).toEqual(['WebSearch', 'WebFetch'])
       expect(mocks.createCanUseTool).toHaveBeenCalledWith('/tmp/space-1', 'space-1', 'conv-1')
       expect(mocks.buildSystemPromptAppend).toHaveBeenCalledWith('/tmp/space-1', 'glm-5', true)
 
@@ -192,13 +221,17 @@ describe('sdk-options', () => {
         ralphSystemPromptAppend: '[RALPH_APPEND]'
       })
 
-      expect(addedMcpServers).toEqual(['ai-browser', 'skill'])
+      expect(addedMcpServers).toEqual(['web-tools', 'ai-browser', 'skill'])
       expect(mocks.createAIBrowserMcpServer).toHaveBeenCalledTimes(1)
+      expect(mocks.createWebToolsMcpServer).toHaveBeenCalledTimes(1)
       expect(mocks.createSkillMcpServer).toHaveBeenCalledTimes(1)
       expect(sdkOptions.maxThinkingTokens).toBe(10240)
       expect(sdkOptions.systemPrompt.append).toBe('[BASE_PROMPT][AI_BROWSER_PROMPT][RALPH_APPEND]')
+      expect(sdkOptions.tools).toEqual(sdkOptions.allowedTools)
+      expect(sdkOptions.disallowedTools).toEqual(['WebSearch', 'WebFetch'])
       expect(sdkOptions.mcpServers).toEqual({
         github: { type: 'stdio', command: 'github-mcp' },
+        'web-tools': { type: 'stdio', command: 'web-tools' },
         'ai-browser': { type: 'stdio', command: 'ai-browser' },
         skill: { type: 'stdio', command: 'skill' }
       })

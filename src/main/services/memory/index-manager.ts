@@ -293,6 +293,29 @@ export class MemoryIndexManager {
   }
 
   /**
+   * Get memory stats for a specific space
+   */
+  getSpaceStats(spaceId: string): { fragmentCount: number; conversationCount: number } {
+    if (!this.db) return { fragmentCount: 0, conversationCount: 0 }
+
+    try {
+      const fragRow = this.db.prepare(
+        'SELECT COUNT(*) as count FROM fragments WHERE space_id = ?'
+      ).get(spaceId) as { count: number }
+      const convRow = this.db.prepare(
+        'SELECT COUNT(*) as count FROM conversations WHERE space_id = ?'
+      ).get(spaceId) as { count: number }
+      return {
+        fragmentCount: fragRow.count,
+        conversationCount: convRow.count
+      }
+    } catch (error) {
+      console.error('[Memory] Failed to get stats:', error)
+      return { fragmentCount: 0, conversationCount: 0 }
+    }
+  }
+
+  /**
    * Close the database connection
    */
   close(): void {

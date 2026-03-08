@@ -20,6 +20,8 @@ export interface ApiCredentials {
   apiKey: string
   model: string
   provider: 'anthropic' | 'openai' | 'oauth'
+  /** True only for Anthropic's official API endpoints with native server-side tools. */
+  nativeAnthropicServerTools?: boolean
   /** Custom headers for OAuth providers */
   customHeaders?: Record<string, string>
   /** API type for OpenAI compatible providers */
@@ -230,6 +232,7 @@ export type V2SDKSession = {
 export interface SessionConfig {
   aiBrowserEnabled: boolean
   hasSkills: boolean
+  customInstructionsHash?: string  // Change detection for custom instructions
   // model is now dynamic, no rebuild needed
   // thinkingEnabled is now dynamic, no rebuild needed
 }

@@ -59,9 +59,16 @@ export function createCanUseTool(
   ): Promise<ToolPermissionResult> => {
     console.log(`[Agent] canUseTool called - Tool: ${toolName}, Input:`, JSON.stringify(input).substring(0, 200))
 
-    if (toolName === 'WebSearch') {
+    if (toolName === 'WebSearch' || toolName === 'mcp__web-tools__WebSearch') {
       const updatedInput = sanitizeWebSearchInput(input)
       return { behavior: 'allow' as const, updatedInput }
+    }
+
+    if (toolName === 'WebFetch' || toolName === 'mcp__web-tools__WebFetch') {
+      return {
+        behavior: 'allow' as const,
+        updatedInput: input
+      }
     }
 
     // Check file path tools - restrict to working directory
@@ -142,7 +149,7 @@ export function createCanUseTool(
 
       // trust mode or allow: auto-approve
       if (permission !== 'ask' || config.permissions.trustMode) {
-        return { behavior: 'allow' as const }
+        return { behavior: 'allow' as const, updatedInput: input }
       }
 
       // ask mode: send approval request to renderer
@@ -179,7 +186,7 @@ export function createCanUseTool(
     // AI Browser tools are always allowed (they run in sandboxed browser context)
     if (isAIBrowserTool(toolName)) {
       console.log(`[Agent] AI Browser tool allowed: ${toolName}`)
-      return { behavior: 'allow' as const }
+      return { behavior: 'allow' as const, updatedInput: input }
     }
 
     // Agent Teams + planning tools are always allowed (they coordinate sub-agents internally)
@@ -189,7 +196,7 @@ export function createCanUseTool(
       'EnterPlanMode', 'EnterWorktree'
     ]
     if (teamTools.includes(toolName)) {
-      return { behavior: 'allow' as const }
+      return { behavior: 'allow' as const, updatedInput: input }
     }
 
     // Handle AskUserQuestion - pause and wait for user's answer
@@ -232,7 +239,7 @@ export function createCanUseTool(
     }
 
     // Default: allow
-    return { behavior: 'allow' as const }
+    return { behavior: 'allow' as const, updatedInput: input }
   }
 }
 

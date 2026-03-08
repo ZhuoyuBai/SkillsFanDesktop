@@ -303,11 +303,15 @@ async function sendMessageInternal(
       aiBrowserEnabled: !!aiBrowserEnabled,
       thinkingEnabled: !!thinkingEnabled,
       includeSkillMcp: skillsAvailable,
-      ralphSystemPromptAppend: ralphMode?.systemPromptAppend || ''
+      ralphSystemPromptAppend: ralphMode?.systemPromptAppend || '',
+      routed: transport.routed
     })
 
     if (addedMcpServers.includes('ai-browser')) {
       console.log(`[Agent][${conversationId}] AI Browser MCP server added`)
+    }
+    if (addedMcpServers.includes('web-tools')) {
+      console.log(`[Agent][${conversationId}] Web Tools MCP server added`)
     }
     if (addedMcpServers.includes('skill')) {
       console.log(`[Agent][${conversationId}] Skill MCP server added`)
@@ -324,9 +328,11 @@ async function sendMessageInternal(
     }
 
     // Session config for rebuild detection
+    const ci = config.customInstructions
     const sessionConfig: SessionConfig = {
       aiBrowserEnabled: !!aiBrowserEnabled,
-      hasSkills: skillsAvailable
+      hasSkills: skillsAvailable,
+      customInstructionsHash: ci?.enabled && ci?.content ? ci.content : undefined
     }
 
     // Get or create persistent V2 session for this conversation

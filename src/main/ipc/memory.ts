@@ -3,6 +3,8 @@
  */
 
 import { clearMemoryForSpace, clearAllMemory } from '../services/memory/clear'
+import { readMemoryMd, saveMemoryMd } from '../services/memory/memory-md'
+import { getMemoryIndexManager } from '../services/memory/index'
 import { ipcHandle } from './utils'
 
 export function registerMemoryHandlers(): void {
@@ -14,5 +16,18 @@ export function registerMemoryHandlers(): void {
     } else {
       throw new Error('Invalid scope or missing spaceId')
     }
+  })
+
+  ipcHandle('memory:read-md', (_e, spaceId: string) => {
+    return readMemoryMd(spaceId)
+  })
+
+  ipcHandle('memory:save-md', (_e, spaceId: string, content: string) => {
+    return saveMemoryMd(spaceId, content)
+  })
+
+  ipcHandle('memory:get-stats', (_e, spaceId: string) => {
+    const manager = getMemoryIndexManager()
+    return manager.getSpaceStats(spaceId)
   })
 }

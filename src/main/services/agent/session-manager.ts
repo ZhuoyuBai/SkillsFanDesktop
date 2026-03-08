@@ -101,6 +101,7 @@ export function stopSessionCleanup(): void {
 export function needsSessionRebuild(existing: V2SessionInfo, newConfig: SessionConfig): boolean {
   return existing.config.aiBrowserEnabled !== newConfig.aiBrowserEnabled
     || existing.config.hasSkills !== newConfig.hasSkills
+    || existing.config.customInstructionsHash !== newConfig.customInstructionsHash
 }
 
 /**
@@ -261,7 +262,8 @@ export async function ensureSessionWarm(
     onStderr: (data: string) => {
       console.error(`[Agent][${conversationId}] CLI stderr (warm):`, data)
     },
-    includeSkillMcp: skillsAvailable
+    includeSkillMcp: skillsAvailable,
+    routed: transport.routed
   })
 
   if (addedMcpServers.includes('skill')) {
@@ -272,9 +274,11 @@ export async function ensureSessionWarm(
     console.log(`[Agent] Warming up V2 session: ${conversationId}`)
 
     // Session config must match sendMessage to avoid rebuild
+    const ci = (config as any).customInstructions
     const sessionConfig: SessionConfig = {
       aiBrowserEnabled: false,  // Default to false for warm-up (user hasn't enabled it yet)
-      hasSkills: skillsAvailable
+      hasSkills: skillsAvailable,
+      customInstructionsHash: ci?.enabled && ci?.content ? ci.content : undefined
     }
 
     await getOrCreateV2Session(spaceId, conversationId, sdkOptions, sessionId, sessionConfig)

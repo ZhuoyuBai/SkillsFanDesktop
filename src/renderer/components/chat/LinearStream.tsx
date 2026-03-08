@@ -10,19 +10,19 @@
  * - Skill: gradient label with child tools nested
  */
 
-import { useState, useMemo, memo, useCallback } from 'react'
+import { useState, useMemo, memo } from 'react'
 import {
   ChevronRight,
   Lightbulb,
   Loader2,
-  Check,
   XCircle,
   Sparkles,
 } from 'lucide-react'
-import { getToolIcon } from '../icons/ToolIcons'
 import { StreamdownRenderer } from './StreamdownRenderer'
 import { TodoCard, parseTodoInput } from '../tool/TodoCard'
 import { AgentTaskCard } from '../tool/AgentTaskCard'
+import { ToolItem } from '../tool/ToolItem'
+import { groupToolsByTodoSteps } from '../../utils/todo-grouping'
 import { HaloLogo } from '../brand/HaloLogo'
 import type { Thought, TimelineItem, TextSegment, TodoItem } from '../../types'
 import { useTranslation } from '../../i18n'
@@ -44,109 +44,7 @@ interface LinearStreamProps {
   taskStatusHistory?: Map<string, string[]>
 }
 
-// ============================================
-// Utility Functions
-// ============================================
-
-// Get human-friendly activity text for a tool call
-function getActivityText(
-  toolName: string | undefined,
-  toolInput: Record<string, unknown> | undefined,
-  isComplete: boolean,
-  t: (key: string, params?: Record<string, unknown>) => string
-): string {
-  const input = toolInput || {}
-
-  const getText = (running: string, done: string) => isComplete ? done : running
-
-  switch (toolName) {
-    case 'Read':
-      return getText(
-        t('Reading {{file}}...', { file: extractFileName(input.file_path) }),
-        t('Read {{file}}', { file: extractFileName(input.file_path) })
-      )
-    case 'Write':
-      return getText(
-        t('Writing {{file}}...', { file: extractFileName(input.file_path) }),
-        t('Wrote {{file}}', { file: extractFileName(input.file_path) })
-      )
-    case 'Edit':
-      return getText(
-        t('Editing {{file}}...', { file: extractFileName(input.file_path) }),
-        t('Edited {{file}}', { file: extractFileName(input.file_path) })
-      )
-    case 'Grep':
-      return getText(
-        t('Searching {{pattern}}...', { pattern: truncate(String(input.pattern || ''), 20) }),
-        t('Searched {{pattern}}', { pattern: truncate(String(input.pattern || ''), 20) })
-      )
-    case 'Glob':
-      return getText(
-        t('Matching {{pattern}}...', { pattern: truncate(String(input.pattern || ''), 20) }),
-        t('Matched {{pattern}}', { pattern: truncate(String(input.pattern || ''), 20) })
-      )
-    case 'Bash':
-      return getText(
-        t('Running {{command}}...', { command: extractCommand(input.command) }),
-        t('Ran {{command}}', { command: extractCommand(input.command) })
-      )
-    case 'WebFetch':
-      return getText(
-        t('Fetching {{url}}...', { url: extractDomain(input.url) }),
-        t('Fetched {{url}}', { url: extractDomain(input.url) })
-      )
-    case 'WebSearch':
-      return getText(
-        t('Searching {{query}}...', { query: truncate(String(input.query || ''), 20) }),
-        t('Searched {{query}}', { query: truncate(String(input.query || ''), 20) })
-      )
-    case 'TodoWrite':
-      return getText(t('Updating tasks...'), t('Updated tasks'))
-    case 'Task':
-      return getText(
-        t('Running {{task}}...', { task: truncate(String(input.description || 'agent'), 25) }),
-        t('Completed {{task}}', { task: truncate(String(input.description || 'agent'), 25) })
-      )
-    case 'NotebookEdit':
-      return getText(t('Editing notebook...'), t('Edited notebook'))
-    case 'AskUserQuestion':
-      return getText(t('Waiting for response...'), t('Got response'))
-    case 'Skill':
-      return getText(
-        t('Running {{skill}}...', { skill: String(input.skill || 'skill') }),
-        t('Ran {{skill}}', { skill: String(input.skill || 'skill') })
-      )
-    default:
-      return toolName ? (isComplete ? toolName : `${toolName}...`) : (isComplete ? t('Done') : t('Processing...'))
-  }
-}
-
-function extractFileName(path: unknown): string {
-  if (typeof path !== 'string' || !path) return 'file'
-  const name = path.split('/').pop() || path.split('\\').pop() || path
-  return truncate(name, 25)
-}
-
-function extractCommand(cmd: unknown): string {
-  if (typeof cmd !== 'string' || !cmd) return 'command'
-  const firstPart = cmd.split(' ').slice(0, 2).join(' ')
-  return truncate(firstPart, 20)
-}
-
-function extractDomain(url: unknown): string {
-  if (typeof url !== 'string' || !url) return 'page'
-  try {
-    const domain = new URL(url).hostname.replace('www.', '')
-    return truncate(domain, 20)
-  } catch {
-    return truncate(url, 20)
-  }
-}
-
-function truncate(text: string, maxLength: number): string {
-  if (text.length <= maxLength) return text
-  return text.substring(0, maxLength - 1) + '…'
-}
+// Utility functions and ToolItem component are in ../tool/ToolItem.tsx
 
 // ============================================
 // Sub-components
@@ -261,56 +159,7 @@ const ThinkingItem = memo(function ThinkingItem({
   )
 })
 
-// Tool call - single line with status
-const ToolItem = memo(function ToolItem({
-  toolName,
-  toolInput,
-  isComplete,
-  isError,
-  duration,
-}: {
-  toolName: string
-  toolInput?: Record<string, unknown>
-  isComplete: boolean
-  isError: boolean
-  duration?: number
-}) {
-  const { t } = useTranslation()
-  const Icon = getToolIcon(toolName)
-  const isRunning = !isComplete && !isError
-
-  const activityText = getActivityText(toolName, toolInput, isComplete, t)
-
-  return (
-    <div
-      className={`flex items-center gap-2 py-0.5 text-xs ${
-        isError ? 'text-destructive/70' : isRunning ? 'text-muted-foreground/80' : 'text-muted-foreground/60'
-      }`}
-    >
-      {/* Status icon */}
-      {isError ? (
-        <XCircle size={14} className="text-destructive/70 flex-shrink-0" />
-      ) : isRunning ? (
-        <Loader2 size={14} className="animate-spin flex-shrink-0" />
-      ) : (
-        <Check size={14} className="flex-shrink-0" />
-      )}
-
-      {/* Tool icon */}
-      <Icon size={14} className="flex-shrink-0" />
-
-      {/* Activity text */}
-      <span className="truncate">{activityText}</span>
-
-      {/* Duration */}
-      {isComplete && duration && (
-        <span className="text-muted-foreground/50 flex-shrink-0">
-          ({(duration / 1000).toFixed(1)}s)
-        </span>
-      )}
-    </div>
-  )
-})
+// ToolItem is imported from ../tool/ToolItem.tsx
 
 // Skill item - gradient label with child tools
 const SkillItem = memo(function SkillItem({
@@ -545,6 +394,30 @@ export function LinearStream({
     return parseTodoInput(latest.toolInput!)
   }, [thoughts])
 
+  // Group tool calls under todo steps (when TodoWrite exists)
+  const todoGrouping = useMemo(() => {
+    return groupToolsByTodoSteps(thoughts, timelineItems)
+  }, [thoughts, timelineItems])
+
+  // Build stepToolItems map for TodoCard
+  const stepToolItems = useMemo(() => {
+    if (!todoGrouping.hasTodos) return undefined
+    const map = new Map<string, TimelineItem[]>()
+    for (const step of todoGrouping.steps) {
+      if (step.toolItems.length > 0) {
+        map.set(step.content, step.toolItems)
+      }
+    }
+    return map
+  }, [todoGrouping])
+
+  // Items to render flat (either all items or only ungrouped ones)
+  const flatItems = useMemo(() => {
+    if (!todoGrouping.hasTodos) return timelineItems
+    return [...todoGrouping.preStepItems, ...todoGrouping.ungroupedItems]
+      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+  }, [todoGrouping, timelineItems])
+
   // Current text (content after last segment)
   const currentText = useMemo(() => {
     if (!streamingContent) return ''
@@ -556,9 +429,93 @@ export function LinearStream({
 
   if (!hasContent) return null
 
+  // Helper to render a timeline item
+  const renderTimelineItem = (item: TimelineItem, taskColorCounter: { value: number }) => {
+    switch (item.type) {
+      case 'thinking':
+        return (
+          <ThinkingItem
+            key={item.id}
+            content={item.content || ''}
+            timestamp={item.timestamp}
+          />
+        )
+      case 'tool_use':
+        // Task (sub-agent) gets its own distinctive card with unique color
+        if (item.toolName === 'Task') {
+          const colorIdx = taskColorCounter.value++
+          return (
+            <AgentTaskCard
+              key={item.id}
+              description={String(item.toolInput?.description || 'agent')}
+              subagentType={String(item.toolInput?.subagent_type || '')}
+              isRunning={!item.isComplete && !item.isError}
+              isComplete={item.isComplete || false}
+              isError={item.isError || false}
+              duration={item.duration}
+              colorIndex={colorIdx}
+            />
+          )
+        }
+        return (
+          <ToolItem
+            key={item.id}
+            toolName={item.toolName || ''}
+            toolInput={item.toolInput}
+            isComplete={item.isComplete || false}
+            isError={item.isError || false}
+            duration={item.duration}
+          />
+        )
+      case 'skill':
+        return (
+          <SkillItem
+            key={item.id}
+            skillName={item.skillName || ''}
+            isComplete={item.isComplete || false}
+            isRunning={!item.isComplete}
+            childItems={item.childItems}
+          />
+        )
+      case 'text':
+        return (
+          <TextBlock
+            key={item.id}
+            content={item.content || ''}
+            isStreaming={false}
+            isLast={false}
+          />
+        )
+      case 'error': {
+        // Translate known error patterns
+        let errorContent = item.content || ''
+        const usageLimitMatch = errorContent.match(/^Usage limit reached\. Resets in ~(\d+) minutes\.$/)
+        if (usageLimitMatch) {
+          errorContent = t('Usage limit reached. Resets in ~{{minutes}} minutes.', { minutes: usageLimitMatch[1] })
+        } else if (errorContent === 'Usage limit reached.') {
+          errorContent = t('Usage limit reached.')
+        }
+        return (
+          <div key={item.id} className="py-1 text-xs text-destructive/70">
+            <XCircle size={14} className="inline mr-1" />
+            {errorContent}
+          </div>
+        )
+      }
+      default:
+        return null
+    }
+  }
+
   return (
-    <div className="rounded-2xl px-4 py-3 message-assistant w-full overflow-y-hidden overflow-x-auto">
-      {/* TodoCard at top - if present */}
+    <div className="rounded-2xl px-4 py-3 message-assistant w-full overflow-y-hidden overflow-x-auto text-left">
+      {/* Pre-step items (tools before first TodoWrite) */}
+      {todoGrouping.hasTodos && todoGrouping.preStepItems.length > 0 && (() => {
+        const counter = { value: 0 }
+        return todoGrouping.preStepItems.map(item => renderTimelineItem(item, counter))
+      })()}
+
+      {/* TodoCard with grouped tool items */}
       {latestTodos && latestTodos.length > 0 && (
         <div className="mb-3">
           <TodoCard
@@ -566,89 +523,15 @@ export function LinearStream({
             isCollapsed={todoCollapsed}
             onToggleCollapse={onToggleTodo}
             taskStatusHistory={taskStatusHistory}
+            stepToolItems={stepToolItems}
           />
         </div>
       )}
 
-      {/* Timeline items */}
+      {/* Flat timeline items (all items when no todos, or ungrouped items when todos exist) */}
       {(() => {
-        let taskColorCounter = 0
-        return timelineItems.map((item, index) => {
-        switch (item.type) {
-          case 'thinking':
-            return (
-              <ThinkingItem
-                key={item.id}
-                content={item.content || ''}
-                timestamp={item.timestamp}
-              />
-            )
-          case 'tool_use':
-            // Task (sub-agent) gets its own distinctive card with unique color
-            if (item.toolName === 'Task') {
-              const colorIdx = taskColorCounter++
-              return (
-                <AgentTaskCard
-                  key={item.id}
-                  description={String(item.toolInput?.description || 'agent')}
-                  subagentType={String(item.toolInput?.subagent_type || '')}
-                  isRunning={!item.isComplete && !item.isError}
-                  isComplete={item.isComplete || false}
-                  isError={item.isError || false}
-                  duration={item.duration}
-                  colorIndex={colorIdx}
-                />
-              )
-            }
-            return (
-              <ToolItem
-                key={item.id}
-                toolName={item.toolName || ''}
-                toolInput={item.toolInput}
-                isComplete={item.isComplete || false}
-                isError={item.isError || false}
-                duration={item.duration}
-              />
-            )
-          case 'skill':
-            return (
-              <SkillItem
-                key={item.id}
-                skillName={item.skillName || ''}
-                isComplete={item.isComplete || false}
-                isRunning={!item.isComplete}
-                childItems={item.childItems}
-              />
-            )
-          case 'text':
-            return (
-              <TextBlock
-                key={item.id}
-                content={item.content || ''}
-                isStreaming={false}
-                isLast={false}
-              />
-            )
-          case 'error': {
-            // Translate known error patterns
-            let errorContent = item.content || ''
-            const usageLimitMatch = errorContent.match(/^Usage limit reached\. Resets in ~(\d+) minutes\.$/)
-            if (usageLimitMatch) {
-              errorContent = t('Usage limit reached. Resets in ~{{minutes}} minutes.', { minutes: usageLimitMatch[1] })
-            } else if (errorContent === 'Usage limit reached.') {
-              errorContent = t('Usage limit reached.')
-            }
-            return (
-              <div key={item.id} className="py-1 text-xs text-destructive/70">
-                <XCircle size={14} className="inline mr-1" />
-                {errorContent}
-              </div>
-            )
-          }
-          default:
-            return null
-        }
-      })
+        const counter = { value: 0 }
+        return flatItems.map(item => renderTimelineItem(item, counter))
       })()}
 
       {/* Current streaming text (content after last segment) */}

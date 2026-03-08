@@ -3,6 +3,7 @@
 // ============================================
 
 import type { ThinkingEffort } from '../../shared/utils/openai-models'
+import type { WebToolsConfig } from '../../shared/types'
 
 // API Provider Configuration
 export type ApiProvider = 'anthropic' | 'openai';
@@ -200,6 +201,11 @@ export interface HaloConfig {
   spaces?: SpacesConfig;  // Space settings (default space, etc.)
   memory?: MemoryConfig;  // Cross-conversation memory settings
   thinkingEffort?: ThinkingEffort;  // Default thinking effort level
+  tools?: WebToolsConfig;  // Local web search/fetch tool settings
+  customInstructions?: {  // Global custom instructions appended to system prompt
+    enabled: boolean;
+    content: string;
+  };
   isFirstLaunch: boolean;
 }
 
@@ -595,6 +601,35 @@ export const DEFAULT_CONFIG: HaloConfig = {
   remoteAccess: {
     enabled: false,
     port: 3456
+  },
+  tools: {
+    web: {
+      search: {
+        enabled: true,
+        provider: 'brave' as WebSearchProvider,
+        apiKey: '',
+        maxResults: 5,
+        timeoutSeconds: 30,
+        cacheTtlMinutes: 15,
+        perplexity: {
+          apiKey: '',
+          baseUrl: 'https://api.perplexity.ai'
+        },
+        kimi: {
+          apiKey: '',
+          baseUrl: 'https://api.moonshot.cn/v1',
+          model: 'moonshot-v1-128k'
+        }
+      },
+      fetch: {
+        enabled: true,
+        maxChars: 15000,
+        timeoutSeconds: 30,
+        cacheTtlMinutes: 15,
+        maxRedirects: 3,
+        userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_7_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+      }
+    }
   },
   mcpServers: {},  // Empty by default
   isFirstLaunch: true

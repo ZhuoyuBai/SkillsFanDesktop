@@ -229,6 +229,7 @@ export async function getApiCredentials(config: ReturnType<typeof getConfig>): P
 
   // Determine provider type based on whether we're using OAuth or custom API (including fallback)
   let provider: 'anthropic' | 'openai' | 'oauth'
+  let nativeAnthropicServerTools = false
 
   if (isOAuthProvider && oauthTokenValid) {
     provider = 'oauth'
@@ -239,6 +240,7 @@ export async function getApiCredentials(config: ReturnType<typeof getConfig>): P
     const effectiveConfig = currentConfig?.apiKey ? currentConfig : null
     const providerType = effectiveConfig?.provider || aiSources?.custom?.provider
     provider = providerType === 'openai' ? 'openai' : 'anthropic'
+    nativeAnthropicServerTools = provider === 'anthropic' && isNativeAnthropicBaseUrl(backendConfig.url)
     console.log(`[Agent] Using custom API (${provider}) for source ${currentSource} via AISourceManager`)
   }
 
@@ -247,8 +249,20 @@ export async function getApiCredentials(config: ReturnType<typeof getConfig>): P
     apiKey: backendConfig.key,
     model: backendConfig.model || 'claude-opus-4-5-20251101',
     provider,
+    nativeAnthropicServerTools,
     customHeaders: backendConfig.headers,
     apiType: backendConfig.apiType
+  }
+}
+
+export function isNativeAnthropicBaseUrl(apiUrl: string): boolean {
+  if (!apiUrl) return false
+
+  try {
+    const url = new URL(apiUrl)
+    return url.hostname === 'api.anthropic.com'
+  } catch {
+    return false
   }
 }
 

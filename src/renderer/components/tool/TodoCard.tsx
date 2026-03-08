@@ -7,10 +7,10 @@
  * - Non-intrusive - appears naturally in the thought flow
  * - Real-time updates - status changes animate smoothly
  * - Collapsible - can be collapsed to save space
- * - Task history - shows status updates per task when expanded
+ * - Tool grouping - each step can expand to show its tool calls
  */
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import {
   Circle,
   CheckCircle2,
@@ -20,6 +20,9 @@ import {
   ChevronRight,
 } from 'lucide-react'
 import { useTranslation } from '../../i18n'
+import { ToolItem } from './ToolItem'
+import { AgentTaskCard } from './AgentTaskCard'
+import type { TimelineItem } from '../../types'
 
 // Todo item status from Claude Code SDK
 type TodoStatus = 'pending' | 'in_progress' | 'completed'
@@ -35,6 +38,7 @@ interface TodoCardProps {
   isCollapsed?: boolean
   onToggleCollapse?: () => void
   taskStatusHistory?: Map<string, string[]>  // task content -> status updates
+  stepToolItems?: Map<string, TimelineItem[]>  // step content -> tool timeline items
 }
 
 // Get icon and style for todo status
@@ -65,18 +69,38 @@ function getTodoStatusDisplay(status: TodoStatus) {
   }
 }
 
-// Single todo item with expandable history
+// Single todo item with expandable tool calls
 function TodoItemRow({
   item,
-  statusHistory
+  statusHistory,
+  toolItems,
 }: {
   item: TodoItem
   statusHistory?: string[]
+  toolItems?: TimelineItem[]
 }) {
-  const [isExpanded, setIsExpanded] = useState(false)
+  // in_progress steps with tools default expanded; completed default collapsed
+  const defaultExpanded = item.status === 'in_progress'
+  const [isExpanded, setIsExpanded] = useState(defaultExpanded)
+  const prevStatusRef = useRef(item.status)
+
+  // Auto-expand when status changes to in_progress, collapse when completed
+  useEffect(() => {
+    if (prevStatusRef.current !== item.status) {
+      if (item.status === 'in_progress') {
+        setIsExpanded(true)
+      } else if (item.status === 'completed') {
+        setIsExpanded(false)
+      }
+      prevStatusRef.current = item.status
+    }
+  }, [item.status])
+
   const display = getTodoStatusDisplay(item.status)
   const Icon = display.Icon
   const hasHistory = statusHistory && statusHistory.length > 0
+  const toolCount = toolItems?.length ?? 0
+  const hasExpandable = toolCount > 0 || hasHistory
 
   // Show activeForm when in progress, otherwise show content
   const displayText = item.status === 'in_progress' && item.activeForm
@@ -90,9 +114,9 @@ function TodoItemRow({
           flex items-start gap-3 px-3 py-2 rounded-lg transition-all duration-200
           ${display.bgColor}
           ${item.status === 'in_progress' ? 'animate-fade-in' : ''}
-          ${hasHistory ? 'cursor-pointer hover:bg-muted/30' : ''}
+          ${hasExpandable ? 'cursor-pointer hover:bg-muted/30' : ''}
         `}
-        onClick={() => hasHistory && setIsExpanded(!isExpanded)}
+        onClick={() => hasExpandable && setIsExpanded(!isExpanded)}
       >
         <Icon
           size={16}
@@ -105,7 +129,16 @@ function TodoItemRow({
         <span className={`text-sm leading-relaxed flex-1 ${display.textStyle}`}>
           {displayText}
         </span>
-        {hasHistory && (
+
+        {/* Tool count badge */}
+        {toolCount > 0 && (
+          <span className="text-[10px] bg-muted/60 text-muted-foreground/70 px-1.5 py-0.5 rounded-full flex-shrink-0 mt-0.5 min-w-[20px] text-center">
+            {toolCount}
+          </span>
+        )}
+
+        {/* Expand/collapse chevron */}
+        {hasExpandable && (
           <ChevronRight
             size={14}
             className={`
@@ -116,10 +149,43 @@ function TodoItemRow({
         )}
       </div>
 
+      {/* Expanded: tool calls list */}
+      {isExpanded && toolCount > 0 && (
+        <div className="ml-9 mt-1 mb-2 pl-3 border-l-2 border-primary/20 space-y-0.5">
+          {toolItems!.map((tool) => {
+            // Task (sub-agent) gets its own card
+            if (tool.toolName === 'Task') {
+              return (
+                <AgentTaskCard
+                  key={tool.id}
+                  description={String(tool.toolInput?.description || 'agent')}
+                  subagentType={String(tool.toolInput?.subagent_type || '')}
+                  isRunning={!tool.isComplete && !tool.isError}
+                  isComplete={tool.isComplete || false}
+                  isError={tool.isError || false}
+                  duration={tool.duration}
+                  colorIndex={0}
+                />
+              )
+            }
+            return (
+              <ToolItem
+                key={tool.id}
+                toolName={tool.toolName || ''}
+                toolInput={tool.toolInput}
+                isComplete={tool.isComplete || false}
+                isError={tool.isError || false}
+                duration={tool.duration}
+              />
+            )
+          })}
+        </div>
+      )}
+
       {/* Status history (when expanded) */}
       {isExpanded && hasHistory && (
         <div className="ml-9 mt-1 mb-2 pl-3 border-l-2 border-border/30 space-y-1">
-          {statusHistory.map((status, idx) => (
+          {statusHistory!.map((status, idx) => (
             <div key={idx} className="text-xs text-muted-foreground/70">
               {status}
             </div>
@@ -134,7 +200,8 @@ export function TodoCard({
   todos,
   isCollapsed = false,
   onToggleCollapse,
-  taskStatusHistory
+  taskStatusHistory,
+  stepToolItems,
 }: TodoCardProps) {
   const { t } = useTranslation()
 
@@ -206,16 +273,17 @@ export function TodoCard({
         <div
           className={`
             transition-all duration-200 ease-out overflow-hidden
-            ${isCollapsed ? 'max-h-0 opacity-0' : 'max-h-[500px] opacity-100'}
+            ${isCollapsed ? 'max-h-0 opacity-0' : 'max-h-[800px] opacity-100'}
           `}
         >
           {/* Todo items - scrollable when list is long */}
-          <div className="p-2 space-y-1 max-h-[400px] overflow-y-auto">
+          <div className="p-2 space-y-1 max-h-[600px] overflow-y-auto">
             {todos.map((item, index) => (
               <TodoItemRow
                 key={index}
                 item={item}
                 statusHistory={taskStatusHistory?.get(item.content)}
+                toolItems={stepToolItems?.get(item.content)}
               />
             ))}
           </div>

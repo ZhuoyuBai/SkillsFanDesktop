@@ -10,6 +10,8 @@ import { api } from '../api'
 import type { HaloConfig, ThemeMode, McpServersConfig, AISourceType, OAuthSourceConfig, ApiProvider, CustomSourceConfig } from '../types'
 import { AVAILABLE_MODELS, DEFAULT_MODEL } from '../types'
 import { Select } from '../components/ui/Select'
+import { Switch } from '../components/ui/Switch'
+import type { WebSearchProvider } from '../../shared/types'
 
 /**
  * Localized text - either a simple string or object with language codes
@@ -35,7 +37,7 @@ import { ResetSection } from '../components/settings/ResetSection'
 import { ScheduledTasksSection } from '../components/settings/ScheduledTasksSection'
 import { FeishuSettings } from '../components/settings/FeishuSettings'
 import { useTranslation, setLanguage, getCurrentLanguage, SUPPORTED_LOCALES, type LocaleCode } from '../i18n'
-import { Loader2, LogOut, Plus, Check, Globe, Key, MessageSquare, Bot, Palette, Server, Settings as SettingsIcon, Wifi, ExternalLink, X, Package, User, Layers, Lock, SlidersHorizontal, Clock, ArrowLeft, type LucideIcon } from 'lucide-react'
+import { Loader2, LogOut, Plus, Check, Globe, Key, MessageSquare, Bot, Palette, Server, Settings as SettingsIcon, Wifi, ExternalLink, X, Package, User, Layers, Lock, SlidersHorizontal, Clock, ArrowLeft, Database, type LucideIcon } from 'lucide-react'
 import { usePlatform } from '../components/layout/Header'
 import { isElectron } from '../api/transport'
 import { useToastStore } from '../stores/toast.store'
@@ -207,6 +209,33 @@ function resolveProviderFormValues(config: HaloConfig | undefined, providerId: s
   }
 }
 
+function resolveWebToolsFormValues(config: HaloConfig | undefined): {
+  searchEnabled: boolean
+  searchProvider: WebSearchProvider
+  braveApiKey: string
+  perplexityApiKey: string
+  perplexityBaseUrl: string
+  kimiApiKey: string
+  kimiBaseUrl: string
+  kimiModel: string
+  fetchEnabled: boolean
+} {
+  const search = config?.tools?.web?.search
+  const fetch = config?.tools?.web?.fetch
+
+  return {
+    searchEnabled: search?.enabled !== false,
+    searchProvider: search?.provider === 'perplexity' || search?.provider === 'kimi' ? search.provider : 'brave',
+    braveApiKey: search?.apiKey || '',
+    perplexityApiKey: search?.perplexity?.apiKey || '',
+    perplexityBaseUrl: search?.perplexity?.baseUrl || 'https://api.perplexity.ai',
+    kimiApiKey: search?.kimi?.apiKey || '',
+    kimiBaseUrl: search?.kimi?.baseUrl || 'https://api.moonshot.cn/v1',
+    kimiModel: search?.kimi?.model || 'moonshot-v1-128k',
+    fetchEnabled: fetch?.enabled !== false
+  }
+}
+
 /**
  * Get localized text based on current language
  */
@@ -329,6 +358,24 @@ export function SettingsPage() {
   const [showClearMemoryDialog, setShowClearMemoryDialog] = useState(false)
   const [clearMemoryScope, setClearMemoryScope] = useState<'space' | 'all'>('space')
   const [isClearingMemory, setIsClearingMemory] = useState(false)
+  const [showMemoryManager, setShowMemoryManager] = useState(false)
+  const [memoryMdContent, setMemoryMdContent] = useState('')
+  const [memoryMdOriginal, setMemoryMdOriginal] = useState('')
+  const [memoryMdExists, setMemoryMdExists] = useState(false)
+  const [memoryStats, setMemoryStats] = useState<{ fragmentCount: number; conversationCount: number } | null>(null)
+  const [isSavingMemory, setIsSavingMemory] = useState(false)
+  const [isLoadingMemory, setIsLoadingMemory] = useState(false)
+  const [customInstructionsContent, setCustomInstructionsContent] = useState(config?.customInstructions?.content || '')
+  const initialWebToolsValues = resolveWebToolsFormValues(config)
+  const [webSearchEnabled, setWebSearchEnabled] = useState(initialWebToolsValues.searchEnabled)
+  const [webSearchProvider, setWebSearchProvider] = useState<WebSearchProvider>(initialWebToolsValues.searchProvider)
+  const [braveSearchApiKey, setBraveSearchApiKey] = useState(initialWebToolsValues.braveApiKey)
+  const [perplexitySearchApiKey, setPerplexitySearchApiKey] = useState(initialWebToolsValues.perplexityApiKey)
+  const [perplexitySearchBaseUrl, setPerplexitySearchBaseUrl] = useState(initialWebToolsValues.perplexityBaseUrl)
+  const [kimiSearchApiKey, setKimiSearchApiKey] = useState(initialWebToolsValues.kimiApiKey)
+  const [kimiSearchBaseUrl, setKimiSearchBaseUrl] = useState(initialWebToolsValues.kimiBaseUrl)
+  const [kimiSearchModel, setKimiSearchModel] = useState(initialWebToolsValues.kimiModel)
+  const [webFetchEnabled, setWebFetchEnabled] = useState(initialWebToolsValues.fetchEnabled)
 
   // API Key visibility state
   const [showApiKey, setShowApiKey] = useState(false)
@@ -444,6 +491,19 @@ export function SettingsPage() {
   useEffect(() => {
     loadSystemSettings()
   }, [])
+
+  useEffect(() => {
+    const values = resolveWebToolsFormValues(config)
+    setWebSearchEnabled(values.searchEnabled)
+    setWebSearchProvider(values.searchProvider)
+    setBraveSearchApiKey(values.braveApiKey)
+    setPerplexitySearchApiKey(values.perplexityApiKey)
+    setPerplexitySearchBaseUrl(values.perplexityBaseUrl)
+    setKimiSearchApiKey(values.kimiApiKey)
+    setKimiSearchBaseUrl(values.kimiBaseUrl)
+    setKimiSearchModel(values.kimiModel)
+    setWebFetchEnabled(values.fetchEnabled)
+  }, [config?.tools])
 
   const loadSystemSettings = async () => {
     try {
@@ -609,6 +669,76 @@ export function SettingsPage() {
     }
   }
 
+  const persistWebToolsConfig = async (overrides?: {
+    searchEnabled?: boolean
+    searchProvider?: WebSearchProvider
+    braveApiKey?: string
+    perplexityApiKey?: string
+    perplexityBaseUrl?: string
+    kimiApiKey?: string
+    kimiBaseUrl?: string
+    kimiModel?: string
+    fetchEnabled?: boolean
+  }) => {
+    const nextSearchEnabled = overrides?.searchEnabled ?? webSearchEnabled
+    const nextSearchProvider = overrides?.searchProvider ?? webSearchProvider
+    const nextBraveApiKey = overrides?.braveApiKey ?? braveSearchApiKey
+    const nextPerplexityApiKey = overrides?.perplexityApiKey ?? perplexitySearchApiKey
+    const nextPerplexityBaseUrl = overrides?.perplexityBaseUrl ?? perplexitySearchBaseUrl
+    const nextKimiApiKey = overrides?.kimiApiKey ?? kimiSearchApiKey
+    const nextKimiBaseUrl = overrides?.kimiBaseUrl ?? kimiSearchBaseUrl
+    const nextKimiModel = overrides?.kimiModel ?? kimiSearchModel
+    const nextFetchEnabled = overrides?.fetchEnabled ?? webFetchEnabled
+
+    const toolsConfig = {
+      web: {
+        search: {
+          ...(config?.tools?.web?.search || {}),
+          enabled: nextSearchEnabled,
+          provider: nextSearchProvider,
+          apiKey: nextBraveApiKey,
+          perplexity: {
+            ...(config?.tools?.web?.search?.perplexity || {}),
+            apiKey: nextPerplexityApiKey,
+            baseUrl: nextPerplexityBaseUrl
+          },
+          kimi: {
+            ...(config?.tools?.web?.search?.kimi || {}),
+            apiKey: nextKimiApiKey,
+            baseUrl: nextKimiBaseUrl,
+            model: nextKimiModel
+          }
+        },
+        fetch: {
+          ...(config?.tools?.web?.fetch || {}),
+          enabled: nextFetchEnabled
+        }
+      }
+    }
+
+    try {
+      await api.setConfig({ tools: toolsConfig })
+      setConfig({ ...config!, tools: toolsConfig } as HaloConfig)
+    } catch (error) {
+      console.error('[Settings] Failed to update web tools config:', error)
+    }
+  }
+
+  const handleWebSearchEnabledChange = async (enabled: boolean) => {
+    setWebSearchEnabled(enabled)
+    await persistWebToolsConfig({ searchEnabled: enabled })
+  }
+
+  const handleWebSearchProviderChange = async (value: WebSearchProvider) => {
+    setWebSearchProvider(value)
+    await persistWebToolsConfig({ searchProvider: value })
+  }
+
+  const handleWebFetchEnabledChange = async (enabled: boolean) => {
+    setWebFetchEnabled(enabled)
+    await persistWebToolsConfig({ fetchEnabled: enabled })
+  }
+
   // Handle clear memory
   const handleClearMemory = async () => {
     setIsClearingMemory(true)
@@ -625,6 +755,75 @@ export function SettingsPage() {
     } finally {
       setIsClearingMemory(false)
       setShowClearMemoryDialog(false)
+    }
+  }
+
+  // Memory management
+  const loadMemoryData = useCallback(async () => {
+    if (!currentSpace?.id) return
+    setIsLoadingMemory(true)
+    try {
+      const [mdResult, statsResult] = await Promise.all([
+        api.readMemoryMd(currentSpace.id),
+        api.getMemoryStats(currentSpace.id)
+      ])
+      if (mdResult.success) {
+        setMemoryMdContent(mdResult.data.content)
+        setMemoryMdOriginal(mdResult.data.content)
+        setMemoryMdExists(mdResult.data.exists)
+      }
+      if (statsResult.success) {
+        setMemoryStats(statsResult.data)
+      }
+    } catch (error) {
+      console.error('[Settings] Failed to load memory data:', error)
+    } finally {
+      setIsLoadingMemory(false)
+    }
+  }, [currentSpace?.id])
+
+  useEffect(() => {
+    if (showMemoryManager) {
+      loadMemoryData()
+    }
+  }, [showMemoryManager, loadMemoryData])
+
+  const handleSaveMemoryMd = async () => {
+    if (!currentSpace?.id) return
+    setIsSavingMemory(true)
+    try {
+      const result = await api.saveMemoryMd(currentSpace.id, memoryMdContent)
+      if (result.success) {
+        setMemoryMdOriginal(memoryMdContent)
+        addToast(t('Memory saved successfully'), 'success')
+      } else {
+        addToast(result.error || t('Failed to save memory'), 'error')
+      }
+    } catch {
+      addToast(t('Failed to save memory'), 'error')
+    } finally {
+      setIsSavingMemory(false)
+    }
+  }
+
+  // Handle custom instructions change
+  const handleCustomInstructionsToggle = async (enabled: boolean) => {
+    const customInstructions = { enabled, content: config?.customInstructions?.content || '' }
+    try {
+      await api.setConfig({ customInstructions })
+      setConfig({ ...config!, customInstructions } as HaloConfig)
+    } catch (error) {
+      console.error('[Settings] Failed to update custom instructions:', error)
+    }
+  }
+
+  const handleCustomInstructionsSave = async (content: string) => {
+    const customInstructions = { enabled: config?.customInstructions?.enabled ?? false, content }
+    try {
+      await api.setConfig({ customInstructions })
+      setConfig({ ...config!, customInstructions } as HaloConfig)
+    } catch (error) {
+      console.error('[Settings] Failed to update custom instructions:', error)
     }
   }
 
@@ -1245,20 +1444,7 @@ export function SettingsPage() {
                       {t('Automatically run Halo when system starts')}
                     </p>
                   </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={autoLaunch}
-                      onChange={(e) => handleAutoLaunchChange(e.target.checked)}
-                      className="sr-only peer"
-                    />
-                    <div className="w-11 h-6 bg-muted-foreground/40 rounded-full peer peer-checked:bg-primary transition-colors">
-                      <div
-                        className={`w-5 h-5 bg-white rounded-full shadow-md transform transition-transform ${autoLaunch ? 'translate-x-5' : 'translate-x-0.5'
-                          } mt-0.5`}
-                      />
-                    </div>
-                  </label>
+                  <Switch checked={autoLaunch} onChange={handleAutoLaunchChange} />
                 </div>
 
                 {/* Minimize to Tray */}
@@ -1271,20 +1457,7 @@ export function SettingsPage() {
                       })}
                     </p>
                   </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={minimizeToTray}
-                      onChange={(e) => handleMinimizeToTrayChange(e.target.checked)}
-                      className="sr-only peer"
-                    />
-                    <div className="w-11 h-6 bg-muted-foreground/40 rounded-full peer peer-checked:bg-primary transition-colors">
-                      <div
-                        className={`w-5 h-5 bg-white rounded-full shadow-md transform transition-transform ${minimizeToTray ? 'translate-x-5' : 'translate-x-0.5'
-                          } mt-0.5`}
-                      />
-                    </div>
-                  </label>
+                  <Switch checked={minimizeToTray} onChange={handleMinimizeToTrayChange} />
                 </div>
 
                 {/* Version Update */}
@@ -1389,21 +1562,7 @@ export function SettingsPage() {
                       {t('AI can remember content from previous conversations')}
                     </p>
                   </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={config?.memory?.enabled ?? true}
-                      onChange={(e) => handleMemoryEnabledChange(e.target.checked)}
-                      className="sr-only peer"
-                    />
-                    <div className="w-11 h-6 bg-muted-foreground/40 rounded-full peer peer-checked:bg-primary transition-colors">
-                      <div
-                        className={`w-5 h-5 bg-white rounded-full shadow-md transform transition-transform ${
-                          (config?.memory?.enabled ?? true) ? 'translate-x-5' : 'translate-x-0.5'
-                        } mt-0.5`}
-                      />
-                    </div>
-                  </label>
+                  <Switch checked={config?.memory?.enabled ?? true} onChange={handleMemoryEnabledChange} />
                 </div>
 
                 {/* Memory Retention Period */}
@@ -1429,6 +1588,184 @@ export function SettingsPage() {
                   </div>
                 </div>
 
+                {/* Custom Instructions */}
+                <div className="pt-4 border-t border-border">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <p className="font-medium">{t('Custom Instructions')}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {t('Global instructions that AI will follow in every conversation')}
+                      </p>
+                    </div>
+                    <Switch checked={config?.customInstructions?.enabled ?? false} onChange={handleCustomInstructionsToggle} />
+                  </div>
+                  <div className={`mt-3 transition-opacity ${(config?.customInstructions?.enabled ?? false) ? '' : 'opacity-50 pointer-events-none'}`}>
+                    <textarea
+                      value={customInstructionsContent}
+                      onChange={(e) => setCustomInstructionsContent(e.target.value)}
+                      onBlur={() => handleCustomInstructionsSave(customInstructionsContent)}
+                      placeholder={t('e.g., Always respond in Chinese, Use concise language...')}
+                      className="w-full h-32 px-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground resize-y focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {t('Changes take effect in the next new conversation')}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Local Web Tools */}
+                <div className="pt-4 border-t border-border space-y-4">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex-1">
+                      <p className="font-medium">{t('Web Search Tool')}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {t('Use a local app-managed search provider for all models instead of model-native search.')}
+                      </p>
+                    </div>
+                    <Switch checked={webSearchEnabled} onChange={handleWebSearchEnabledChange} />
+                  </div>
+
+                  <div className={`space-y-3 transition-opacity ${webSearchEnabled ? '' : 'opacity-50 pointer-events-none'}`}>
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground mb-1">
+                        {t('Search Provider')}
+                      </p>
+                      <Select<WebSearchProvider>
+                        value={webSearchProvider}
+                        onChange={handleWebSearchProviderChange}
+                        options={[
+                          { value: 'brave', label: 'Brave' },
+                          { value: 'perplexity', label: 'Perplexity' },
+                          { value: 'kimi', label: 'Kimi' }
+                        ]}
+                      />
+                    </div>
+
+                    {webSearchProvider === 'brave' && (
+                      <label className="block">
+                        <p className="text-xs font-medium text-muted-foreground mb-1">
+                          {t('Brave Search API Key')}
+                        </p>
+                        <input
+                          type="password"
+                          value={braveSearchApiKey}
+                          onChange={(e) => setBraveSearchApiKey(e.target.value)}
+                          onBlur={() => persistWebToolsConfig({ braveApiKey: braveSearchApiKey })}
+                          placeholder="BSA..."
+                          className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                        />
+                      </label>
+                    )}
+
+                    {webSearchProvider === 'perplexity' && (
+                      <>
+                        <label className="block">
+                          <p className="text-xs font-medium text-muted-foreground mb-1">
+                            {t('Perplexity Search API Key')}
+                          </p>
+                          <input
+                            type="password"
+                            value={perplexitySearchApiKey}
+                            onChange={(e) => setPerplexitySearchApiKey(e.target.value)}
+                            onBlur={() => persistWebToolsConfig({ perplexityApiKey: perplexitySearchApiKey })}
+                            placeholder="pplx-..."
+                            className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                          />
+                        </label>
+                        <label className="block">
+                          <p className="text-xs font-medium text-muted-foreground mb-1">
+                            {t('Perplexity Base URL')}
+                          </p>
+                          <input
+                            type="text"
+                            value={perplexitySearchBaseUrl}
+                            onChange={(e) => setPerplexitySearchBaseUrl(e.target.value)}
+                            onBlur={() => persistWebToolsConfig({ perplexityBaseUrl: perplexitySearchBaseUrl })}
+                            placeholder="https://api.perplexity.ai"
+                            className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                          />
+                        </label>
+                      </>
+                    )}
+
+                    {webSearchProvider === 'kimi' && (
+                      <>
+                        <label className="block">
+                          <p className="text-xs font-medium text-muted-foreground mb-1">
+                            {t('Kimi Search API Key')}
+                          </p>
+                          <input
+                            type="password"
+                            value={kimiSearchApiKey}
+                            onChange={(e) => setKimiSearchApiKey(e.target.value)}
+                            onBlur={() => persistWebToolsConfig({ kimiApiKey: kimiSearchApiKey })}
+                            placeholder="sk-..."
+                            className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                          />
+                        </label>
+                        <label className="block">
+                          <p className="text-xs font-medium text-muted-foreground mb-1">
+                            {t('Kimi Base URL')}
+                          </p>
+                          <input
+                            type="text"
+                            value={kimiSearchBaseUrl}
+                            onChange={(e) => setKimiSearchBaseUrl(e.target.value)}
+                            onBlur={() => persistWebToolsConfig({ kimiBaseUrl: kimiSearchBaseUrl })}
+                            placeholder="https://api.moonshot.cn/v1"
+                            className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                          />
+                        </label>
+                        <label className="block">
+                          <p className="text-xs font-medium text-muted-foreground mb-1">
+                            {t('Kimi Search Model')}
+                          </p>
+                          <input
+                            type="text"
+                            value={kimiSearchModel}
+                            onChange={(e) => setKimiSearchModel(e.target.value)}
+                            onBlur={() => persistWebToolsConfig({ kimiModel: kimiSearchModel })}
+                            placeholder="moonshot-v1-128k"
+                            className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                          />
+                        </label>
+                      </>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between gap-4 pt-4 border-t border-border">
+                    <div className="flex-1">
+                      <p className="font-medium">{t('Web Fetch Tool')}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {t('Allow the app to fetch public web pages locally when a tool needs page content.')}
+                      </p>
+                    </div>
+                    <Switch checked={webFetchEnabled} onChange={handleWebFetchEnabledChange} />
+                  </div>
+
+                  <p className="text-xs text-muted-foreground">
+                    {t('These settings apply to the local web tools and are independent from your chat model provider.')}
+                  </p>
+                </div>
+
+                {/* Memory Management */}
+                <div className={`pt-4 border-t border-border transition-opacity ${(config?.memory?.enabled ?? true) ? '' : 'opacity-50 pointer-events-none'}`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <p className="font-medium">{t('Memory Management')}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {t('View and edit the memory file for current space')}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setShowMemoryManager(true)}
+                      className="px-4 py-2 bg-primary/10 text-primary rounded-lg hover:bg-primary/20 transition-colors border border-primary/30"
+                    >
+                      {t('Manage')}
+                    </button>
+                  </div>
+                </div>
+
                 {/* Clear Memory Button */}
                 <div className={`pt-4 border-t border-border transition-opacity ${(config?.memory?.enabled ?? true) ? '' : 'opacity-50 pointer-events-none'}`}>
                   <div className="flex items-center justify-between">
@@ -1448,6 +1785,78 @@ export function SettingsPage() {
                 </div>
               </div>
             </section>
+          )}
+
+          {/* Memory Manager Modal */}
+          {showMemoryManager && (
+            <div
+              className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4"
+              onClick={(e) => {
+                if (e.target === e.currentTarget) setShowMemoryManager(false)
+              }}
+            >
+              <div className="bg-background border border-border rounded-lg w-full max-w-2xl shadow-lg max-h-[80vh] flex flex-col">
+                {/* Header */}
+                <div className="flex items-center justify-between p-4 border-b border-border">
+                  <h3 className="font-medium text-foreground">{t('Memory Management')}</h3>
+                  <button
+                    onClick={() => setShowMemoryManager(false)}
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* Stats Bar */}
+                <div className="px-4 py-3 bg-secondary/30 border-b border-border flex items-center gap-4 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-1.5">
+                    <Database className="w-4 h-4" />
+                    <span>{t('Fragments')}: {memoryStats?.fragmentCount ?? 0}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <MessageSquare className="w-4 h-4" />
+                    <span>{t('Conversations')}: {memoryStats?.conversationCount ?? 0}</span>
+                  </div>
+                  {!memoryMdExists && !isLoadingMemory && (
+                    <span className="text-amber-500 text-xs ml-auto">{t('No MEMORY.md file found')}</span>
+                  )}
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 p-4 overflow-hidden">
+                  {isLoadingMemory ? (
+                    <div className="flex items-center justify-center h-64 text-muted-foreground">
+                      <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                      {t('Loading...')}
+                    </div>
+                  ) : (
+                    <textarea
+                      value={memoryMdContent}
+                      onChange={(e) => setMemoryMdContent(e.target.value)}
+                      placeholder={t('MEMORY.md content will appear here...')}
+                      className="w-full h-80 px-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground resize-y focus:outline-none focus:ring-2 focus:ring-primary/50 font-mono"
+                    />
+                  )}
+                </div>
+
+                {/* Footer */}
+                <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-border">
+                  <button
+                    onClick={() => setShowMemoryManager(false)}
+                    className="px-4 py-2 text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {t('Cancel')}
+                  </button>
+                  <button
+                    onClick={handleSaveMemoryMd}
+                    disabled={isSavingMemory || memoryMdContent === memoryMdOriginal}
+                    className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50"
+                  >
+                    {isSavingMemory ? t('Saving...') : t('Save')}
+                  </button>
+                </div>
+              </div>
+            </div>
           )}
 
           {/* Clear Memory Dialog */}

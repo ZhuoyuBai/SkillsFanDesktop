@@ -16,3 +16,6 @@ export * from './channel'
 
 // Feishu types
 export * from './feishu'
+
+// Web tool config types
+export * from './web-tools'
