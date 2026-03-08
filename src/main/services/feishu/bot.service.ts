@@ -23,7 +23,7 @@ export interface FeishuMessageEvent {
 
 type MessageHandler = (event: FeishuMessageEvent) => void
 type CardActionHandler = (action: {
-  actionValue: Record<string, string>
+  actionValue: unknown
   openId: string
   chatId?: string
   messageId?: string
@@ -274,12 +274,22 @@ export class FeishuBotService {
       const action = data.action as Record<string, unknown> | undefined
       if (!action) return
 
-      // action.value is the JSON string we set in the card button
-      const valueStr = (action.value as Record<string, string>) || {}
+      const actionValue = action.value
       const openId = (data.open_id as string) || (data.operator as Record<string, string>)?.open_id || ''
 
+      console.log('[FeishuBot] Card action received:', JSON.stringify({
+        hasActionValue: actionValue !== undefined,
+        actionValueType: typeof actionValue,
+        actionValuePreview: typeof actionValue === 'string'
+          ? actionValue.slice(0, 200)
+          : JSON.stringify(actionValue).slice(0, 200),
+        openId,
+        openChatId: data.open_chat_id,
+        openMessageId: data.open_message_id
+      }))
+
       this.cardActionHandler({
-        actionValue: valueStr,
+        actionValue,
         openId,
         chatId: data.open_chat_id as string | undefined,
         messageId: data.open_message_id as string | undefined

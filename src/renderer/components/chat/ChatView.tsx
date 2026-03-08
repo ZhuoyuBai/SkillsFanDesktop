@@ -17,6 +17,7 @@ import { useAIBrowserStore } from '../../stores/ai-browser.store'
 import { useSmartScroll } from '../../hooks/useSmartScroll'
 import { MessageList } from './MessageList'
 import { InputArea } from './InputArea'
+import { ToolCard } from '../tool/ToolCard'
 import type { ThinkingEffort } from '../../../shared/utils/openai-models'
 import { ScrollToBottomButton } from './ScrollToBottomButton'
 import { UserQuestionCard } from './UserQuestionCard'
@@ -181,7 +182,21 @@ export function ChatView({ isCompact = false }: ChatViewProps) {
   const currentConversation = getCurrentConversation()
   const { isLoadingConversation, toggleTodoCollapsed } = useChatStore()
   const session = getCurrentSession()
-  const { isGenerating, streamingContent, isStreaming, thoughts, isThinking, compactInfo, error, todoCollapsed, taskStatusHistory, textSegments, lastSegmentIndex, pendingUserQuestion } = session
+  const {
+    isGenerating,
+    streamingContent,
+    isStreaming,
+    thoughts,
+    isThinking,
+    compactInfo,
+    error,
+    todoCollapsed,
+    taskStatusHistory,
+    textSegments,
+    lastSegmentIndex,
+    pendingToolApproval,
+    pendingUserQuestion
+  } = session
 
   // Create toggle callbacks for the current conversation
   const handleToggleTodo = useCallback(() => {
@@ -433,6 +448,16 @@ export function ChatView({ isCompact = false }: ChatViewProps) {
           onClick={() => scrollToBottom('smooth')}
         />
       </div>
+
+      {/* Tool approval prompt - show when execution is waiting for confirmation */}
+      {pendingToolApproval && currentConversation && (
+        <div className={`shrink-0 px-4 pb-2 ${isCompact ? '' : 'max-w-3xl mx-auto w-full'}`}>
+          <ToolCard
+            toolCall={pendingToolApproval}
+            conversationId={currentConversation.id}
+          />
+        </div>
+      )}
 
       {/* UserQuestionCard - show when AI is asking a question */}
       {pendingUserQuestion && currentConversation && (

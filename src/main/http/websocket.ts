@@ -41,6 +41,7 @@ export function getSendStrategy(channel: string): SendStrategy {
     case 'agent:error':                           // Error
     case 'agent:tool-call':                       // Tool call
     case 'agent:tool-result':                     // Tool result
+    case 'agent:tool-approval-resolved':          // Tool approval decision
     case 'agent:compact':                         // Context compression
     case 'agent:queued':                          // Queue notification
     case 'agent:start':     return 'reliable'     // Must deliver

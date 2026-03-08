@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   buildThinkingCard,
   buildThinkingCardWithTools,
-  buildCompleteCard
+  buildCompleteCard,
+  buildToolApprovalCard
 } from '@main/services/feishu/card-builder'
 
 function getHeaderTitle(card: Record<string, any>): string {
@@ -45,5 +46,23 @@ describe('feishu card builder', () => {
 
     expect(getHeaderTitle(card)).toBe('任務狀態')
     expect(getBodyText(card)).toBe('任務完成 ✓')
+  })
+
+  it('embeds approval message id into button payload when provided', () => {
+    const card = buildToolApprovalCard(
+      'mcp__local-tools__bash_code_execution',
+      '{"command":"pwd"}',
+      'conv-1',
+      'tool-1',
+      'msg-123',
+      'zh-CN'
+    ) as Record<string, any>
+
+    const actions = card.elements[2].actions
+    const approveValue = JSON.parse(actions[0].value)
+    const rejectValue = JSON.parse(actions[1].value)
+
+    expect(approveValue.messageId).toBe('msg-123')
+    expect(rejectValue.messageId).toBe('msg-123')
   })
 })

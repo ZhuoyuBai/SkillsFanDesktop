@@ -77,19 +77,43 @@ export function getActivityText(
         t('Matched {{pattern}}', { pattern: truncate(String(input.pattern || ''), 20) })
       )
     case 'Bash':
+    case 'mcp__local-tools__bash_code_execution':
       return getText(
         t('Running {{command}}...', { command: extractCommand(input.command) }),
         t('Ran {{command}}', { command: extractCommand(input.command) })
       )
+    case 'mcp__local-tools__code_execution':
+      return getText(
+        t('Running {{command}}...', { command: truncate(String(input.language || 'code'), 20) }),
+        t('Ran {{command}}', { command: truncate(String(input.language || 'code'), 20) })
+      )
     case 'WebFetch':
+    case 'mcp__web-tools__WebFetch':
       return getText(
         t('Fetching {{url}}...', { url: extractDomain(input.url) }),
         t('Fetched {{url}}', { url: extractDomain(input.url) })
       )
     case 'WebSearch':
+    case 'mcp__web-tools__WebSearch':
       return getText(
         t('Searching {{query}}...', { query: truncate(String(input.query || ''), 20) }),
         t('Searched {{query}}', { query: truncate(String(input.query || ''), 20) })
+      )
+    case 'mcp__local-tools__memory':
+      return getText(
+        t('Searching {{query}}...', { query: truncate(String(input.query || input.path || 'memory'), 20) }),
+        t('Searched {{query}}', { query: truncate(String(input.query || input.path || 'memory'), 20) })
+      )
+    case 'mcp__local-tools__text_editor_code_execution':
+      return getText(
+        t('Editing {{file}}...', { file: extractFileName(input.path) }),
+        t('Edited {{file}}', { file: extractFileName(input.path) })
+      )
+    case 'mcp__local-tools__tool_search_tool_regex':
+    case 'mcp__local-tools__tool_search_tool_bm25':
+      return getText(
+        t('Searching {{pattern}}...', { pattern: truncate(String(input.pattern || input.query || ''), 20) }),
+        t('Searched {{pattern}}', { pattern: truncate(String(input.pattern || input.query || ''), 20) })
       )
     case 'TodoWrite':
       return getText(t('Updating tasks...'), t('Updated tasks'))

@@ -41,4 +41,23 @@ describe('feishu tool status', () => {
     expect(summary.key).toBe('tool:notebookedit')
     expect(summary.text).toBe('🔧 呼叫工具：Notebook Edit')
   })
+
+  it('summarizes local memory and code tools with localized copy', () => {
+    const memory = summarizeToolCall('zh-CN', 'mcp__local-tools__memory', {
+      command: 'search',
+      query: '缓存策略'
+    })
+    const code = summarizeToolCall('en', 'mcp__local-tools__code_execution', {
+      language: 'python'
+    })
+
+    expect(memory).toEqual({
+      key: 'memory',
+      text: '🧠 检索记忆：缓存策略'
+    })
+    expect(code).toEqual({
+      key: 'code-execution',
+      text: '🧪 Running code: python'
+    })
+  })
 })

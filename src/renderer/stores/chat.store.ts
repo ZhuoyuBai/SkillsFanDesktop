@@ -180,6 +180,7 @@ interface ChatState {
   handleAgentMessage: (data: AgentEventBase & { content: string; isComplete: boolean }) => void
   handleAgentToolCall: (data: AgentEventBase & ToolCall) => void
   handleAgentToolResult: (data: AgentEventBase & { toolId: string; result: string; isError: boolean }) => void
+  handleAgentToolApprovalResolved: (data: AgentEventBase & { toolId?: string; toolName?: string; approved: boolean }) => void
   handleAgentError: (data: AgentEventBase & { error: string; errorCode?: number }) => void
   handleAgentComplete: (data: AgentEventBase & { userMessageUuid?: string }) => void
   handleAgentThought: (data: AgentEventBase & { thought: Thought }) => void
@@ -1134,6 +1135,26 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const { conversationId, toolId } = data
     logger.debug(`[ChatStore] handleAgentToolResult [${conversationId}]:`, toolId)
     // Tool results are tracked in thoughts, no additional state needed
+  },
+
+  handleAgentToolApprovalResolved: (data) => {
+    const { conversationId, toolId, toolName, approved } = data
+    logger.debug(`[ChatStore] handleAgentToolApprovalResolved [${conversationId}]:`, approved, toolId, toolName)
+
+    set((state) => {
+      const newSessions = new Map(state.sessions)
+      const session = newSessions.get(conversationId) || createEmptySessionState()
+      newSessions.set(conversationId, {
+        ...session,
+        pendingToolApproval: null
+      })
+      return { sessions: newSessions }
+    })
+
+    useToastStore.getState().addToast(
+      approved ? i18n.t('Tool approved') : i18n.t('Tool rejected'),
+      approved ? 'success' : 'info'
+    )
   },
 
   // Handle error for a specific conversation

@@ -116,8 +116,17 @@ function getActionSummaryData(thoughts: Thought[]): { key: string; params?: Reco
         case 'Grep': return { key: 'Searching {{pattern}}...', params: { pattern: extractSearchTerm(input?.pattern) } }
         case 'Glob': return { key: 'Matching {{pattern}}...', params: { pattern: extractSearchTerm(input?.pattern) } }
         case 'Bash': return { key: 'Executing {{command}}...', params: { command: extractCommand(input?.command) } }
+        case 'mcp__local-tools__bash_code_execution': return { key: 'Executing {{command}}...', params: { command: extractCommand(input?.command) } }
+        case 'mcp__local-tools__code_execution': return { key: 'Executing {{command}}...', params: { command: extractSearchTerm(input?.language) } }
         case 'WebFetch': return { key: 'Fetching {{url}}...', params: { url: extractUrl(input?.url) } }
+        case 'mcp__web-tools__WebFetch': return { key: 'Fetching {{url}}...', params: { url: extractUrl(input?.url) } }
         case 'WebSearch': return { key: 'Searching {{query}}...', params: { query: extractSearchTerm(input?.query) } }
+        case 'mcp__web-tools__WebSearch': return { key: 'Searching {{query}}...', params: { query: extractSearchTerm(input?.query) } }
+        case 'mcp__local-tools__memory': return { key: 'Searching {{query}}...', params: { query: extractSearchTerm(input?.query || input?.path) } }
+        case 'mcp__local-tools__text_editor_code_execution': return { key: 'Editing {{file}}...', params: { file: extractFileName(input?.path) } }
+        case 'mcp__local-tools__tool_search_tool_regex':
+        case 'mcp__local-tools__tool_search_tool_bm25':
+          return { key: 'Searching {{pattern}}...', params: { pattern: extractSearchTerm(input?.pattern || input?.query) } }
         case 'TodoWrite': return { key: 'Updating tasks...' }
         case 'Task': return { key: 'Executing {{task}}...', params: { task: extractSearchTerm(input?.description) } }
         case 'NotebookEdit': return { key: 'Editing {{file}}...', params: { file: extractFileName(input?.notebook_path) } }

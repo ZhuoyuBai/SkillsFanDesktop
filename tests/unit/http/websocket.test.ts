@@ -85,6 +85,10 @@ describe('getSendStrategy', () => {
     expect(getSendStrategy('agent:tool-result')).toBe('reliable')
   })
 
+  it('1.6.1: agent:tool-approval-resolved returns reliable', () => {
+    expect(getSendStrategy('agent:tool-approval-resolved')).toBe('reliable')
+  })
+
   it('1.7: agent:compact returns reliable', () => {
     expect(getSendStrategy('agent:compact')).toBe('reliable')
   })

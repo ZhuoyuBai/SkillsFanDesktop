@@ -35,6 +35,7 @@ import {
 } from '../../feishu'
 import type { FeishuMessageEvent } from '../../feishu'
 import { summarizeToolCall, upsertToolSummary } from '../../feishu/tool-status'
+import { parseFeishuCardActionValue } from '../../feishu/card-action'
 import { getChannelManager } from '../channel-manager'
 
 export class FeishuChannel implements Channel {
@@ -56,6 +57,13 @@ export class FeishuChannel implements Channel {
   private deliveredOutputs = new Set<string>()
   /** Track tool call IDs that already triggered an approval card, to prevent duplicate notifications */
   private approvedToolCalls = new Set<string>()
+  /** Track approval card message IDs by tool call ID so card updates do not depend on callback payload shape */
+  private approvalCards = new Map<string, {
+    messageId: string
+    chatId: string
+    conversationId: string
+    toolName: string
+  }>()
   /** Track active tools per conversation for aggregated thinking card */
   private activeTools = new Map<string, Array<{ key: string; text: string }>>()
   /** Dedup inbound messages by messageId (飞书 WebSocket may retry) */
@@ -192,6 +200,7 @@ export class FeishuChannel implements Channel {
     this.thinkingCardIds.clear()
     this.messageBuffers.clear()
     this.activeTools.clear()
+    this.approvalCards.clear()
 
     await this.botService.stop()
     this.messageHandler = null
@@ -232,21 +241,34 @@ export class FeishuChannel implements Channel {
   // ============================================
 
   private async handleCardAction(action: {
-    actionValue: Record<string, string>
+    actionValue: unknown
     openId: string
     chatId?: string
     messageId?: string
   }): Promise<void> {
     try {
-      // Parse the action value (JSON string stored in button value)
-      const valueStr = Object.values(action.actionValue)[0]
-      if (!valueStr) return
+      const value = parseFeishuCardActionValue(action.actionValue)
+      if (!value) {
+        console.warn('[FeishuChannel] Ignoring card action with empty/invalid value')
+        return
+      }
 
-      const value = JSON.parse(valueStr) as Record<string, string>
       const actionType = value.action
       const conversationId = value.conversationId
 
-      if (!conversationId) return
+      console.log('[FeishuChannel] Parsed card action:', JSON.stringify({
+        actionType,
+        conversationId,
+        toolCallId: value.toolCallId,
+        toolName: value.toolName,
+        valueMessageId: value.messageId,
+        messageId: action.messageId
+      }))
+
+      if (!conversationId) {
+        console.warn('[FeishuChannel] Card action missing conversationId')
+        return
+      }
 
       // Dynamic import to avoid circular deps
       const { handleToolApproval, handleUserQuestionAnswer } = await import('../../agent')
@@ -256,24 +278,92 @@ export class FeishuChannel implements Channel {
           const locale = this.getLocaleTag()
           handleToolApproval(conversationId, true)
           // Update card to show result
-          if (action.messageId) {
-            const toolName = value.toolName || 'Tool'
-            await this.botService.updateCard(
-              action.messageId,
-              buildToolApprovalResultCard(toolName, true, locale)
-            ).catch(() => { /* ignore */ })
+          const storedApproval = value.toolCallId ? this.approvalCards.get(value.toolCallId) : undefined
+          const approvalMessageId = action.messageId || value.messageId || storedApproval?.messageId
+          const toolName = value.toolName || storedApproval?.toolName || 'Tool'
+          if (approvalMessageId) {
+            try {
+              await this.botService.updateCard(
+                approvalMessageId,
+                buildToolApprovalResultCard(toolName, true, locale)
+              )
+            } catch (error) {
+              console.warn('[FeishuChannel] Failed to update approval card after approve, sending fallback card:', error)
+              const fallbackChatId = action.chatId || storedApproval?.chatId
+              if (fallbackChatId) {
+                await this.botService.sendCard(
+                  fallbackChatId,
+                  buildToolApprovalResultCard(toolName, true, locale)
+                ).catch((sendError) => {
+                  console.warn('[FeishuChannel] Failed to send fallback approval result card:', sendError)
+                })
+              }
+            }
+            if (value.toolCallId) {
+              this.approvalCards.delete(value.toolCallId)
+              this.approvedToolCalls.delete(value.toolCallId)
+            }
+          } else {
+            console.warn('[FeishuChannel] Approval succeeded but no message ID was available to update the card')
+            const fallbackChatId = action.chatId || storedApproval?.chatId
+            if (fallbackChatId) {
+              await this.botService.sendCard(
+                fallbackChatId,
+                buildToolApprovalResultCard(toolName, true, locale)
+              ).catch((sendError) => {
+                console.warn('[FeishuChannel] Failed to send fallback approval result card without message ID:', sendError)
+              })
+            }
+            if (value.toolCallId) {
+              this.approvalCards.delete(value.toolCallId)
+              this.approvedToolCalls.delete(value.toolCallId)
+            }
           }
           break
         }
         case 'tool_reject': {
           const locale = this.getLocaleTag()
           handleToolApproval(conversationId, false)
-          if (action.messageId) {
-            const toolName = value.toolName || 'Tool'
-            await this.botService.updateCard(
-              action.messageId,
-              buildToolApprovalResultCard(toolName, false, locale)
-            ).catch(() => { /* ignore */ })
+          const storedApproval = value.toolCallId ? this.approvalCards.get(value.toolCallId) : undefined
+          const approvalMessageId = action.messageId || value.messageId || storedApproval?.messageId
+          const toolName = value.toolName || storedApproval?.toolName || 'Tool'
+          if (approvalMessageId) {
+            try {
+              await this.botService.updateCard(
+                approvalMessageId,
+                buildToolApprovalResultCard(toolName, false, locale)
+              )
+            } catch (error) {
+              console.warn('[FeishuChannel] Failed to update approval card after reject, sending fallback card:', error)
+              const fallbackChatId = action.chatId || storedApproval?.chatId
+              if (fallbackChatId) {
+                await this.botService.sendCard(
+                  fallbackChatId,
+                  buildToolApprovalResultCard(toolName, false, locale)
+                ).catch((sendError) => {
+                  console.warn('[FeishuChannel] Failed to send fallback rejection result card:', sendError)
+                })
+              }
+            }
+            if (value.toolCallId) {
+              this.approvalCards.delete(value.toolCallId)
+              this.approvedToolCalls.delete(value.toolCallId)
+            }
+          } else {
+            console.warn('[FeishuChannel] Rejection succeeded but no message ID was available to update the card')
+            const fallbackChatId = action.chatId || storedApproval?.chatId
+            if (fallbackChatId) {
+              await this.botService.sendCard(
+                fallbackChatId,
+                buildToolApprovalResultCard(toolName, false, locale)
+              ).catch((sendError) => {
+                console.warn('[FeishuChannel] Failed to send fallback rejection result card without message ID:', sendError)
+              })
+            }
+            if (value.toolCallId) {
+              this.approvalCards.delete(value.toolCallId)
+              this.approvedToolCalls.delete(value.toolCallId)
+            }
           }
           break
         }
@@ -288,6 +378,10 @@ export class FeishuChannel implements Channel {
     } catch (err) {
       console.error('[FeishuChannel] Error handling card action:', err)
     }
+  }
+
+  private parseCardActionValue(raw: unknown): Record<string, string> | null {
+    return parseFeishuCardActionValue(raw)
   }
 
   // ============================================
@@ -587,19 +681,37 @@ export class FeishuChannel implements Channel {
         const requiresApproval = payload.requiresApproval as boolean
         const toolCallId = payload.id as string || ''
 
+        const approvalKey = toolCallId || `${convId}:${toolName}`
+
         // Skip tools that already have an approval card (prevents duplicate notification
         // from permission-handler + SDK stream both emitting agent:tool-call)
-        if (this.approvedToolCalls.has(toolName)) {
+        if (this.approvedToolCalls.has(approvalKey)) {
           break
         }
 
         if (requiresApproval) {
-          this.approvedToolCalls.add(toolName)
+          this.approvedToolCalls.add(approvalKey)
           const inputStr = toolInput ? JSON.stringify(toolInput, null, 2) : ''
-          await this.botService.sendCard(
+          const approvalCardId = await this.botService.sendCard(
             chatId,
-            buildToolApprovalCard(toolName, inputStr, convId, toolCallId, locale)
+            buildToolApprovalCard(toolName, inputStr, convId, toolCallId, undefined, locale)
           )
+          if (toolCallId && approvalCardId) {
+            this.approvalCards.set(toolCallId, {
+              messageId: approvalCardId,
+              chatId,
+              conversationId: convId,
+              toolName
+            })
+            // Embed the message ID into button payload so future callbacks can still
+            // patch the original card even if in-memory state is lost after restart.
+            await this.botService.updateCard(
+              approvalCardId,
+              buildToolApprovalCard(toolName, inputStr, convId, toolCallId, approvalCardId, locale)
+            ).catch((error) => {
+              console.warn('[FeishuChannel] Failed to persist approval card message ID into button payload:', error)
+            })
+          }
         } else {
           // Suppress notifications for internal/high-frequency tools to reduce noise
           const SILENT_TOOLS = new Set([

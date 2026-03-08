@@ -80,6 +80,7 @@ export default function App() {
     handleAgentMessage,
     handleAgentToolCall,
     handleAgentToolResult,
+    handleAgentToolApprovalResolved,
     handleAgentError,
     handleAgentComplete,
     handleAgentThought,
@@ -210,6 +211,15 @@ export default function App() {
       handleAgentToolResult(data as AgentEventBase & { toolId: string; result: string; isError: boolean })
     })
 
+    const unsubToolApprovalResolved = api.onAgentToolApprovalResolved((data) => {
+      logger.debug('[App] Received agent:tool-approval-resolved event:', data)
+      handleAgentToolApprovalResolved(data as AgentEventBase & {
+        toolId?: string
+        toolName?: string
+        approved: boolean
+      })
+    })
+
     const unsubError = api.onAgentError((data) => {
       logger.debug('[App] Received agent:error event:', data)
       handleAgentError(data as AgentEventBase & { error: string; errorCode?: number })
@@ -292,6 +302,7 @@ export default function App() {
       unsubStart()
       unsubToolCall()
       unsubToolResult()
+      unsubToolApprovalResolved()
       unsubError()
       unsubComplete()
       unsubCompact()

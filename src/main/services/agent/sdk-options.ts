@@ -18,6 +18,18 @@ import type { ApiCredentials } from './types'
 const DEFAULT_MODEL = 'claude-opus-4-5-20251101'
 const ROUTED_MODEL = 'claude-sonnet-4-20250514'
 const MAX_THINKING_TOKENS = 10240
+const DISALLOWED_SERVER_SIDE_TOOLS = [
+  'WebSearch',
+  'WebFetch',
+  'web_search',
+  'web_fetch',
+  'code_execution',
+  'bash_code_execution',
+  'text_editor_code_execution',
+  'tool_search_tool_regex',
+  'tool_search_tool_bm25',
+  'memory'
+]
 
 export interface ResolvedSdkTransport {
   anthropicBaseUrl: string
@@ -126,6 +138,16 @@ export async function buildSdkOptions(params: BuildSdkOptionsParams): Promise<{
   const mcpServers: Record<string, any> = enabledMcp ? { ...enabledMcp } : {}
   const addedMcpServers: string[] = []
 
+  const { createLocalToolsMcpServer } = await import('../local-tools/sdk-mcp-server')
+  mcpServers['local-tools'] = createLocalToolsMcpServer({
+    workDir,
+    spaceId,
+    conversationId,
+    aiBrowserEnabled,
+    includeSkillMcp
+  })
+  addedMcpServers.push('local-tools')
+
   const { createWebToolsMcpServer } = await import('../web-tools/sdk-mcp-server')
   mcpServers['web-tools'] = createWebToolsMcpServer()
   addedMcpServers.push('web-tools')
@@ -197,7 +219,7 @@ export async function buildSdkOptions(params: BuildSdkOptionsParams): Promise<{
     maxTurns: 50,
     allowedTools: builtInTools,
     tools: builtInTools,
-    disallowedTools: ['WebSearch', 'WebFetch'],
+    disallowedTools: DISALLOWED_SERVER_SIDE_TOOLS,
     permissionMode: 'acceptEdits' as const,
     canUseTool: createCanUseTool(workDir, spaceId, conversationId),
     includePartialMessages: true,

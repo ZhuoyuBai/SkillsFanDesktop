@@ -107,10 +107,14 @@ export const toolIconMap: Record<string, LucideIcon> = {
 
   // Execution
   Bash: Terminal,
+  'mcp__local-tools__bash_code_execution': Terminal,
+  'mcp__local-tools__code_execution': Terminal,
 
   // Web
   WebFetch: Globe,
   WebSearch: Globe,
+  'mcp__web-tools__WebFetch': Globe,
+  'mcp__web-tools__WebSearch': Globe,
 
   // Task management
   TodoWrite: ListTodo,
@@ -123,6 +127,10 @@ export const toolIconMap: Record<string, LucideIcon> = {
 
   // Other
   AskUserQuestion: MessageSquare,
+  'mcp__local-tools__text_editor_code_execution': FileEdit,
+  'mcp__local-tools__tool_search_tool_regex': Search,
+  'mcp__local-tools__tool_search_tool_bm25': Search,
+  'mcp__local-tools__memory': Database,
 }
 
 // Get icon component for a tool

@@ -385,6 +385,7 @@ export function createSessionState(
     spaceId,
     conversationId,
     pendingPermissionResolve: null,
+    pendingPermissionToolCall: null,
     thoughts: [],
     pendingUserQuestion: null,
     currentStreamingContent: ''

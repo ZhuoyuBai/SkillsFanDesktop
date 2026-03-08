@@ -196,6 +196,7 @@ export interface SessionState {
   spaceId: string
   conversationId: string
   pendingPermissionResolve: ((approved: boolean) => void) | null
+  pendingPermissionToolCall: ToolCall | null
   thoughts: Thought[]  // Backend accumulates thoughts (Single Source of Truth)
   /** Pending user question - pauses execution until answered */
   pendingUserQuestion: UserQuestionInfo | null

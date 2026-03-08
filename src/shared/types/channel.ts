@@ -69,6 +69,7 @@ export type OutboundEventType =
   | 'agent:thought'
   | 'agent:tool-call'
   | 'agent:tool-result'
+  | 'agent:tool-approval-resolved'
   | 'agent:complete'
   | 'agent:error'
   | 'agent:compact'

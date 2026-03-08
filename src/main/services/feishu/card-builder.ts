@@ -126,6 +126,7 @@ export function buildToolApprovalCard(
   toolInput: string,
   conversationId: string,
   toolCallId: string,
+  approvalMessageId?: string,
   locale: FeishuCardLocale = 'zh-CN'
 ): Record<string, unknown> {
   const copy = getCopy(locale)
@@ -157,7 +158,9 @@ export function buildToolApprovalCard(
             value: JSON.stringify({
               action: 'tool_approve',
               conversationId,
-              toolCallId
+              toolCallId,
+              toolName,
+              messageId: approvalMessageId
             })
           },
           {
@@ -167,7 +170,9 @@ export function buildToolApprovalCard(
             value: JSON.stringify({
               action: 'tool_reject',
               conversationId,
-              toolCallId
+              toolCallId,
+              toolName,
+              messageId: approvalMessageId
             })
           }
         ]

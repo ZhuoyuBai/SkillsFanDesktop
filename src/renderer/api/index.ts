@@ -881,6 +881,8 @@ export const api = {
     onEvent('agent:tool-call', callback),
   onAgentToolResult: (callback: (data: unknown) => void) =>
     onEvent('agent:tool-result', callback),
+  onAgentToolApprovalResolved: (callback: (data: unknown) => void) =>
+    onEvent('agent:tool-approval-resolved', callback),
   onAgentError: (callback: (data: unknown) => void) =>
     onEvent('agent:error', callback),
   onAgentComplete: (callback: (data: unknown) => void) =>

@@ -8,7 +8,7 @@ import { useSpaceStore } from '../stores/space.store'
 import { useUpdaterStore } from '../stores/updater.store'
 import { api } from '../api'
 import type { HaloConfig, ThemeMode, McpServersConfig, AISourceType, OAuthSourceConfig, ApiProvider, CustomSourceConfig } from '../types'
-import { AVAILABLE_MODELS, DEFAULT_MODEL } from '../types'
+import { AVAILABLE_MODELS, DEFAULT_CONFIG, DEFAULT_MODEL } from '../types'
 import { Select } from '../components/ui/Select'
 import { Switch } from '../components/ui/Switch'
 import type { WebSearchProvider } from '../../shared/types'
@@ -644,6 +644,27 @@ export function SettingsPage() {
     } catch (error) {
       console.error('[Settings] Failed to set minimize to tray:', error)
       setMinimizeToTray(!enabled) // Revert on error
+    }
+  }
+
+  const isFullAccessEnabled = (config?.permissions?.commandExecution === 'allow')
+    || (config?.permissions?.trustMode ?? false)
+
+  const handlePermissionModeChange = async (enabled: boolean) => {
+    const currentPermissions = config?.permissions ?? DEFAULT_CONFIG.permissions
+    const permissions = {
+      ...currentPermissions,
+      commandExecution: enabled ? 'allow' as const : 'ask' as const,
+      trustMode: enabled
+    }
+
+    try {
+      await api.setConfig({ permissions })
+      setConfig({ ...(config ?? DEFAULT_CONFIG), permissions } as HaloConfig)
+      addToast(t('Saved'), 'success')
+    } catch (error) {
+      console.error('[Settings] Failed to update permission mode:', error)
+      addToast(t('Save failed'), 'error')
     }
   }
 
@@ -1554,8 +1575,38 @@ export function SettingsPage() {
               <h2 className="text-lg font-medium mb-4">{t('Advanced')}</h2>
 
               <div className="space-y-4">
+                {/* Permission Mode */}
+                <div>
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium">{t('Permission Mode')}</p>
+                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                          isFullAccessEnabled
+                            ? 'bg-amber-500/10 text-amber-600 border border-amber-500/30'
+                            : 'bg-secondary text-muted-foreground border border-border'
+                        }`}>
+                          {isFullAccessEnabled ? t('Full Access') : t('Ask Every Time')}
+                        </span>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {isFullAccessEnabled
+                          ? t('Run commands, code execution, and sub-agents without asking for confirmation.')
+                          : t('Ask before running commands, code execution, or sub-agents.')}
+                      </p>
+                    </div>
+                    <Switch checked={isFullAccessEnabled} onChange={handlePermissionModeChange} />
+                  </div>
+
+                  {isFullAccessEnabled && (
+                    <div className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-400">
+                      {t('Full access allows AI to execute commands directly. Only enable this on a trusted machine.')}
+                    </div>
+                  )}
+                </div>
+
                 {/* Cross-conversation Memory Toggle */}
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between pt-4 border-t border-border">
                   <div className="flex-1">
                     <p className="font-medium">{t('Cross-conversation Memory')}</p>
                     <p className="text-sm text-muted-foreground">

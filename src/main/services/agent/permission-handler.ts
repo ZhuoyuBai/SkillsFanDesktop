@@ -29,6 +29,31 @@ export type CanUseToolFn = (
   options: { signal: AbortSignal }
 ) => Promise<ToolPermissionResult>
 
+const BLOCKED_SERVER_SIDE_TOOLS = new Set([
+  'WebSearch',
+  'WebFetch',
+  'web_search',
+  'web_fetch',
+  'code_execution',
+  'bash_code_execution',
+  'text_editor_code_execution',
+  'tool_search_tool_regex',
+  'tool_search_tool_bm25',
+  'memory'
+])
+
+function getPathCandidates(input: Record<string, unknown>): string[] {
+  const candidates = [
+    input.file_path,
+    input.path,
+    input.notebook_path,
+    input.old_path,
+    input.new_path
+  ]
+
+  return candidates.filter((value): value is string => typeof value === 'string' && value.length > 0)
+}
+
 // ============================================
 // Permission Handler Factory
 // ============================================
@@ -59,25 +84,13 @@ export function createCanUseTool(
   ): Promise<ToolPermissionResult> => {
     console.log(`[Agent] canUseTool called - Tool: ${toolName}, Input:`, JSON.stringify(input).substring(0, 200))
 
-    if (toolName === 'WebSearch' || toolName === 'mcp__web-tools__WebSearch') {
-      const updatedInput = sanitizeWebSearchInput(input)
-      return { behavior: 'allow' as const, updatedInput }
-    }
+    const ensurePathsWithinWorkspace = (): ToolPermissionResult | null => {
+      const pathParams = getPathCandidates(input)
 
-    if (toolName === 'WebFetch' || toolName === 'mcp__web-tools__WebFetch') {
-      return {
-        behavior: 'allow' as const,
-        updatedInput: input
-      }
-    }
-
-    // Check file path tools - restrict to working directory
-    const fileTools = ['Read', 'Write', 'Edit', 'Grep', 'Glob', 'NotebookEdit']
-    if (fileTools.includes(toolName)) {
-      const pathParam = (input.file_path || input.path || input.notebook_path) as string | undefined
-
-      if (pathParam) {
-        const absolutePath = path.resolve(pathParam)
+      for (const pathParam of pathParams) {
+        const absolutePath = path.isAbsolute(pathParam)
+          ? path.resolve(pathParam)
+          : path.resolve(absoluteWorkDir, pathParam)
         const isWithinWorkDir =
           absolutePath.startsWith(absoluteWorkDir + path.sep) || absolutePath === absoluteWorkDir
 
@@ -89,10 +102,11 @@ export function createCanUseTool(
           }
         }
       }
+
+      return null
     }
 
-    // Check Bash commands based on permission settings
-    if (toolName === 'Bash') {
+    const requestCommandApproval = async (name: string, description: string): Promise<ToolPermissionResult> => {
       const permission = config.permissions.commandExecution
 
       if (permission === 'deny') {
@@ -103,28 +117,27 @@ export function createCanUseTool(
       }
 
       if (permission === 'ask' && !config.permissions.trustMode) {
-        // Send permission request to renderer with session IDs
         const toolCall: ToolCall = {
           id: `tool-${Date.now()}`,
-          name: toolName,
+          name,
           status: 'waiting_approval',
           input,
           requiresApproval: true,
-          description: `Execute command: ${input.command}`
+          description
         }
 
         sendToRenderer('agent:tool-call', spaceId, conversationId, toolCall as unknown as Record<string, unknown>)
 
-        // Wait for user response using session-specific resolver
         const session = activeSessions.get(conversationId)
         if (!session) {
           return { behavior: 'deny' as const, message: 'Session not found' }
         }
+        session.pendingPermissionToolCall = toolCall
 
-        return new Promise((resolve) => {
+        return await new Promise((resolve) => {
           session.pendingPermissionResolve = (approved: boolean) => {
             if (approved) {
-              resolve({ behavior: 'allow' as const })
+              resolve({ behavior: 'allow' as const, updatedInput: input })
             } else {
               resolve({
                 behavior: 'deny' as const,
@@ -134,6 +147,87 @@ export function createCanUseTool(
           }
         })
       }
+
+      return {
+        behavior: 'allow' as const,
+        updatedInput: input
+      }
+    }
+
+    if (toolName === 'mcp__web-tools__WebSearch') {
+      const updatedInput = sanitizeWebSearchInput(input)
+      return { behavior: 'allow' as const, updatedInput }
+    }
+
+    if (toolName === 'mcp__web-tools__WebFetch') {
+      return {
+        behavior: 'allow' as const,
+        updatedInput: input
+      }
+    }
+
+    if (toolName === 'mcp__local-tools__memory') {
+      return {
+        behavior: 'allow' as const,
+        updatedInput: input
+      }
+    }
+
+    if (
+      toolName === 'mcp__local-tools__tool_search_tool_regex'
+      || toolName === 'mcp__local-tools__tool_search_tool_bm25'
+    ) {
+      return {
+        behavior: 'allow' as const,
+        updatedInput: input
+      }
+    }
+
+    if (toolName === 'mcp__local-tools__text_editor_code_execution') {
+      const violation = ensurePathsWithinWorkspace()
+      if (violation) return violation
+
+      return {
+        behavior: 'allow' as const,
+        updatedInput: input
+      }
+    }
+
+    if (toolName === 'mcp__local-tools__bash_code_execution') {
+      return await requestCommandApproval(
+        toolName,
+        `Execute command: ${input.command || 'shell command'}`
+      )
+    }
+
+    if (toolName === 'mcp__local-tools__code_execution') {
+      const language = typeof input.language === 'string' ? input.language : 'code'
+      return await requestCommandApproval(
+        toolName,
+        `Execute ${language} snippet`
+      )
+    }
+
+    if (BLOCKED_SERVER_SIDE_TOOLS.has(toolName)) {
+      return {
+        behavior: 'deny' as const,
+        message: `Built-in server-side tool "${toolName}" is disabled. Use local MCP tools instead.`
+      }
+    }
+
+    // Check file path tools - restrict to working directory
+    const fileTools = ['Read', 'Write', 'Edit', 'Grep', 'Glob', 'NotebookEdit']
+    if (fileTools.includes(toolName)) {
+      const violation = ensurePathsWithinWorkspace()
+      if (violation) return violation
+    }
+
+    // Check Bash commands based on permission settings
+    if (toolName === 'Bash') {
+      return await requestCommandApproval(
+        toolName,
+        `Execute command: ${input.command || 'shell command'}`
+      )
     }
 
     // Task (sub-agent) — requires user approval since it spawns child agents and costs tokens
@@ -168,11 +262,12 @@ export function createCanUseTool(
       }
 
       sendToRenderer('agent:tool-call', spaceId, conversationId, toolCall as unknown as Record<string, unknown>)
+      session.pendingPermissionToolCall = toolCall
 
       return new Promise((resolve) => {
         session.pendingPermissionResolve = (approved: boolean) => {
           if (approved) {
-            resolve({ behavior: 'allow' as const })
+            resolve({ behavior: 'allow' as const, updatedInput: input })
           } else {
             resolve({
               behavior: 'deny' as const,
@@ -253,8 +348,18 @@ export function createCanUseTool(
 export function handleToolApproval(conversationId: string, approved: boolean): void {
   const session = activeSessions.get(conversationId)
   if (session?.pendingPermissionResolve) {
+    console.log(`[Agent][${conversationId}] Tool approval received: approved=${approved}`)
+    const pendingTool = session.pendingPermissionToolCall
+    sendToRenderer('agent:tool-approval-resolved', session.spaceId, conversationId, {
+      toolId: pendingTool?.id,
+      toolName: pendingTool?.name,
+      approved
+    })
     session.pendingPermissionResolve(approved)
     session.pendingPermissionResolve = null
+    session.pendingPermissionToolCall = null
+  } else {
+    console.warn(`[Agent][${conversationId}] Tool approval received but no pending permission resolver was found`)
   }
 }
 

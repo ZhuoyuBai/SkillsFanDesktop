@@ -78,14 +78,20 @@ export function ToolCard({ toolCall, conversationId }: ToolCardProps) {
       case 'Edit':
         return t('Edit file')
       case 'Bash':
+      case 'mcp__local-tools__bash_code_execution':
+      case 'mcp__local-tools__code_execution':
         return t('Execute command')
       case 'Grep':
+      case 'mcp__local-tools__tool_search_tool_regex':
+      case 'mcp__local-tools__tool_search_tool_bm25':
         return t('Search content')
       case 'Glob':
         return t('Find files')
       case 'WebFetch':
+      case 'mcp__web-tools__WebFetch':
         return t('Fetch web page')
       case 'WebSearch':
+      case 'mcp__web-tools__WebSearch':
         return t('Search the web')
       case 'TodoWrite':
         return t('Task list')
@@ -93,6 +99,10 @@ export function ToolCard({ toolCall, conversationId }: ToolCardProps) {
         return t('Subtask')
       case 'NotebookEdit':
         return t('Edit notebook')
+      case 'mcp__local-tools__text_editor_code_execution':
+        return t('Edit file')
+      case 'mcp__local-tools__memory':
+        return t('Memory')
       case 'AskUserQuestion':
         return t('Ask user')
       default:
@@ -113,11 +123,21 @@ export function ToolCard({ toolCall, conversationId }: ToolCardProps) {
       case 'Edit':
         return input.file_path as string
       case 'Bash':
+      case 'mcp__local-tools__bash_code_execution':
         return input.command as string
+      case 'mcp__local-tools__code_execution':
+        return `${String(input.language || 'code')}: ${String(input.code || '').slice(0, 50)}`
       case 'Grep':
+      case 'mcp__local-tools__tool_search_tool_regex':
         return t('Search: {{pattern}}', { pattern: input.pattern as string })
+      case 'mcp__local-tools__tool_search_tool_bm25':
+        return t('Search: {{pattern}}', { pattern: input.query as string })
       case 'Glob':
         return t('Pattern: {{pattern}}', { pattern: input.pattern as string })
+      case 'mcp__local-tools__memory':
+        return `${String(input.command || 'memory')}: ${String(input.path || input.query || 'MEMORY.md')}`
+      case 'mcp__local-tools__text_editor_code_execution':
+        return `${String(input.command || 'edit')}: ${String(input.path || '')}`
       default:
         return JSON.stringify(input).slice(0, 50)
     }
