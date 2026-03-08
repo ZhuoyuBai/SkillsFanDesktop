@@ -379,6 +379,30 @@ async function runKimiSearch(args: {
   }
 }
 
+function autoSelectProvider(search: ReturnType<typeof getProviderRuntime>['web']['search']): {
+  provider: WebSearchProvider
+  apiKey: string
+} {
+  // Brave
+  const braveKey = normalizeApiKey(search.apiKey || process.env.BRAVE_API_KEY)
+  if (braveKey) return { provider: 'brave', apiKey: braveKey }
+
+  // Perplexity
+  const perplexityKey = normalizeApiKey(search.perplexity.apiKey || process.env.PERPLEXITY_API_KEY)
+  if (perplexityKey) return { provider: 'perplexity', apiKey: perplexityKey }
+
+  // Kimi (multiple fallback sources)
+  const kimiKey = normalizeApiKey(
+    search.kimi.apiKey
+    || process.env.KIMI_API_KEY
+    || process.env.MOONSHOT_API_KEY
+    || resolveKimiFallbackApiKey()
+  )
+  if (kimiKey) return { provider: 'kimi', apiKey: kimiKey }
+
+  throw new Error('No search API key found. Set BRAVE_API_KEY, PERPLEXITY_API_KEY, or KIMI_API_KEY environment variable.')
+}
+
 export async function executeWebSearch(args: {
   query: string
   count?: number
@@ -394,12 +418,13 @@ export async function executeWebSearch(args: {
     throw new Error('Web search is disabled in settings.')
   }
 
+  const { provider, apiKey } = autoSelectProvider(search)
+
   const count = Math.max(1, Math.min(10, Math.floor(args.count || search.maxResults)))
   const country = args.country?.trim()
   const language = args.language?.trim().toLowerCase()
   const freshness = args.freshness?.trim().toLowerCase()
   const domainFilter = (args.domainFilter || []).map((entry) => entry.trim()).filter(Boolean)
-  const provider = search.provider
 
   const cacheKey = buildCacheKey([
     provider,
@@ -416,11 +441,6 @@ export async function executeWebSearch(args: {
   const start = Date.now()
 
   if (provider === 'perplexity') {
-    const apiKey = normalizeApiKey(search.perplexity.apiKey || process.env.PERPLEXITY_API_KEY)
-    if (!apiKey) {
-      throw new Error('Perplexity Search API key is missing. Configure tools.web.search.perplexity.apiKey or PERPLEXITY_API_KEY.')
-    }
-
     const results = await runPerplexitySearch({
       query: args.query,
       count,
@@ -449,16 +469,6 @@ export async function executeWebSearch(args: {
       throw new Error('Kimi search only supports query and count right now.')
     }
 
-    const apiKey = normalizeApiKey(
-      search.kimi.apiKey
-      || process.env.KIMI_API_KEY
-      || process.env.MOONSHOT_API_KEY
-      || resolveKimiFallbackApiKey()
-    )
-    if (!apiKey) {
-      throw new Error('Kimi Search API key is missing. Configure tools.web.search.kimi.apiKey or set KIMI_API_KEY / MOONSHOT_API_KEY.')
-    }
-
     const result = await runKimiSearch({
       query: args.query,
       timeoutSeconds: search.timeoutSeconds,
@@ -478,11 +488,7 @@ export async function executeWebSearch(args: {
     return payload
   }
 
-  const apiKey = normalizeApiKey(search.apiKey || process.env.BRAVE_API_KEY)
-  if (!apiKey) {
-    throw new Error('Brave Search API key is missing. Configure tools.web.search.apiKey or BRAVE_API_KEY.')
-  }
-
+  // Brave (default)
   const results = await runBraveSearch({
     query: args.query,
     count,

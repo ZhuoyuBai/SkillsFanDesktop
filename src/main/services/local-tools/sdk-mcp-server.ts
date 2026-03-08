@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { createSdkMcpServer, tool } from '@anthropic-ai/claude-agent-sdk'
 import { executeCodeSnippet, executeShellCommand } from './code-execution'
+import { executeAppleScript, openMacOSApplication } from './macos-ui'
 import { executeMemoryCommand } from './memory-tool'
 import { executeTextEditorCommand } from './text-editor'
 import { buildToolCatalog } from './tool-catalog'
@@ -144,6 +145,106 @@ export function createLocalToolsMcpServer(options: CreateLocalToolsMcpServerOpti
     }
   )
 
+  const openUrlTool = tool(
+    'open_url',
+    'Open a URL in the user\'s default system browser (Chrome, Safari, etc). Use this to let the user view web pages.',
+    {
+      url: z.string().url().describe('The URL to open')
+    },
+    async (args) => {
+      try {
+        const { shell } = await import('electron')
+        await shell.openExternal(args.url)
+        return {
+          content: [{ type: 'text' as const, text: `Opened ${args.url} in system browser.` }]
+        }
+      } catch (error) {
+        return {
+          content: [{ type: 'text' as const, text: (error as Error).message }],
+          isError: true
+        }
+      }
+    }
+  )
+
+  const openApplicationTool = tool(
+    'open_application',
+    'Open a real macOS application, optionally with a URL or file target. Use this to launch the user\'s actual Google Chrome instead of the sandboxed AI browser.',
+    {
+      application: z.string().min(1).describe('macOS application name, such as "Google Chrome" or "Safari"'),
+      target: z.string().optional().describe('Optional URL or file path to open with the application'),
+      activate: z.boolean().optional().describe('Whether to bring the application to the front (default: true)'),
+      timeoutMs: z.number().int().min(1_000).max(120_000).optional().describe('Execution timeout in milliseconds')
+    },
+    async (args) => {
+      try {
+        const result = await openMacOSApplication({
+          workDir: options.workDir,
+          application: args.application,
+          target: args.target,
+          activate: args.activate,
+          timeoutMs: args.timeoutMs
+        })
+
+        if (result.returnCode !== 0 || result.timedOut) {
+          const detail = result.stderr || result.stdout || 'Unknown error'
+          return {
+            content: [{ type: 'text' as const, text: `Failed to open ${args.application}: ${detail}` }],
+            isError: true
+          }
+        }
+
+        const targetText = args.target ? ` with ${args.target}` : ''
+        return {
+          content: [{ type: 'text' as const, text: `Opened ${args.application}${targetText}.` }]
+        }
+      } catch (error) {
+        return {
+          content: [{ type: 'text' as const, text: (error as Error).message }],
+          isError: true
+        }
+      }
+    }
+  )
+
+  const runAppleScriptTool = tool(
+    'run_applescript',
+    'Run AppleScript on macOS for system-level UI automation. Use this to control real desktop apps through System Events after the user grants Accessibility and Automation permissions.',
+    {
+      script: z.string().min(1).describe('AppleScript source code to execute'),
+      timeoutMs: z.number().int().min(1_000).max(120_000).optional().describe('Execution timeout in milliseconds')
+    },
+    async (args) => {
+      try {
+        const result = await executeAppleScript({
+          workDir: options.workDir,
+          script: args.script,
+          timeoutMs: args.timeoutMs
+        })
+
+        if (result.returnCode !== 0 || result.timedOut) {
+          const detail = result.stderr || result.stdout || 'Unknown error'
+          return {
+            content: [{ type: 'text' as const, text: `AppleScript failed: ${detail}` }],
+            isError: true
+          }
+        }
+
+        return {
+          content: [{
+            type: 'text' as const,
+            text: result.stdout.trim() ? `AppleScript completed:\n${result.stdout.trim()}` : 'AppleScript completed.'
+          }]
+        }
+      } catch (error) {
+        return {
+          content: [{ type: 'text' as const, text: (error as Error).message }],
+          isError: true
+        }
+      }
+    }
+  )
+
   const regexToolSearch = tool(
     'tool_search_tool_regex',
     'Search the current local tool catalog with a regex pattern. Use this when you need to discover the best available tool before acting.',
@@ -206,6 +307,9 @@ export function createLocalToolsMcpServer(options: CreateLocalToolsMcpServerOpti
       codeExecutionTool,
       bashCodeExecutionTool,
       textEditorTool,
+      openUrlTool,
+      openApplicationTool,
+      runAppleScriptTool,
       regexToolSearch,
       bm25ToolSearch
     ]

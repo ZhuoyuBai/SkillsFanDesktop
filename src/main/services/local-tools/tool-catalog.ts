@@ -73,6 +73,27 @@ const BASE_MCP_TOOLS: ToolCatalogEntry[] = [
     category: 'meta'
   },
   {
+    name: 'mcp__local-tools__open_url',
+    description: 'Open a URL in the user\'s default system browser.',
+    source: 'mcp',
+    server: 'local-tools',
+    category: 'web'
+  },
+  {
+    name: 'mcp__local-tools__open_application',
+    description: 'Open a real macOS application, optionally with a URL or file target, such as Google Chrome.',
+    source: 'mcp',
+    server: 'local-tools',
+    category: 'browser'
+  },
+  {
+    name: 'mcp__local-tools__run_applescript',
+    description: 'Run AppleScript on macOS for system-level UI automation after the user grants Accessibility permissions.',
+    source: 'mcp',
+    server: 'local-tools',
+    category: 'shell'
+  },
+  {
     name: 'mcp__web-tools__WebSearch',
     description: 'Search the web using the app-configured local search provider.',
     source: 'mcp',

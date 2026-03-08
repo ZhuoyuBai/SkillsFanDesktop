@@ -2,11 +2,13 @@
  * AI Browser Module - Main Entry Point
  *
  * This module provides AI-controlled browser capabilities for SkillsFan.
- * It enables the AI to navigate web pages, interact with elements,
- * and extract information - all without requiring external tools.
+ * It connects to the user's real Chrome browser via CDP WebSocket,
+ * enabling full automation without being detected as a bot.
  *
  * Key Features:
  * - 26 browser control tools compatible with Claude Agent SDK
+ * - Real Chrome browser (user's login sessions preserved)
+ * - No automation detection banner
  * - Accessibility tree-based element identification
  * - Network and console monitoring
  * - Screenshot capture
@@ -20,7 +22,6 @@
 
 import { BrowserWindow } from 'electron'
 import { browserContext, BrowserContext } from './context'
-import { browserViewManager } from '../browser-view.service'
 import {
   allTools,
   getToolNames,
@@ -29,6 +30,7 @@ import {
 } from './tools'
 import type { AIBrowserTool, ToolResult } from './types'
 import { AI_BROWSER_SYSTEM_PROMPT } from './prompt'
+import { isAIBrowserTool as isAIBrowserToolName } from './tool-utils'
 
 // Import SDK MCP server creator
 import { createAIBrowserMcpServer, getAIBrowserSdkToolNames } from './sdk-mcp-server'
@@ -46,78 +48,29 @@ export { createAIBrowserMcpServer, getAIBrowserSdkToolNames }
  */
 export function initializeAIBrowser(mainWindow: BrowserWindow): void {
   browserContext.initialize(mainWindow)
-
-  // Extend browserViewManager to expose getWebContents
-  extendBrowserViewManager()
-
-  console.log('[AI Browser] Module initialized')
-}
-
-/**
- * Extend browserViewManager to expose webContents access
- * This is needed for the context to execute CDP commands
- */
-function extendBrowserViewManager(): void {
-  const manager = browserViewManager as any
-
-  // Add getWebContents method if not exists
-  if (!manager.getWebContents) {
-    manager.getWebContents = (viewId: string) => {
-      const view = manager.views?.get(viewId)
-      return view?.webContents || null
-    }
-  }
-
-  // Add getAllStates method if not exists
-  if (!manager.getAllStates) {
-    manager.getAllStates = () => {
-      const states: any[] = []
-      if (manager.states) {
-        for (const [id, state] of manager.states) {
-          states.push({ ...state, id })
-        }
-      }
-      return states
-    }
-  }
+  console.log('[AI Browser] Module initialized (real Chrome mode)')
 }
 
 // ============================================
 // Tool Registration
 // ============================================
 
-/**
- * Get all AI Browser tool names for SDK allowedTools
- */
 export function getAIBrowserToolNames(): string[] {
   return getToolNames()
 }
 
-/**
- * Get tool definitions for SDK registration
- */
 export function getAIBrowserToolDefinitions() {
   return getToolDefinitions()
 }
 
-/**
- * Check if a tool name is an AI Browser tool
- */
 export function isAIBrowserTool(toolName: string): boolean {
-  return toolName.startsWith('browser_')
+  return isAIBrowserToolName(toolName)
 }
 
 // ============================================
 // Tool Execution
 // ============================================
 
-/**
- * Execute an AI Browser tool
- *
- * @param toolName - Name of the tool to execute
- * @param params - Tool parameters
- * @returns Tool result
- */
 export async function executeAIBrowserTool(
   toolName: string,
   params: Record<string, unknown>
@@ -155,23 +108,14 @@ export { AI_BROWSER_SYSTEM_PROMPT }
 // Context Access
 // ============================================
 
-/**
- * Get the browser context for advanced operations
- */
 export function getBrowserContext(): BrowserContext {
   return browserContext
 }
 
-/**
- * Set the active browser view for AI operations
- */
 export function setActiveBrowserView(viewId: string): void {
   browserContext.setActiveViewId(viewId)
 }
 
-/**
- * Clean up AI Browser resources
- */
 export function cleanupAIBrowser(): void {
   browserContext.destroy()
   console.log('[AI Browser] Module cleaned up')

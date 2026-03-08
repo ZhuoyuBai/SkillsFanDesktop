@@ -11,7 +11,6 @@ import type { HaloConfig, ThemeMode, McpServersConfig, AISourceType, OAuthSource
 import { AVAILABLE_MODELS, DEFAULT_CONFIG, DEFAULT_MODEL } from '../types'
 import { Select } from '../components/ui/Select'
 import { Switch } from '../components/ui/Switch'
-import type { WebSearchProvider } from '../../shared/types'
 
 /**
  * Localized text - either a simple string or object with language codes
@@ -211,28 +210,11 @@ function resolveProviderFormValues(config: HaloConfig | undefined, providerId: s
 
 function resolveWebToolsFormValues(config: HaloConfig | undefined): {
   searchEnabled: boolean
-  searchProvider: WebSearchProvider
-  braveApiKey: string
-  perplexityApiKey: string
-  perplexityBaseUrl: string
-  kimiApiKey: string
-  kimiBaseUrl: string
-  kimiModel: string
-  fetchEnabled: boolean
 } {
   const search = config?.tools?.web?.search
-  const fetch = config?.tools?.web?.fetch
 
   return {
-    searchEnabled: search?.enabled !== false,
-    searchProvider: search?.provider === 'perplexity' || search?.provider === 'kimi' ? search.provider : 'brave',
-    braveApiKey: search?.apiKey || '',
-    perplexityApiKey: search?.perplexity?.apiKey || '',
-    perplexityBaseUrl: search?.perplexity?.baseUrl || 'https://api.perplexity.ai',
-    kimiApiKey: search?.kimi?.apiKey || '',
-    kimiBaseUrl: search?.kimi?.baseUrl || 'https://api.moonshot.cn/v1',
-    kimiModel: search?.kimi?.model || 'moonshot-v1-128k',
-    fetchEnabled: fetch?.enabled !== false
+    searchEnabled: search?.enabled !== false
   }
 }
 
@@ -368,14 +350,6 @@ export function SettingsPage() {
   const [customInstructionsContent, setCustomInstructionsContent] = useState(config?.customInstructions?.content || '')
   const initialWebToolsValues = resolveWebToolsFormValues(config)
   const [webSearchEnabled, setWebSearchEnabled] = useState(initialWebToolsValues.searchEnabled)
-  const [webSearchProvider, setWebSearchProvider] = useState<WebSearchProvider>(initialWebToolsValues.searchProvider)
-  const [braveSearchApiKey, setBraveSearchApiKey] = useState(initialWebToolsValues.braveApiKey)
-  const [perplexitySearchApiKey, setPerplexitySearchApiKey] = useState(initialWebToolsValues.perplexityApiKey)
-  const [perplexitySearchBaseUrl, setPerplexitySearchBaseUrl] = useState(initialWebToolsValues.perplexityBaseUrl)
-  const [kimiSearchApiKey, setKimiSearchApiKey] = useState(initialWebToolsValues.kimiApiKey)
-  const [kimiSearchBaseUrl, setKimiSearchBaseUrl] = useState(initialWebToolsValues.kimiBaseUrl)
-  const [kimiSearchModel, setKimiSearchModel] = useState(initialWebToolsValues.kimiModel)
-  const [webFetchEnabled, setWebFetchEnabled] = useState(initialWebToolsValues.fetchEnabled)
 
   // API Key visibility state
   const [showApiKey, setShowApiKey] = useState(false)
@@ -495,14 +469,6 @@ export function SettingsPage() {
   useEffect(() => {
     const values = resolveWebToolsFormValues(config)
     setWebSearchEnabled(values.searchEnabled)
-    setWebSearchProvider(values.searchProvider)
-    setBraveSearchApiKey(values.braveApiKey)
-    setPerplexitySearchApiKey(values.perplexityApiKey)
-    setPerplexitySearchBaseUrl(values.perplexityBaseUrl)
-    setKimiSearchApiKey(values.kimiApiKey)
-    setKimiSearchBaseUrl(values.kimiBaseUrl)
-    setKimiSearchModel(values.kimiModel)
-    setWebFetchEnabled(values.fetchEnabled)
   }, [config?.tools])
 
   const loadSystemSettings = async () => {
@@ -649,6 +615,7 @@ export function SettingsPage() {
 
   const isFullAccessEnabled = (config?.permissions?.commandExecution === 'allow')
     || (config?.permissions?.trustMode ?? false)
+  const isSystemBrowserMode = (config?.browserAutomation?.mode ?? DEFAULT_CONFIG.browserAutomation?.mode) === 'system-browser'
 
   const handlePermissionModeChange = async (enabled: boolean) => {
     const currentPermissions = config?.permissions ?? DEFAULT_CONFIG.permissions
@@ -690,49 +657,33 @@ export function SettingsPage() {
     }
   }
 
-  const persistWebToolsConfig = async (overrides?: {
-    searchEnabled?: boolean
-    searchProvider?: WebSearchProvider
-    braveApiKey?: string
-    perplexityApiKey?: string
-    perplexityBaseUrl?: string
-    kimiApiKey?: string
-    kimiBaseUrl?: string
-    kimiModel?: string
-    fetchEnabled?: boolean
-  }) => {
-    const nextSearchEnabled = overrides?.searchEnabled ?? webSearchEnabled
-    const nextSearchProvider = overrides?.searchProvider ?? webSearchProvider
-    const nextBraveApiKey = overrides?.braveApiKey ?? braveSearchApiKey
-    const nextPerplexityApiKey = overrides?.perplexityApiKey ?? perplexitySearchApiKey
-    const nextPerplexityBaseUrl = overrides?.perplexityBaseUrl ?? perplexitySearchBaseUrl
-    const nextKimiApiKey = overrides?.kimiApiKey ?? kimiSearchApiKey
-    const nextKimiBaseUrl = overrides?.kimiBaseUrl ?? kimiSearchBaseUrl
-    const nextKimiModel = overrides?.kimiModel ?? kimiSearchModel
-    const nextFetchEnabled = overrides?.fetchEnabled ?? webFetchEnabled
+  const handleSystemBrowserModeChange = async (enabled: boolean) => {
+    const browserAutomation = {
+      mode: enabled ? 'system-browser' as const : 'ai-browser' as const
+    }
+
+    try {
+      await api.setConfig({ browserAutomation })
+      setConfig({ ...(config ?? DEFAULT_CONFIG), browserAutomation } as HaloConfig)
+      addToast(t('Saved'), 'success')
+    } catch (error) {
+      console.error('[Settings] Failed to update browser automation mode:', error)
+      addToast(t('Save failed'), 'error')
+    }
+  }
+
+  const handleWebToolsEnabledChange = async (enabled: boolean) => {
+    setWebSearchEnabled(enabled)
 
     const toolsConfig = {
       web: {
         search: {
           ...(config?.tools?.web?.search || {}),
-          enabled: nextSearchEnabled,
-          provider: nextSearchProvider,
-          apiKey: nextBraveApiKey,
-          perplexity: {
-            ...(config?.tools?.web?.search?.perplexity || {}),
-            apiKey: nextPerplexityApiKey,
-            baseUrl: nextPerplexityBaseUrl
-          },
-          kimi: {
-            ...(config?.tools?.web?.search?.kimi || {}),
-            apiKey: nextKimiApiKey,
-            baseUrl: nextKimiBaseUrl,
-            model: nextKimiModel
-          }
+          enabled
         },
         fetch: {
           ...(config?.tools?.web?.fetch || {}),
-          enabled: nextFetchEnabled
+          enabled
         }
       }
     }
@@ -743,21 +694,6 @@ export function SettingsPage() {
     } catch (error) {
       console.error('[Settings] Failed to update web tools config:', error)
     }
-  }
-
-  const handleWebSearchEnabledChange = async (enabled: boolean) => {
-    setWebSearchEnabled(enabled)
-    await persistWebToolsConfig({ searchEnabled: enabled })
-  }
-
-  const handleWebSearchProviderChange = async (value: WebSearchProvider) => {
-    setWebSearchProvider(value)
-    await persistWebToolsConfig({ searchProvider: value })
-  }
-
-  const handleWebFetchEnabledChange = async (enabled: boolean) => {
-    setWebFetchEnabled(enabled)
-    await persistWebToolsConfig({ fetchEnabled: enabled })
   }
 
   // Handle clear memory
@@ -1616,6 +1552,21 @@ export function SettingsPage() {
                   <Switch checked={config?.memory?.enabled ?? true} onChange={handleMemoryEnabledChange} />
                 </div>
 
+                {platform.isMac && (
+                  <div className="flex items-center justify-between pt-4 border-t border-border">
+                    <div className="flex-1">
+                      <p className="font-medium">{t('Prefer System Browser')}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {t('Use your normal Chrome or Safari for browser tasks and avoid opening the AI-controlled browser.')}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {t('Changes take effect on the next message')}
+                      </p>
+                    </div>
+                    <Switch checked={isSystemBrowserMode} onChange={handleSystemBrowserModeChange} />
+                  </div>
+                )}
+
                 {/* Memory Retention Period */}
                 <div className={`pt-4 border-t border-border transition-opacity ${(config?.memory?.enabled ?? true) ? '' : 'opacity-50 pointer-events-none'}`}>
                   <div className="flex items-center justify-between">
@@ -1668,135 +1619,13 @@ export function SettingsPage() {
                 <div className="pt-4 border-t border-border space-y-4">
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex-1">
-                      <p className="font-medium">{t('Web Search Tool')}</p>
+                      <p className="font-medium">{t('Web Tools')}</p>
                       <p className="text-sm text-muted-foreground">
-                        {t('Use a local app-managed search provider for all models instead of model-native search.')}
+                        {t('Enable local web search and page fetching. The search provider is auto-selected based on available API keys.')}
                       </p>
                     </div>
-                    <Switch checked={webSearchEnabled} onChange={handleWebSearchEnabledChange} />
+                    <Switch checked={webSearchEnabled} onChange={handleWebToolsEnabledChange} />
                   </div>
-
-                  <div className={`space-y-3 transition-opacity ${webSearchEnabled ? '' : 'opacity-50 pointer-events-none'}`}>
-                    <div>
-                      <p className="text-xs font-medium text-muted-foreground mb-1">
-                        {t('Search Provider')}
-                      </p>
-                      <Select<WebSearchProvider>
-                        value={webSearchProvider}
-                        onChange={handleWebSearchProviderChange}
-                        options={[
-                          { value: 'brave', label: 'Brave' },
-                          { value: 'perplexity', label: 'Perplexity' },
-                          { value: 'kimi', label: 'Kimi' }
-                        ]}
-                      />
-                    </div>
-
-                    {webSearchProvider === 'brave' && (
-                      <label className="block">
-                        <p className="text-xs font-medium text-muted-foreground mb-1">
-                          {t('Brave Search API Key')}
-                        </p>
-                        <input
-                          type="password"
-                          value={braveSearchApiKey}
-                          onChange={(e) => setBraveSearchApiKey(e.target.value)}
-                          onBlur={() => persistWebToolsConfig({ braveApiKey: braveSearchApiKey })}
-                          placeholder="BSA..."
-                          className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                        />
-                      </label>
-                    )}
-
-                    {webSearchProvider === 'perplexity' && (
-                      <>
-                        <label className="block">
-                          <p className="text-xs font-medium text-muted-foreground mb-1">
-                            {t('Perplexity Search API Key')}
-                          </p>
-                          <input
-                            type="password"
-                            value={perplexitySearchApiKey}
-                            onChange={(e) => setPerplexitySearchApiKey(e.target.value)}
-                            onBlur={() => persistWebToolsConfig({ perplexityApiKey: perplexitySearchApiKey })}
-                            placeholder="pplx-..."
-                            className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                          />
-                        </label>
-                        <label className="block">
-                          <p className="text-xs font-medium text-muted-foreground mb-1">
-                            {t('Perplexity Base URL')}
-                          </p>
-                          <input
-                            type="text"
-                            value={perplexitySearchBaseUrl}
-                            onChange={(e) => setPerplexitySearchBaseUrl(e.target.value)}
-                            onBlur={() => persistWebToolsConfig({ perplexityBaseUrl: perplexitySearchBaseUrl })}
-                            placeholder="https://api.perplexity.ai"
-                            className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                          />
-                        </label>
-                      </>
-                    )}
-
-                    {webSearchProvider === 'kimi' && (
-                      <>
-                        <label className="block">
-                          <p className="text-xs font-medium text-muted-foreground mb-1">
-                            {t('Kimi Search API Key')}
-                          </p>
-                          <input
-                            type="password"
-                            value={kimiSearchApiKey}
-                            onChange={(e) => setKimiSearchApiKey(e.target.value)}
-                            onBlur={() => persistWebToolsConfig({ kimiApiKey: kimiSearchApiKey })}
-                            placeholder="sk-..."
-                            className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                          />
-                        </label>
-                        <label className="block">
-                          <p className="text-xs font-medium text-muted-foreground mb-1">
-                            {t('Kimi Base URL')}
-                          </p>
-                          <input
-                            type="text"
-                            value={kimiSearchBaseUrl}
-                            onChange={(e) => setKimiSearchBaseUrl(e.target.value)}
-                            onBlur={() => persistWebToolsConfig({ kimiBaseUrl: kimiSearchBaseUrl })}
-                            placeholder="https://api.moonshot.cn/v1"
-                            className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                          />
-                        </label>
-                        <label className="block">
-                          <p className="text-xs font-medium text-muted-foreground mb-1">
-                            {t('Kimi Search Model')}
-                          </p>
-                          <input
-                            type="text"
-                            value={kimiSearchModel}
-                            onChange={(e) => setKimiSearchModel(e.target.value)}
-                            onBlur={() => persistWebToolsConfig({ kimiModel: kimiSearchModel })}
-                            placeholder="moonshot-v1-128k"
-                            className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                          />
-                        </label>
-                      </>
-                    )}
-                  </div>
-
-                  <div className="flex items-center justify-between gap-4 pt-4 border-t border-border">
-                    <div className="flex-1">
-                      <p className="font-medium">{t('Web Fetch Tool')}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {t('Allow the app to fetch public web pages locally when a tool needs page content.')}
-                      </p>
-                    </div>
-                    <Switch checked={webFetchEnabled} onChange={handleWebFetchEnabledChange} />
-                  </div>
-
-                  <p className="text-xs text-muted-foreground">
-                    {t('These settings apply to the local web tools and are independent from your chat model provider.')}
-                  </p>
                 </div>
 
                 {/* Memory Management */}

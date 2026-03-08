@@ -233,6 +233,7 @@ export type V2SDKSession = {
 export interface SessionConfig {
   aiBrowserEnabled: boolean
   hasSkills: boolean
+  browserAutomationMode?: 'ai-browser' | 'system-browser'
   customInstructionsHash?: string  // Change detection for custom instructions
   // model is now dynamic, no rebuild needed
   // thinkingEnabled is now dynamic, no rebuild needed

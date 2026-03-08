@@ -120,6 +120,9 @@ interface HaloConfig {
     enabled: boolean       // Master toggle, default true
     retentionDays: number  // 0 = forever, 7/30/180
   }
+  browserAutomation?: {
+    mode: 'ai-browser' | 'system-browser'
+  }
   // Custom instructions appended to system prompt
   customInstructions?: {
     enabled: boolean
@@ -232,6 +235,9 @@ const DEFAULT_CONFIG: HaloConfig = {
   remoteAccess: {
     enabled: false,
     port: 3456
+  },
+  browserAutomation: {
+    mode: 'ai-browser'
   },
   onboarding: {
     completed: false
@@ -394,6 +400,7 @@ function mergeConfigWithDefaults(parsed: Record<string, any>): HaloConfig {
     spaces: { ...DEFAULT_CONFIG.spaces, ...parsed.spaces },
     // memory: merge with defaults
     memory: { ...DEFAULT_CONFIG.memory, ...parsed.memory },
+    browserAutomation: { ...DEFAULT_CONFIG.browserAutomation, ...parsed.browserAutomation },
     tools: normalizeWebToolsConfig(parsed.tools)
   }
 }
@@ -436,6 +443,9 @@ function applyConfigUpdates(currentConfig: HaloConfig, config: Partial<HaloConfi
   // memory: merge with current config
   if (config.memory) {
     newConfig.memory = { ...currentConfig.memory, ...config.memory }
+  }
+  if (config.browserAutomation) {
+    newConfig.browserAutomation = { ...currentConfig.browserAutomation, ...config.browserAutomation }
   }
   if (config.tools) {
     newConfig.tools = normalizeWebToolsConfig({

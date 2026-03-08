@@ -18,6 +18,27 @@ import type { ApiCredentials } from './types'
 const DEFAULT_MODEL = 'claude-opus-4-5-20251101'
 const ROUTED_MODEL = 'claude-sonnet-4-20250514'
 const MAX_THINKING_TOKENS = 10240
+const SYSTEM_BROWSER_AUTOMATION_PROMPT = `
+
+## System Browser Mode
+
+The user prefers the normal system browser instead of the AI-controlled browser.
+When browser automation is needed:
+1. Do not use \`mcp__ai-browser__*\` tools.
+2. Prefer \`mcp__local-tools__open_url\` to open the page in the user's normal browser.
+3. Use \`mcp__local-tools__open_application\` only when the user explicitly wants a specific browser such as Chrome or Safari.
+4. Do not use \`mcp__local-tools__run_applescript\` unless the user explicitly asks for system-level UI automation after the browser is open.
+5. Avoid opening any additional automated browser window unless the user explicitly asks for it.
+`
+
+const AI_BROWSER_PREFERENCE_PROMPT = `
+
+## Browser Preference
+
+When browser automation is needed in this conversation, prefer the AI Browser tools.
+Avoid opening a separate system browser unless the user explicitly asks for it or AI Browser tools are unavailable.
+`
+
 const DISALLOWED_SERVER_SIDE_TOOLS = [
   'WebSearch',
   'WebFetch',
@@ -128,6 +149,11 @@ export async function buildSdkOptions(params: BuildSdkOptionsParams): Promise<{
     routed = false
   } = params
 
+  const browserAutomationMode = config.browserAutomation?.mode === 'system-browser'
+    ? 'system-browser'
+    : 'ai-browser'
+  const effectiveAiBrowserEnabled = aiBrowserEnabled && browserAutomationMode !== 'system-browser'
+
   // Load custom agent definitions from .claude/agents/*.md
   const agents = loadAgentDefinitions(workDir)
 
@@ -138,12 +164,16 @@ export async function buildSdkOptions(params: BuildSdkOptionsParams): Promise<{
   const mcpServers: Record<string, any> = enabledMcp ? { ...enabledMcp } : {}
   const addedMcpServers: string[] = []
 
+  if (browserAutomationMode === 'system-browser' && mcpServers['ai-browser']) {
+    delete mcpServers['ai-browser']
+  }
+
   const { createLocalToolsMcpServer } = await import('../local-tools/sdk-mcp-server')
   mcpServers['local-tools'] = createLocalToolsMcpServer({
     workDir,
     spaceId,
     conversationId,
-    aiBrowserEnabled,
+    aiBrowserEnabled: effectiveAiBrowserEnabled,
     includeSkillMcp
   })
   addedMcpServers.push('local-tools')
@@ -152,7 +182,7 @@ export async function buildSdkOptions(params: BuildSdkOptionsParams): Promise<{
   mcpServers['web-tools'] = createWebToolsMcpServer()
   addedMcpServers.push('web-tools')
 
-  if (aiBrowserEnabled) {
+  if (effectiveAiBrowserEnabled) {
     const { createAIBrowserMcpServer } = await import('../ai-browser/sdk-mcp-server')
     mcpServers['ai-browser'] = createAIBrowserMcpServer()
     addedMcpServers.push('ai-browser')
@@ -210,7 +240,8 @@ export async function buildSdkOptions(params: BuildSdkOptionsParams): Promise<{
       type: 'preset' as const,
       preset: 'claude_code' as const,
       append: buildSystemPromptAppend(workDir, credentialsModel, config.memory?.enabled)
-        + (aiBrowserEnabled ? AI_BROWSER_SYSTEM_PROMPT : '')
+        + (effectiveAiBrowserEnabled ? AI_BROWSER_SYSTEM_PROMPT + AI_BROWSER_PREFERENCE_PROMPT : '')
+        + (browserAutomationMode === 'system-browser' ? SYSTEM_BROWSER_AUTOMATION_PROMPT : '')
         + ralphSystemPromptAppend
         + (config.customInstructions?.enabled && config.customInstructions?.content
           ? `\n\n## User Custom Instructions\n\n${config.customInstructions.content}\n`
@@ -225,6 +256,10 @@ export async function buildSdkOptions(params: BuildSdkOptionsParams): Promise<{
     includePartialMessages: true,
     executable: electronPath,
     executableArgs: ['--no-warnings'],
+    // Only use MCP servers explicitly assembled by SkillsFan.
+    // This prevents user-level Claude settings from injecting browser automation servers
+    // such as chrome-devtools and bypassing app-level browser mode preferences.
+    strictMcpConfig: true,
     // Enable Claude Code native hooks system
     // CLI will read hooks from ~/.claude/settings.json and .claude/settings.json
     hooks: true,

@@ -196,10 +196,10 @@ export interface DialogInfo {
 export interface BrowserContextInterface {
   // View management
   getActiveViewId(): string | null
-  setActiveViewId(viewId: string): void
+  setActiveViewId(viewId: string): void | Promise<void>
 
-  // WebContents access
-  getWebContents(): Electron.WebContents | null
+  // Chrome connection
+  ensureConnected(): Promise<void>
 
   // CDP command execution
   sendCDPCommand<T = unknown>(method: string, params?: Record<string, unknown>): Promise<T>

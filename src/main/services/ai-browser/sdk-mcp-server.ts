@@ -12,7 +12,7 @@ import { z } from 'zod'
 import { tool, createSdkMcpServer } from '@anthropic-ai/claude-agent-sdk'
 import type { BrowserContextInterface } from './types'
 import { browserContext } from './context'
-import { browserViewManager } from '../browser-view.service'
+import { chromeConnection } from './chrome-connection'
 
 // ============================================
 // Navigation Tools
@@ -23,21 +23,28 @@ const browser_list_pages = tool(
   'List all open browser pages/tabs with their URLs and titles',
   {},
   async () => {
-    const states = (browserViewManager as any).getAllStates?.() || []
+    try {
+      const pages = await chromeConnection.listPages()
 
-    if (states.length === 0) {
-      return {
-        content: [{ type: 'text' as const, text: 'No browser pages are currently open.' }]
+      if (pages.length === 0) {
+        return {
+          content: [{ type: 'text' as const, text: 'No browser pages are currently open.' }]
+        }
       }
-    }
 
-    const lines = ['Open browser pages:']
-    states.forEach((state: any, index: number) => {
-      lines.push(`[${index}] ${state.title || 'Untitled'} - ${state.url || 'about:blank'}`)
-    })
+      const lines = ['Open browser pages:']
+      pages.forEach((page, index) => {
+        lines.push(`[${index}] ${page.title || 'Untitled'} - ${page.url || 'about:blank'}`)
+      })
 
-    return {
-      content: [{ type: 'text' as const, text: lines.join('\n') }]
+      return {
+        content: [{ type: 'text' as const, text: lines.join('\n') }]
+      }
+    } catch (error) {
+      return {
+        content: [{ type: 'text' as const, text: `Failed to list pages: ${(error as Error).message}` }],
+        isError: true
+      }
     }
   }
 )
@@ -50,20 +57,27 @@ const browser_select_page = tool(
     bringToFront: z.boolean().optional().describe('Whether to bring the page to front (default: true)')
   },
   async (args) => {
-    const states = (browserViewManager as any).getAllStates?.() || []
+    try {
+      const pages = await chromeConnection.listPages()
 
-    if (args.pageIdx < 0 || args.pageIdx >= states.length) {
+      if (args.pageIdx < 0 || args.pageIdx >= pages.length) {
+        return {
+          content: [{ type: 'text' as const, text: `Invalid page index: ${args.pageIdx}. Valid range: 0-${pages.length - 1}` }],
+          isError: true
+        }
+      }
+
+      const page = pages[args.pageIdx]
+      await browserContext.setActiveViewId(page.id)
+
       return {
-        content: [{ type: 'text' as const, text: `Invalid page index: ${args.pageIdx}. Valid range: 0-${states.length - 1}` }],
+        content: [{ type: 'text' as const, text: `Selected page [${args.pageIdx}]: ${page.title || 'Untitled'} - ${page.url}` }]
+      }
+    } catch (error) {
+      return {
+        content: [{ type: 'text' as const, text: `Failed to select page: ${(error as Error).message}` }],
         isError: true
       }
-    }
-
-    const state = states[args.pageIdx]
-    browserContext.setActiveViewId(state.id)
-
-    return {
-      content: [{ type: 'text' as const, text: `Selected page [${args.pageIdx}]: ${state.title || 'Untitled'} - ${state.url}` }]
     }
   }
 )
@@ -79,23 +93,28 @@ const browser_new_page = tool(
     const timeout = args.timeout || 30000
 
     try {
-      const viewId = `ai-browser-${Date.now()}`
-      const state = await browserViewManager.create(viewId, args.url)
-      browserContext.setActiveViewId(viewId)
+      // Ensure Chrome is running
+      await browserContext.ensureConnected()
+
+      // Create new tab in Chrome
+      const page = await chromeConnection.createPage(args.url)
+      await browserContext.setActiveViewId(page.id)
 
       // Wait for page load
       const startTime = Date.now()
       while (Date.now() - startTime < timeout) {
-        const currentState = browserViewManager.getState(viewId)
-        if (currentState && !currentState.isLoading) {
-          break
+        try {
+          const result = await browserContext.evaluateScript<string>('document.readyState')
+          if (result === 'complete' || result === 'interactive') break
+        } catch {
+          // Page might not be ready
         }
-        await new Promise(resolve => setTimeout(resolve, 100))
+        await new Promise(resolve => setTimeout(resolve, 200))
       }
 
-      const finalState = browserViewManager.getState(viewId)
+      const info = await browserContext.getPageInfo()
       return {
-        content: [{ type: 'text' as const, text: `Created new page: ${finalState?.title || 'Untitled'} - ${finalState?.url || args.url}` }]
+        content: [{ type: 'text' as const, text: `Created new page: ${info.title || 'Untitled'} - ${info.url || args.url}` }]
       }
     } catch (error) {
       return {
@@ -113,20 +132,27 @@ const browser_close_page = tool(
     pageIdx: z.number().describe('The index of the page to close')
   },
   async (args) => {
-    const states = (browserViewManager as any).getAllStates?.() || []
+    try {
+      const pages = await chromeConnection.listPages()
 
-    if (args.pageIdx < 0 || args.pageIdx >= states.length) {
+      if (args.pageIdx < 0 || args.pageIdx >= pages.length) {
+        return {
+          content: [{ type: 'text' as const, text: `Invalid page index: ${args.pageIdx}` }],
+          isError: true
+        }
+      }
+
+      const page = pages[args.pageIdx]
+      await chromeConnection.closePage(page.id)
+
       return {
-        content: [{ type: 'text' as const, text: `Invalid page index: ${args.pageIdx}` }],
+        content: [{ type: 'text' as const, text: `Closed page [${args.pageIdx}]: ${page.title || 'Untitled'}` }]
+      }
+    } catch (error) {
+      return {
+        content: [{ type: 'text' as const, text: `Failed to close page: ${(error as Error).message}` }],
         isError: true
       }
-    }
-
-    const state = states[args.pageIdx]
-    browserViewManager.destroy(state.id)
-
-    return {
-      content: [{ type: 'text' as const, text: `Closed page [${args.pageIdx}]: ${state.title || 'Untitled'}` }]
     }
   }
 )
@@ -155,13 +181,17 @@ const browser_navigate = tool(
     try {
       switch (type) {
         case 'back':
-          browserViewManager.goBack(viewId)
+          await browserContext.evaluateScript('window.history.back()')
           break
         case 'forward':
-          browserViewManager.goForward(viewId)
+          await browserContext.evaluateScript('window.history.forward()')
           break
         case 'reload':
-          browserViewManager.reload(viewId)
+          if (args.ignoreCache) {
+            await browserContext.sendCDPCommand('Page.reload', { ignoreCache: true })
+          } else {
+            await browserContext.evaluateScript('window.location.reload()')
+          }
           break
         case 'url':
         default:
@@ -171,23 +201,25 @@ const browser_navigate = tool(
               isError: true
             }
           }
-          await browserViewManager.navigate(viewId, args.url)
+          await browserContext.sendCDPCommand('Page.navigate', { url: args.url })
           break
       }
 
       // Wait for navigation
       const startTime = Date.now()
       while (Date.now() - startTime < timeout) {
-        const state = browserViewManager.getState(viewId)
-        if (state && !state.isLoading) {
-          break
+        try {
+          const result = await browserContext.evaluateScript<string>('document.readyState')
+          if (result === 'complete' || result === 'interactive') break
+        } catch {
+          // Page navigating
         }
-        await new Promise(resolve => setTimeout(resolve, 100))
+        await new Promise(resolve => setTimeout(resolve, 200))
       }
 
-      const finalState = browserViewManager.getState(viewId)
+      const info = await browserContext.getPageInfo()
       return {
-        content: [{ type: 'text' as const, text: `Navigated to: ${finalState?.title || 'Untitled'} - ${finalState?.url}` }]
+        content: [{ type: 'text' as const, text: `Navigated to: ${info.title || 'Untitled'} - ${info.url}` }]
       }
     } catch (error) {
       return {

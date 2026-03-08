@@ -2,18 +2,14 @@
  * Browser Context - Core context manager for AI Browser
  *
  * The BrowserContext is the central manager for AI Browser operations.
- * It provides:
- * - Access to the active BrowserView's WebContents
- * - CDP command execution
- * - Accessibility snapshot management
- * - Network and console monitoring
- * - Element interaction operations
+ * It connects to the user's real Chrome browser via CDP WebSocket,
+ * providing full automation without being detected as a bot.
  *
  * All AI Browser tools operate through this context.
  */
 
 import { BrowserWindow } from 'electron'
-import { browserViewManager } from '../browser-view.service'
+import { chromeConnection, type CDPClient, type ChromePage } from './chrome-connection'
 import {
   createAccessibilitySnapshot,
   getElementBoundingBox,
@@ -31,11 +27,17 @@ import type {
 
 /**
  * BrowserContext - Manages the browser state for AI operations
+ * Now uses real Chrome via CDP WebSocket instead of Electron BrowserView
  */
 export class BrowserContext implements BrowserContextInterface {
   private mainWindow: BrowserWindow | null = null
-  private activeViewId: string | null = null
+  private activeTargetId: string | null = null
+  private activeCDPClient: CDPClient | null = null
   private lastSnapshot: AccessibilitySnapshot | null = null
+
+  // Track page info (since we don't have webContents.getURL() anymore)
+  private pageUrl: string = ''
+  private pageTitle: string = ''
 
   // Network monitoring state
   private networkRequests: Map<string, NetworkRequest> = new Map()
@@ -49,7 +51,6 @@ export class BrowserContext implements BrowserContextInterface {
 
   // Dialog handling state
   private pendingDialog: DialogInfo | null = null
-  private dialogResolver: ((result: { accept: boolean; promptText?: string }) => void) | null = null
 
   /**
    * Initialize the context with the main window
@@ -60,88 +61,114 @@ export class BrowserContext implements BrowserContextInterface {
   }
 
   /**
-   * Get the currently active view ID
+   * Ensure Chrome is launched and connected
    */
-  getActiveViewId(): string | null {
-    return this.activeViewId
+  async ensureConnected(): Promise<void> {
+    if (!chromeConnection.connected) {
+      await chromeConnection.launch()
+    }
   }
 
   /**
-   * Set the active browser view
-   * Also notifies the renderer process of the new active view ID
+   * Get the currently active view ID (target ID in Chrome terms)
    */
-  setActiveViewId(viewId: string): void {
-    // If changing views, disable monitoring on old view
-    if (this.activeViewId && this.activeViewId !== viewId) {
+  getActiveViewId(): string | null {
+    return this.activeTargetId
+  }
+
+  /**
+   * Set the active browser page by target ID
+   */
+  async setActiveViewId(viewId: string): Promise<void> {
+    // If changing pages, disable monitoring on old page
+    if (this.activeTargetId && this.activeTargetId !== viewId) {
       this.disableMonitoring()
     }
 
-    this.activeViewId = viewId
-    console.log(`[BrowserContext] Active view set to: ${viewId}`)
+    this.activeTargetId = viewId
 
-    // Enable monitoring on new view
-    this.enableMonitoring()
+    // Get CDP session for this page
+    try {
+      this.activeCDPClient = await chromeConnection.getPageSession(viewId)
 
-    // Notify renderer of active view change for BrowserTaskCard "View Live" functionality
-    this.notifyActiveViewChange(viewId)
+      // Bring page to front
+      await chromeConnection.activatePage(viewId)
+
+      // Update page info
+      await this.updatePageInfo()
+
+      console.log(`[BrowserContext] Active page set to: ${viewId}`)
+
+      // Enable monitoring on new page
+      await this.enableMonitoring()
+
+      // Notify renderer
+      this.notifyActiveViewChange(viewId)
+    } catch (error) {
+      console.error(`[BrowserContext] Failed to set active page:`, error)
+      throw error
+    }
   }
 
   /**
    * Notify renderer process of active view ID change
-   * Used by BrowserTaskCard to show the correct AI-controlled browser
    */
   private notifyActiveViewChange(viewId: string): void {
     if (this.mainWindow && !this.mainWindow.isDestroyed()) {
-      const state = browserViewManager.getState(viewId)
       this.mainWindow.webContents.send('ai-browser:active-view-changed', {
         viewId,
-        url: state?.url || null,
-        title: state?.title || null,
+        url: this.pageUrl || null,
+        title: this.pageTitle || null,
       })
-      console.log(`[BrowserContext] Notified renderer of active view: ${viewId}`)
     }
   }
 
   /**
-   * Get the WebContents of the active BrowserView
+   * Update tracked page URL and title via CDP
    */
-  getWebContents(): Electron.WebContents | null {
-    if (!this.activeViewId) {
-      console.warn('[BrowserContext] No active view ID')
-      return null
+  private async updatePageInfo(): Promise<void> {
+    try {
+      const result = await this.sendCDPCommand<{
+        result: { value: { url: string; title: string } }
+      }>('Runtime.evaluate', {
+        expression: 'JSON.stringify({ url: location.href, title: document.title })',
+        returnByValue: true
+      })
+      if (result?.result?.value) {
+        const info = typeof result.result.value === 'string'
+          ? JSON.parse(result.result.value)
+          : result.result.value
+        this.pageUrl = info.url
+        this.pageTitle = info.title
+      }
+    } catch {
+      // Page might not be ready yet
     }
-
-    const state = browserViewManager.getState(this.activeViewId)
-    if (!state) {
-      console.warn(`[BrowserContext] No state for view: ${this.activeViewId}`)
-      return null
-    }
-
-    // Access the BrowserView's webContents through the manager
-    // We need to extend browserViewManager to expose this
-    return (browserViewManager as any).getWebContents(this.activeViewId)
   }
 
   /**
-   * Send a CDP command to the active browser
+   * Get the active CDP client
+   */
+  private getActiveCDPClient(): CDPClient | null {
+    if (!this.activeCDPClient || this.activeCDPClient.closed) {
+      return null
+    }
+    return this.activeCDPClient
+  }
+
+  /**
+   * Send a CDP command to the active browser page
    */
   async sendCDPCommand<T = unknown>(
     method: string,
     params?: Record<string, unknown>
   ): Promise<T> {
-    const webContents = this.getWebContents()
-    if (!webContents) {
-      throw new Error('No active browser view')
+    const client = this.getActiveCDPClient()
+    if (!client) {
+      throw new Error('No active browser page')
     }
 
-    // Ensure debugger is attached
-    try {
-      webContents.debugger.attach('1.3')
-    } catch (e) {
-      // Already attached
-    }
-
-    return webContents.debugger.sendCommand(method, params) as Promise<T>
+    return client.sendCommand<T>(method, params)
   }
 
   // ============================================
@@ -152,12 +179,17 @@ export class BrowserContext implements BrowserContextInterface {
    * Create a new accessibility snapshot
    */
   async createSnapshot(verbose: boolean = false): Promise<AccessibilitySnapshot> {
-    const webContents = this.getWebContents()
-    if (!webContents) {
-      throw new Error('No active browser view')
+    const client = this.getActiveCDPClient()
+    if (!client) {
+      throw new Error('No active browser page')
     }
 
-    this.lastSnapshot = await createAccessibilitySnapshot(webContents, verbose)
+    // Update page info before snapshot
+    await this.updatePageInfo()
+
+    this.lastSnapshot = await createAccessibilitySnapshot(
+      client, verbose, this.pageUrl, this.pageTitle
+    )
     return this.lastSnapshot
   }
 
@@ -182,58 +214,22 @@ export class BrowserContext implements BrowserContextInterface {
   // Network Monitoring
   // ============================================
 
-  /**
-   * Enable network monitoring
-   */
   private async enableNetworkMonitoring(): Promise<void> {
-    const webContents = this.getWebContents()
-    if (!webContents || this.networkEnabled) return
+    const client = this.getActiveCDPClient()
+    if (!client || this.networkEnabled) return
 
     try {
-      // Ensure debugger is attached
-      try {
-        webContents.debugger.attach('1.3')
-      } catch (e) {
-        // Already attached
-      }
-
-      // Enable network domain
-      await webContents.debugger.sendCommand('Network.enable')
+      await client.sendCommand('Network.enable')
 
       // Listen for network events
-      webContents.debugger.on('message', this.handleCDPMessage)
+      client.on('Network.requestWillBeSent', (params) => this.handleNetworkRequest(params))
+      client.on('Network.responseReceived', (params) => this.handleNetworkResponse(params))
+      client.on('Network.loadingFailed', (params) => this.handleNetworkError(params))
 
       this.networkEnabled = true
       console.log('[BrowserContext] Network monitoring enabled')
     } catch (error) {
       console.error('[BrowserContext] Failed to enable network monitoring:', error)
-    }
-  }
-
-  /**
-   * Handle CDP messages for network monitoring
-   */
-  private handleCDPMessage = (
-    event: Electron.Event,
-    method: string,
-    params: Record<string, unknown>
-  ): void => {
-    switch (method) {
-      case 'Network.requestWillBeSent':
-        this.handleNetworkRequest(params)
-        break
-      case 'Network.responseReceived':
-        this.handleNetworkResponse(params)
-        break
-      case 'Network.loadingFailed':
-        this.handleNetworkError(params)
-        break
-      case 'Runtime.consoleAPICalled':
-        this.handleConsoleMessage(params)
-        break
-      case 'Page.javascriptDialogOpening':
-        this.handleDialogOpening(params)
-        break
     }
   }
 
@@ -296,19 +292,10 @@ export class BrowserContext implements BrowserContextInterface {
     }
   }
 
-  /**
-   * Get all network requests
-   * @param includePreserved If true, includes preserved requests from previous navigations
-   */
-  getNetworkRequests(includePreserved: boolean = false): NetworkRequest[] {
-    // Note: For now, we return all requests. In the future, we can track
-    // navigation boundaries and filter based on includePreserved
+  getNetworkRequests(_includePreserved: boolean = false): NetworkRequest[] {
     return Array.from(this.networkRequests.values())
   }
 
-  /**
-   * Get a specific network request by ID
-   */
   getNetworkRequest(id: string): NetworkRequest | undefined {
     for (const request of this.networkRequests.values()) {
       if (request.id === id) {
@@ -318,18 +305,10 @@ export class BrowserContext implements BrowserContextInterface {
     return undefined
   }
 
-  /**
-   * Get the currently selected network request (if DevTools integration is available)
-   */
   getSelectedNetworkRequest(): NetworkRequest | undefined {
-    // For now, return undefined. This can be implemented when
-    // we have DevTools panel integration
     return undefined
   }
 
-  /**
-   * Clear network requests
-   */
   clearNetworkRequests(): void {
     this.networkRequests.clear()
     this.networkRequestCounter = 0
@@ -339,23 +318,15 @@ export class BrowserContext implements BrowserContextInterface {
   // Console Monitoring
   // ============================================
 
-  /**
-   * Enable console monitoring
-   */
   private async enableConsoleMonitoring(): Promise<void> {
-    const webContents = this.getWebContents()
-    if (!webContents || this.consoleEnabled) return
+    const client = this.getActiveCDPClient()
+    if (!client || this.consoleEnabled) return
 
     try {
-      // Ensure debugger is attached
-      try {
-        webContents.debugger.attach('1.3')
-      } catch (e) {
-        // Already attached
-      }
+      await client.sendCommand('Runtime.enable')
 
-      // Enable Runtime domain for console events
-      await webContents.debugger.sendCommand('Runtime.enable')
+      client.on('Runtime.consoleAPICalled', (params) => this.handleConsoleMessage(params))
+      client.on('Page.javascriptDialogOpening', (params) => this.handleDialogOpening(params))
 
       this.consoleEnabled = true
       console.log('[BrowserContext] Console monitoring enabled')
@@ -369,7 +340,6 @@ export class BrowserContext implements BrowserContextInterface {
     const args = params.args as Array<{ type: string; value?: unknown; description?: string }>
     const stackTrace = params.stackTrace as { callFrames?: Array<{ url: string; lineNumber: number }> }
 
-    // Convert args to string representation
     const text = args
       .map(arg => {
         if (arg.value !== undefined) return String(arg.value)
@@ -387,7 +357,6 @@ export class BrowserContext implements BrowserContextInterface {
       args: args.map(a => a.value)
     }
 
-    // Add stack trace info if available
     if (stackTrace?.callFrames?.[0]) {
       const frame = stackTrace.callFrames[0]
       message.url = frame.url
@@ -396,32 +365,19 @@ export class BrowserContext implements BrowserContextInterface {
 
     this.consoleMessages.push(message)
 
-    // Keep only last 1000 messages
     if (this.consoleMessages.length > 1000) {
       this.consoleMessages = this.consoleMessages.slice(-1000)
     }
   }
 
-  /**
-   * Get all console messages
-   * @param includePreserved If true, includes preserved messages from previous navigations
-   */
-  getConsoleMessages(includePreserved: boolean = false): ConsoleMessage[] {
-    // Note: For now, we return all messages. In the future, we can track
-    // navigation boundaries and filter based on includePreserved
+  getConsoleMessages(_includePreserved: boolean = false): ConsoleMessage[] {
     return this.consoleMessages
   }
 
-  /**
-   * Get a specific console message by ID
-   */
   getConsoleMessage(id: string): ConsoleMessage | undefined {
     return this.consoleMessages.find(m => m.id === id)
   }
 
-  /**
-   * Clear console messages
-   */
   clearConsoleMessages(): void {
     this.consoleMessages = []
     this.consoleMessageCounter = 0
@@ -439,16 +395,10 @@ export class BrowserContext implements BrowserContextInterface {
     }
   }
 
-  /**
-   * Get pending dialog
-   */
   getPendingDialog(): DialogInfo | null {
     return this.pendingDialog
   }
 
-  /**
-   * Handle a dialog (accept or dismiss)
-   */
   async handleDialog(accept: boolean, promptText?: string): Promise<void> {
     try {
       await this.sendCDPCommand('Page.handleJavaScriptDialog', {
@@ -465,34 +415,27 @@ export class BrowserContext implements BrowserContextInterface {
   // Element Operations
   // ============================================
 
-  /**
-   * Click an element by UID
-   */
   async clickElement(uid: string, options?: { dblClick?: boolean }): Promise<void> {
     const element = this.getElementByUid(uid)
     if (!element) {
       throw new Error(`Element not found: ${uid}`)
     }
 
-    const webContents = this.getWebContents()
-    if (!webContents) {
-      throw new Error('No active browser view')
+    const client = this.getActiveCDPClient()
+    if (!client) {
+      throw new Error('No active browser page')
     }
 
-    // Scroll element into view
-    await scrollIntoView(webContents, element.backendNodeId)
+    await scrollIntoView(client, element.backendNodeId)
 
-    // Get element bounding box
-    const box = await getElementBoundingBox(webContents, element.backendNodeId)
+    const box = await getElementBoundingBox(client, element.backendNodeId)
     if (!box) {
       throw new Error(`Could not get bounding box for element: ${uid}`)
     }
 
-    // Calculate center point
     const x = box.x + box.width / 2
     const y = box.y + box.height / 2
 
-    // Perform click using CDP
     await this.sendCDPCommand('Input.dispatchMouseEvent', {
       type: 'mousePressed',
       x,
@@ -510,30 +453,24 @@ export class BrowserContext implements BrowserContextInterface {
     })
   }
 
-  /**
-   * Hover over an element by UID
-   */
   async hoverElement(uid: string): Promise<void> {
     const element = this.getElementByUid(uid)
     if (!element) {
       throw new Error(`Element not found: ${uid}`)
     }
 
-    const webContents = this.getWebContents()
-    if (!webContents) {
-      throw new Error('No active browser view')
+    const client = this.getActiveCDPClient()
+    if (!client) {
+      throw new Error('No active browser page')
     }
 
-    // Scroll element into view
-    await scrollIntoView(webContents, element.backendNodeId)
+    await scrollIntoView(client, element.backendNodeId)
 
-    // Get element bounding box
-    const box = await getElementBoundingBox(webContents, element.backendNodeId)
+    const box = await getElementBoundingBox(client, element.backendNodeId)
     if (!box) {
       throw new Error(`Could not get bounding box for element: ${uid}`)
     }
 
-    // Move mouse to element center
     const x = box.x + box.width / 2
     const y = box.y + box.height / 2
 
@@ -544,25 +481,20 @@ export class BrowserContext implements BrowserContextInterface {
     })
   }
 
-  /**
-   * Fill an input element with text
-   */
   async fillElement(uid: string, value: string): Promise<void> {
     const element = this.getElementByUid(uid)
     if (!element) {
       throw new Error(`Element not found: ${uid}`)
     }
 
-    const webContents = this.getWebContents()
-    if (!webContents) {
-      throw new Error('No active browser view')
+    const client = this.getActiveCDPClient()
+    if (!client) {
+      throw new Error('No active browser page')
     }
 
-    // Focus the element
-    await focusElement(webContents, element.backendNodeId)
+    await focusElement(client, element.backendNodeId)
 
     // Clear existing content
-    // Use platform-specific modifier: macOS uses Command (Meta=4), others use Ctrl (2)
     const selectAllModifier = process.platform === 'darwin' ? 4 : 2
     await this.sendCDPCommand('Input.dispatchKeyEvent', {
       type: 'keyDown',
@@ -577,7 +509,6 @@ export class BrowserContext implements BrowserContextInterface {
       modifiers: selectAllModifier
     })
 
-    // Delete selection
     await this.sendCDPCommand('Input.dispatchKeyEvent', {
       type: 'keyDown',
       key: 'Backspace',
@@ -589,17 +520,9 @@ export class BrowserContext implements BrowserContextInterface {
       code: 'Backspace'
     })
 
-    // Insert new text
     await this.sendCDPCommand('Input.insertText', { text: value })
   }
 
-  /**
-   * Select an option from a combobox/select element
-   * Aligned with chrome-devtools-mcp: selectOption in input.ts
-   *
-   * For combobox/select elements, the value is the text content of the option.
-   * We need to find the matching option and get its actual DOM value.
-   */
   async selectOption(uid: string, value: string): Promise<void> {
     const element = this.getElementByUid(uid)
     if (!element) {
@@ -610,20 +533,12 @@ export class BrowserContext implements BrowserContextInterface {
       throw new Error(`Element is not a select/combobox: ${element.role}`)
     }
 
-    // Find the option with matching text
     let optionFound = false
     for (const child of element.children || []) {
       if (child.role === 'option' && child.name === value) {
         optionFound = true
 
-        // Get the option's DOM value via CDP
-        const webContents = this.getWebContents()
-        if (!webContents) {
-          throw new Error('No active browser view')
-        }
-
         try {
-          // Resolve the option node to get its value property
           const resolveResponse = await this.sendCDPCommand<{
             object?: { objectId?: string }
           }>('DOM.resolveNode', {
@@ -631,7 +546,6 @@ export class BrowserContext implements BrowserContextInterface {
           })
 
           if (resolveResponse?.object?.objectId) {
-            // Get the option's value property
             const valueResponse = await this.sendCDPCommand<{
               result?: { value?: string }
             }>('Runtime.callFunctionOn', {
@@ -642,7 +556,6 @@ export class BrowserContext implements BrowserContextInterface {
 
             const optionValue = valueResponse?.result?.value || value
 
-            // Set the select element's value
             const parentResolve = await this.sendCDPCommand<{
               object?: { objectId?: string }
             }>('DOM.resolveNode', {
@@ -675,66 +588,41 @@ export class BrowserContext implements BrowserContextInterface {
     }
   }
 
-  /**
-   * Drag an element to another element
-   */
   async dragElement(fromUid: string, toUid: string): Promise<void> {
     const fromElement = this.getElementByUid(fromUid)
     const toElement = this.getElementByUid(toUid)
 
-    if (!fromElement) {
-      throw new Error(`Source element not found: ${fromUid}`)
-    }
-    if (!toElement) {
-      throw new Error(`Target element not found: ${toUid}`)
-    }
+    if (!fromElement) throw new Error(`Source element not found: ${fromUid}`)
+    if (!toElement) throw new Error(`Target element not found: ${toUid}`)
 
-    const webContents = this.getWebContents()
-    if (!webContents) {
-      throw new Error('No active browser view')
-    }
+    const client = this.getActiveCDPClient()
+    if (!client) throw new Error('No active browser page')
 
-    // Get bounding boxes
-    const fromBox = await getElementBoundingBox(webContents, fromElement.backendNodeId)
-    const toBox = await getElementBoundingBox(webContents, toElement.backendNodeId)
+    const fromBox = await getElementBoundingBox(client, fromElement.backendNodeId)
+    const toBox = await getElementBoundingBox(client, toElement.backendNodeId)
 
-    if (!fromBox || !toBox) {
-      throw new Error('Could not get element positions')
-    }
+    if (!fromBox || !toBox) throw new Error('Could not get element positions')
 
     const fromX = fromBox.x + fromBox.width / 2
     const fromY = fromBox.y + fromBox.height / 2
     const toX = toBox.x + toBox.width / 2
     const toY = toBox.y + toBox.height / 2
 
-    // Perform drag operation
     await this.sendCDPCommand('Input.dispatchMouseEvent', {
-      type: 'mousePressed',
-      x: fromX,
-      y: fromY,
-      button: 'left',
-      clickCount: 1
+      type: 'mousePressed', x: fromX, y: fromY, button: 'left', clickCount: 1
     })
 
-    // Move in steps for smooth drag
     const steps = 10
     for (let i = 1; i <= steps; i++) {
       const x = fromX + (toX - fromX) * (i / steps)
       const y = fromY + (toY - fromY) * (i / steps)
       await this.sendCDPCommand('Input.dispatchMouseEvent', {
-        type: 'mouseMoved',
-        x,
-        y,
-        button: 'left'
+        type: 'mouseMoved', x, y, button: 'left'
       })
     }
 
     await this.sendCDPCommand('Input.dispatchMouseEvent', {
-      type: 'mouseReleased',
-      x: toX,
-      y: toY,
-      button: 'left',
-      clickCount: 1
+      type: 'mouseReleased', x: toX, y: toY, button: 'left', clickCount: 1
     })
   }
 
@@ -742,9 +630,6 @@ export class BrowserContext implements BrowserContextInterface {
   // Keyboard Input
   // ============================================
 
-  /**
-   * Press a keyboard key
-   */
   async pressKey(key: string): Promise<void> {
     const keyInfo = parseKey(key)
 
@@ -759,9 +644,6 @@ export class BrowserContext implements BrowserContextInterface {
     })
   }
 
-  /**
-   * Type text character by character
-   */
   async typeText(text: string): Promise<void> {
     await this.sendCDPCommand('Input.insertText', { text })
   }
@@ -770,10 +652,6 @@ export class BrowserContext implements BrowserContextInterface {
   // Screenshot
   // ============================================
 
-  /**
-   * Capture a screenshot
-   * Aligned with chrome-devtools-mcp: supports png, jpeg, webp formats
-   */
   async captureScreenshot(options?: {
     format?: 'png' | 'jpeg' | 'webp'
     quality?: number
@@ -781,10 +659,8 @@ export class BrowserContext implements BrowserContextInterface {
     uid?: string
   }): Promise<{ data: string; mimeType: string }> {
     const format = options?.format || 'png'
-    // Quality only applies to jpeg and webp, not png
     const quality = format === 'png' ? undefined : (options?.quality || 80)
 
-    // Helper to get mime type
     const getMimeType = (fmt: string): string => {
       switch (fmt) {
         case 'jpeg': return 'image/jpeg'
@@ -793,53 +669,40 @@ export class BrowserContext implements BrowserContextInterface {
       }
     }
 
-    // If uid provided, capture specific element
     if (options?.uid) {
       const element = this.getElementByUid(options.uid)
-      if (!element) {
-        throw new Error(`Element not found: ${options.uid}`)
-      }
+      if (!element) throw new Error(`Element not found: ${options.uid}`)
 
-      const webContents = this.getWebContents()
-      if (!webContents) {
-        throw new Error('No active browser view')
-      }
+      const client = this.getActiveCDPClient()
+      if (!client) throw new Error('No active browser page')
 
-      await scrollIntoView(webContents, element.backendNodeId)
-      const box = await getElementBoundingBox(webContents, element.backendNodeId)
+      await scrollIntoView(client, element.backendNodeId)
+      const box = await getElementBoundingBox(client, element.backendNodeId)
 
       if (box) {
         const response = await this.sendCDPCommand<{ data: string }>('Page.captureScreenshot', {
           format,
           quality,
           clip: {
-            x: box.x,
-            y: box.y,
-            width: box.width,
-            height: box.height,
+            x: box.x, y: box.y,
+            width: box.width, height: box.height,
             scale: 1
           }
         })
 
-        return {
-          data: response.data,
-          mimeType: getMimeType(format)
-        }
+        return { data: response.data, mimeType: getMimeType(format) }
       }
     }
 
-    // Full page or viewport screenshot
     const params: Record<string, unknown> = { format, quality }
 
     if (options?.fullPage) {
-      // Get full page dimensions
       const metrics = await this.sendCDPCommand<{
         contentSize: { width: number; height: number }
       }>('Page.getLayoutMetrics')
 
       params.clip = {
-        x: 0,
-        y: 0,
+        x: 0, y: 0,
         width: metrics.contentSize.width,
         height: metrics.contentSize.height,
         scale: 1
@@ -848,22 +711,14 @@ export class BrowserContext implements BrowserContextInterface {
     }
 
     const response = await this.sendCDPCommand<{ data: string }>('Page.captureScreenshot', params)
-
-    return {
-      data: response.data,
-      mimeType: getMimeType(format)
-    }
+    return { data: response.data, mimeType: getMimeType(format) }
   }
 
   // ============================================
   // Script Execution
   // ============================================
 
-  /**
-   * Evaluate JavaScript in the browser context
-   */
   async evaluateScript<T = unknown>(script: string, args?: unknown[]): Promise<T> {
-    // Wrap script in a function call if args provided
     let expression = script
     if (args && args.length > 0) {
       const argsStr = args.map(a => JSON.stringify(a)).join(', ')
@@ -892,26 +747,20 @@ export class BrowserContext implements BrowserContextInterface {
   // Page State
   // ============================================
 
-  /**
-   * Get current page information
-   */
   async getPageInfo(): Promise<{
     url: string
     title: string
     viewport: { width: number; height: number }
   }> {
-    const webContents = this.getWebContents()
-    if (!webContents) {
-      throw new Error('No active browser view')
-    }
+    await this.updatePageInfo()
 
     const metrics = await this.sendCDPCommand<{
       layoutViewport: { clientWidth: number; clientHeight: number }
     }>('Page.getLayoutMetrics')
 
     return {
-      url: webContents.getURL(),
-      title: webContents.getTitle(),
+      url: this.pageUrl,
+      title: this.pageTitle,
       viewport: {
         width: metrics.layoutViewport.clientWidth,
         height: metrics.layoutViewport.clientHeight
@@ -923,9 +772,6 @@ export class BrowserContext implements BrowserContextInterface {
   // Wait Utilities
   // ============================================
 
-  /**
-   * Wait for text to appear on the page
-   */
   async waitForText(text: string, timeout: number = 30000): Promise<void> {
     const startTime = Date.now()
     const pollInterval = 500
@@ -944,9 +790,6 @@ export class BrowserContext implements BrowserContextInterface {
     throw new Error(`Timeout waiting for text: "${text}"`)
   }
 
-  /**
-   * Wait for an element matching a selector
-   */
   async waitForElement(selector: string, timeout: number = 30000): Promise<void> {
     const startTime = Date.now()
     const pollInterval = 500
@@ -956,10 +799,8 @@ export class BrowserContext implements BrowserContextInterface {
         const result = await this.evaluateScript<boolean>(
           `!!document.querySelector("${selector.replace(/"/g, '\\"')}")`
         )
-        if (result) {
-          return
-        }
-      } catch (e) {
+        if (result) return
+      } catch {
         // Ignore errors and retry
       }
 
@@ -973,48 +814,12 @@ export class BrowserContext implements BrowserContextInterface {
   // Monitoring Control
   // ============================================
 
-  /**
-   * Enable all monitoring features
-   */
   private async enableMonitoring(): Promise<void> {
     await this.enableNetworkMonitoring()
     await this.enableConsoleMonitoring()
   }
 
-  /**
-   * Disable all monitoring features and cleanup debugger resources
-   */
   private disableMonitoring(): void {
-    // Remove debugger event listener and detach to prevent memory leaks
-    const webContents = this.getWebContents()
-    if (webContents && !webContents.isDestroyed()) {
-      try {
-        // Remove the CDP message listener
-        webContents.debugger.off('message', this.handleCDPMessage)
-      } catch (e) {
-        // Listener may already be removed
-      }
-
-      try {
-        // Disable CDP domains before detaching
-        if (this.networkEnabled) {
-          webContents.debugger.sendCommand('Network.disable').catch(() => {})
-        }
-        if (this.consoleEnabled) {
-          webContents.debugger.sendCommand('Runtime.disable').catch(() => {})
-        }
-      } catch (e) {
-        // Ignore errors during domain disable
-      }
-
-      try {
-        // Detach debugger to free resources
-        webContents.debugger.detach()
-      } catch (e) {
-        // Already detached or not attached
-      }
-    }
-
     this.networkEnabled = false
     this.consoleEnabled = false
     this.clearNetworkRequests()
@@ -1026,7 +831,10 @@ export class BrowserContext implements BrowserContextInterface {
    */
   destroy(): void {
     this.disableMonitoring()
-    this.activeViewId = null
+    // Only disconnect, don't close Chrome
+    chromeConnection.close()
+    this.activeTargetId = null
+    this.activeCDPClient = null
     this.lastSnapshot = null
     this.mainWindow = null
   }
@@ -1036,16 +844,12 @@ export class BrowserContext implements BrowserContextInterface {
 // Key Parsing Utility
 // ============================================
 
-/**
- * Parse a key string into CDP key event parameters
- */
 function parseKey(key: string): {
   key: string
   code: string
   modifiers?: number
   text?: string
 } {
-  // Handle special keys
   const specialKeys: Record<string, { key: string; code: string }> = {
     'Enter': { key: 'Enter', code: 'Enter' },
     'Tab': { key: 'Tab', code: 'Tab' },
@@ -1063,7 +867,6 @@ function parseKey(key: string): {
     'Space': { key: ' ', code: 'Space' },
   }
 
-  // Check for modifier+key combinations (e.g., "Control+a", "Shift+Tab")
   const parts = key.split('+')
   let modifiers = 0
   let actualKey = key
@@ -1086,7 +889,6 @@ function parseKey(key: string): {
     }
   }
 
-  // Regular character key
   return {
     key: actualKey,
     code: actualKey.length === 1 ? `Key${actualKey.toUpperCase()}` : actualKey,

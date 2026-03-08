@@ -101,6 +101,7 @@ export function stopSessionCleanup(): void {
 export function needsSessionRebuild(existing: V2SessionInfo, newConfig: SessionConfig): boolean {
   return existing.config.aiBrowserEnabled !== newConfig.aiBrowserEnabled
     || existing.config.hasSkills !== newConfig.hasSkills
+    || existing.config.browserAutomationMode !== newConfig.browserAutomationMode
     || existing.config.customInstructionsHash !== newConfig.customInstructionsHash
 }
 
@@ -151,7 +152,7 @@ export async function getOrCreateV2Session(
   if (existing) {
     // Check if config changed and requires rebuild
     if (config && needsSessionRebuild(existing, config)) {
-      console.log(`[Agent][${conversationId}] Config changed (aiBrowser: ${existing.config.aiBrowserEnabled} → ${config.aiBrowserEnabled}), rebuilding session...`)
+      console.log(`[Agent][${conversationId}] Config changed (aiBrowser: ${existing.config.aiBrowserEnabled} → ${config.aiBrowserEnabled}, browserMode: ${existing.config.browserAutomationMode || 'ai-browser'} → ${config.browserAutomationMode || 'ai-browser'}), rebuilding session...`)
       closeV2SessionForRebuild(conversationId)
       // Fall through to create new session
     } else {
@@ -278,6 +279,7 @@ export async function ensureSessionWarm(
     const sessionConfig: SessionConfig = {
       aiBrowserEnabled: false,  // Default to false for warm-up (user hasn't enabled it yet)
       hasSkills: skillsAvailable,
+      browserAutomationMode: (config as any).browserAutomation?.mode === 'system-browser' ? 'system-browser' : 'ai-browser',
       customInstructionsHash: ci?.enabled && ci?.content ? ci.content : undefined
     }
 

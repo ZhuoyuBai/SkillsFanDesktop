@@ -196,6 +196,7 @@ describe('sdk-options', () => {
         'EnterPlanMode', 'EnterWorktree',
       ])
       expect(sdkOptions.tools).toEqual(sdkOptions.allowedTools)
+      expect(sdkOptions.strictMcpConfig).toBe(true)
       expect(sdkOptions.disallowedTools).toEqual([
         'WebSearch',
         'WebFetch',
@@ -252,7 +253,10 @@ describe('sdk-options', () => {
       expect(mocks.createWebToolsMcpServer).toHaveBeenCalledTimes(1)
       expect(mocks.createSkillMcpServer).toHaveBeenCalledTimes(1)
       expect(sdkOptions.maxThinkingTokens).toBe(10240)
-      expect(sdkOptions.systemPrompt.append).toBe('[BASE_PROMPT][AI_BROWSER_PROMPT][RALPH_APPEND]')
+      expect(sdkOptions.systemPrompt.append).toContain('[BASE_PROMPT]')
+      expect(sdkOptions.systemPrompt.append).toContain('[AI_BROWSER_PROMPT]')
+      expect(sdkOptions.systemPrompt.append).toContain('prefer the AI Browser tools')
+      expect(sdkOptions.systemPrompt.append).toContain('[RALPH_APPEND]')
       expect(sdkOptions.tools).toEqual(sdkOptions.allowedTools)
       expect(sdkOptions.disallowedTools).toEqual([
         'WebSearch',
@@ -274,6 +278,83 @@ describe('sdk-options', () => {
         skill: { type: 'stdio', command: 'skill' }
       })
       expect(mocks.buildSystemPromptAppend).toHaveBeenCalledWith('/tmp/space-2', 'gpt-4.1', false)
+    })
+
+    it('disables AI Browser MCP when system browser mode is enabled', async () => {
+      const abortController = new AbortController()
+
+      const { sdkOptions, addedMcpServers } = await buildSdkOptions({
+        conversationId: 'conv-3',
+        spaceId: 'space-3',
+        workDir: '/tmp/space-3',
+        config: {
+          mcpServers: {},
+          memory: { enabled: true },
+          browserAutomation: { mode: 'system-browser' }
+        },
+        abortController,
+        sdkModel: 'claude-sonnet-4-20250514',
+        credentialsModel: 'glm-5',
+        anthropicBaseUrl: 'http://router.local',
+        anthropicApiKey: 'encoded-key',
+        electronPath: '/Applications/Electron.app/Contents/MacOS/Electron',
+        onStderr: vi.fn(),
+        aiBrowserEnabled: true
+      })
+
+      expect(addedMcpServers).toEqual(['local-tools', 'web-tools'])
+      expect(mocks.createAIBrowserMcpServer).not.toHaveBeenCalled()
+      expect(mocks.createLocalToolsMcpServer).toHaveBeenCalledWith({
+        workDir: '/tmp/space-3',
+        spaceId: 'space-3',
+        conversationId: 'conv-3',
+        aiBrowserEnabled: false,
+        includeSkillMcp: false
+      })
+      expect(sdkOptions.systemPrompt.append).toContain('System Browser Mode')
+      expect(sdkOptions.systemPrompt.append).toContain('mcp__local-tools__open_url')
+      expect(sdkOptions.systemPrompt.append).toContain('mcp__local-tools__open_application')
+      expect(sdkOptions.systemPrompt.append).not.toContain('[AI_BROWSER_PROMPT]')
+      expect(sdkOptions.strictMcpConfig).toBe(true)
+    })
+
+    it('removes configured ai-browser MCP servers in system browser mode', async () => {
+      mocks.getEnabledMcpServers.mockReturnValue({
+        github: { type: 'stdio', command: 'github-mcp' },
+        'ai-browser': { type: 'stdio', command: 'custom-ai-browser' }
+      })
+      const abortController = new AbortController()
+
+      const { sdkOptions, addedMcpServers } = await buildSdkOptions({
+        conversationId: 'conv-4',
+        spaceId: 'space-4',
+        workDir: '/tmp/space-4',
+        config: {
+          mcpServers: {
+            github: { command: 'github-mcp' },
+            'ai-browser': { command: 'custom-ai-browser' }
+          },
+          memory: { enabled: true },
+          browserAutomation: { mode: 'system-browser' }
+        },
+        abortController,
+        sdkModel: 'claude-sonnet-4-20250514',
+        credentialsModel: 'glm-5',
+        anthropicBaseUrl: 'http://router.local',
+        anthropicApiKey: 'encoded-key',
+        electronPath: '/Applications/Electron.app/Contents/MacOS/Electron',
+        onStderr: vi.fn(),
+        aiBrowserEnabled: true
+      })
+
+      expect(addedMcpServers).toEqual(['local-tools', 'web-tools'])
+      expect(mocks.createAIBrowserMcpServer).not.toHaveBeenCalled()
+      expect(sdkOptions.mcpServers).toEqual({
+        github: { type: 'stdio', command: 'github-mcp' },
+        'local-tools': { type: 'stdio', command: 'local-tools' },
+        'web-tools': { type: 'stdio', command: 'web-tools' }
+      })
+      expect(sdkOptions.strictMcpConfig).toBe(true)
     })
   })
 })

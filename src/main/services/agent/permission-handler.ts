@@ -72,7 +72,6 @@ export function createCanUseTool(
   spaceId: string,
   conversationId: string
 ): CanUseToolFn {
-  const config = getConfig()
   const absoluteWorkDir = path.resolve(workDir)
 
   console.log(`[Agent] Creating canUseTool with workDir: ${absoluteWorkDir}`)
@@ -107,7 +106,8 @@ export function createCanUseTool(
     }
 
     const requestCommandApproval = async (name: string, description: string): Promise<ToolPermissionResult> => {
-      const permission = config.permissions.commandExecution
+      const currentConfig = getConfig()
+      const permission = currentConfig.permissions.commandExecution
 
       if (permission === 'deny') {
         return {
@@ -116,7 +116,7 @@ export function createCanUseTool(
         }
       }
 
-      if (permission === 'ask' && !config.permissions.trustMode) {
+      if (permission === 'ask' && !currentConfig.permissions.trustMode) {
         const toolCall: ToolCall = {
           id: `tool-${Date.now()}`,
           name,
@@ -208,6 +208,21 @@ export function createCanUseTool(
       )
     }
 
+    if (toolName === 'mcp__local-tools__open_application') {
+      const application = typeof input.application === 'string' ? input.application : 'application'
+      return await requestCommandApproval(
+        toolName,
+        `Open macOS application: ${application}`
+      )
+    }
+
+    if (toolName === 'mcp__local-tools__run_applescript') {
+      return await requestCommandApproval(
+        toolName,
+        'Execute AppleScript for macOS UI automation'
+      )
+    }
+
     if (BLOCKED_SERVER_SIDE_TOOLS.has(toolName)) {
       return {
         behavior: 'deny' as const,
@@ -232,7 +247,8 @@ export function createCanUseTool(
 
     // Task (sub-agent) — requires user approval since it spawns child agents and costs tokens
     if (toolName === 'Task') {
-      const permission = config.permissions.commandExecution
+      const currentConfig = getConfig()
+      const permission = currentConfig.permissions.commandExecution
 
       if (permission === 'deny') {
         return {
@@ -242,7 +258,7 @@ export function createCanUseTool(
       }
 
       // trust mode or allow: auto-approve
-      if (permission !== 'ask' || config.permissions.trustMode) {
+      if (permission !== 'ask' || currentConfig.permissions.trustMode) {
         return { behavior: 'allow' as const, updatedInput: input }
       }
 
@@ -278,8 +294,15 @@ export function createCanUseTool(
       })
     }
 
-    // AI Browser tools are always allowed (they run in sandboxed browser context)
     if (isAIBrowserTool(toolName)) {
+      const currentConfig = getConfig()
+      if (currentConfig.browserAutomation?.mode === 'system-browser') {
+        return {
+          behavior: 'deny' as const,
+          message: 'AI Browser is disabled while "Use System Browser" mode is enabled. Use local system browser tools instead.'
+        }
+      }
+
       console.log(`[Agent] AI Browser tool allowed: ${toolName}`)
       return { behavior: 'allow' as const, updatedInput: input }
     }

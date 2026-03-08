@@ -8,7 +8,7 @@
 export const AI_BROWSER_SYSTEM_PROMPT = `
 ## AI Browser
 
-You can now control SkillsFan's embedded real browser. All browser tools are provided via MCP server "ai-browser".
+You can now control the user's real Chrome browser. All browser tools are provided via MCP server "ai-browser". The browser uses the user's actual Chrome with their login sessions and cookies preserved.
 
 ### Core Workflow
 1. Use \`mcp__ai-browser__browser_new_page\` to open a webpage

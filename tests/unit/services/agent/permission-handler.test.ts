@@ -211,4 +211,146 @@ describe('permission-handler', () => {
     expect(activeSessions.get('conv-1')?.pendingPermissionResolve).toBeNull()
     expect(activeSessions.get('conv-1')?.pendingPermissionToolCall).toBeNull()
   })
+
+  it('requests approval before opening a macOS application', async () => {
+    mocks.getConfig.mockReturnValue({
+      permissions: {
+        commandExecution: 'ask',
+        trustMode: false
+      }
+    })
+
+    activeSessions.set('conv-1', {
+      abortController: new AbortController(),
+      spaceId: 'space-1',
+      conversationId: 'conv-1',
+      pendingPermissionResolve: null,
+      pendingPermissionToolCall: null,
+      thoughts: [],
+      pendingUserQuestion: null,
+      currentStreamingContent: ''
+    })
+
+    const canUseTool = createCanUseTool('/tmp/workspace', 'space-1', 'conv-1')
+    const pendingDecision = canUseTool('mcp__local-tools__open_application', {
+      application: 'Google Chrome',
+      target: 'https://creator.xiaohongshu.com/login'
+    }, { signal: new AbortController().signal })
+
+    expect(mocks.sendToRenderer).toHaveBeenCalledWith(
+      'agent:tool-call',
+      'space-1',
+      'conv-1',
+      expect.objectContaining({
+        name: 'mcp__local-tools__open_application',
+        status: 'waiting_approval',
+        requiresApproval: true,
+        description: 'Open macOS application: Google Chrome'
+      })
+    )
+
+    handleToolApproval('conv-1', true)
+
+    await expect(pendingDecision).resolves.toEqual({
+      behavior: 'allow',
+      updatedInput: {
+        application: 'Google Chrome',
+        target: 'https://creator.xiaohongshu.com/login'
+      }
+    })
+  })
+
+  it('requests approval before executing AppleScript', async () => {
+    mocks.getConfig.mockReturnValue({
+      permissions: {
+        commandExecution: 'ask',
+        trustMode: false
+      }
+    })
+
+    activeSessions.set('conv-1', {
+      abortController: new AbortController(),
+      spaceId: 'space-1',
+      conversationId: 'conv-1',
+      pendingPermissionResolve: null,
+      pendingPermissionToolCall: null,
+      thoughts: [],
+      pendingUserQuestion: null,
+      currentStreamingContent: ''
+    })
+
+    const canUseTool = createCanUseTool('/tmp/workspace', 'space-1', 'conv-1')
+    const pendingDecision = canUseTool('mcp__local-tools__run_applescript', {
+      script: 'tell application "Google Chrome" to activate'
+    }, { signal: new AbortController().signal })
+
+    expect(mocks.sendToRenderer).toHaveBeenCalledWith(
+      'agent:tool-call',
+      'space-1',
+      'conv-1',
+      expect.objectContaining({
+        name: 'mcp__local-tools__run_applescript',
+        status: 'waiting_approval',
+        requiresApproval: true,
+        description: 'Execute AppleScript for macOS UI automation'
+      })
+    )
+
+    handleToolApproval('conv-1', true)
+
+    await expect(pendingDecision).resolves.toEqual({
+      behavior: 'allow',
+      updatedInput: {
+        script: 'tell application "Google Chrome" to activate'
+      }
+    })
+  })
+
+  it('denies AI Browser tools when system browser mode is enabled', async () => {
+    mocks.getConfig.mockReturnValue({
+      permissions: {
+        commandExecution: 'allow',
+        trustMode: false
+      },
+      browserAutomation: {
+        mode: 'system-browser'
+      }
+    })
+    mocks.isAIBrowserTool.mockReturnValue(true)
+
+    const canUseTool = createCanUseTool('/tmp/workspace', 'space-1', 'conv-1')
+    const result = await canUseTool('mcp__ai-browser__browser_new_page', {
+      url: 'https://example.com'
+    }, { signal: new AbortController().signal })
+
+    expect(result).toEqual({
+      behavior: 'deny',
+      message: 'AI Browser is disabled while "Use System Browser" mode is enabled. Use local system browser tools instead.'
+    })
+  })
+
+  it('allows AI Browser tools when system browser mode is not enabled', async () => {
+    mocks.getConfig.mockReturnValue({
+      permissions: {
+        commandExecution: 'allow',
+        trustMode: false
+      },
+      browserAutomation: {
+        mode: 'ai-browser'
+      }
+    })
+    mocks.isAIBrowserTool.mockReturnValue(true)
+
+    const canUseTool = createCanUseTool('/tmp/workspace', 'space-1', 'conv-1')
+    const result = await canUseTool('mcp__ai-browser__browser_new_page', {
+      url: 'https://example.com'
+    }, { signal: new AbortController().signal })
+
+    expect(result).toEqual({
+      behavior: 'allow',
+      updatedInput: {
+        url: 'https://example.com'
+      }
+    })
+  })
 })

@@ -190,6 +190,10 @@ export interface MemoryConfig {
   retentionDays: number;  // 0 = forever, 7/30/180
 }
 
+export interface BrowserAutomationConfig {
+  mode: 'ai-browser' | 'system-browser';
+}
+
 export interface HaloConfig {
   api: ApiConfig;  // Legacy, kept for backward compatibility
   aiSources?: AISourcesConfig;  // New multi-source configuration
@@ -200,6 +204,7 @@ export interface HaloConfig {
   mcpServers: McpServersConfig;  // MCP servers configuration
   spaces?: SpacesConfig;  // Space settings (default space, etc.)
   memory?: MemoryConfig;  // Cross-conversation memory settings
+  browserAutomation?: BrowserAutomationConfig;  // Browser automation mode preference
   thinkingEffort?: ThinkingEffort;  // Default thinking effort level
   tools?: WebToolsConfig;  // Local web search/fetch tool settings
   customInstructions?: {  // Global custom instructions appended to system prompt
@@ -601,6 +606,9 @@ export const DEFAULT_CONFIG: HaloConfig = {
   remoteAccess: {
     enabled: false,
     port: 3456
+  },
+  browserAutomation: {
+    mode: 'ai-browser'
   },
   tools: {
     web: {

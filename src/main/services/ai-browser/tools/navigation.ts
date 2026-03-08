@@ -2,15 +2,14 @@
  * Navigation Tools - Page navigation and management
  *
  * Tools for navigating between pages, managing tabs, and waiting for content.
- * Tool descriptions aligned with chrome-devtools-mcp for 100% compatibility.
+ * Now uses real Chrome via CDP instead of Electron BrowserView.
  */
 
 import type { AIBrowserTool, ToolResult } from '../types'
-import { browserViewManager } from '../../browser-view.service'
+import { chromeConnection } from '../chrome-connection'
 
 /**
  * list_pages - List all open browser pages/tabs
- * Aligned with chrome-devtools-mcp: listPages
  */
 export const listPagesTool: AIBrowserTool = {
   name: 'browser_list_pages',
@@ -21,29 +20,30 @@ export const listPagesTool: AIBrowserTool = {
     properties: {}
   },
   handler: async (_params, _context): Promise<ToolResult> => {
-    // Get all view states from the manager
-    const states = (browserViewManager as any).getAllStates?.() || []
+    try {
+      const pages = await chromeConnection.listPages()
 
-    if (states.length === 0) {
-      return {
-        content: 'No browser pages are currently open.'
+      if (pages.length === 0) {
+        return { content: 'No browser pages are currently open.' }
       }
-    }
 
-    const lines = ['Open browser pages:']
-    states.forEach((state: any, index: number) => {
-      lines.push(`[${index}] ${state.title || 'Untitled'} - ${state.url || 'about:blank'}`)
-    })
+      const lines = ['Open browser pages:']
+      pages.forEach((page, index) => {
+        lines.push(`[${index}] ${page.title || 'Untitled'} - ${page.url || 'about:blank'}`)
+      })
 
-    return {
-      content: lines.join('\n')
+      return { content: lines.join('\n') }
+    } catch (error) {
+      return {
+        content: `Failed to list pages: ${(error as Error).message}`,
+        isError: true
+      }
     }
   }
 }
 
 /**
  * select_page - Select a page by index to make it active
- * Aligned with chrome-devtools-mcp: selectPage
  */
 export const selectPageTool: AIBrowserTool = {
   name: 'browser_select_page',
@@ -65,27 +65,34 @@ export const selectPageTool: AIBrowserTool = {
   },
   handler: async (params, context): Promise<ToolResult> => {
     const pageIdx = params.pageIdx as number
-    const states = (browserViewManager as any).getAllStates?.() || []
 
-    if (pageIdx < 0 || pageIdx >= states.length) {
+    try {
+      const pages = await chromeConnection.listPages()
+
+      if (pageIdx < 0 || pageIdx >= pages.length) {
+        return {
+          content: `Invalid page index: ${pageIdx}. Valid range: 0-${pages.length - 1}`,
+          isError: true
+        }
+      }
+
+      const page = pages[pageIdx]
+      await context.setActiveViewId(page.id)
+
       return {
-        content: `Invalid page index: ${pageIdx}. Valid range: 0-${states.length - 1}`,
+        content: `Selected page [${pageIdx}]: ${page.title || 'Untitled'} - ${page.url}`
+      }
+    } catch (error) {
+      return {
+        content: `Failed to select page: ${(error as Error).message}`,
         isError: true
       }
-    }
-
-    const state = states[pageIdx]
-    context.setActiveViewId(state.id)
-
-    return {
-      content: `Selected page [${pageIdx}]: ${state.title || 'Untitled'} - ${state.url}`
     }
   }
 }
 
 /**
  * new_page - Create a new browser page
- * Aligned with chrome-devtools-mcp: newPage
  */
 export const newPageTool: AIBrowserTool = {
   name: 'browser_new_page',
@@ -110,28 +117,32 @@ export const newPageTool: AIBrowserTool = {
     const timeout = (params.timeout as number) || 30000
 
     try {
-      // Generate a unique view ID
-      const viewId = `ai-browser-${Date.now()}`
+      // Ensure Chrome is running
+      await context.ensureConnected()
 
-      // Create the browser view
-      const state = await browserViewManager.create(viewId, url)
+      // Create new tab in Chrome
+      const page = await chromeConnection.createPage(url)
 
-      // Set as active view in context
-      context.setActiveViewId(viewId)
+      // Set as active page
+      await context.setActiveViewId(page.id)
 
-      // Wait for page load with timeout
+      // Wait for page load
       const startTime = Date.now()
       while (Date.now() - startTime < timeout) {
-        const currentState = browserViewManager.getState(viewId)
-        if (currentState && !currentState.isLoading) {
-          break
+        try {
+          const result = await context.evaluateScript<string>('document.readyState')
+          if (result === 'complete' || result === 'interactive') break
+        } catch {
+          // Page might not be ready for JS yet
         }
-        await new Promise(resolve => setTimeout(resolve, 100))
+        await new Promise(resolve => setTimeout(resolve, 200))
       }
 
-      const finalState = browserViewManager.getState(viewId)
+      // Get final page info
+      const info = await context.getPageInfo()
+
       return {
-        content: `Created new page: ${finalState?.title || 'Untitled'} - ${finalState?.url || url}`
+        content: `Created new page: ${info.title || 'Untitled'} - ${info.url || url}`
       }
     } catch (error) {
       return {
@@ -144,7 +155,6 @@ export const newPageTool: AIBrowserTool = {
 
 /**
  * close_page - Close a browser page
- * Aligned with chrome-devtools-mcp: closePage
  */
 export const closePageTool: AIBrowserTool = {
   name: 'browser_close_page',
@@ -162,35 +172,41 @@ export const closePageTool: AIBrowserTool = {
   },
   handler: async (params, _context): Promise<ToolResult> => {
     const pageIdx = params.pageIdx as number
-    const states = (browserViewManager as any).getAllStates?.() || []
 
-    if (pageIdx < 0 || pageIdx >= states.length) {
+    try {
+      const pages = await chromeConnection.listPages()
+
+      if (pageIdx < 0 || pageIdx >= pages.length) {
+        return {
+          content: `Invalid page index: ${pageIdx}`,
+          isError: true
+        }
+      }
+
+      if (pages.length === 1) {
+        return {
+          content: 'The last open page cannot be closed.',
+          isError: true
+        }
+      }
+
+      const page = pages[pageIdx]
+      await chromeConnection.closePage(page.id)
+
       return {
-        content: `Invalid page index: ${pageIdx}`,
+        content: `Closed page [${pageIdx}]: ${page.title || 'Untitled'}`
+      }
+    } catch (error) {
+      return {
+        content: `Failed to close page: ${(error as Error).message}`,
         isError: true
       }
-    }
-
-    // Prevent closing the last page
-    if (states.length === 1) {
-      return {
-        content: 'The last open page cannot be closed.',
-        isError: true
-      }
-    }
-
-    const state = states[pageIdx]
-    browserViewManager.destroy(state.id)
-
-    return {
-      content: `Closed page [${pageIdx}]: ${state.title || 'Untitled'}`
     }
   }
 }
 
 /**
  * navigate_page - Navigate to a URL or perform navigation actions
- * Aligned with chrome-devtools-mcp: navigatePage
  */
 export const navigatePageTool: AIBrowserTool = {
   name: 'browser_navigate',
@@ -221,10 +237,10 @@ export const navigatePageTool: AIBrowserTool = {
   handler: async (params, context): Promise<ToolResult> => {
     const type = (params.type as string) || 'url'
     const url = params.url as string
+    const ignoreCache = params.ignoreCache as boolean
     const timeout = (params.timeout as number) || 30000
 
-    const viewId = context.getActiveViewId()
-    if (!viewId) {
+    if (!context.getActiveViewId()) {
       return {
         content: 'No active browser page. Use browser_new_page first.',
         isError: true
@@ -234,14 +250,18 @@ export const navigatePageTool: AIBrowserTool = {
     try {
       switch (type) {
         case 'back':
-          browserViewManager.goBack(viewId)
-          return { content: `Successfully navigated back.` }
+          await context.evaluateScript('window.history.back()')
+          return { content: 'Successfully navigated back.' }
         case 'forward':
-          browserViewManager.goForward(viewId)
-          return { content: `Successfully navigated forward.` }
+          await context.evaluateScript('window.history.forward()')
+          return { content: 'Successfully navigated forward.' }
         case 'reload':
-          browserViewManager.reload(viewId)
-          return { content: `Successfully reloaded the page.` }
+          if (ignoreCache) {
+            await context.sendCDPCommand('Page.reload', { ignoreCache: true })
+          } else {
+            await context.evaluateScript('window.location.reload()')
+          }
+          return { content: 'Successfully reloaded the page.' }
         case 'url':
         default:
           if (!url) {
@@ -250,23 +270,25 @@ export const navigatePageTool: AIBrowserTool = {
               isError: true
             }
           }
-          await browserViewManager.navigate(viewId, url)
+          await context.sendCDPCommand('Page.navigate', { url })
           break
       }
 
       // Wait for navigation to complete
       const startTime = Date.now()
       while (Date.now() - startTime < timeout) {
-        const state = browserViewManager.getState(viewId)
-        if (state && !state.isLoading) {
-          break
+        try {
+          const result = await context.evaluateScript<string>('document.readyState')
+          if (result === 'complete' || result === 'interactive') break
+        } catch {
+          // Page navigating
         }
-        await new Promise(resolve => setTimeout(resolve, 100))
+        await new Promise(resolve => setTimeout(resolve, 200))
       }
 
-      const finalState = browserViewManager.getState(viewId)
+      const info = await context.getPageInfo()
       return {
-        content: `Successfully navigated to ${finalState?.url || url}.`
+        content: `Successfully navigated to ${info.url || url}.`
       }
     } catch (error) {
       return {
@@ -279,7 +301,6 @@ export const navigatePageTool: AIBrowserTool = {
 
 /**
  * wait_for - Wait for text to appear on the page
- * Aligned with chrome-devtools-mcp: waitFor
  */
 export const waitForTool: AIBrowserTool = {
   name: 'browser_wait_for',
@@ -305,9 +326,7 @@ export const waitForTool: AIBrowserTool = {
 
     try {
       await context.waitForText(text, timeout)
-      return {
-        content: `Element with text "${text}" found.`
-      }
+      return { content: `Element with text "${text}" found.` }
     } catch (error) {
       return {
         content: `Timeout waiting for text: "${text}"`,
@@ -319,7 +338,6 @@ export const waitForTool: AIBrowserTool = {
 
 /**
  * resize_page - Resize the browser viewport
- * Aligned with chrome-devtools-mcp: resizePage
  */
 export const resizePageTool: AIBrowserTool = {
   name: 'browser_resize',
@@ -328,14 +346,8 @@ export const resizePageTool: AIBrowserTool = {
   inputSchema: {
     type: 'object',
     properties: {
-      width: {
-        type: 'number',
-        description: 'Page width'
-      },
-      height: {
-        type: 'number',
-        description: 'Page height'
-      }
+      width: { type: 'number', description: 'Page width' },
+      height: { type: 'number', description: 'Page height' }
     },
     required: ['width', 'height']
   },
@@ -344,25 +356,15 @@ export const resizePageTool: AIBrowserTool = {
     const height = params.height as number
 
     if (!context.getActiveViewId()) {
-      return {
-        content: 'No active browser page.',
-        isError: true
-      }
+      return { content: 'No active browser page.', isError: true }
     }
 
     try {
       await context.sendCDPCommand('Emulation.setDeviceMetricsOverride', {
-        width,
-        height,
-        deviceScaleFactor: 1,
-        mobile: false,
-        screenWidth: width,
-        screenHeight: height
+        width, height, deviceScaleFactor: 1, mobile: false,
+        screenWidth: width, screenHeight: height
       })
-
-      return {
-        content: `Viewport resized to: ${width}x${height}`
-      }
+      return { content: `Viewport resized to: ${width}x${height}` }
     } catch (error) {
       return {
         content: `Resize failed: ${(error as Error).message}`,
@@ -373,8 +375,7 @@ export const resizePageTool: AIBrowserTool = {
 }
 
 /**
- * handle_dialog - Handle a browser dialog (alert, confirm, prompt)
- * Aligned with chrome-devtools-mcp: handleDialog
+ * handle_dialog - Handle a browser dialog
  */
 export const handleDialogTool: AIBrowserTool = {
   name: 'browser_handle_dialog',
@@ -401,10 +402,7 @@ export const handleDialogTool: AIBrowserTool = {
 
     const dialog = context.getPendingDialog()
     if (!dialog) {
-      return {
-        content: 'No open dialog found',
-        isError: true
-      }
+      return { content: 'No open dialog found', isError: true }
     }
 
     try {
@@ -421,7 +419,6 @@ export const handleDialogTool: AIBrowserTool = {
   }
 }
 
-// Export all navigation tools
 export const navigationTools: AIBrowserTool[] = [
   listPagesTool,
   selectPageTool,

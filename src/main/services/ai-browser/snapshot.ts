@@ -6,11 +6,10 @@
  * 2. Converting it to a structured format with unique IDs
  * 3. Formatting it as text for AI consumption
  *
- * The snapshot allows AI to reference elements by UID without
- * needing to understand CSS selectors or DOM structure.
+ * Uses CDPClient (WebSocket to real Chrome) instead of Electron's WebContents.
  */
 
-import type { WebContents } from 'electron'
+import type { CDPClient } from './chrome-connection'
 import type { AccessibilityNode, AccessibilitySnapshot } from './types'
 
 // Counter for generating unique snapshot IDs
@@ -37,134 +36,105 @@ interface CDPAXNode {
   frameId?: string
 }
 
-/**
- * CDP AXTree response
- */
 interface CDPAXTreeResponse {
   nodes: CDPAXNode[]
 }
 
-/**
- * Role names to include in the snapshot (interactive elements)
- */
 const INTERACTIVE_ROLES = new Set([
-  'button',
-  'link',
-  'textbox',
-  'searchbox',
-  'combobox',
-  'listbox',
-  'option',
-  'checkbox',
-  'radio',
-  'switch',
-  'slider',
-  'spinbutton',
-  'menuitem',
-  'menuitemcheckbox',
-  'menuitemradio',
-  'tab',
-  'treeitem',
-  'gridcell',
-  'columnheader',
-  'rowheader',
+  'button', 'link', 'textbox', 'searchbox', 'combobox', 'listbox', 'option',
+  'checkbox', 'radio', 'switch', 'slider', 'spinbutton',
+  'menuitem', 'menuitemcheckbox', 'menuitemradio',
+  'tab', 'treeitem', 'gridcell', 'columnheader', 'rowheader',
 ])
 
-/**
- * Roles to always include (structural/informational)
- */
 const STRUCTURAL_ROLES = new Set([
-  'heading',
-  'img',
-  'figure',
-  'table',
-  'list',
-  'listitem',
-  'navigation',
-  'main',
-  'article',
-  'region',
-  'banner',
-  'contentinfo',
-  'complementary',
-  'form',
-  'search',
-  'dialog',
-  'alertdialog',
-  'alert',
-  'status',
-  'tooltip',
-  'progressbar',
-  'meter',
+  'heading', 'img', 'figure', 'table', 'list', 'listitem',
+  'navigation', 'main', 'article', 'region', 'banner',
+  'contentinfo', 'complementary', 'form', 'search',
+  'dialog', 'alertdialog', 'alert', 'status', 'tooltip',
+  'progressbar', 'meter',
 ])
 
 /**
- * Create an accessibility snapshot from a WebContents
+ * Create an accessibility snapshot using CDP client
  */
 export async function createAccessibilitySnapshot(
-  webContents: WebContents,
-  verbose: boolean = false
+  cdpClient: CDPClient,
+  verbose: boolean = false,
+  pageUrl: string = '',
+  pageTitle: string = ''
 ): Promise<AccessibilitySnapshot> {
   const snapshotId = `snap_${++snapshotCounter}`
   const idToNode = new Map<string, AccessibilityNode>()
   let nodeIndex = 0
 
-  // Ensure debugger is attached
-  try {
-    webContents.debugger.attach('1.3')
-  } catch (e) {
-    // Already attached
+  const response = await cdpClient.sendCommand<CDPAXTreeResponse>(
+    'Accessibility.getFullAXTree'
+  )
+
+  if (!response?.nodes || response.nodes.length === 0) {
+    throw new Error('Empty accessibility tree')
   }
 
-  try {
-    // Get the full accessibility tree via CDP
-    const response = await webContents.debugger.sendCommand(
-      'Accessibility.getFullAXTree'
-    ) as CDPAXTreeResponse
+  // Build node lookup
+  const cdpNodeMap = new Map<string, CDPAXNode>()
+  for (const node of response.nodes) {
+    cdpNodeMap.set(node.nodeId, node)
+  }
 
-    if (!response?.nodes || response.nodes.length === 0) {
-      throw new Error('Empty accessibility tree')
+  const rootCDPNode = response.nodes.find(
+    n => !n.ignored && !n.parentId
+  ) || response.nodes[0]
+
+  const convertNode = (cdpNode: CDPAXNode): AccessibilityNode | null => {
+    if (cdpNode.ignored) {
+      const children: AccessibilityNode[] = []
+      if (cdpNode.childIds) {
+        for (const childId of cdpNode.childIds) {
+          const childCDPNode = cdpNodeMap.get(childId)
+          if (childCDPNode) {
+            const childNode = convertNode(childCDPNode)
+            if (childNode) children.push(childNode)
+          }
+        }
+      }
+      if (children.length === 1) return children[0]
+      if (children.length > 1) {
+        const uid = `${snapshotId}_${nodeIndex++}`
+        const node: AccessibilityNode = {
+          uid, role: 'group', name: '', children,
+          backendNodeId: cdpNode.backendDOMNodeId || 0,
+        }
+        idToNode.set(uid, node)
+        return node
+      }
+      return null
     }
 
-    // Build node lookup
-    const cdpNodeMap = new Map<string, CDPAXNode>()
-    for (const node of response.nodes) {
-      cdpNodeMap.set(node.nodeId, node)
-    }
+    const role = cdpNode.role?.value || 'generic'
+    const name = cdpNode.name?.value || ''
 
-    // Find root node (first non-ignored node without parent)
-    const rootCDPNode = response.nodes.find(
-      n => !n.ignored && !n.parentId
-    ) || response.nodes[0]
+    if (!verbose) {
+      const isInteractive = INTERACTIVE_ROLES.has(role)
+      const isStructural = STRUCTURAL_ROLES.has(role)
+      const hasName = name.trim().length > 0
 
-    // Convert CDP nodes to our format
-    const convertNode = (cdpNode: CDPAXNode): AccessibilityNode | null => {
-      if (cdpNode.ignored) {
-        // Process children even for ignored nodes
+      if (!isInteractive && !isStructural && !hasName && role === 'generic') {
         const children: AccessibilityNode[] = []
         if (cdpNode.childIds) {
           for (const childId of cdpNode.childIds) {
             const childCDPNode = cdpNodeMap.get(childId)
             if (childCDPNode) {
               const childNode = convertNode(childCDPNode)
-              if (childNode) {
-                children.push(childNode)
-              }
+              if (childNode) children.push(childNode)
             }
           }
         }
-        // Return children without wrapper if node is ignored
-        if (children.length === 1) {
-          return children[0]
-        }
-        // For multiple children, create a generic container
+        if (children.length === 1) return children[0]
         if (children.length > 1) {
           const uid = `${snapshotId}_${nodeIndex++}`
           const node: AccessibilityNode = {
-            uid,
-            role: 'group',
-            name: '',
-            children,
+            uid, role: 'group', name: '', children,
             backendNodeId: cdpNode.backendDOMNodeId || 0,
           }
           idToNode.set(uid, node)
@@ -172,151 +142,89 @@ export async function createAccessibilitySnapshot(
         }
         return null
       }
-
-      const role = cdpNode.role?.value || 'generic'
-      const name = cdpNode.name?.value || ''
-
-      // Skip empty text nodes and generic containers in non-verbose mode
-      if (!verbose) {
-        const isInteractive = INTERACTIVE_ROLES.has(role)
-        const isStructural = STRUCTURAL_ROLES.has(role)
-        const hasName = name.trim().length > 0
-
-        // Skip nodes that aren't interactive, structural, or named
-        if (!isInteractive && !isStructural && !hasName && role === 'generic') {
-          // Still process children
-          const children: AccessibilityNode[] = []
-          if (cdpNode.childIds) {
-            for (const childId of cdpNode.childIds) {
-              const childCDPNode = cdpNodeMap.get(childId)
-              if (childCDPNode) {
-                const childNode = convertNode(childCDPNode)
-                if (childNode) {
-                  children.push(childNode)
-                }
-              }
-            }
-          }
-          if (children.length === 1) return children[0]
-          if (children.length > 1) {
-            const uid = `${snapshotId}_${nodeIndex++}`
-            const node: AccessibilityNode = {
-              uid,
-              role: 'group',
-              name: '',
-              children,
-              backendNodeId: cdpNode.backendDOMNodeId || 0,
-            }
-            idToNode.set(uid, node)
-            return node
-          }
-          return null
-        }
-      }
-
-      // Create the node
-      const uid = `${snapshotId}_${nodeIndex++}`
-      const node: AccessibilityNode = {
-        uid,
-        role,
-        name,
-        backendNodeId: cdpNode.backendDOMNodeId || 0,
-        children: [],
-      }
-
-      // Extract value
-      if (cdpNode.value?.value !== undefined) {
-        node.value = String(cdpNode.value.value)
-      }
-
-      // Extract description
-      if (cdpNode.description?.value) {
-        node.description = cdpNode.description.value
-      }
-
-      // Extract properties
-      if (cdpNode.properties) {
-        for (const prop of cdpNode.properties) {
-          switch (prop.name) {
-            case 'focused':
-              node.focused = prop.value.value === true
-              break
-            case 'checked':
-              node.checked = prop.value.value === true || prop.value.value === 'true'
-              break
-            case 'disabled':
-              node.disabled = prop.value.value === true
-              break
-            case 'expanded':
-              node.expanded = prop.value.value === true
-              break
-            case 'selected':
-              node.selected = prop.value.value === true
-              break
-            case 'required':
-              node.required = prop.value.value === true
-              break
-            case 'level':
-              node.level = Number(prop.value.value)
-              break
-          }
-        }
-      }
-
-      // Process children
-      if (cdpNode.childIds) {
-        for (const childId of cdpNode.childIds) {
-          const childCDPNode = cdpNodeMap.get(childId)
-          if (childCDPNode) {
-            const childNode = convertNode(childCDPNode)
-            if (childNode) {
-              node.children.push(childNode)
-            }
-          }
-        }
-      }
-
-      // Register in lookup table
-      idToNode.set(uid, node)
-
-      return node
     }
 
-    // Convert the tree
-    const root = convertNode(rootCDPNode) || {
-      uid: `${snapshotId}_0`,
-      role: 'document',
-      name: 'Empty page',
+    const uid = `${snapshotId}_${nodeIndex++}`
+    const node: AccessibilityNode = {
+      uid, role, name,
+      backendNodeId: cdpNode.backendDOMNodeId || 0,
       children: [],
-      backendNodeId: 0,
     }
 
-    // Get page info
-    const url = webContents.getURL()
-    const title = webContents.getTitle()
+    if (cdpNode.value?.value !== undefined) {
+      node.value = String(cdpNode.value.value)
+    }
+    if (cdpNode.description?.value) {
+      node.description = cdpNode.description.value
+    }
 
-    // Create snapshot object
-    const snapshot: AccessibilitySnapshot = {
-      root,
-      snapshotId,
-      timestamp: Date.now(),
-      url,
-      title,
-      idToNode,
-      format: function(verbose?: boolean): string {
-        return formatSnapshot(this, verbose)
+    if (cdpNode.properties) {
+      for (const prop of cdpNode.properties) {
+        switch (prop.name) {
+          case 'focused':
+            node.focused = prop.value.value === true
+            break
+          case 'checked':
+            node.checked = prop.value.value === true || prop.value.value === 'true'
+            break
+          case 'disabled':
+            node.disabled = prop.value.value === true
+            break
+          case 'expanded':
+            node.expanded = prop.value.value === true
+            break
+          case 'selected':
+            node.selected = prop.value.value === true
+            break
+          case 'required':
+            node.required = prop.value.value === true
+            break
+          case 'level':
+            node.level = Number(prop.value.value)
+            break
+        }
       }
     }
 
-    return snapshot
-  } finally {
-    // Don't detach debugger - keep it attached for subsequent operations
+    if (cdpNode.childIds) {
+      for (const childId of cdpNode.childIds) {
+        const childCDPNode = cdpNodeMap.get(childId)
+        if (childCDPNode) {
+          const childNode = convertNode(childCDPNode)
+          if (childNode) node.children.push(childNode)
+        }
+      }
+    }
+
+    idToNode.set(uid, node)
+    return node
   }
+
+  const root = convertNode(rootCDPNode) || {
+    uid: `${snapshotId}_0`,
+    role: 'document',
+    name: 'Empty page',
+    children: [],
+    backendNodeId: 0,
+  }
+
+  const snapshot: AccessibilitySnapshot = {
+    root,
+    snapshotId,
+    timestamp: Date.now(),
+    url: pageUrl,
+    title: pageTitle,
+    idToNode,
+    format: function(verbose?: boolean): string {
+      return formatSnapshot(this, verbose)
+    }
+  }
+
+  return snapshot
 }
 
 /**
  * Format accessibility snapshot as text for AI consumption
- * Format aligned with chrome-devtools-mcp: uid=X role "name" attributes
  */
 function formatSnapshot(snapshot: AccessibilitySnapshot, verbose: boolean = false): string {
   const lines: string[] = []
@@ -329,22 +237,16 @@ function formatSnapshot(snapshot: AccessibilitySnapshot, verbose: boolean = fals
     const prefix = '  '.repeat(indent)
     const attributes: string[] = []
 
-    // Format: uid=X role "name" [attributes]
-    // Aligned with chrome-devtools-mcp snapshotFormatter.ts
     attributes.push(`uid=${node.uid}`)
 
-    // Role (use 'ignored' for 'none' role to match DevTools)
     if (node.role) {
       attributes.push(node.role === 'none' ? 'ignored' : node.role)
     }
 
-    // Name in quotes
     if (node.name) {
       attributes.push(`"${node.name}"`)
     }
 
-    // Boolean properties with their semantic meanings
-    // Map matches chrome-devtools-mcp: disabled->disableable, expanded->expandable, etc.
     if (node.disabled !== undefined) {
       attributes.push('disableable')
       if (node.disabled) attributes.push('disabled')
@@ -362,11 +264,9 @@ function formatSnapshot(snapshot: AccessibilitySnapshot, verbose: boolean = fals
       if (node.selected) attributes.push('selected')
     }
 
-    // Other boolean states
     if (node.checked) attributes.push('checked')
     if (node.required) attributes.push('required')
 
-    // String/number attributes
     if (node.value !== undefined) {
       attributes.push(`value="${node.value}"`)
     }
@@ -379,14 +279,12 @@ function formatSnapshot(snapshot: AccessibilitySnapshot, verbose: boolean = fals
 
     lines.push(prefix + attributes.join(' '))
 
-    // Process children
     for (const child of node.children) {
       formatNode(child, indent + 1)
     }
   }
 
   formatNode(snapshot.root)
-
   return lines.join('\n')
 }
 
@@ -394,39 +292,24 @@ function formatSnapshot(snapshot: AccessibilitySnapshot, verbose: boolean = fals
  * Get element bounding box by backend node ID
  */
 export async function getElementBoundingBox(
-  webContents: WebContents,
+  cdpClient: CDPClient,
   backendNodeId: number
 ): Promise<{ x: number; y: number; width: number; height: number } | null> {
   try {
-    // Ensure debugger is attached
-    try {
-      webContents.debugger.attach('1.3')
-    } catch (e) {
-      // Already attached
-    }
+    const response = await cdpClient.sendCommand<{ model?: { content: number[] } }>(
+      'DOM.getBoxModel',
+      { backendNodeId }
+    )
 
-    // Get the box model for the element
-    const response = await webContents.debugger.sendCommand('DOM.getBoxModel', {
-      backendNodeId
-    }) as { model?: { content: number[] } }
+    if (!response?.model?.content) return null
 
-    if (!response?.model?.content) {
-      return null
-    }
-
-    // content is [x1, y1, x2, y2, x3, y3, x4, y4] - quad points
     const content = response.model.content
     const x = Math.min(content[0], content[2], content[4], content[6])
     const y = Math.min(content[1], content[3], content[5], content[7])
     const maxX = Math.max(content[0], content[2], content[4], content[6])
     const maxY = Math.max(content[1], content[3], content[5], content[7])
 
-    return {
-      x,
-      y,
-      width: maxX - x,
-      height: maxY - y
-    }
+    return { x, y, width: maxX - x, height: maxY - y }
   } catch (error) {
     console.error('[Snapshot] Failed to get bounding box:', error)
     return null
@@ -437,25 +320,16 @@ export async function getElementBoundingBox(
  * Scroll element into view
  */
 export async function scrollIntoView(
-  webContents: WebContents,
+  cdpClient: CDPClient,
   backendNodeId: number
 ): Promise<void> {
   try {
-    // Ensure debugger is attached
-    try {
-      webContents.debugger.attach('1.3')
-    } catch (e) {
-      // Already attached
-    }
-
-    // Resolve to a RemoteObjectId for scrolling
-    const resolveResponse = await webContents.debugger.sendCommand('DOM.resolveNode', {
-      backendNodeId
-    }) as { object?: { objectId?: string } }
+    const resolveResponse = await cdpClient.sendCommand<{
+      object?: { objectId?: string }
+    }>('DOM.resolveNode', { backendNodeId })
 
     if (resolveResponse?.object?.objectId) {
-      // Scroll into view using Runtime.callFunctionOn
-      await webContents.debugger.sendCommand('Runtime.callFunctionOn', {
+      await cdpClient.sendCommand('Runtime.callFunctionOn', {
         objectId: resolveResponse.object.objectId,
         functionDeclaration: `function() {
           this.scrollIntoView({ behavior: 'instant', block: 'center', inline: 'center' });
@@ -472,20 +346,11 @@ export async function scrollIntoView(
  * Focus an element by backend node ID
  */
 export async function focusElement(
-  webContents: WebContents,
+  cdpClient: CDPClient,
   backendNodeId: number
 ): Promise<void> {
   try {
-    // Ensure debugger is attached
-    try {
-      webContents.debugger.attach('1.3')
-    } catch (e) {
-      // Already attached
-    }
-
-    await webContents.debugger.sendCommand('DOM.focus', {
-      backendNodeId
-    })
+    await cdpClient.sendCommand('DOM.focus', { backendNodeId })
   } catch (error) {
     console.error('[Snapshot] Failed to focus element:', error)
   }

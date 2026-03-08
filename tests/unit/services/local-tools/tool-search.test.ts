@@ -28,4 +28,18 @@ describe('local tool search', () => {
     expect(results[0]?.name).toBe('mcp__local-tools__memory')
     expect(results[0]?.score).toBeGreaterThan(0)
   })
+
+  it('surfaces macOS automation tools for system browser workflows', () => {
+    const catalog = buildToolCatalog({ aiBrowserEnabled: false, includeSkillMcp: false })
+    const results = searchToolsByBm25({
+      catalog,
+      query: 'open real chrome and automate macos ui with applescript',
+      limit: 4
+    })
+
+    expect(results.map((item) => item.name)).toEqual(expect.arrayContaining([
+      'mcp__local-tools__open_application',
+      'mcp__local-tools__run_applescript'
+    ]))
+  })
 })

@@ -329,9 +329,12 @@ async function sendMessageInternal(
 
     // Session config for rebuild detection
     const ci = config.customInstructions
+    const browserAutomationMode = config.browserAutomation?.mode === 'system-browser' ? 'system-browser' : 'ai-browser'
+    const effectiveAiBrowserEnabled = !!aiBrowserEnabled && browserAutomationMode !== 'system-browser'
     const sessionConfig: SessionConfig = {
-      aiBrowserEnabled: !!aiBrowserEnabled,
+      aiBrowserEnabled: effectiveAiBrowserEnabled,
       hasSkills: skillsAvailable,
+      browserAutomationMode,
       customInstructionsHash: ci?.enabled && ci?.content ? ci.content : undefined
     }
 
