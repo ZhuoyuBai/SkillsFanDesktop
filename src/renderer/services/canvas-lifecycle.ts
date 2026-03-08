@@ -69,6 +69,7 @@ export interface TabState {
   scrollPosition?: number
   browserViewId?: string
   browserState?: BrowserState
+  lastModified?: number
 }
 
 // Callback types
@@ -191,6 +192,10 @@ class CanvasLifecycle {
 
   // IPC listener cleanup
   private browserStateUnsubscribe: (() => void) | null = null
+  private fileChangeUnsubscribe: (() => void) | null = null
+
+  // Track watched file paths
+  private watchedFiles: Set<string> = new Set()
 
   // Callback subscriptions
   private tabsChangeCallbacks: Set<TabsChangeCallback> = new Set()
@@ -255,6 +260,12 @@ class CanvasLifecycle {
       }
     })
 
+    // Listen for file changes from main process (for live content reload)
+    this.fileChangeUnsubscribe = api.onArtifactFileChanged((data: unknown) => {
+      const { filePath } = data as { filePath: string }
+      this.handleFileChanged(filePath)
+    })
+
     console.log('[CanvasLifecycle] Initialized successfully')
   }
 
@@ -268,6 +279,17 @@ class CanvasLifecycle {
       this.browserStateUnsubscribe()
       this.browserStateUnsubscribe = null
     }
+
+    if (this.fileChangeUnsubscribe) {
+      this.fileChangeUnsubscribe()
+      this.fileChangeUnsubscribe = null
+    }
+
+    // Unwatch all files
+    for (const filePath of this.watchedFiles) {
+      api.unwatchArtifactFile(filePath)
+    }
+    this.watchedFiles.clear()
 
     // Destroy all browser views
     this.closeAll()
@@ -329,6 +351,9 @@ class CanvasLifecycle {
     // Load content (async)
     this.loadFileContent(tabId, path, type)
 
+    // Start watching the file for changes
+    this.startWatchingFile(path)
+
     return tabId
   }
 
@@ -363,6 +388,9 @@ class CanvasLifecycle {
 
     // Switch to new tab (this will create the BrowserView)
     await this.switchTab(tabId)
+
+    // Start watching the file for changes
+    this.startWatchingFile(path)
 
     return tabId
   }
@@ -405,6 +433,51 @@ class CanvasLifecycle {
     }
 
     this.notifyTabsChange()
+  }
+
+  /**
+   * Start watching a file for changes
+   */
+  private startWatchingFile(filePath: string): void {
+    if (this.watchedFiles.has(filePath)) return
+    this.watchedFiles.add(filePath)
+    api.watchArtifactFile(filePath)
+  }
+
+  /**
+   * Stop watching a file if no other tab uses it
+   */
+  private stopWatchingFileIfUnused(filePath: string, excludeTabId: string): void {
+    // Check if any other tab references the same file
+    for (const [tabId, tab] of this.tabs) {
+      if (tabId !== excludeTabId && tab.path === filePath) {
+        return // Another tab still uses this file
+      }
+    }
+    // No other tab uses it, stop watching
+    if (this.watchedFiles.has(filePath)) {
+      this.watchedFiles.delete(filePath)
+      api.unwatchArtifactFile(filePath)
+    }
+  }
+
+  /**
+   * Handle file change notification from main process
+   * Reloads content for all tabs that have the changed file open
+   */
+  private async handleFileChanged(filePath: string): Promise<void> {
+    for (const [tabId, tab] of this.tabs) {
+      if (tab.path === filePath) {
+        if (tab.type === 'image') {
+          // For images, update lastModified to bust cache
+          tab.lastModified = Date.now()
+          this.notifyTabsChange()
+        } else {
+          // For text-based files, reload content
+          await this.loadFileContent(tabId, filePath, tab.type)
+        }
+      }
+    }
   }
 
   /**
@@ -542,6 +615,11 @@ class CanvasLifecycle {
 
     console.log(`[CanvasLifecycle] Closing tab: ${tabId}`)
 
+    // Stop watching the file if no other tab uses it
+    if (tab.path) {
+      this.stopWatchingFileIfUnused(tab.path, tabId)
+    }
+
     // Destroy BrowserView if this is a browser/pdf tab
     const hasBrowserView = (tab.type === 'browser' || tab.type === 'pdf') && tab.browserViewId
     if (hasBrowserView) {
@@ -571,6 +649,12 @@ class CanvasLifecycle {
    */
   async closeAll(): Promise<void> {
     console.log('[CanvasLifecycle] Closing all tabs')
+
+    // Unwatch all files
+    for (const filePath of this.watchedFiles) {
+      api.unwatchArtifactFile(filePath)
+    }
+    this.watchedFiles.clear()
 
     // Destroy all browser views (browser and pdf types)
     for (const [, tab] of this.tabs) {

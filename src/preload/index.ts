@@ -171,6 +171,9 @@ export interface SkillsFanAPI {
   openArtifact: (filePath: string) => Promise<IpcResponse>
   showArtifactInFolder: (filePath: string) => Promise<IpcResponse>
   readArtifactContent: (filePath: string) => Promise<IpcResponse>
+  watchArtifactFile: (filePath: string) => Promise<IpcResponse>
+  unwatchArtifactFile: (filePath: string) => Promise<IpcResponse>
+  onArtifactFileChanged: (callback: (data: { filePath: string }) => void) => () => void
 
   // Skill
   listSkills: () => Promise<IpcResponse>
@@ -563,6 +566,9 @@ const api: SkillsFanAPI = {
   openArtifact: (filePath) => ipcRenderer.invoke('artifact:open', filePath),
   showArtifactInFolder: (filePath) => ipcRenderer.invoke('artifact:show-in-folder', filePath),
   readArtifactContent: (filePath) => ipcRenderer.invoke('artifact:read-content', filePath),
+  watchArtifactFile: (filePath) => ipcRenderer.invoke('artifact:watch-file', filePath),
+  unwatchArtifactFile: (filePath) => ipcRenderer.invoke('artifact:unwatch-file', filePath),
+  onArtifactFileChanged: (callback) => createEventListener('artifact:file-changed', callback as (data: unknown) => void),
 
   // Skill
   listSkills: () => ipcRenderer.invoke('skill:list'),

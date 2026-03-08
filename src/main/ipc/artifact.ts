@@ -2,11 +2,15 @@
  * Artifact IPC Handlers - Handle artifact-related requests from renderer
  */
 
-import { shell } from 'electron'
-import { listArtifacts, listArtifactsTree, readArtifactContent } from '../services/artifact.service'
+import { shell, BrowserWindow } from 'electron'
+import { listArtifacts, listArtifactsTree, readArtifactContent, watchFile, unwatchFile, setFileWatcherWindow } from '../services/artifact.service'
 import { ipcHandle } from './utils'
 
-export function registerArtifactHandlers(): void {
+export function registerArtifactHandlers(mainWindow: BrowserWindow | null): void {
+  if (mainWindow) {
+    setFileWatcherWindow(mainWindow)
+  }
+
   ipcHandle('artifact:list', (_e, spaceId: string) => listArtifacts(spaceId))
 
   ipcHandle('artifact:list-tree', (_e, spaceId: string) => listArtifactsTree(spaceId))
@@ -21,4 +25,8 @@ export function registerArtifactHandlers(): void {
   })
 
   ipcHandle('artifact:read-content', (_e, filePath: string) => readArtifactContent(filePath))
+
+  ipcHandle('artifact:watch-file', (_e, filePath: string) => watchFile(filePath))
+
+  ipcHandle('artifact:unwatch-file', (_e, filePath: string) => unwatchFile(filePath))
 }

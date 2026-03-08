@@ -32,10 +32,12 @@ export function ImageViewer({ tab }: ImageViewerProps) {
 
   // Get image URL
   // Priority: halo-file:// (custom protocol, fast) > remote download > base64 fallback
+  // Append lastModified timestamp to bust browser cache when file changes
+  const cacheBuster = tab.lastModified ? `?t=${tab.lastModified}` : ''
   const imageUrl = tab.path
     ? (api.isRemoteMode()
         ? api.getArtifactDownloadUrl(tab.path)
-        : `halo-file://${tab.path}`)
+        : `halo-file://${tab.path}${cacheBuster}`)
     : tab.content
       ? `data:${tab.mimeType || 'image/png'};base64,${tab.content}`
       : ''
@@ -47,6 +49,14 @@ export function ImageViewer({ tab }: ImageViewerProps) {
     setImageLoaded(false)
     setImageError(false)
   }, [tab.id])
+
+  // Reset image load state when file content changes (live reload)
+  useEffect(() => {
+    if (tab.lastModified) {
+      setImageLoaded(false)
+      setImageError(false)
+    }
+  }, [tab.lastModified])
 
   // Zoom functions
   const zoomIn = () => setScale(s => Math.min(s * 1.25, 5))

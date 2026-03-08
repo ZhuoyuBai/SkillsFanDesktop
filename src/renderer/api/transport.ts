@@ -231,6 +231,7 @@ export function onEvent(channel: string, callback: (data: unknown) => void): () 
       'browser:zoom-changed': 'onBrowserZoomChanged',
       'canvas:tab-action': 'onCanvasTabAction',
       'ai-browser:active-view-changed': 'onAIBrowserActiveViewChanged',
+      'artifact:file-changed': 'onArtifactFileChanged',
       'perf:snapshot': 'onPerfSnapshot',
       'perf:warning': 'onPerfWarning',
       'updater:status': 'onUpdaterStatus',

@@ -73,7 +73,7 @@ export function initializeEssentialServices(mainWindow: BrowserWindow): void {
   registerAgentHandlers(mainWindow)
 
   // Artifact: File list is displayed in the right sidebar
-  registerArtifactHandlers()
+  registerArtifactHandlers(mainWindow)
 
   // System: Window controls (maximize, minimize, tray) are basic functionality
   registerSystemHandlers(mainWindow)

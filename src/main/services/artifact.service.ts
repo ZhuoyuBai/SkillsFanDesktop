@@ -3,8 +3,9 @@
  * Provides real-time artifact discovery and file information
  */
 
-import { readdirSync, statSync, existsSync, readFileSync } from 'fs'
+import { readdirSync, statSync, existsSync, readFileSync, watch, type FSWatcher } from 'fs'
 import { join, extname, basename } from 'path'
+import type { BrowserWindow } from 'electron'
 import { getTempSpacePath } from './config.service'
 import { getSpace } from './space.service'
 
@@ -233,14 +234,94 @@ export function getArtifact(artifactId: string): Artifact | null {
   return null
 }
 
-// Watch for file changes (future feature)
-export function watchArtifacts(
-  spaceId: string,
-  callback: (artifacts: Artifact[]) => void
-): () => void {
-  // TODO: Implement file watching with chokidar or similar
-  // For now, return a no-op cleanup function
-  return () => {}
+// ============================================
+// File Watching for Content Canvas
+// ============================================
+
+const fileWatchers = new Map<string, FSWatcher>()
+const fileWatchDebounceTimers = new Map<string, ReturnType<typeof setTimeout>>()
+let watcherWindow: BrowserWindow | null = null
+
+/**
+ * Set the BrowserWindow reference for sending file change events
+ */
+export function setFileWatcherWindow(window: BrowserWindow): void {
+  watcherWindow = window
+}
+
+/**
+ * Watch a single file for changes and notify renderer via IPC
+ */
+export function watchFile(filePath: string): void {
+  // Already watching this file
+  if (fileWatchers.has(filePath)) return
+
+  if (!existsSync(filePath)) {
+    console.warn(`[Artifact] Cannot watch non-existent file: ${filePath}`)
+    return
+  }
+
+  try {
+    const watcher = watch(filePath, (eventType) => {
+      // Debounce: 300ms to avoid multiple rapid notifications
+      const existing = fileWatchDebounceTimers.get(filePath)
+      if (existing) clearTimeout(existing)
+
+      fileWatchDebounceTimers.set(filePath, setTimeout(() => {
+        fileWatchDebounceTimers.delete(filePath)
+
+        // After rename, the file may have a new inode - check it still exists
+        if (!existsSync(filePath)) return
+
+        if (watcherWindow && !watcherWindow.isDestroyed()) {
+          watcherWindow.webContents.send('artifact:file-changed', { filePath })
+        }
+
+        // After rename event, re-establish watcher (inode may have changed)
+        if (eventType === 'rename') {
+          unwatchFile(filePath)
+          watchFile(filePath)
+        }
+      }, 300))
+    })
+
+    watcher.on('error', (err) => {
+      console.error(`[Artifact] File watcher error for ${filePath}:`, err)
+      unwatchFile(filePath)
+    })
+
+    fileWatchers.set(filePath, watcher)
+    console.log(`[Artifact] Watching file: ${filePath}`)
+  } catch (err) {
+    console.error(`[Artifact] Failed to watch file ${filePath}:`, err)
+  }
+}
+
+/**
+ * Stop watching a single file
+ */
+export function unwatchFile(filePath: string): void {
+  const watcher = fileWatchers.get(filePath)
+  if (watcher) {
+    watcher.close()
+    fileWatchers.delete(filePath)
+    const timer = fileWatchDebounceTimers.get(filePath)
+    if (timer) {
+      clearTimeout(timer)
+      fileWatchDebounceTimers.delete(filePath)
+    }
+    console.log(`[Artifact] Unwatched file: ${filePath}`)
+  }
+}
+
+/**
+ * Stop watching all files
+ */
+export function unwatchAllFiles(): void {
+  const paths = Array.from(fileWatchers.keys())
+  for (const filePath of paths) {
+    unwatchFile(filePath)
+  }
 }
 
 // Recursively scan directory and return tree structure

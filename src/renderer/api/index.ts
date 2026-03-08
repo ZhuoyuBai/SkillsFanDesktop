@@ -591,6 +591,26 @@ export const api = {
     return httpRequest('GET', `/api/artifacts/content?path=${encodeURIComponent(filePath)}`)
   },
 
+  // Watch artifact file for changes (Content Canvas live reload)
+  watchArtifactFile: async (filePath: string): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.skillsfan.watchArtifactFile(filePath)
+    }
+    // Remote mode: no file watching support
+    return { success: false, error: 'File watching not supported in remote mode' }
+  },
+
+  unwatchArtifactFile: async (filePath: string): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.skillsfan.unwatchArtifactFile(filePath)
+    }
+    return { success: false, error: 'File watching not supported in remote mode' }
+  },
+
+  onArtifactFileChanged: (callback: (data: unknown) => void): (() => void) => {
+    return onEvent('artifact:file-changed', callback)
+  },
+
   // ===== Skill =====
   listSkills: async (): Promise<ApiResponse> => {
     if (isElectron()) {
