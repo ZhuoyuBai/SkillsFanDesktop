@@ -312,7 +312,8 @@ export function SkillsFanAccountSection() {
           <button
             onClick={handleLogin}
             disabled={isLoggingIn}
-            className="flex items-center justify-center gap-2 w-full px-4 py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50"
+            className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-lg transition-colors disabled:opacity-50"
+            style={{ backgroundColor: '#E07B2F', color: '#fff' }}
           >
             {isLoggingIn ? (
               <>

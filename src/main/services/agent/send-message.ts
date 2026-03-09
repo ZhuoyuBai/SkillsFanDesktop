@@ -264,7 +264,8 @@ async function sendMessageInternal(
     addMessage(spaceId, conversationId, {
       role: 'user',
       content: message,
-      images: images  // Include images in the saved message
+      images: images,  // Include legacy images in the saved message
+      attachments: attachments  // Persist all attachments for renderer restore
     })
 
     // Add placeholder for assistant response

@@ -12,6 +12,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, rmSync
 import { atomicWriteJsonSync } from '../utils/atomic-write'
 import { getTempSpacePath } from './config.service'
 import { getSpace, getSpaceMetaDir } from './space.service'
+import type { Attachment } from './agent/types'
 import {
   removePersistedFeishuSessionsByConversation,
   removePersistedFeishuSessionsBySpace
@@ -62,6 +63,7 @@ interface Message {
   toolCalls?: ToolCall[]
   thoughts?: Thought[]  // Agent reasoning process for this message
   images?: ImageAttachment[]  // Attached images for multi-modal messages
+  attachments?: Attachment[]  // All persisted attachments for user messages
   tokenUsage?: TokenUsage  // Optional token usage stats for assistant messages
 }
 

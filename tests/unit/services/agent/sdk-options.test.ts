@@ -183,7 +183,8 @@ describe('sdk-options', () => {
       expect(sdkOptions.extraArgs).toBeUndefined()
       expect(sdkOptions.env.ANTHROPIC_API_KEY).toBe('encoded-key')
       expect(sdkOptions.env.ANTHROPIC_BASE_URL).toBe('http://router.local')
-      expect(sdkOptions.systemPrompt.append).toBe('[BASE_PROMPT]')
+      expect(sdkOptions.systemPrompt.append).toContain('[BASE_PROMPT]')
+      expect(sdkOptions.systemPrompt.append).toContain('Do not delegate that work to a `Task` sub-agent.')
       expect(sdkOptions.allowedTools).toEqual([
         'Read', 'Write', 'Edit', 'Grep', 'Glob',
         'Bash',

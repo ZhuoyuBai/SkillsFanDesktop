@@ -1,4 +1,4 @@
-export type WebSearchProvider = 'brave' | 'perplexity' | 'kimi'
+export type WebSearchProvider = 'duckduckgo' | 'brave' | 'perplexity' | 'kimi'
 
 export interface PerplexitySearchConfig {
   apiKey?: string

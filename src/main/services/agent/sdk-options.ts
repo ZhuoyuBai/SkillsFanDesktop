@@ -39,6 +39,16 @@ When browser automation is needed in this conversation, prefer the AI Browser to
 Avoid opening a separate system browser unless the user explicitly asks for it or AI Browser tools are unavailable.
 `
 
+const WEB_RESEARCH_POLICY_PROMPT = `
+
+## Web Research Policy
+
+When the user asks for fresh online information, source links, citations, or page fetching:
+1. Do not delegate that work to a \`Task\` sub-agent.
+2. Perform the web research directly in the primary agent.
+3. Use \`mcp__web-tools__WebSearch\` and \`mcp__web-tools__WebFetch\` directly so SkillsFan can manage permissions and results correctly.
+`
+
 const DISALLOWED_SERVER_SIDE_TOOLS = [
   'WebSearch',
   'WebFetch',
@@ -240,6 +250,7 @@ export async function buildSdkOptions(params: BuildSdkOptionsParams): Promise<{
       type: 'preset' as const,
       preset: 'claude_code' as const,
       append: buildSystemPromptAppend(workDir, credentialsModel, config.memory?.enabled)
+        + WEB_RESEARCH_POLICY_PROMPT
         + (effectiveAiBrowserEnabled ? AI_BROWSER_SYSTEM_PROMPT + AI_BROWSER_PREFERENCE_PROMPT : '')
         + (browserAutomationMode === 'system-browser' ? SYSTEM_BROWSER_AUTOMATION_PROMPT : '')
         + ralphSystemPromptAppend

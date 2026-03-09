@@ -26,7 +26,7 @@ import { getToolIcon } from '../icons/ToolIcons'
 import { BrowserTaskCard, isBrowserTool } from '../tool/BrowserTaskCard'
 import { MarkdownRenderer } from './MarkdownRenderer'
 import { FileChangesFooter } from '../diff'
-import { MessageImages } from './ImageAttachmentPreview'
+import { MessageAttachments } from './AttachmentPreview'
 import { HaloLogo } from '../brand/HaloLogo'
 import type { Message, Thought } from '../../types'
 import { useTranslation } from '../../i18n'
@@ -192,6 +192,11 @@ export function MessageItem({ message, hideThoughts = false, isInContainer = fal
   const isStreaming = (message as any).isStreaming
   const [copied, setCopied] = useState(false)
   const { t } = useTranslation()
+  const userAttachments = useMemo(() => {
+    if (!isUser) return []
+    if (message.attachments && message.attachments.length > 0) return message.attachments
+    return message.images || []
+  }, [isUser, message.attachments, message.images])
 
   // Handle copying message content to clipboard
   const handleCopyMessage = useCallback(async () => {
@@ -301,9 +306,9 @@ export function MessageItem({ message, hideThoughts = false, isInContainer = fal
         </div>
       )}
 
-      {/* User message images (displayed before text) */}
-      {isUser && message.images && message.images.length > 0 && (
-        <MessageImages images={message.images} />
+      {/* User message attachments (displayed before text) */}
+      {isUser && userAttachments.length > 0 && (
+        <MessageAttachments attachments={userAttachments} />
       )}
 
       {/* Message content with streaming cursor */}

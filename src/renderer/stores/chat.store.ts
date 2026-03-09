@@ -75,6 +75,8 @@ interface SessionState {
   lastSegmentIndex: number  // End position of last saved segment
   // Pending user question (AskUserQuestion tool)
   pendingUserQuestion: UserQuestionInfo | null
+  // Draft input content (preserved across page navigation)
+  draftContent: string
 }
 
 // Create empty session state
@@ -93,7 +95,8 @@ function createEmptySessionState(): SessionState {
     taskStatusHistory: new Map(),
     textSegments: [],
     lastSegmentIndex: 0,
-    pendingUserQuestion: null
+    pendingUserQuestion: null,
+    draftContent: ''
   }
 }
 
@@ -169,6 +172,9 @@ interface ChatState {
   // Tool approval
   approveTool: (conversationId: string) => Promise<void>
   rejectTool: (conversationId: string) => Promise<void>
+
+  // Draft input content
+  setDraftContent: (conversationId: string, content: string) => void
 
   // Task execution panel UI state
   toggleTodoCollapsed: (conversationId: string) => void
@@ -1017,6 +1023,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   // Toggle todo card collapsed state
+  setDraftContent: (conversationId: string, content: string) => {
+    set((state) => {
+      const newSessions = new Map(state.sessions)
+      const session = newSessions.get(conversationId) || createEmptySessionState()
+      newSessions.set(conversationId, {
+        ...session,
+        draftContent: content
+      })
+      return { sessions: newSessions }
+    })
+  },
+
   toggleTodoCollapsed: (conversationId: string) => {
     set((state) => {
       const newSessions = new Map(state.sessions)

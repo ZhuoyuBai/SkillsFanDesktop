@@ -306,6 +306,20 @@ describe('permission-handler', () => {
     })
   })
 
+  it('denies delegating web research to a Task sub-agent', async () => {
+    const canUseTool = createCanUseTool('/tmp/workspace', 'space-1', 'conv-1')
+
+    const result = await canUseTool('Task', {
+      description: '搜索飞机乘客数据',
+      prompt: '联网搜索并汇总可用于中文社交帖子中的可靠数据，并附来源链接'
+    }, { signal: new AbortController().signal })
+
+    expect(result).toEqual({
+      behavior: 'deny',
+      message: 'Web research must run in the primary agent. Use mcp__web-tools__WebSearch/WebFetch directly instead of delegating it to a Task sub-agent.'
+    })
+  })
+
   it('denies AI Browser tools when system browser mode is enabled', async () => {
     mocks.getConfig.mockReturnValue({
       permissions: {

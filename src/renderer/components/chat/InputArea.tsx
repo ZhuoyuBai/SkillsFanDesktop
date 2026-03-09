@@ -25,6 +25,7 @@ import { useAppStore } from '../../stores/app.store'
 import { useSpaceStore } from '../../stores/space.store'
 import { useOnboardingStore } from '../../stores/onboarding.store'
 import { useAIBrowserStore } from '../../stores/ai-browser.store'
+import { useChatStore } from '../../stores/chat.store'
 import { getOnboardingPrompt } from '../onboarding/onboardingData'
 import { AttachmentPreview } from './AttachmentPreview'
 import { FilePopover } from './FilePopover'
@@ -180,7 +181,17 @@ interface AttachmentError {
 
 export function InputArea({ onSend, onStop, onInject, isGenerating, isCompact = false, noBorder = false, suggestedContent, showTypewriterAnimation = true }: InputAreaProps) {
   const { t } = useTranslation()
-  const [content, setContent] = useState('')
+  const { conversationId, initialDraft, setDraftContent } = useChatStore(s => {
+    const id = s.getCurrentConversationId()
+    const session = id ? s.getSession(id) : null
+    return {
+      conversationId: id,
+      initialDraft: session?.draftContent ?? '',
+      setDraftContent: s.setDraftContent
+    }
+  })
+  const [content, setContent] = useState(initialDraft)
+  const contentRef = useRef(content)
   const [isFocused, setIsFocused] = useState(false)
   const [isHovered, setIsHovered] = useState(false)
   const [attachments, setAttachments] = useState<Attachment[]>([])
@@ -188,6 +199,20 @@ export function InputArea({ onSend, onStop, onInject, isGenerating, isCompact = 
   const [isProcessingFiles, setIsProcessingFiles] = useState(false)
   const [fileError, setFileError] = useState<AttachmentError | null>(null)
   const [infoToast, setInfoToast] = useState<string | null>(null)  // Info toast message
+
+  // Keep contentRef in sync for unmount cleanup
+  useEffect(() => {
+    contentRef.current = content
+  }, [content])
+
+  // Save draft content to store on unmount
+  useEffect(() => {
+    return () => {
+      if (conversationId) {
+        setDraftContent(conversationId, contentRef.current)
+      }
+    }
+  }, [conversationId, setDraftContent])
 
   // AI Browser state
   const { enabled: aiBrowserEnabled, setEnabled: setAIBrowserEnabled } = useAIBrowserStore()

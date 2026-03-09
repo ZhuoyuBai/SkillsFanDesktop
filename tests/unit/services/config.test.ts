@@ -77,7 +77,7 @@ describe('Config Service', () => {
       expect(config.api.apiUrl).toBe('https://api.anthropic.com')
       expect(config.permissions.commandExecution).toBe('ask')
       expect(config.appearance.theme).toBe('light')
-      expect(config.tools?.web.search.provider).toBe('brave')
+      expect(config.tools?.web.search.provider).toBe('duckduckgo')
       expect(config.tools?.web.fetch.enabled).toBe(true)
       expect(config.isFirstLaunch).toBe(true)
     })

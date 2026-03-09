@@ -16,7 +16,6 @@ import {
   Lightbulb,
   Loader2,
   XCircle,
-  Sparkles,
 } from 'lucide-react'
 import { StreamdownRenderer } from './StreamdownRenderer'
 import { TodoCard, parseTodoInput } from '../tool/TodoCard'
@@ -95,7 +94,7 @@ const ProcessTag = memo(function ProcessTag({
         onClick={() => hasContent && setIsExpanded(!isExpanded)}
         disabled={!hasContent}
         className={`
-          inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs
+          inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs text-left
           border transition-all
           ${tagStyles[type]}
           ${hasContent ? 'cursor-pointer hover:bg-muted/40' : 'cursor-default'}
@@ -177,15 +176,14 @@ const SkillItem = memo(function SkillItem({
 
   return (
     <div className="py-1">
-      {/* Gradient label */}
+      {/* Skill label */}
       <div
         className={`
           inline-flex items-center gap-2 px-3 py-1.5 rounded-full
-          ${isRunning ? 'skill-gradient-animated skill-breathing' : 'skill-gradient'}
-          shadow-[0_0_20px_rgba(139,92,246,0.4)]
+          bg-[#E07B2F] shadow-[0_0_15px_rgba(224,123,47,0.35)]
+          ${isRunning ? 'skill-breathing' : ''}
         `}
       >
-        <Sparkles size={14} className="text-white" />
         <span className="text-xs font-medium text-white">
           {isRunning
             ? t('Running {{skill}}...', { skill: skillName })
@@ -196,7 +194,7 @@ const SkillItem = memo(function SkillItem({
 
       {/* Child tools */}
       {childItems && childItems.length > 0 && (
-        <div className="ml-4 mt-1 border-l-2 border-violet-500/30 pl-3">
+        <div className="ml-4 mt-1 border-l-2 border-orange-500/30 pl-3">
           {childItems.map((child) => (
             <ToolItem
               key={child.id}
@@ -509,10 +507,12 @@ export function LinearStream({
 
   return (
     <div className="rounded-2xl px-4 py-3 message-assistant w-full overflow-y-hidden overflow-x-auto text-left">
-      {/* Pre-step items (tools before first TodoWrite) */}
+      {/* Pre-step items (tools before first TodoWrite), skip skill badges */}
       {todoGrouping.hasTodos && todoGrouping.preStepItems.length > 0 && (() => {
         const counter = { value: 0 }
-        return todoGrouping.preStepItems.map(item => renderTimelineItem(item, counter))
+        return todoGrouping.preStepItems
+          .filter(item => item.type !== 'skill')
+          .map(item => renderTimelineItem(item, counter))
       })()}
 
       {/* TodoCard with grouped tool items */}

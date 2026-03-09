@@ -3,7 +3,7 @@
 // ============================================
 
 import type { ThinkingEffort } from '../../shared/utils/openai-models'
-import type { WebToolsConfig } from '../../shared/types'
+import type { WebSearchProvider, WebToolsConfig } from '../../shared/types'
 
 // API Provider Configuration
 export type ApiProvider = 'anthropic' | 'openai';
@@ -614,7 +614,7 @@ export const DEFAULT_CONFIG: HaloConfig = {
     web: {
       search: {
         enabled: true,
-        provider: 'brave' as WebSearchProvider,
+        provider: 'duckduckgo' as WebSearchProvider,
         apiKey: '',
         maxResults: 5,
         timeoutSeconds: 30,

@@ -39,7 +39,7 @@ export interface NormalizedWebToolsConfig {
   }
 }
 
-export const DEFAULT_WEB_SEARCH_PROVIDER: WebSearchProvider = 'brave'
+export const DEFAULT_WEB_SEARCH_PROVIDER: WebSearchProvider = 'duckduckgo'
 export const DEFAULT_WEB_SEARCH_MAX_RESULTS = 5
 export const DEFAULT_WEB_SEARCH_TIMEOUT_SECONDS = 30
 export const DEFAULT_WEB_SEARCH_CACHE_TTL_MINUTES = 15
@@ -95,7 +95,10 @@ export const DEFAULT_WEB_TOOLS_CONFIG: NormalizedWebToolsConfig = {
 }
 
 export function normalizeWebSearchConfig(config?: WebSearchConfig): NormalizedWebSearchConfig {
-  const provider = config?.provider === 'perplexity' || config?.provider === 'kimi'
+  const provider = config?.provider === 'duckduckgo'
+    || config?.provider === 'brave'
+    || config?.provider === 'perplexity'
+    || config?.provider === 'kimi'
     ? config.provider
     : DEFAULT_WEB_SEARCH_PROVIDER
 

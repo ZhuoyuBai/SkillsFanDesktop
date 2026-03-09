@@ -563,27 +563,8 @@ body {
   }
 }
 
-@keyframes skill-shimmer {
-  0% {
-    background-position: -200% 0;
-  }
-  100% {
-    background-position: 200% 0;
-  }
-}
-
 .skill-breathing {
   animation: skill-breathe 2s ease-in-out infinite;
-}
-
-.skill-gradient {
-  background: linear-gradient(135deg, #8b5cf6, #d946ef, #ec4899);
-}
-
-.skill-gradient-animated {
-  background: linear-gradient(90deg, #8b5cf6, #d946ef, #ec4899, #8b5cf6);
-  background-size: 300% 100%;
-  animation: skill-shimmer 3s ease-in-out infinite;
 }
 
 /* Cursor blink for streaming */

@@ -42,6 +42,43 @@ const BLOCKED_SERVER_SIDE_TOOLS = new Set([
   'memory'
 ])
 
+const WEB_RESEARCH_TASK_HINTS = [
+  'mcp__web-tools__',
+  '联网',
+  '网页',
+  '在线搜索',
+  '上网',
+  '抓取',
+  '检索',
+  '来源链接',
+  '引用',
+  'citation',
+  'citations',
+  'source',
+  'sources',
+  'url',
+  'urls',
+  'web search',
+  'web fetch',
+  'internet',
+  'online research',
+  'online search',
+  'fetch'
+]
+
+function isWebResearchTask(input: Record<string, unknown>): boolean {
+  const fields = [input.description, input.prompt]
+    .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+    .map((value) => value.toLowerCase())
+
+  if (fields.length === 0) return false
+
+  const combined = fields.join('\n')
+  if (/https?:\/\//i.test(combined)) return true
+
+  return WEB_RESEARCH_TASK_HINTS.some((hint) => combined.includes(hint))
+}
+
 function getPathCandidates(input: Record<string, unknown>): string[] {
   const candidates = [
     input.file_path,
@@ -247,6 +284,13 @@ export function createCanUseTool(
 
     // Task (sub-agent) — requires user approval since it spawns child agents and costs tokens
     if (toolName === 'Task') {
+      if (isWebResearchTask(input)) {
+        return {
+          behavior: 'deny' as const,
+          message: 'Web research must run in the primary agent. Use mcp__web-tools__WebSearch/WebFetch directly instead of delegating it to a Task sub-agent.'
+        }
+      }
+
       const currentConfig = getConfig()
       const permission = currentConfig.permissions.commandExecution
 

@@ -4,6 +4,7 @@
  */
 
 import { BrowserWindow } from 'electron'
+import type { Attachment } from '../services/agent/types'
 import {
   sendMessage as agentSendMessage,
   stopGeneration as agentStopGeneration,
@@ -30,6 +31,7 @@ export interface SendMessageRequest {
   message: string
   resumeSessionId?: string
   images?: ImageAttachment[]  // Optional images for multi-modal messages
+  attachments?: Attachment[]  // General file attachments for multi-modal messages
   thinkingEnabled?: boolean   // Enable extended thinking mode
   aiBrowserEnabled?: boolean  // Enable AI Browser tools
 }

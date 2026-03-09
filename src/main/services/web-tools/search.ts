@@ -25,8 +25,15 @@ type CacheEntry = {
 }
 
 const SEARCH_CACHE = new Map<string, CacheEntry>()
+const DUCKDUCKGO_HTML_ENDPOINT = 'https://html.duckduckgo.com/html/'
 const BRAVE_ENDPOINT = 'https://api.search.brave.com/res/v1/web/search'
 const PERPLEXITY_PATH = '/search'
+const DUCKDUCKGO_FRESHNESS_MAP: Record<string, string> = {
+  day: 'd',
+  week: 'w',
+  month: 'm',
+  year: 'y'
+}
 const BRAVE_FRESHNESS_MAP: Record<string, string> = {
   day: 'pd',
   week: 'pw',
@@ -36,6 +43,30 @@ const BRAVE_FRESHNESS_MAP: Record<string, string> = {
 
 function normalizeApiKey(value?: string): string {
   return typeof value === 'string' ? value.trim() : ''
+}
+
+function normalizeWhitespace(value: string): string {
+  return value
+    .replace(/\r/g, '')
+    .replace(/\t/g, ' ')
+    .replace(/[ \u00a0]+/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
+function decodeHtmlEntities(value: string): string {
+  return value
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&#x27;/gi, "'")
+}
+
+function stripHtml(value: string): string {
+  return normalizeWhitespace(decodeHtmlEntities(value.replace(/<[^>]+>/g, ' ')))
 }
 
 function resolveSiteName(url: string): string | undefined {
@@ -100,6 +131,106 @@ function resolveKimiFallbackApiKey(): string {
 function getProviderRuntime() {
   const config = getConfig()
   return normalizeWebToolsConfig(config.tools)
+}
+
+function buildDuckDuckGoQuery(query: string, domainFilter?: string[]): string {
+  if (!domainFilter || domainFilter.length === 0) {
+    return query
+  }
+
+  if (domainFilter.length === 1) {
+    return `${query} site:${domainFilter[0]}`
+  }
+
+  return `${query} (${domainFilter.map((domain) => `site:${domain}`).join(' OR ')})`
+}
+
+function resolveDuckDuckGoHref(rawHref: string): string | undefined {
+  const decodedHref = decodeHtmlEntities(rawHref).trim()
+  if (!decodedHref) return undefined
+
+  try {
+    const url = new URL(decodedHref, 'https://duckduckgo.com')
+    const redirected = url.searchParams.get('uddg')
+    if (redirected) {
+      const resolved = decodeURIComponent(redirected)
+      const target = new URL(resolved)
+      if (target.protocol === 'http:' || target.protocol === 'https:') {
+        return target.toString()
+      }
+      return undefined
+    }
+
+    if (url.protocol === 'http:' || url.protocol === 'https:') {
+      return url.toString()
+    }
+  } catch {
+    return undefined
+  }
+
+  return undefined
+}
+
+async function runDuckDuckGoSearch(args: {
+  query: string
+  count: number
+  country?: string
+  language?: string
+  freshness?: string
+  domainFilter?: string[]
+  timeoutSeconds: number
+}) {
+  const url = new URL(DUCKDUCKGO_HTML_ENDPOINT)
+  url.searchParams.set('q', buildDuckDuckGoQuery(args.query, args.domainFilter))
+
+  if (args.freshness && DUCKDUCKGO_FRESHNESS_MAP[args.freshness]) {
+    url.searchParams.set('df', DUCKDUCKGO_FRESHNESS_MAP[args.freshness])
+  }
+
+  const acceptLanguage = [args.language, args.country]
+    .filter(Boolean)
+    .join(args.country ? '-' : '')
+
+  const response = await fetchWithTimeout(url.toString(), {
+    method: 'GET',
+    headers: {
+      Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      'Accept-Language': acceptLanguage || 'en-US,en;q=0.9',
+      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_7_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+    }
+  }, args.timeoutSeconds)
+
+  if (!response.ok) {
+    throw new Error(`DuckDuckGo HTML search error (${response.status}): ${await readErrorText(response)}`)
+  }
+
+  const html = await response.text()
+  const anchorRegex = /<a[^>]*class="[^"]*result__a[^"]*"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi
+  const matches = Array.from(html.matchAll(anchorRegex))
+  const results: SearchPayload['results'] = []
+  const seen = new Set<string>()
+
+  for (let index = 0; index < matches.length && results.length < args.count; index += 1) {
+    const match = matches[index]
+    const href = resolveDuckDuckGoHref(match[1] || '')
+    if (!href || seen.has(href)) continue
+
+    const nextIndex = matches[index + 1]?.index ?? html.length
+    const segment = html.slice(match.index || 0, nextIndex)
+    const snippetMatch = segment.match(/class="[^"]*result__snippet[^"]*"[^>]*>([\s\S]*?)<\/(?:a|div)>/i)
+    const title = stripHtml(match[2] || '')
+    if (!title) continue
+
+    seen.add(href)
+    results.push({
+      title,
+      url: href,
+      snippet: stripHtml(snippetMatch?.[1] || ''),
+      siteName: resolveSiteName(href)
+    })
+  }
+
+  return results
 }
 
 async function runBraveSearch(args: {
@@ -379,28 +510,32 @@ async function runKimiSearch(args: {
   }
 }
 
-function autoSelectProvider(search: ReturnType<typeof getProviderRuntime>['web']['search']): {
+function resolveSearchProvider(search: ReturnType<typeof getProviderRuntime>['web']['search']): {
   provider: WebSearchProvider
-  apiKey: string
+  apiKey?: string
 } {
-  // Brave
   const braveKey = normalizeApiKey(search.apiKey || process.env.BRAVE_API_KEY)
-  if (braveKey) return { provider: 'brave', apiKey: braveKey }
-
-  // Perplexity
   const perplexityKey = normalizeApiKey(search.perplexity.apiKey || process.env.PERPLEXITY_API_KEY)
-  if (perplexityKey) return { provider: 'perplexity', apiKey: perplexityKey }
-
-  // Kimi (multiple fallback sources)
   const kimiKey = normalizeApiKey(
     search.kimi.apiKey
     || process.env.KIMI_API_KEY
     || process.env.MOONSHOT_API_KEY
     || resolveKimiFallbackApiKey()
   )
-  if (kimiKey) return { provider: 'kimi', apiKey: kimiKey }
 
-  throw new Error('No search API key found. Set BRAVE_API_KEY, PERPLEXITY_API_KEY, or KIMI_API_KEY environment variable.')
+  if (search.provider === 'brave') {
+    return braveKey ? { provider: 'brave', apiKey: braveKey } : { provider: 'duckduckgo' }
+  }
+
+  if (search.provider === 'perplexity') {
+    return perplexityKey ? { provider: 'perplexity', apiKey: perplexityKey } : { provider: 'duckduckgo' }
+  }
+
+  if (search.provider === 'kimi') {
+    return kimiKey ? { provider: 'kimi', apiKey: kimiKey } : { provider: 'duckduckgo' }
+  }
+
+  return { provider: 'duckduckgo' }
 }
 
 export async function executeWebSearch(args: {
@@ -418,7 +553,7 @@ export async function executeWebSearch(args: {
     throw new Error('Web search is disabled in settings.')
   }
 
-  const { provider, apiKey } = autoSelectProvider(search)
+  const { provider, apiKey } = resolveSearchProvider(search)
 
   const count = Math.max(1, Math.min(10, Math.floor(args.count || search.maxResults)))
   const country = args.country?.trim()
@@ -440,6 +575,28 @@ export async function executeWebSearch(args: {
 
   const start = Date.now()
 
+  if (provider === 'duckduckgo') {
+    const results = await runDuckDuckGoSearch({
+      query: args.query,
+      count,
+      country,
+      language,
+      freshness,
+      domainFilter,
+      timeoutSeconds: search.timeoutSeconds
+    })
+
+    const payload: SearchPayload = {
+      query: args.query,
+      provider,
+      count: results.length,
+      tookMs: Date.now() - start,
+      results
+    }
+    writeCachedPayload(cacheKey, search.cacheTtlMinutes, payload)
+    return payload
+  }
+
   if (provider === 'perplexity') {
     const results = await runPerplexitySearch({
       query: args.query,
@@ -449,7 +606,7 @@ export async function executeWebSearch(args: {
       freshness,
       domainFilter,
       timeoutSeconds: search.timeoutSeconds,
-      apiKey,
+      apiKey: apiKey || '',
       baseUrl: search.perplexity.baseUrl
     })
 
@@ -472,7 +629,7 @@ export async function executeWebSearch(args: {
     const result = await runKimiSearch({
       query: args.query,
       timeoutSeconds: search.timeoutSeconds,
-      apiKey,
+      apiKey: apiKey || '',
       baseUrl: search.kimi.baseUrl,
       model: search.kimi.model
     })
@@ -496,7 +653,7 @@ export async function executeWebSearch(args: {
     language,
     freshness,
     timeoutSeconds: search.timeoutSeconds,
-    apiKey
+    apiKey: apiKey || ''
   })
 
   const payload: SearchPayload = {
@@ -511,9 +668,12 @@ export async function executeWebSearch(args: {
 }
 
 export const __testing = {
+  DUCKDUCKGO_FRESHNESS_MAP,
   BRAVE_FRESHNESS_MAP,
   SEARCH_CACHE,
   buildCacheKey,
+  buildDuckDuckGoQuery,
+  resolveDuckDuckGoHref,
   extractKimiCitations,
   extractKimiMessageText,
   buildKimiToolResultContent,

@@ -145,4 +145,108 @@ describe('web-tools/search', () => {
     expect(result.provider).toBe('perplexity')
     expect(result.results?.[0].siteName).toBe('perplexity.ai')
   })
+
+  it('uses the no-key DuckDuckGo HTML provider when configured', async () => {
+    mocks.getConfig.mockReturnValue({
+      tools: {
+        web: {
+          search: {
+            enabled: true,
+            provider: 'duckduckgo',
+            timeoutSeconds: 5,
+            cacheTtlMinutes: 15,
+            maxResults: 5
+          },
+          fetch: {
+            enabled: true
+          }
+        }
+      },
+      aiSources: {}
+    })
+
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(`
+        <html>
+          <body>
+            <a class="result__a" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fexample.com%2Ffirst">First result</a>
+            <div class="result__snippet">First snippet</div>
+            <a class="result__a" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fexample.com%2Fsecond">Second result</a>
+            <div class="result__snippet">Second snippet</div>
+          </body>
+        </html>
+      `, {
+        status: 200,
+        headers: { 'content-type': 'text/html' }
+      })
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await executeWebSearch({ query: 'open source ai', count: 2 })
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const requestUrl = new URL(fetchMock.mock.calls[0][0] as string)
+    expect(requestUrl.hostname).toBe('html.duckduckgo.com')
+    expect(requestUrl.searchParams.get('q')).toBe('open source ai')
+    expect(result.provider).toBe('duckduckgo')
+    expect(result.count).toBe(2)
+    expect(result.results).toEqual([
+      {
+        title: 'First result',
+        url: 'https://example.com/first',
+        snippet: 'First snippet',
+        siteName: 'example.com'
+      },
+      {
+        title: 'Second result',
+        url: 'https://example.com/second',
+        snippet: 'Second snippet',
+        siteName: 'example.com'
+      }
+    ])
+  })
+
+  it('falls back to DuckDuckGo HTML when an API provider is selected without a key', async () => {
+    mocks.getConfig.mockReturnValue({
+      tools: {
+        web: {
+          search: {
+            enabled: true,
+            provider: 'brave',
+            apiKey: '',
+            timeoutSeconds: 5,
+            cacheTtlMinutes: 15,
+            maxResults: 5
+          },
+          fetch: {
+            enabled: true
+          }
+        }
+      },
+      aiSources: {}
+    })
+
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(`
+        <html>
+          <body>
+            <a class="result__a" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fexample.com%2Ffallback">Fallback result</a>
+            <div class="result__snippet">Fallback snippet</div>
+          </body>
+        </html>
+      `, {
+        status: 200,
+        headers: { 'content-type': 'text/html' }
+      })
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await executeWebSearch({ query: 'fallback search', count: 1 })
+
+    expect(result.provider).toBe('duckduckgo')
+    expect(result.results?.[0]).toMatchObject({
+      title: 'Fallback result',
+      url: 'https://example.com/fallback'
+    })
+  })
 })
