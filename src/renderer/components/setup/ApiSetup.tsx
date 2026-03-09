@@ -188,8 +188,10 @@ export function ApiSetup({ onBack, showBack = false, initialProviderId }: ApiSet
 
       const newConfig = {
         ...config,
-        // Legacy api field for backward compatibility
-        api: providerConfig,
+        ...(storageKey === 'custom' ? {
+          // Legacy api field is reserved for the generic custom provider.
+          api: providerConfig
+        } : {}),
         // New aiSources structure - use provider ID as key
         aiSources: {
           ...config?.aiSources,

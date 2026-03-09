@@ -305,8 +305,27 @@ function normalizeAiSources(parsed: Record<string, any>): AISourcesConfig {
   const legacyApi = parsed?.api
   const hasLegacyApi =
     typeof legacyApi?.apiKey === 'string' && legacyApi.apiKey.length > 0
+  const hasNamedProviderConfigs = Object.keys(aiSources).some((key) => {
+    if (key === 'current' || key === 'custom' || key === 'oauth') return false
+    const source = aiSources[key]
+    if (!source || typeof source !== 'object') return false
 
-  if (!aiSources.custom && hasLegacyApi) {
+    if ('loggedIn' in source) {
+      return Boolean(source.loggedIn)
+    }
+
+    if ('apiKey' in source) {
+      return Boolean(source.apiKey)
+    }
+
+    return false
+  })
+  const shouldPromoteLegacyApiToCustom =
+    !aiSources.custom &&
+    hasLegacyApi &&
+    (aiSources.current === 'custom' || !hasNamedProviderConfigs)
+
+  if (shouldPromoteLegacyApiToCustom) {
     const provider = legacyApi?.provider === 'openai' ? 'openai' : 'anthropic'
     aiSources.custom = {
       provider,
@@ -323,6 +342,27 @@ function normalizeAiSources(parsed: Record<string, any>): AISourcesConfig {
       apiKey: aiSources.custom.apiKey || '',
       apiUrl: aiSources.custom.apiUrl || (provider === 'openai' ? 'https://api.openai.com' : 'https://api.anthropic.com'),
       model: aiSources.custom.model || DEFAULT_MODEL
+    }
+  }
+
+  if (aiSources.custom && aiSources.current !== 'custom') {
+    const custom = aiSources.custom
+    const duplicatedNamedProvider = Object.keys(aiSources).some((key) => {
+      if (key === 'current' || key === 'custom' || key === 'oauth') return false
+      const source = aiSources[key]
+      if (!source || typeof source !== 'object' || !('apiKey' in source)) return false
+
+      const normalizedProvider = source.provider === 'openai' ? 'openai' : 'anthropic'
+      return (
+        normalizedProvider === custom.provider &&
+        (source.apiKey || '') === custom.apiKey &&
+        (source.apiUrl || '') === custom.apiUrl &&
+        (source.model || '') === custom.model
+      )
+    })
+
+    if (duplicatedNamedProvider) {
+      delete aiSources.custom
     }
   }
 

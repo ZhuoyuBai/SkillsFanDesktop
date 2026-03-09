@@ -199,7 +199,19 @@ function resolveProviderFormValues(config: HaloConfig | undefined, providerId: s
   }
 
   const customConfig = config?.aiSources?.custom
-  const legacyApi = config?.api
+  const hasNamedProviderConfigs = Object.keys(config?.aiSources || {}).some((key) => {
+    if (key === 'current' || key === 'custom' || key === 'oauth') return false
+    const source = config?.aiSources?.[key]
+    if (!source || typeof source !== 'object') return false
+    if ('loggedIn' in source) return Boolean(source.loggedIn)
+    if ('apiKey' in source) return Boolean(source.apiKey)
+    return false
+  })
+  const shouldUseLegacyApiForCustom =
+    !customConfig?.apiKey &&
+    (!!config?.api?.apiKey) &&
+    ((config?.aiSources?.current === 'custom') || !hasNamedProviderConfigs)
+  const legacyApi = shouldUseLegacyApiForCustom ? config?.api : undefined
   return {
     provider: normalizeProviderType(customConfig?.provider || legacyApi?.provider, 'anthropic'),
     apiKey: customConfig?.apiKey || legacyApi?.apiKey || '',
@@ -901,7 +913,7 @@ export function SettingsPage() {
       }
 
       const updates = {
-        api: providerConfig,  // Legacy field for backward compatibility
+        ...(storageKey === 'custom' ? { api: providerConfig } : {}),
         aiSources: {
           ...config?.aiSources,
           current: storageKey as AISourceType,
