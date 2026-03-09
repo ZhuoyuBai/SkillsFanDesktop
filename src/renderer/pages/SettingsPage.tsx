@@ -355,7 +355,7 @@ export function SettingsPage() {
   const [showApiKey, setShowApiKey] = useState(false)
 
   // Version update state (from shared store)
-  const { status: updateStatus, currentVersion: appVersion, latestVersion, downloadProgress } = useUpdaterStore()
+  const { status: updateStatus, currentVersion: appVersion, latestVersion } = useUpdaterStore()
   const [isCheckingUpdate, setIsCheckingUpdate] = useState(false)
 
   // Load SkillsFan auth state for permission checks
@@ -404,17 +404,7 @@ export function SettingsPage() {
     }
   }
 
-  // Handler for download update button
-  const handleDownloadUpdate = async () => {
-    await api.downloadUpdate()
-  }
-
-  // Handler for install update button
-  const handleInstallUpdate = () => {
-    api.installUpdate()
-  }
-
-  // Handler for opening download page (fallback)
+  // Handler for opening download page
   const handleOpenDownloadPage = () => {
     api.openDownloadPage()
   }
@@ -1424,9 +1414,9 @@ export function SettingsPage() {
                       <p className="font-medium">{t('Version Update')}</p>
                       <p className="text-sm text-muted-foreground">
                         {t('Current version')}: <span className="font-mono">{appVersion}</span>
-                        {(updateStatus === 'available' || updateStatus === 'downloading' || updateStatus === 'downloaded') && latestVersion && (
+                        {updateStatus === 'available' && latestVersion && (
                           <span className="ml-2 text-primary">
-                            → {latestVersion} {updateStatus === 'downloaded' ? t('ready') : t('available')}
+                            → {latestVersion} {t('available')}
                           </span>
                         )}
                       </p>
@@ -1435,50 +1425,18 @@ export function SettingsPage() {
                           {t('Already latest version')}
                         </p>
                       )}
-                      {updateStatus === 'downloading' && downloadProgress && (
-                        <div className="mt-2 space-y-1">
-                          <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
-                            <div
-                              className="bg-primary h-full transition-all duration-300 ease-out"
-                              style={{ width: `${Math.min(downloadProgress.percent, 100)}%` }}
-                            />
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            {downloadProgress.percent.toFixed(0)}% - {(downloadProgress.bytesPerSecond / 1024 / 1024).toFixed(1)} MB/s
-                          </p>
-                        </div>
-                      )}
-                      {updateStatus === 'downloaded' && (
-                        <p className="text-xs text-green-600 mt-1">
-                          {t('Update downloaded, restart to install')}
-                        </p>
-                      )}
                       {updateStatus === 'error' && (
                         <p className="text-xs text-red-500/70 mt-1">
                           {t('Update check failed')}
                         </p>
                       )}
                     </div>
-                    {updateStatus === 'downloaded' ? (
+                    {updateStatus === 'available' ? (
                       <button
-                        onClick={handleInstallUpdate}
-                        className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors"
-                      >
-                        {t('Restart to Install')}
-                      </button>
-                    ) : updateStatus === 'downloading' ? (
-                      <button
-                        disabled
-                        className="px-4 py-2 bg-secondary text-secondary-foreground text-sm rounded-lg opacity-50 cursor-not-allowed"
-                      >
-                        {t('Downloading...')}
-                      </button>
-                    ) : updateStatus === 'available' ? (
-                      <button
-                        onClick={handleDownloadUpdate}
+                        onClick={handleOpenDownloadPage}
                         className="px-4 py-2 bg-primary text-primary-foreground text-sm rounded-lg hover:bg-primary/90 transition-colors"
                       >
-                        {t('Download Update')}
+                        {t('Download from website')}
                       </button>
                     ) : (
                       <div className="flex items-center gap-2">
