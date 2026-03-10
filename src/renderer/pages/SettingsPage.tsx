@@ -1713,7 +1713,7 @@ export function SettingsPage() {
                     <div className="flex-1">
                       <p className="font-medium">{t('Web Tools')}</p>
                       <p className="text-sm text-muted-foreground">
-                        {t('Enable web search and page fetching. Search automatically uses your configured AI source (GLM, Kimi, MiniMax, Claude, GPT). No separate API key needed.')}
+                        {t('Enable web search and page fetching. Automatically uses your AI model\'s built-in search when available.')}
                       </p>
                     </div>
                     <Switch checked={webSearchEnabled} onChange={handleWebToolsEnabledChange} />
@@ -1721,7 +1721,7 @@ export function SettingsPage() {
 
                   <div className={`space-y-4 transition-opacity ${webSearchEnabled ? '' : 'opacity-50 pointer-events-none'}`}>
                     <p className="text-xs text-muted-foreground">
-                      {t('Web search auto-detects your configured AI sources. Supported providers: Kimi, GLM (Zhipu), MiniMax, Claude, GPT. DeepSeek does not support web search. If no AI source is configured, DuckDuckGo HTML scraping is used as fallback.')}
+                      {t('Supported models: Kimi, GLM, MiniMax, Claude, GPT. DeepSeek not supported. Falls back to DuckDuckGo otherwise.')}
                     </p>
 
                     <div className="rounded-lg border border-border bg-secondary/20">
@@ -1733,7 +1733,7 @@ export function SettingsPage() {
                         <div>
                           <p className="text-sm font-medium">{t('Standalone Search API Keys (Advanced)')}</p>
                           <p className="text-xs text-muted-foreground mt-1">
-                            {t('Optional: configure dedicated search API keys for Brave or Perplexity as additional fallback options.')}
+                            {t('Only needed when your model has no built-in search. Use Brave or Perplexity as an alternative.')}
                           </p>
                         </div>
                         {showWebSearchKeys ? <EyeOff className="w-4 h-4 text-muted-foreground" /> : <Eye className="w-4 h-4 text-muted-foreground" />}
