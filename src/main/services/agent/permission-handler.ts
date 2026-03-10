@@ -12,6 +12,7 @@ import { activeSessions } from './session-manager'
 import { sendToRenderer } from './helpers'
 import type { ToolCall, UserQuestionInfo } from './types'
 import { sanitizeWebSearchInput } from './tool-input-utils'
+import { getEnabledExtensions, runToolUseHooks } from '../extension'
 
 // ============================================
 // Tool Permission Types
@@ -120,6 +121,18 @@ export function createCanUseTool(
   ): Promise<ToolPermissionResult> => {
     console.log(`[Agent] canUseTool called - Tool: ${toolName}, Input:`, JSON.stringify(input).substring(0, 200))
 
+    // Extension hook: let extensions intercept tool calls
+    const enabledExtensions = getEnabledExtensions()
+    if (enabledExtensions.length > 0) {
+      const extResult = await runToolUseHooks(enabledExtensions, toolName, input as Record<string, any>)
+      if (extResult.behavior === 'deny') {
+        return { behavior: 'deny', message: extResult.message || 'Blocked by extension' }
+      }
+      if (extResult.updatedInput) {
+        input = extResult.updatedInput
+      }
+    }
+
     const ensurePathsWithinWorkspace = (): ToolPermissionResult | null => {
       const pathParams = getPathCandidates(input)
 
@@ -223,6 +236,21 @@ export function createCanUseTool(
     if (toolName === 'mcp__local-tools__text_editor_code_execution') {
       const violation = ensurePathsWithinWorkspace()
       if (violation) return violation
+
+      return {
+        behavior: 'allow' as const,
+        updatedInput: input
+      }
+    }
+
+    if (toolName === 'mcp__local-tools__open_url') {
+      const currentConfig = getConfig()
+      if (currentConfig.browserAutomation?.mode !== 'system-browser') {
+        return {
+          behavior: 'deny' as const,
+          message: 'System browser opening is disabled while automated browser mode is active. Use automated browser tools instead.'
+        }
+      }
 
       return {
         behavior: 'allow' as const,
@@ -343,7 +371,7 @@ export function createCanUseTool(
       if (currentConfig.browserAutomation?.mode === 'system-browser') {
         return {
           behavior: 'deny' as const,
-          message: 'AI Browser is disabled while "Use System Browser" mode is enabled. Use local system browser tools instead.'
+          message: 'Automated browser is disabled while "Use System Default Browser" mode is enabled. Use local system browser tools instead.'
         }
       }
 

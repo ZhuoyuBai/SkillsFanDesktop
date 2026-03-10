@@ -8,6 +8,7 @@ import i18n from '../i18n'
 import type { HaloConfig, AppView, McpServerStatus } from '../types'
 import { hasAnyAISource } from '../types'
 import { useSpaceStore } from './space.store'
+import { syncAIBrowserStoreWithConfig } from './ai-browser.store'
 import { createLogger } from '../lib/logger'
 
 // Settings section type (must match SettingsPage)
@@ -111,12 +112,17 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setLoading: (isLoading) => set({ isLoading }),
   setError: (error) => set({ error }),
-  setConfig: (config) => set({ config }),
+  setConfig: (config) => {
+    syncAIBrowserStoreWithConfig(config)
+    set({ config })
+  },
 
   updateConfig: (updates) => {
     const currentConfig = get().config
     if (currentConfig) {
-      set({ config: { ...currentConfig, ...updates } })
+      const nextConfig = { ...currentConfig, ...updates }
+      syncAIBrowserStoreWithConfig(nextConfig)
+      set({ config: nextConfig })
     }
   },
 
@@ -243,7 +249,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (response.success && response.data) {
         const config = response.data as HaloConfig
 
-        set({ config })
+        get().setConfig(config)
 
         // Determine initial view based on config
         // Skip onboarding - go directly to setup or space
@@ -288,7 +294,7 @@ export const useAppStore = create<AppState>((set, get) => ({
               appLogger.debug('[Store] AI sources refreshed on startup')
               api.getConfig().then((configResult) => {
                 if (configResult.success && configResult.data) {
-                  set({ config: configResult.data as HaloConfig })
+                  get().setConfig(configResult.data as HaloConfig)
                 }
               })
             }

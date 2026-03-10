@@ -92,6 +92,8 @@ export async function executeMemoryCommand(args: {
 
     const manager = getMemoryIndexManager()
     const limit = Math.max(1, Math.min(10, Math.floor(args.limit || 5)))
+    // Warm embedding for semantic search before querying
+    await manager.warmQueryEmbedding(args.query)
     let results = manager.searchRelevant(args.spaceId, args.query, args.conversationId, limit)
 
     if (results.length < 2) {

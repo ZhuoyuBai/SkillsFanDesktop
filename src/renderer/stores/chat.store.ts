@@ -376,6 +376,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
           return { spaceStates: newSpaceStates, conversationCache: newCache }
         })
 
+        // Subscribe immediately so the first send on a brand-new conversation
+        // does not race the WebSocket subscription against the HTTP request.
+        api.subscribeToConversation(newConversation.id)
+
         // Warm up V2 Session in background - non-blocking
         // When user sends a message, V2 Session is ready to avoid delay
         try {

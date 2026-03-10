@@ -115,6 +115,24 @@ export async function httpRequest<T>(
 let wsConnection: WebSocket | null = null
 let wsReconnectTimer: ReturnType<typeof setTimeout> | null = null
 const wsEventListeners = new Map<string, Set<(data: unknown) => void>>()
+const wsConversationSubscriptions = new Set<string>()
+
+function sendSubscriptionMessage(type: 'subscribe' | 'unsubscribe', conversationId: string): void {
+  if (wsConnection?.readyState !== WebSocket.OPEN) return
+
+  wsConnection.send(
+    JSON.stringify({
+      type,
+      payload: { conversationId }
+    })
+  )
+}
+
+function replayConversationSubscriptions(): void {
+  for (const conversationId of wsConversationSubscriptions) {
+    sendSubscriptionMessage('subscribe', conversationId)
+  }
+}
 
 export function connectWebSocket(): void {
   if (!isRemoteClient()) return
@@ -133,6 +151,7 @@ export function connectWebSocket(): void {
 
   wsConnection.onopen = () => {
     transportLogger.debug('[WS] Connected')
+    replayConversationSubscriptions()
   }
 
   wsConnection.onmessage = (event) => {
@@ -183,28 +202,19 @@ export function disconnectWebSocket(): void {
     wsConnection.close()
     wsConnection = null
   }
+
+  // Manual disconnect only happens on logout, so clear stale conversation subscriptions too.
+  wsConversationSubscriptions.clear()
 }
 
 export function subscribeToConversation(conversationId: string): void {
-  if (wsConnection?.readyState === WebSocket.OPEN) {
-    wsConnection.send(
-      JSON.stringify({
-        type: 'subscribe',
-        payload: { conversationId }
-      })
-    )
-  }
+  wsConversationSubscriptions.add(conversationId)
+  sendSubscriptionMessage('subscribe', conversationId)
 }
 
 export function unsubscribeFromConversation(conversationId: string): void {
-  if (wsConnection?.readyState === WebSocket.OPEN) {
-    wsConnection.send(
-      JSON.stringify({
-        type: 'unsubscribe',
-        payload: { conversationId }
-      })
-    )
-  }
+  wsConversationSubscriptions.delete(conversationId)
+  sendSubscriptionMessage('unsubscribe', conversationId)
 }
 
 /**

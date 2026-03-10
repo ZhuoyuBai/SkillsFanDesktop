@@ -12,6 +12,7 @@ import { unstable_v2_createSession } from '@anthropic-ai/claude-agent-sdk'
 import { getConfig, onApiConfigChange } from '../config.service'
 import { getConversation } from '../conversation.service'
 import { ensureSkillsInitialized, hasSkills } from '../skill'
+import { clearCompactionState, clearAllCompactionStates } from './compaction-monitor'
 import type {
   V2SDKSession,
   V2SessionInfo,
@@ -103,6 +104,7 @@ export function needsSessionRebuild(existing: V2SessionInfo, newConfig: SessionC
     || existing.config.hasSkills !== newConfig.hasSkills
     || existing.config.browserAutomationMode !== newConfig.browserAutomationMode
     || existing.config.customInstructionsHash !== newConfig.customInstructionsHash
+    || existing.config.extensionHash !== newConfig.extensionHash
 }
 
 /**
@@ -276,11 +278,13 @@ export async function ensureSessionWarm(
 
     // Session config must match sendMessage to avoid rebuild
     const ci = (config as any).customInstructions
+    const { getExtensionHash } = await import('../extension')
     const sessionConfig: SessionConfig = {
       aiBrowserEnabled: false,  // Default to false for warm-up (user hasn't enabled it yet)
       hasSkills: skillsAvailable,
       browserAutomationMode: (config as any).browserAutomation?.mode === 'system-browser' ? 'system-browser' : 'ai-browser',
-      customInstructionsHash: ci?.enabled && ci?.content ? ci.content : undefined
+      customInstructionsHash: ci?.enabled && ci?.content ? ci.content : undefined,
+      extensionHash: getExtensionHash()
     }
 
     await getOrCreateV2Session(spaceId, conversationId, sdkOptions, sessionId, sessionConfig)
@@ -308,6 +312,7 @@ export function closeV2Session(conversationId: string): void {
       console.error(`[Agent] Error closing session:`, e)
     }
     v2Sessions.delete(conversationId)
+    clearCompactionState(conversationId)
   }
 }
 
@@ -325,6 +330,7 @@ export function closeAllV2Sessions(): void {
     }
   }
   v2Sessions.clear()
+  clearAllCompactionStates()
 
   stopSessionCleanup()
 }

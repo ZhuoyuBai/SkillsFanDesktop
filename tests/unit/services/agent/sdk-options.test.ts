@@ -22,8 +22,8 @@ vi.mock('../../../../src/main/services/ai-browser/prompt', () => ({
   AI_BROWSER_SYSTEM_PROMPT: '[AI_BROWSER_PROMPT]'
 }))
 
-vi.mock('../../../../src/main/services/ai-browser/sdk-mcp-server', () => ({
-  createAIBrowserMcpServer: mocks.createAIBrowserMcpServer
+vi.mock('../../../../src/main/services/automated-browser/sdk-mcp-server', () => ({
+  createAutomatedBrowserMcpServer: mocks.createAIBrowserMcpServer
 }))
 
 vi.mock('../../../../src/main/services/local-tools/sdk-mcp-server', () => ({
@@ -256,7 +256,7 @@ describe('sdk-options', () => {
       expect(sdkOptions.maxThinkingTokens).toBe(10240)
       expect(sdkOptions.systemPrompt.append).toContain('[BASE_PROMPT]')
       expect(sdkOptions.systemPrompt.append).toContain('[AI_BROWSER_PROMPT]')
-      expect(sdkOptions.systemPrompt.append).toContain('prefer the AI Browser tools')
+      expect(sdkOptions.systemPrompt.append).toContain('prefer the automated browser tools')
       expect(sdkOptions.systemPrompt.append).toContain('[RALPH_APPEND]')
       expect(sdkOptions.tools).toEqual(sdkOptions.allowedTools)
       expect(sdkOptions.disallowedTools).toEqual([

@@ -117,16 +117,27 @@ interface HaloConfig {
   }
   // Memory configuration (cross-conversation memory)
   memory?: {
-    enabled: boolean       // Master toggle, default true
-    retentionDays: number  // 0 = forever, 7/30/180
+    enabled: boolean        // Master toggle, default true
+    retentionDays: number   // 0 = forever, 7/30/180
+    semanticSearch?: boolean // Enable vector-based semantic search, default true
   }
   browserAutomation?: {
     mode: 'ai-browser' | 'system-browser'
+  }
+  // Vision model for image preprocessing (used when primary model doesn't support vision)
+  imageModel?: {
+    source: string  // AI source key, e.g. 'custom', 'skillsfan-credits'
+    model: string   // Model ID, e.g. 'claude-haiku-4-5-20251001'
   }
   // Custom instructions appended to system prompt
   customInstructions?: {
     enabled: boolean
     content: string
+  }
+  // Conversation compaction settings
+  conversation?: {
+    autoCompact?: boolean     // Proactive compaction prompts, default true
+    compactThreshold?: number // Context usage ratio to trigger (0-1), default 0.75
   }
   // Local web tool settings (search/fetch provider configuration)
   tools?: WebToolsConfig

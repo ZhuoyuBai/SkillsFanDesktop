@@ -235,6 +235,7 @@ export interface SessionConfig {
   hasSkills: boolean
   browserAutomationMode?: 'ai-browser' | 'system-browser'
   customInstructionsHash?: string  // Change detection for custom instructions
+  extensionHash?: string  // Change detection for enabled extensions
   // model is now dynamic, no rebuild needed
   // thinkingEnabled is now dynamic, no rebuild needed
 }

@@ -324,12 +324,19 @@ class BrowserViewManager {
   /**
    * Capture screenshot of the view
    */
-  async capture(viewId: string): Promise<string | null> {
+  async capture(viewId: string, rect?: BrowserViewBounds): Promise<string | null> {
     const view = this.views.get(viewId)
     if (!view) return null
 
     try {
-      const image = await view.webContents.capturePage()
+      const image = rect
+        ? await view.webContents.capturePage({
+          x: Math.round(rect.x),
+          y: Math.round(rect.y),
+          width: Math.round(rect.width),
+          height: Math.round(rect.height)
+        })
+        : await view.webContents.capturePage()
       return image.toDataURL()
     } catch (error) {
       console.error('[BrowserView] Screenshot failed:', error)

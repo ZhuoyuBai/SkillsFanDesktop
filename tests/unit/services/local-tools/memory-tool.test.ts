@@ -40,7 +40,8 @@ describe('local memory tool', () => {
           content: 'We decided to cache search results.'
         }
       ]),
-      getRecentFragments: vi.fn(() => [])
+      getRecentFragments: vi.fn(() => []),
+      warmQueryEmbedding: vi.fn(async () => {})
     })
   })
 

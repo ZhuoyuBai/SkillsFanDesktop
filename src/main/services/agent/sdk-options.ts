@@ -13,6 +13,7 @@ import { AI_BROWSER_SYSTEM_PROMPT } from '../ai-browser/prompt'
 import { createSkillMcpServer } from '../skill'
 import { createCanUseTool } from './permission-handler'
 import { buildSystemPromptAppend, getEnabledMcpServers, inferOpenAIWireApi } from './helpers'
+import { getEnabledExtensions, runSystemPromptHooks, runGetMcpServersHooks } from '../extension'
 import type { ApiCredentials } from './types'
 
 const DEFAULT_MODEL = 'claude-opus-4-5-20251101'
@@ -22,7 +23,7 @@ const SYSTEM_BROWSER_AUTOMATION_PROMPT = `
 
 ## System Browser Mode
 
-The user prefers the normal system browser instead of the AI-controlled browser.
+The user prefers the normal system browser instead of the automated browser.
 When browser automation is needed:
 1. Do not use \`mcp__ai-browser__*\` tools.
 2. Prefer \`mcp__local-tools__open_url\` to open the page in the user's normal browser.
@@ -35,8 +36,8 @@ const AI_BROWSER_PREFERENCE_PROMPT = `
 
 ## Browser Preference
 
-When browser automation is needed in this conversation, prefer the AI Browser tools.
-Avoid opening a separate system browser unless the user explicitly asks for it or AI Browser tools are unavailable.
+When browser automation is needed in this conversation, prefer the automated browser tools from MCP server \`ai-browser\`.
+Avoid opening a separate system browser unless the user explicitly asks for it or the automated browser tools are unavailable.
 `
 
 const WEB_RESEARCH_POLICY_PROMPT = `
@@ -193,14 +194,24 @@ export async function buildSdkOptions(params: BuildSdkOptionsParams): Promise<{
   addedMcpServers.push('web-tools')
 
   if (effectiveAiBrowserEnabled) {
-    const { createAIBrowserMcpServer } = await import('../ai-browser/sdk-mcp-server')
-    mcpServers['ai-browser'] = createAIBrowserMcpServer()
+    const { createAutomatedBrowserMcpServer } = await import('../automated-browser/sdk-mcp-server')
+    mcpServers['ai-browser'] = createAutomatedBrowserMcpServer()
     addedMcpServers.push('ai-browser')
   }
 
   if (includeSkillMcp) {
     mcpServers['skill'] = await createSkillMcpServer()
     addedMcpServers.push('skill')
+  }
+
+  // Extension MCP servers
+  const enabledExtensions = getEnabledExtensions()
+  if (enabledExtensions.length > 0) {
+    const extensionMcpServers = await runGetMcpServersHooks(enabledExtensions)
+    for (const [name, config] of Object.entries(extensionMcpServers)) {
+      mcpServers[name] = config
+      addedMcpServers.push(name)
+    }
   }
 
   const builtInTools = [
@@ -256,6 +267,9 @@ export async function buildSdkOptions(params: BuildSdkOptionsParams): Promise<{
         + ralphSystemPromptAppend
         + (config.customInstructions?.enabled && config.customInstructions?.content
           ? `\n\n## User Custom Instructions\n\n${config.customInstructions.content}\n`
+          : '')
+        + (enabledExtensions.length > 0
+          ? await runSystemPromptHooks(enabledExtensions, { spaceId, conversationId, workDir })
           : '')
     },
     maxTurns: 50,

@@ -36,6 +36,8 @@ import { registerLoopTaskHandlers } from '../ipc/loop-task'
 import { registerMemoryHandlers } from '../ipc/memory'
 import { shutdownMemory } from '../services/memory'
 import { registerFeishuHandlers } from '../ipc/feishu'
+import { registerExtensionHandlers } from '../ipc/extension'
+import { initializeExtensions as initExtensions, shutdownExtensions } from '../services/extension'
 import { FeishuChannel } from '../services/channel/adapters/feishu.channel'
 import { getChannelManager } from '../services/channel'
 import { shutdownScheduler } from '../services/scheduler.service'
@@ -110,6 +112,10 @@ export function initializeExtendedServices(mainWindow: BrowserWindow): void {
   // Memory: Memory management (clear memory)
   registerMemoryHandlers()
 
+  // Extensions: Lightweight plugin system
+  registerExtensionHandlers()
+  initExtensions()
+
   // Feishu: Chat bot remote control (optional)
   registerFeishuHandlers()
   const feishuChannel = new FeishuChannel()
@@ -169,8 +175,11 @@ export function cleanupExtendedServices(): void {
   // Search: Cancel any ongoing searches
   cleanupSearchHandlers()
 
-  // Memory: Close SQLite database
-  shutdownMemory()
+  // Memory: Close SQLite database and embedding service
+  shutdownMemory().catch(() => {})
+
+  // Extensions: Stop watcher and unload extensions
+  shutdownExtensions()
 
   // Scheduler: Stop all cron jobs and interval timers
   shutdownScheduler()

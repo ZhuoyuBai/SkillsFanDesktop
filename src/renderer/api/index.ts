@@ -1085,7 +1085,7 @@ export const api = {
 
   // AI Browser active view change notification
   // Sent when AI Browser tools create or select a view
-  onAIBrowserActiveViewChanged: (callback: (data: { viewId: string; url: string | null; title: string | null }) => void) =>
+  onAIBrowserActiveViewChanged: (callback: (data: { viewId: string | null; url: string | null; title: string | null }) => void) =>
     onEvent('ai-browser:active-view-changed', callback as (data: unknown) => void),
 
   // ===== Search =====

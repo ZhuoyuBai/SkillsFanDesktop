@@ -339,7 +339,7 @@ describe('permission-handler', () => {
 
     expect(result).toEqual({
       behavior: 'deny',
-      message: 'AI Browser is disabled while "Use System Browser" mode is enabled. Use local system browser tools instead.'
+      message: 'Automated browser is disabled while "Use System Default Browser" mode is enabled. Use local system browser tools instead.'
     })
   })
 
@@ -357,6 +357,52 @@ describe('permission-handler', () => {
 
     const canUseTool = createCanUseTool('/tmp/workspace', 'space-1', 'conv-1')
     const result = await canUseTool('mcp__ai-browser__browser_new_page', {
+      url: 'https://example.com'
+    }, { signal: new AbortController().signal })
+
+    expect(result).toEqual({
+      behavior: 'allow',
+      updatedInput: {
+        url: 'https://example.com'
+      }
+    })
+  })
+
+  it('denies open_url when AI Browser mode is active', async () => {
+    mocks.getConfig.mockReturnValue({
+      permissions: {
+        commandExecution: 'allow',
+        trustMode: false
+      },
+      browserAutomation: {
+        mode: 'ai-browser'
+      }
+    })
+
+    const canUseTool = createCanUseTool('/tmp/workspace', 'space-1', 'conv-1')
+    const result = await canUseTool('mcp__local-tools__open_url', {
+      url: 'https://example.com'
+    }, { signal: new AbortController().signal })
+
+    expect(result).toEqual({
+      behavior: 'deny',
+      message: 'System browser opening is disabled while automated browser mode is active. Use automated browser tools instead.'
+    })
+  })
+
+  it('allows open_url when system browser mode is enabled', async () => {
+    mocks.getConfig.mockReturnValue({
+      permissions: {
+        commandExecution: 'allow',
+        trustMode: false
+      },
+      browserAutomation: {
+        mode: 'system-browser'
+      }
+    })
+
+    const canUseTool = createCanUseTool('/tmp/workspace', 'space-1', 'conv-1')
+    const result = await canUseTool('mcp__local-tools__open_url', {
       url: 'https://example.com'
     }, { signal: new AbortController().signal })
 

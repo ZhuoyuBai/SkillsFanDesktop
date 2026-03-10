@@ -42,6 +42,7 @@ import {
 } from './session-manager'
 import { broadcastMcpStatus } from './mcp-manager'
 import { buildSdkOptions, resolveSdkTransport } from './sdk-options'
+import { preprocessImages } from './image-preprocess'
 import {
   formatCanvasContext,
   buildMessageContent,
@@ -50,6 +51,15 @@ import {
   extractResultUsage
 } from './message-utils'
 import { getMemoryIndexManager } from '../memory'
+import { getEnabledExtensions, runBeforeSendMessageHooks, runHook } from '../extension'
+import {
+  updateCompactionState,
+  shouldTriggerCompaction,
+  markCompactionTriggered,
+  buildCompactionPrompt,
+  getCompactionStatus,
+  clearCompactionState
+} from './compaction-monitor'
 import { agentQueue } from './lane-queue'
 import {
   normalizeThinkingEffortForModel,
@@ -332,11 +342,13 @@ async function sendMessageInternal(
     const ci = config.customInstructions
     const browserAutomationMode = config.browserAutomation?.mode === 'system-browser' ? 'system-browser' : 'ai-browser'
     const effectiveAiBrowserEnabled = !!aiBrowserEnabled && browserAutomationMode !== 'system-browser'
+    const { getExtensionHash } = await import('../extension')
     const sessionConfig: SessionConfig = {
       aiBrowserEnabled: effectiveAiBrowserEnabled,
       hasSkills: skillsAvailable,
       browserAutomationMode,
-      customInstructionsHash: ci?.enabled && ci?.content ? ci.content : undefined
+      customInstructionsHash: ci?.enabled && ci?.content ? ci.content : undefined,
+      extensionHash: getExtensionHash()
     }
 
     // Get or create persistent V2 session for this conversation
@@ -544,18 +556,21 @@ async function processMessageStream(
   // Cross-conversation memory search — inject as message prefix (not system prompt)
   // This runs on every message send, so it works even when V2 session is reused
   //
-  // Strategy: keyword search + recent conversation fallback
-  // Keyword search alone can miss semantic gaps (e.g., "职业" vs "产品经理")
-  // Recent fallback ensures the model always has some cross-conversation context
+  // Strategy: hybrid search (semantic + keyword) + recent conversation fallback
+  // Semantic search catches meaning-level matches (e.g., "Python crawler" ↔ "requests web scraping")
+  // Keyword search catches exact matches; recent fallback provides baseline context
   let memoryPrefix = ''
   if (!ralphMode?.enabled && memoryManager.enabled) {
     try {
-      // 1. Keyword-based search (searches both content and conversation titles)
+      // Warm query embedding for semantic search (async but fast if model loaded)
+      await memoryManager.warmQueryEmbedding(message)
+
+      // 1. Hybrid search (semantic + keyword, merged and deduplicated)
       let fragments = memoryManager.searchRelevant(
         spaceId, message, conversationId, 5
       )
 
-      // 2. Fallback: if few keyword results, supplement with recent conversations
+      // 2. Fallback: if few results, supplement with recent conversations
       if (fragments.length < 2) {
         const recentFragments = memoryManager.getRecentFragments(
           spaceId, conversationId, 3
@@ -583,14 +598,62 @@ async function processMessageStream(
     }
   }
 
+  // Proactive compaction: if context usage was high on previous message, inject compaction request
+  let compactionPrefix = ''
+  const compactConfig = getConfig().conversation
+  const autoCompact = compactConfig?.autoCompact !== false // default true
+  if (autoCompact && !ralphMode?.enabled && shouldTriggerCompaction(conversationId)) {
+    const status = getCompactionStatus(conversationId)
+    if (status) {
+      compactionPrefix = buildCompactionPrompt(status.usageRatio)
+      markCompactionTriggered(conversationId)
+      console.log(`[Agent][${conversationId}] Compaction prompt injected (${(status.usageRatio * 100).toFixed(0)}% usage)`)
+    }
+  }
+
   // Inject Canvas Context prefix if available
   // This provides AI awareness of what user is currently viewing
   const canvasPrefix = formatCanvasContext(canvasContext)
   const runtimePrefix = messagePrefix ? `${messagePrefix}\n\n` : ''
-  const messageWithContext = memoryPrefix + memoryFlushPrefix + canvasPrefix + runtimePrefix + message
+  let messageWithContext = compactionPrefix + memoryPrefix + memoryFlushPrefix + canvasPrefix + runtimePrefix + message
+
+  // Extension hook: let extensions modify message before sending
+  const enabledExtensions = getEnabledExtensions()
+  if (enabledExtensions.length > 0) {
+    messageWithContext = await runBeforeSendMessageHooks(
+      enabledExtensions,
+      messageWithContext,
+      { spaceId, conversationId, workDir }
+    )
+  }
+
+  // Preprocess images for models that don't support vision
+  // This describes images using a vision-capable model and injects text descriptions
+  let finalMessage = messageWithContext
+  let finalImages = images
+  let finalAttachments = attachments
+  const hasAnyImages = (images && images.length > 0) || (attachments && attachments.some(a => a.type === 'image'))
+  if (hasAnyImages) {
+    sendToRenderer('agent:message', spaceId, conversationId, {
+      type: 'status',
+      content: 'Analyzing images...'
+    })
+    const preprocessResult = await preprocessImages(messageWithContext, credentials.model, images, attachments)
+    if (preprocessResult.preprocessed) {
+      finalMessage = preprocessResult.enhancedMessage
+      finalImages = preprocessResult.filteredImages
+      finalAttachments = preprocessResult.filteredAttachments
+      if (preprocessResult.error) {
+        sendToRenderer('agent:message', spaceId, conversationId, {
+          type: 'warning',
+          content: preprocessResult.error
+        })
+      }
+    }
+  }
 
   // Build message content (text-only or multi-modal with images/PDFs/text)
-  const messageContent = buildMessageContent(messageWithContext, images, attachments)
+  const messageContent = buildMessageContent(finalMessage, finalImages, finalAttachments)
 
   // Send message to V2 session and stream response
   // For multi-modal messages, we need to send as SDKUserMessage
@@ -899,6 +962,12 @@ async function processMessageStream(
     }
   }
 
+  // Update compaction monitor with token usage from this message
+  if (tokenUsage && !ralphMode?.enabled) {
+    const threshold = getConfig().conversation?.compactThreshold ?? 0.75
+    updateCompactionState(conversationId, tokenUsage, threshold)
+  }
+
   // Save session ID for future resumption (skip for Ralph mode - no conversation history needed)
   if (capturedSessionId && !ralphMode?.enabled) {
     saveSessionId(spaceId, conversationId, capturedSessionId)
@@ -919,11 +988,13 @@ async function processMessageStream(
       })
       console.log(`[Agent][${conversationId}] Saved ${sessionState.thoughts.length} thoughts${tokenUsage ? ' with tokenUsage' : ''} to backend, userMessageUuid=${lastUserMessageUuid ?? 'NONE'}`)
     }
+    const compactStatus = getCompactionStatus(conversationId)
     sendToRenderer('agent:complete', spaceId, conversationId, {
       type: 'complete',
       duration: 0,
       tokenUsage,  // Include token usage data
-      userMessageUuid: lastUserMessageUuid  // For file rewind support
+      userMessageUuid: lastUserMessageUuid,  // For file rewind support
+      contextUsage: compactStatus ? compactStatus.usageRatio : undefined  // Context window usage ratio
     })
   } else {
     console.log(`[Agent][${conversationId}] WARNING: No text content after SDK query completed`)
@@ -947,6 +1018,21 @@ async function processMessageStream(
       tokenUsage,  // Include token usage data
       userMessageUuid: lastUserMessageUuid  // For file rewind support
     })
+  }
+
+  // Extension hook: notify extensions that message is complete
+  if (enabledExtensions.length > 0 && !ralphMode?.enabled) {
+    const finalContent = accumulatedTextContent || currentStreamingText || ''
+    runHook(enabledExtensions, 'onAfterMessage', {
+      spaceId,
+      conversationId,
+      content: finalContent,
+      tokenUsage: tokenUsage ? {
+        inputTokens: tokenUsage.inputTokens,
+        outputTokens: tokenUsage.outputTokens,
+        contextWindow: tokenUsage.contextWindow
+      } : undefined
+    }).catch(() => {}) // Fire and forget
   }
 
   // Ralph mode: call onComplete callback

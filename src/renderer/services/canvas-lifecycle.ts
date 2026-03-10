@@ -541,7 +541,7 @@ class CanvasLifecycle {
     }
 
     // Parse URL for title
-    let displayTitle = title || '🤖 AI Browser'
+    let displayTitle = title || '🤖 Automated Browser'
     if (!title) {
       try {
         displayTitle = `🤖 ${new URL(url).hostname}`

@@ -36,6 +36,7 @@ import { ResetSection } from '../components/settings/ResetSection'
 import { ScheduledTasksSection } from '../components/settings/ScheduledTasksSection'
 import { FeishuSettings } from '../components/settings/FeishuSettings'
 import { useTranslation, setLanguage, getCurrentLanguage, SUPPORTED_LOCALES, type LocaleCode } from '../i18n'
+import { isNoVisionModel } from '../../shared/utils/vision-models'
 import { Loader2, LogOut, Plus, Check, Globe, Key, MessageSquare, Bot, Palette, Server, Settings as SettingsIcon, Wifi, ExternalLink, X, Package, User, Layers, Lock, SlidersHorizontal, Clock, ArrowLeft, Database, type LucideIcon } from 'lucide-react'
 import { usePlatform } from '../components/layout/Header'
 import { isElectron } from '../api/transport'
@@ -832,6 +833,64 @@ export function SettingsPage() {
     }
   }
 
+  // Handle imageModel change
+  const handleImageModelChange = async (value: string) => {
+    try {
+      if (value === 'auto') {
+        await api.setConfig({ imageModel: undefined } as any)
+        setConfig({ ...config!, imageModel: undefined } as any)
+      } else {
+        const [source, ...modelParts] = value.split('/')
+        const model = modelParts.join('/')
+        const imageModel = { source, model }
+        await api.setConfig({ imageModel } as any)
+        setConfig({ ...config!, imageModel } as any)
+      }
+    } catch (error) {
+      console.error('[Settings] Failed to update imageModel:', error)
+    }
+  }
+
+  // Build imageModel options from configured AI sources
+  const imageModelOptions = (() => {
+    const options: Array<{ value: string; label: string }> = [
+      { value: 'auto', label: t('Auto (detect from configured sources)') }
+    ]
+    const aiSources = config?.aiSources
+    if (!aiSources) return options
+
+    for (const key of Object.keys(aiSources)) {
+      if (key === 'current') continue
+      const src = aiSources[key]
+      if (!src || typeof src !== 'object') continue
+
+      // OAuth provider with available models
+      if ('loggedIn' in src && (src as OAuthSourceConfig).loggedIn) {
+        const oauthSrc = src as OAuthSourceConfig
+        for (const modelId of (oauthSrc.availableModels || [])) {
+          if (!isNoVisionModel(modelId)) {
+            const displayName = oauthSrc.modelNames?.[modelId] || modelId
+            options.push({ value: `${key}/${modelId}`, label: `${key}: ${displayName}` })
+          }
+        }
+      }
+
+      // Custom API provider
+      if ('apiKey' in src && (src as CustomSourceConfig).apiKey) {
+        const customSrc = src as CustomSourceConfig
+        const modelId = customSrc.model || ''
+        if (modelId && !isNoVisionModel(modelId)) {
+          options.push({ value: `${key}/${modelId}`, label: `${key}: ${modelId}` })
+        }
+      }
+    }
+    return options
+  })()
+
+  const currentImageModelValue = config?.imageModel
+    ? `${(config.imageModel as any).source}/${(config.imageModel as any).model}`
+    : 'auto'
+
   // Handle custom instructions change
   const handleCustomInstructionsToggle = async (enabled: boolean) => {
     const customInstructions = { enabled, content: config?.customInstructions?.content || '' }
@@ -1625,6 +1684,21 @@ export function SettingsPage() {
                       ]}
                     />
                   </div>
+                </div>
+
+                {/* Image Understanding Model */}
+                <div className="pt-4 border-t border-border">
+                  <div className="flex-1 mb-2">
+                    <p className="font-medium">{t('Image Understanding Model')}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {t('When the active model does not support vision, this model will be used to describe images as text')}
+                    </p>
+                  </div>
+                  <Select<string>
+                    value={currentImageModelValue}
+                    onChange={handleImageModelChange}
+                    options={imageModelOptions}
+                  />
                 </div>
 
                 {/* Custom Instructions */}

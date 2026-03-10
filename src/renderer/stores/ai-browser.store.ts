@@ -13,6 +13,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { api } from '../api'
+import type { HaloConfig } from '../types'
 
 // ============================================
 // Types
@@ -45,6 +46,10 @@ interface AIBrowserState {
   setOperating: (isOperating: boolean) => void
   setError: (error: string | null) => void
   reset: () => void
+}
+
+function shouldEnableAIBrowser(config?: Pick<HaloConfig, 'browserAutomation'> | null): boolean {
+  return config?.browserAutomation?.mode !== 'system-browser'
 }
 
 // ============================================
@@ -115,6 +120,26 @@ export const useAIBrowserStore = create<AIBrowserState>()(
   )
 )
 
+export function syncAIBrowserStoreWithConfig(config?: Pick<HaloConfig, 'browserAutomation'> | null): void {
+  const enabled = shouldEnableAIBrowser(config)
+
+  useAIBrowserStore.setState(() => {
+    const nextState: Partial<AIBrowserState> = {
+      enabled,
+      defaultEnabled: enabled
+    }
+
+    if (!enabled) {
+      nextState.activeViewId = null
+      nextState.activeUrl = null
+      nextState.isOperating = false
+      nextState.lastError = null
+    }
+
+    return nextState
+  })
+}
+
 // ============================================
 // Selectors
 // ============================================
@@ -171,9 +196,7 @@ export function initAIBrowserStoreListeners(): () => void {
   const unsubscribe = api.onAIBrowserActiveViewChanged((data) => {
     const store = useAIBrowserStore.getState()
     store.setActiveViewId(data.viewId)
-    if (data.url) {
-      store.setActiveUrl(data.url)
-    }
+    store.setActiveUrl(data.url)
     console.log(`[AI Browser Store] Active view updated from main: ${data.viewId}, url: ${data.url}`)
   })
 

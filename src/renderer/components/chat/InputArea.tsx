@@ -38,6 +38,7 @@ import { Select } from '../ui/select'
 import { processFile, isSupportedFile, checkFileSize, getAcceptedExtensions } from '../../utils/fileProcessor'
 import { api } from '../../api'
 import type { Attachment, HaloConfig } from '../../types'
+import { isNoVisionModel } from '../../../shared/utils/vision-models'
 import { useTranslation } from '../../i18n'
 import {
   type ThinkingEffort,
@@ -164,14 +165,6 @@ function useTypewriter(phrases: string[], options?: {
 // Attachment constraints
 const MAX_ATTACHMENTS = 10  // Max attachments per message
 
-// Model patterns that do not support image/vision input (matched case-insensitively via includes)
-const NO_VISION_PATTERNS = ['glm-5', 'glm-4', 'minimax-m2.1', 'minimax-m2.5']
-
-function isNoVisionModel(modelId: string): boolean {
-  if (!modelId) return false
-  const lower = modelId.toLowerCase()
-  return NO_VISION_PATTERNS.some(p => lower.includes(p))
-}
 
 // Error message type
 interface AttachmentError {
@@ -590,11 +583,6 @@ export function InputArea({ onSend, onStop, onInject, isGenerating, isCompact = 
 
   // Handle image button click - select images only
   const handleImageButtonClick = () => {
-    if (isNoVisionModel(currentModelId)) {
-      setInfoToast(t('This model does not support image understanding'))
-      setShowAttachMenu(false)
-      return
-    }
     setShowAttachMenu(false)
     imageInputRef.current?.click()
   }
@@ -621,13 +609,6 @@ export function InputArea({ onSend, onStop, onInject, isGenerating, isCompact = 
     const hasContent = finalText || attachments.length > 0
 
     if (!hasContent) return
-
-    // Block send if images attached with a model that doesn't support vision
-    const hasImageAttachments = attachments.some(a => a.type === 'image')
-    if (hasImageAttachments && isNoVisionModel(currentModelId)) {
-      setInfoToast(t('This model does not support image understanding'))
-      return
-    }
 
     if (isGenerating && onInject) {
       // During generation: inject message instead of normal send
@@ -812,11 +793,18 @@ export function InputArea({ onSend, onStop, onInject, isGenerating, isCompact = 
 
         {/* Attachment preview area - outside input container */}
         {(hasAttachments || isProcessingFiles) && (
-          <AttachmentPreview
-            attachments={attachments}
-            onRemove={removeAttachment}
-            isProcessing={isProcessingFiles}
-          />
+          <>
+            <AttachmentPreview
+              attachments={attachments}
+              onRemove={removeAttachment}
+              isProcessing={isProcessingFiles}
+            />
+            {attachments.some(a => a.type === 'image') && isNoVisionModel(currentModelId) && (
+              <p className="text-xs text-muted-foreground px-2 -mt-1">
+                {t('Images will be auto-converted to text descriptions before sending')}
+              </p>
+            )}
+          </>
         )}
 
         {/* Input container */}
