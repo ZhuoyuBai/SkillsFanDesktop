@@ -913,6 +913,8 @@ export const api = {
     onEvent('agent:mcp-status', callback),
   onAgentCompact: (callback: (data: unknown) => void) =>
     onEvent('agent:compact', callback),
+  onAgentSuggestions: (callback: (data: unknown) => void) =>
+    onEvent('agent:suggestions', callback),
   onAgentUserQuestion: (callback: (data: unknown) => void) =>
     onEvent('agent:user-question', callback),
   onAgentUserQuestionAnswered: (callback: (data: unknown) => void) =>

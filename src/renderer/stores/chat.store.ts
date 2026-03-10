@@ -75,6 +75,8 @@ interface SessionState {
   lastSegmentIndex: number  // End position of last saved segment
   // Pending user question (AskUserQuestion tool)
   pendingUserQuestion: UserQuestionInfo | null
+  // AI-generated follow-up suggestions
+  aiSuggestions: string[] | null
   // Draft input content (preserved across page navigation)
   draftContent: string
 }
@@ -96,6 +98,7 @@ function createEmptySessionState(): SessionState {
     textSegments: [],
     lastSegmentIndex: 0,
     pendingUserQuestion: null,
+    aiSuggestions: null,
     draftContent: ''
   }
 }
@@ -190,6 +193,7 @@ interface ChatState {
   handleAgentError: (data: AgentEventBase & { error: string; errorCode?: number }) => void
   handleAgentComplete: (data: AgentEventBase & { userMessageUuid?: string }) => void
   handleAgentThought: (data: AgentEventBase & { thought: Thought }) => void
+  handleAgentSuggestions: (data: AgentEventBase & { suggestions: string[] }) => void
   handleAgentCompact: (data: AgentEventBase & { trigger: 'manual' | 'auto'; preTokens: number }) => void
   handleAgentUserQuestion: (data: AgentEventBase & { toolId: string; questions: UserQuestionInfo['questions'] }) => void
   handleAgentUserQuestionAnswered: (data: AgentEventBase) => void
@@ -1100,6 +1104,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         isThinking: true,
         pendingToolApproval: null,
         compactInfo: null,
+        aiSuggestions: null,
         textSegments: [],
         lastSegmentIndex: 0
       })
@@ -1416,6 +1421,22 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   // Handle compact notification - context was compressed
+  handleAgentSuggestions: (data) => {
+    const { conversationId, suggestions } = data
+    logger.debug(`[ChatStore] handleAgentSuggestions [${conversationId}]: ${suggestions.length} suggestions`)
+
+    set((state) => {
+      const newSessions = new Map(state.sessions)
+      const session = newSessions.get(conversationId) || createEmptySessionState()
+
+      newSessions.set(conversationId, {
+        ...session,
+        aiSuggestions: suggestions
+      })
+      return { sessions: newSessions }
+    })
+  },
+
   handleAgentCompact: (data) => {
     const { conversationId, trigger, preTokens } = data
     logger.debug(`[ChatStore] handleAgentCompact [${conversationId}]: trigger=${trigger}, preTokens=${preTokens}`)

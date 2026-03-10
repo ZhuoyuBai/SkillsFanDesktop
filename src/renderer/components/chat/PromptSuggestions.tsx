@@ -2,6 +2,7 @@
  * PromptSuggestions - Context-aware follow-up suggestions after assistant response
  *
  * Priority:
+ * 0. AI-generated suggestions (highest priority - contextual and dynamic)
  * 1. Extract actionable options from assistant's reply text (e.g. bullet-point choices)
  * 2. Generate suggestions based on tools used in the turn
  * 3. Show nothing if no meaningful suggestions can be derived
@@ -14,6 +15,7 @@ import { useTranslation } from '../../i18n'
 interface PromptSuggestionsProps {
   thoughts: Thought[]
   content?: string   // Last assistant message text
+  aiSuggestions?: string[] | null  // AI-generated follow-up suggestions
   onSelect: (suggestion: string) => void
 }
 
@@ -54,11 +56,16 @@ function extractOptionsFromContent(content: string): string[] {
   return []
 }
 
-export function PromptSuggestions({ thoughts, content, onSelect }: PromptSuggestionsProps) {
+export function PromptSuggestions({ thoughts, content, aiSuggestions, onSelect }: PromptSuggestionsProps) {
   const { t } = useTranslation()
 
   const suggestions = useMemo(() => {
-    // 1. Try content-based extraction first (most contextual)
+    // 0. AI-generated suggestions (highest priority - contextual)
+    if (aiSuggestions && aiSuggestions.length > 0) {
+      return aiSuggestions.slice(0, 3)
+    }
+
+    // 1. Try content-based extraction (fallback)
     if (content) {
       const contentItems = extractOptionsFromContent(content)
       if (contentItems.length > 0) return contentItems
@@ -93,7 +100,7 @@ export function PromptSuggestions({ thoughts, content, onSelect }: PromptSuggest
 
     // No generic fallback — only show when we have something meaningful
     return items.slice(0, 3)
-  }, [thoughts, content, t])
+  }, [thoughts, content, aiSuggestions, t])
 
   if (suggestions.length === 0) return null
 

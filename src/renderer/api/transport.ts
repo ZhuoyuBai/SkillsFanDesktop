@@ -234,6 +234,7 @@ export function onEvent(channel: string, callback: (data: unknown) => void): () 
       'agent:thought': 'onAgentThought',
       'agent:mcp-status': 'onAgentMcpStatus',
       'agent:compact': 'onAgentCompact',
+      'agent:suggestions': 'onAgentSuggestions',
       'agent:user-question': 'onAgentUserQuestion',
       'agent:user-question-answered': 'onAgentUserQuestionAnswered',
       'remote:status-change': 'onRemoteStatusChange',

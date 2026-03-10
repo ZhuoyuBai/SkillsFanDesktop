@@ -195,7 +195,8 @@ export function ChatView({ isCompact = false }: ChatViewProps) {
     textSegments,
     lastSegmentIndex,
     pendingToolApproval,
-    pendingUserQuestion
+    pendingUserQuestion,
+    aiSuggestions
   } = session
 
   // Create toggle callbacks for the current conversation
@@ -433,6 +434,7 @@ export function ChatView({ isCompact = false }: ChatViewProps) {
                   <PromptSuggestions
                     thoughts={lastAssistant.thoughts}
                     content={lastAssistant.content}
+                    aiSuggestions={aiSuggestions}
                     onSelect={handleSuggestionSelect}
                   />
                 </div>

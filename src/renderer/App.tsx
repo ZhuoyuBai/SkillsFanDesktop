@@ -85,6 +85,7 @@ export default function App() {
     handleAgentComplete,
     handleAgentThought,
     handleAgentCompact,
+    handleAgentSuggestions,
     handleAgentUserQuestion,
     handleAgentUserQuestionAnswered,
     currentSpaceId,
@@ -235,6 +236,10 @@ export default function App() {
       handleAgentCompact(data as AgentEventBase & { trigger: 'manual' | 'auto'; preTokens: number })
     })
 
+    const unsubSuggestions = api.onAgentSuggestions((data) => {
+      handleAgentSuggestions(data as AgentEventBase & { suggestions: string[] })
+    })
+
     const unsubUserQuestion = api.onAgentUserQuestion((data) => {
       logger.debug('[App] Received agent:user-question event:', data)
       handleAgentUserQuestion(data as AgentEventBase & { toolId: string; questions: Array<{ question: string; header: string; options: Array<{ label: string; description: string }>; multiSelect: boolean }> })
@@ -306,6 +311,7 @@ export default function App() {
       unsubError()
       unsubComplete()
       unsubCompact()
+      unsubSuggestions()
       unsubUserQuestion()
       unsubUserQuestionAnswered()
       unsubMcpStatus()
@@ -321,6 +327,7 @@ export default function App() {
     handleAgentComplete,
     handleAgentThought,
     handleAgentCompact,
+    handleAgentSuggestions,
     handleAgentUserQuestion,
     handleAgentUserQuestionAnswered,
     setMcpStatus

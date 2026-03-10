@@ -162,6 +162,7 @@ export interface SkillsFanAPI {
   onAgentThought: (callback: (data: unknown) => void) => () => void
   onAgentMcpStatus: (callback: (data: unknown) => void) => () => void
   onAgentCompact: (callback: (data: unknown) => void) => () => void
+  onAgentSuggestions: (callback: (data: unknown) => void) => () => void
   onAgentUserQuestion: (callback: (data: unknown) => void) => () => void
   onAgentUserQuestionAnswered: (callback: (data: unknown) => void) => () => void
 
@@ -557,6 +558,7 @@ const api: SkillsFanAPI = {
   onAgentThought: (callback) => createEventListener('agent:thought', callback),
   onAgentMcpStatus: (callback) => createEventListener('agent:mcp-status', callback),
   onAgentCompact: (callback) => createEventListener('agent:compact', callback),
+  onAgentSuggestions: (callback) => createEventListener('agent:suggestions', callback),
   onAgentUserQuestion: (callback) => createEventListener('agent:user-question', callback),
   onAgentUserQuestionAnswered: (callback) => createEventListener('agent:user-question-answered', callback),
 

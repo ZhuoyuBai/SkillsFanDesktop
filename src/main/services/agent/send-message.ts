@@ -43,6 +43,7 @@ import {
 import { broadcastMcpStatus } from './mcp-manager'
 import { buildSdkOptions, resolveSdkTransport } from './sdk-options'
 import { preprocessImages } from './image-preprocess'
+import { generateSuggestions } from './suggestion-generator'
 import {
   formatCanvasContext,
   buildMessageContent,
@@ -1018,6 +1019,21 @@ async function processMessageStream(
       tokenUsage,  // Include token usage data
       userMessageUuid: lastUserMessageUuid  // For file rewind support
     })
+  }
+
+  // AI-powered follow-up suggestions - fire and forget, don't block completion
+  if (!ralphMode?.enabled && (accumulatedTextContent || currentStreamingText)) {
+    const sugContent = accumulatedTextContent || currentStreamingText || ''
+    const toolsUsed = sessionState.thoughts
+      .filter((t: any) => t.type === 'tool_use' && t.toolName)
+      .map((t: any) => t.toolName!)
+    generateSuggestions(message, sugContent, [...new Set(toolsUsed)])
+      .then(suggestions => {
+        if (suggestions.length > 0) {
+          sendToRenderer('agent:suggestions', spaceId, conversationId, { type: 'suggestions', suggestions })
+        }
+      })
+      .catch(() => {}) // Silent failure - frontend falls back to static suggestions
   }
 
   // Extension hook: notify extensions that message is complete
