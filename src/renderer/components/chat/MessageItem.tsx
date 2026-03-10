@@ -272,6 +272,12 @@ export function MessageItem({ message, hideThoughts = false, isInContainer = fal
 
   // Check if there are running browser tools (based on isWorking state)
   const hasBrowserActivity = isWorking && browserToolCalls.length > 0
+  const hasMessageContent = Boolean(message.content)
+  const shouldRenderShell = isUser
+    || hasMessageContent
+    || Boolean(isStreaming)
+    || Boolean(isWaitingMore)
+    || userAttachments.length > 0
 
   // Extract file paths from thoughts for clickable file links in markdown
   const filePathMap = useMemo(() => {
@@ -290,53 +296,8 @@ export function MessageItem({ message, hideThoughts = false, isInContainer = fal
     return Object.keys(map).length > 0 ? map : undefined
   }, [message.thoughts])
 
-  // Message bubble content
-  const bubble = (
-    <div
-      onContextMenu={handleContextMenu}
-      className={`rounded-2xl px-4 py-3 overflow-y-hidden overflow-x-auto w-full ${
-        isUser ? 'message-user' : 'message-assistant'
-      } ${isStreaming ? 'streaming-message' : ''} ${isWorking ? 'message-working' : ''}`}
-    >
-      {/* Working indicator - shows when AI is working */}
-      {isWorking && !isUser && (
-        <div className="flex items-center gap-1.5 mb-2 pb-2 border-b border-border/20 working-indicator-fade">
-          <Sparkles size={12} className="text-primary/60 animate-pulse-gentle" />
-          <span className="text-xs text-muted-foreground/70">{t('Halo is working')}</span>
-        </div>
-      )}
-
-      {/* User message attachments (displayed before text) */}
-      {isUser && userAttachments.length > 0 && (
-        <MessageAttachments attachments={userAttachments} />
-      )}
-
-      {/* Message content with streaming cursor */}
-      <div className="break-words leading-relaxed" data-message-content>
-        {message.content && (
-          isUser ? (
-            // User messages: simple whitespace-preserving text
-            <span className="whitespace-pre-wrap">{message.content}</span>
-          ) : (
-            // Assistant messages: full markdown rendering
-            <MarkdownRenderer content={message.content} filePathMap={filePathMap} />
-          )
-        )}
-        {/* Streaming logo animation when actively receiving tokens */}
-        {isStreaming && (
-          <span className="inline-flex items-center ml-1 align-middle">
-            <HaloLogo size={16} animated={true} />
-          </span>
-        )}
-        {/* Waiting logo when content paused but still working (e.g., tool call in progress) */}
-        {isWaitingMore && !isStreaming && (
-          <span className="inline-flex items-center ml-1 align-middle">
-            <HaloLogo size={16} animated={true} />
-          </span>
-        )}
-      </div>
-
-      {/* Browser task card - browser tools displayed separately */}
+  const auxiliaryContent = (
+    <>
       {browserToolCalls.length > 0 && (
         <BrowserTaskCard
           browserToolCalls={browserToolCalls}
@@ -344,22 +305,71 @@ export function MessageItem({ message, hideThoughts = false, isInContainer = fal
         />
       )}
 
-      {/* Thought history - only for assistant messages with thoughts (when not hidden) */}
       {!hideThoughts && !isUser && message.thoughts && message.thoughts.length > 0 && (
         <ThoughtHistory thoughts={message.thoughts} />
       )}
 
-      {/* File changes footer - only for assistant messages with thoughts */}
       {!isUser && message.thoughts && message.thoughts.length > 0 && (
         <FileChangesFooter thoughts={message.thoughts} />
       )}
+    </>
+  )
 
+  // CLI-style message content
+  const messageContent = shouldRenderShell ? (
+    <div
+      onContextMenu={handleContextMenu}
+      className={`flex items-start gap-2.5 py-2 px-3 overflow-y-hidden overflow-x-auto w-full rounded ${
+        isUser ? 'bg-muted/15' : 'bg-muted/8'
+      }`}
+    >
+      {/* CLI indicator */}
+      <span className={`flex-shrink-0 text-[13px] leading-relaxed select-none ${
+        isUser ? 'text-blue-400' : 'text-orange-400'
+      }`}>
+        {isUser ? '❯' : '⏺'}
+      </span>
+
+      {/* Content */}
+      <div className="flex-1 min-w-0">
+        {/* User message attachments (displayed before text) */}
+        {isUser && userAttachments.length > 0 && (
+          <MessageAttachments attachments={userAttachments} />
+        )}
+
+        {/* Message content */}
+        <div className="break-words leading-relaxed text-[13px]" data-message-content>
+          {hasMessageContent && (
+            isUser ? (
+              <span className="whitespace-pre-wrap text-foreground">{message.content}</span>
+            ) : (
+              <MarkdownRenderer content={message.content} filePathMap={filePathMap} />
+            )
+          )}
+          {isStreaming && (
+            <span className="inline-flex items-center ml-1 align-middle">
+              <HaloLogo size={16} animated={true} />
+            </span>
+          )}
+          {isWaitingMore && !isStreaming && (
+            <span className="inline-flex items-center ml-1 align-middle">
+              <HaloLogo size={16} animated={true} />
+            </span>
+          )}
+        </div>
+
+        {auxiliaryContent}
+      </div>
+    </div>
+  ) : (
+    <div className="pl-7 pr-3 py-1">
+      {auxiliaryContent}
     </div>
   )
 
-  // Hover action buttons - shown on all messages with content
+  // Hover action buttons
   const actionButtons = message.content ? (
-    <div className="absolute -top-2 -right-2 opacity-0 group-hover:opacity-100
+    <div className="absolute top-1 right-0 opacity-0 group-hover:opacity-100
       flex items-center gap-0.5 bg-background border border-border shadow-sm
       rounded-lg p-0.5 transition-all z-10">
       <button
@@ -390,12 +400,12 @@ export function MessageItem({ message, hideThoughts = false, isInContainer = fal
     document.body
   ) : null
 
-  // When in container, just return the bubble without wrapper
+  // When in container, just return without wrapper
   if (isInContainer) {
     return (
       <div data-message-id={message.id}>
         <div className="relative group">
-          {bubble}
+          {messageContent}
           {actionButtons}
         </div>
         {contextMenuPortal}
@@ -403,14 +413,14 @@ export function MessageItem({ message, hideThoughts = false, isInContainer = fal
     )
   }
 
-  // Normal case: wrap with flex container
+  // Normal case: left-aligned CLI style
   return (
     <div
-      className={`flex ${isUser ? 'justify-end' : 'justify-start'} animate-fade-in`}
+      className="animate-fade-in"
       data-message-id={message.id}
     >
-      <div className="relative group max-w-[85%]">
-        {bubble}
+      <div className="relative group">
+        {messageContent}
         {actionButtons}
       </div>
       {contextMenuPortal}

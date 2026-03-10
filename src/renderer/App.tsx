@@ -85,9 +85,11 @@ export default function App() {
     handleAgentComplete,
     handleAgentThought,
     handleAgentCompact,
-    handleAgentSuggestions,
+    handleAgentStatus,
     handleAgentUserQuestion,
     handleAgentUserQuestionAnswered,
+    handleAgentTaskUpdate,
+    handleAgentSubagentUpdate,
     currentSpaceId,
     setCurrentSpace: setChatCurrentSpace,
     loadConversations,
@@ -236,8 +238,8 @@ export default function App() {
       handleAgentCompact(data as AgentEventBase & { trigger: 'manual' | 'auto'; preTokens: number })
     })
 
-    const unsubSuggestions = api.onAgentSuggestions((data) => {
-      handleAgentSuggestions(data as AgentEventBase & { suggestions: string[] })
+    const unsubStatus = api.onAgentStatus((data) => {
+      handleAgentStatus(data as AgentEventBase & { message: string })
     })
 
     const unsubUserQuestion = api.onAgentUserQuestion((data) => {
@@ -248,6 +250,40 @@ export default function App() {
     const unsubUserQuestionAnswered = api.onAgentUserQuestionAnswered((data) => {
       logger.debug('[App] Received agent:user-question-answered event:', data)
       handleAgentUserQuestionAnswered(data as AgentEventBase)
+    })
+
+    // Sub-agent task updates (task_started, task_progress, task_notification)
+    const unsubTaskUpdate = api.onAgentTaskUpdate((data) => {
+      handleAgentTaskUpdate(data as AgentEventBase & {
+        type: 'task_started' | 'task_progress' | 'task_notification'
+        taskId: string
+        toolUseId?: string
+        description?: string
+        summary?: string
+        lastToolName?: string
+        status?: string
+        usage?: { total_tokens: number; tool_uses: number; duration_ms: number }
+      })
+    })
+
+    const unsubSubagentUpdate = api.onAgentSubagentUpdate((data) => {
+      handleAgentSubagentUpdate(data as AgentEventBase & {
+        runId: string
+        parentConversationId: string
+        parentSpaceId: string
+        childConversationId: string
+        status: 'queued' | 'running' | 'waiting_announce' | 'completed' | 'failed' | 'killed' | 'timeout'
+        task: string
+        label?: string
+        spawnedAt: string
+        startedAt?: string
+        endedAt?: string
+        latestSummary?: string
+        resultSummary?: string
+        error?: string
+        announcedAt?: string
+        durationMs?: number
+      })
     })
 
     // MCP status updates (global - not per-conversation)
@@ -311,9 +347,11 @@ export default function App() {
       unsubError()
       unsubComplete()
       unsubCompact()
-      unsubSuggestions()
+      unsubStatus()
       unsubUserQuestion()
       unsubUserQuestionAnswered()
+      unsubTaskUpdate()
+      unsubSubagentUpdate()
       unsubMcpStatus()
       unsubSkillsFanLogin()
       unsubSkillsFanLogout()
@@ -327,9 +365,11 @@ export default function App() {
     handleAgentComplete,
     handleAgentThought,
     handleAgentCompact,
-    handleAgentSuggestions,
+    handleAgentStatus,
     handleAgentUserQuestion,
     handleAgentUserQuestionAnswered,
+    handleAgentTaskUpdate,
+    handleAgentSubagentUpdate,
     setMcpStatus
   ])
 

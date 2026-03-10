@@ -253,7 +253,7 @@ describe('sdk-options', () => {
       expect(mocks.createLocalToolsMcpServer).toHaveBeenCalledTimes(1)
       expect(mocks.createWebToolsMcpServer).toHaveBeenCalledTimes(1)
       expect(mocks.createSkillMcpServer).toHaveBeenCalledTimes(1)
-      expect(sdkOptions.maxThinkingTokens).toBe(10240)
+      expect(sdkOptions.thinking).toEqual({ type: 'enabled', budgetTokens: 10240 })
       expect(sdkOptions.systemPrompt.append).toContain('[BASE_PROMPT]')
       expect(sdkOptions.systemPrompt.append).toContain('[AI_BROWSER_PROMPT]')
       expect(sdkOptions.systemPrompt.append).toContain('prefer the automated browser tools')

@@ -29,6 +29,10 @@ import { useToastStore } from './toast.store'
 import i18n from '../i18n'
 import { logger } from '../lib/logger'
 import type { ThinkingEffort } from '../../shared/utils/openai-models'
+import {
+  shouldSuppressSetModelStatus,
+  stripLeadingSetModelStatus
+} from '../../shared/utils/sdk-status'
 
 // LRU cache size limit
 const CONVERSATION_CACHE_SIZE = 10
@@ -75,10 +79,83 @@ interface SessionState {
   lastSegmentIndex: number  // End position of last saved segment
   // Pending user question (AskUserQuestion tool)
   pendingUserQuestion: UserQuestionInfo | null
-  // AI-generated follow-up suggestions
-  aiSuggestions: string[] | null
   // Draft input content (preserved across page navigation)
   draftContent: string
+  // SDK status line message (ephemeral, clears when generation completes)
+  sdkStatus: string | null
+  // Sub-agent task progress (from agent:task-update events)
+  taskProgressMap: Map<string, TaskProgress>
+  // Hosted subagent runtime runs (from agent:subagent-update events)
+  subagentRunMap: Map<string, SubagentRunEntry>
+}
+
+// Sub-agent step history entry
+export interface TaskStepEntry {
+  toolName: string
+  summary?: string
+  timestamp: number
+  toolUseCount: number
+}
+
+// Sub-agent task progress info
+interface TaskProgress {
+  taskId: string
+  toolUseId?: string
+  description: string
+  summary?: string
+  resultSummary?: string
+  lastToolName?: string
+  status: 'running' | 'completed' | 'failed' | 'stopped'
+  usage?: { total_tokens: number; tool_uses: number; duration_ms: number }
+  stepHistory: TaskStepEntry[]
+}
+
+export interface SubagentRunEntry {
+  runId: string
+  parentConversationId: string
+  parentSpaceId: string
+  childConversationId: string
+  status: 'queued' | 'running' | 'waiting_announce' | 'completed' | 'failed' | 'killed' | 'timeout'
+  task: string
+  label?: string
+  model?: string
+  modelSource?: string
+  thinkingEffort?: string
+  spawnedAt: string
+  startedAt?: string
+  endedAt?: string
+  latestSummary?: string
+  resultSummary?: string
+  error?: string
+  announcedAt?: string
+  tokenUsage?: {
+    inputTokens: number
+    outputTokens: number
+    totalCostUsd?: number
+  }
+  toolUseId?: string
+  durationMs?: number
+}
+
+function getMessagePreview(message?: Message): string | undefined {
+  if (!message) return undefined
+
+  const sanitizedContent = message.role === 'assistant'
+    ? stripLeadingSetModelStatus(message.content || '')
+    : (message.content || '')
+  const content = sanitizedContent.trim()
+  if (content) return content.slice(0, 50)
+
+  const thoughts = message.thoughts || []
+  for (let i = thoughts.length - 1; i >= 0; i -= 1) {
+    const thought = thoughts[i]
+    if (thought.type === 'error' && thought.content) return thought.content.slice(0, 50)
+    if (thought.type === 'thinking' && thought.content) return thought.content.slice(0, 50)
+    if (thought.type === 'tool_use' && thought.toolName) return `Tool: ${thought.toolName}`
+    if (thought.type === 'tool_result' && thought.toolName) return `Result: ${thought.toolName}`
+  }
+
+  return undefined
 }
 
 // Create empty session state
@@ -98,8 +175,10 @@ function createEmptySessionState(): SessionState {
     textSegments: [],
     lastSegmentIndex: 0,
     pendingUserQuestion: null,
-    aiSuggestions: null,
-    draftContent: ''
+    draftContent: '',
+    sdkStatus: null,
+    taskProgressMap: new Map(),
+    subagentRunMap: new Map()
   }
 }
 
@@ -110,6 +189,11 @@ function createEmptySpaceState(): SpaceState {
     currentConversationId: null,
     selectionType: 'conversation'
   }
+}
+
+function shouldHideSdkStatus(message?: string | null): boolean {
+  if (!message) return false
+  return shouldSuppressSetModelStatus(message)
 }
 
 interface ChatState {
@@ -193,10 +277,22 @@ interface ChatState {
   handleAgentError: (data: AgentEventBase & { error: string; errorCode?: number }) => void
   handleAgentComplete: (data: AgentEventBase & { userMessageUuid?: string }) => void
   handleAgentThought: (data: AgentEventBase & { thought: Thought }) => void
-  handleAgentSuggestions: (data: AgentEventBase & { suggestions: string[] }) => void
   handleAgentCompact: (data: AgentEventBase & { trigger: 'manual' | 'auto'; preTokens: number }) => void
+  handleAgentStatus: (data: AgentEventBase & { message: string }) => void
   handleAgentUserQuestion: (data: AgentEventBase & { toolId: string; questions: UserQuestionInfo['questions'] }) => void
   handleAgentUserQuestionAnswered: (data: AgentEventBase) => void
+  handleAgentTaskUpdate: (data: AgentEventBase & {
+    type: 'task_started' | 'task_progress' | 'task_notification'
+    taskId: string
+    toolUseId?: string
+    description?: string
+    summary?: string
+    lastToolName?: string
+    status?: string
+    usage?: { total_tokens: number; tool_uses: number; duration_ms: number }
+  }) => void
+  handleAgentSubagentUpdate: (data: AgentEventBase & SubagentRunEntry) => void
+  killSubagentRun: (runId: string) => Promise<void>
   answerUserQuestion: (conversationId: string, answers: Record<string, string>) => Promise<void>
 
   // Cleanup
@@ -463,10 +559,31 @@ export const useChatStore = create<ChatState>((set, get) => ({
     try {
       const response = await api.getSessionState(conversationId)
       if (response.success && response.data) {
-        const sessionState = response.data as { isActive: boolean; thoughts: Thought[]; spaceId?: string }
+        const sessionState = response.data as {
+          isActive: boolean
+          thoughts: Thought[]
+          taskProgress?: TaskProgress[]
+          subagentRuns?: SubagentRunEntry[]
+          spaceId?: string
+        }
+        const recoveredTaskProgress = new Map(
+          (sessionState.taskProgress || []).map(task => [task.taskId, task])
+        )
+        const recoveredSubagentRuns = new Map(
+          (sessionState.subagentRuns || []).map(run => [run.runId, run])
+        )
 
-        if (sessionState.isActive && sessionState.thoughts.length > 0) {
-          logger.debug(`[ChatStore] Recovering ${sessionState.thoughts.length} thoughts for conversation ${conversationId}`)
+        if (
+          sessionState.isActive
+          || sessionState.thoughts.length > 0
+          || recoveredTaskProgress.size > 0
+          || recoveredSubagentRuns.size > 0
+        ) {
+          logger.debug(
+            `[ChatStore] Recovering session for conversation ${conversationId}: ` +
+            `${sessionState.thoughts.length} thoughts, ${recoveredTaskProgress.size} tasks, ` +
+            `${recoveredSubagentRuns.size} hosted subagents`
+          )
 
           set((state) => {
             const newSessions = new Map(state.sessions)
@@ -474,9 +591,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
             newSessions.set(conversationId, {
               ...existingSession,
-              isGenerating: true,
-              isThinking: true,
-              thoughts: sessionState.thoughts
+              isGenerating: sessionState.isActive,
+              isThinking: sessionState.isActive,
+              thoughts: sessionState.thoughts,
+              taskProgressMap: recoveredTaskProgress,
+              subagentRunMap: recoveredSubagentRuns
             })
 
             return { sessions: newSessions }
@@ -919,7 +1038,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   // Stop generation for a specific conversation
   stopGeneration: async (conversationId?: string) => {
-    const targetId = conversationId || get().getCurrentSpaceState().currentConversationId
+    const targetId = conversationId ?? get().getCurrentSpaceState().currentConversationId ?? undefined
     try {
       await api.stopGeneration(targetId)
 
@@ -1104,7 +1223,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         isThinking: true,
         pendingToolApproval: null,
         compactInfo: null,
-        aiSuggestions: null,
+        sdkStatus: null,
         textSegments: [],
         lastSegmentIndex: 0
       })
@@ -1212,6 +1331,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         error,
         isGenerating: false,
         isThinking: false,
+        sdkStatus: null,
         thoughts: [...session.thoughts, errorThought]
       })
       return { sessions: newSessions }
@@ -1263,7 +1383,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
         newSessions.set(conversationId, {
           ...session,
           isStreaming: false,
-          isThinking: false
+          isThinking: false,
+          sdkStatus: null
           // Keep isGenerating=true and streamingContent until backend loads
         })
       }
@@ -1286,7 +1407,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           updatedAt: updatedConversation.updatedAt,
           messageCount: updatedConversation.messages?.length || 0,
           preview: updatedConversation.messages?.length
-            ? updatedConversation.messages[updatedConversation.messages.length - 1].content.slice(0, 50)
+            ? getMessagePreview(updatedConversation.messages[updatedConversation.messages.length - 1])
             : undefined
         }
 
@@ -1334,7 +1455,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 ...currentSession,
                 isGenerating: false,
                 streamingContent: '',
-                compactInfo: null
+                compactInfo: null,
+                sdkStatus: null
               })
             }
             // If nextMessageStarted, leave session state untouched
@@ -1347,6 +1469,28 @@ export const useChatStore = create<ChatState>((set, get) => ({
           }
         })
         logger.debug(`[ChatStore] Conversation reloaded from backend [${conversationId}]`)
+      } else {
+        logger.warn(
+          `[ChatStore] Failed to reload conversation after complete [${conversationId}]: ${response.error || 'unknown error'}`
+        )
+
+        set((state) => {
+          const newSessions = new Map(state.sessions)
+          const currentSession = newSessions.get(conversationId)
+          if (currentSession) {
+            const nextMessageStarted = currentSession.isThinking === true
+            if (!nextMessageStarted) {
+              newSessions.set(conversationId, {
+                ...currentSession,
+                isGenerating: false,
+                streamingContent: '',
+                compactInfo: null,
+                sdkStatus: null
+              })
+            }
+          }
+          return { sessions: newSessions }
+        })
       }
     } catch (error) {
       logger.error('[ChatStore] Failed to reload conversation:', error)
@@ -1361,7 +1505,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
               ...currentSession,
               isGenerating: false,
               streamingContent: '',
-              compactInfo: null
+              compactInfo: null,
+              sdkStatus: null
             })
           }
         }
@@ -1421,22 +1566,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   // Handle compact notification - context was compressed
-  handleAgentSuggestions: (data) => {
-    const { conversationId, suggestions } = data
-    logger.debug(`[ChatStore] handleAgentSuggestions [${conversationId}]: ${suggestions.length} suggestions`)
-
-    set((state) => {
-      const newSessions = new Map(state.sessions)
-      const session = newSessions.get(conversationId) || createEmptySessionState()
-
-      newSessions.set(conversationId, {
-        ...session,
-        aiSuggestions: suggestions
-      })
-      return { sessions: newSessions }
-    })
-  },
-
   handleAgentCompact: (data) => {
     const { conversationId, trigger, preTokens } = data
     logger.debug(`[ChatStore] handleAgentCompact [${conversationId}]: trigger=${trigger}, preTokens=${preTokens}`)
@@ -1451,6 +1580,96 @@ export const useChatStore = create<ChatState>((set, get) => ({
       })
       return { sessions: newSessions }
     })
+  },
+
+  // Handle SDK status line messages (ephemeral progress indicator)
+  handleAgentStatus: (data) => {
+    const { conversationId, message } = data
+    set((state) => {
+      const newSessions = new Map(state.sessions)
+      const session = newSessions.get(conversationId) || createEmptySessionState()
+      newSessions.set(conversationId, {
+        ...session,
+        sdkStatus: shouldHideSdkStatus(message) ? null : (message || null)
+      })
+      return { sessions: newSessions }
+    })
+  },
+
+  // Handle sub-agent task updates (task_started, task_progress, task_notification)
+  handleAgentTaskUpdate: (data) => {
+    const { conversationId, type, taskId, toolUseId, description, summary, lastToolName, status, usage } = data
+    const stepHistory = (data as any).stepHistory as TaskStepEntry[] | undefined
+    const resultSummary = (data as any).resultSummary as string | undefined
+    set((state) => {
+      const newSessions = new Map(state.sessions)
+      const session = newSessions.get(conversationId) || createEmptySessionState()
+      const newMap = new Map(session.taskProgressMap)
+
+      if (type === 'task_started') {
+        newMap.set(taskId, {
+          taskId,
+          toolUseId,
+          description: description || 'agent',
+          status: 'running',
+          stepHistory: [],
+        })
+      } else if (type === 'task_progress') {
+        const existing = newMap.get(taskId)
+        if (existing) {
+          newMap.set(taskId, {
+            ...existing,
+            summary: summary || existing.summary,
+            lastToolName: lastToolName || existing.lastToolName,
+            usage: usage || existing.usage,
+            stepHistory: stepHistory || existing.stepHistory,
+          })
+        }
+      } else if (type === 'task_notification') {
+        const existing = newMap.get(taskId)
+        if (existing) {
+          newMap.set(taskId, {
+            ...existing,
+            status: (status as TaskProgress['status']) || 'completed',
+            summary: summary || existing.summary,
+            resultSummary: resultSummary || existing.resultSummary,
+            usage: usage || existing.usage,
+            stepHistory: stepHistory || existing.stepHistory,
+          })
+        }
+      }
+
+      newSessions.set(conversationId, {
+        ...session,
+        taskProgressMap: newMap,
+      })
+      return { sessions: newSessions }
+    })
+  },
+
+  handleAgentSubagentUpdate: (data) => {
+    const { conversationId, runId } = data
+    set((state) => {
+      const newSessions = new Map(state.sessions)
+      const session = newSessions.get(conversationId) || createEmptySessionState()
+      const nextRuns = new Map(session.subagentRunMap)
+      nextRuns.set(runId, { ...(data as AgentEventBase & SubagentRunEntry) })
+
+      newSessions.set(conversationId, {
+        ...session,
+        subagentRunMap: nextRuns
+      })
+      return { sessions: newSessions }
+    })
+  },
+
+  killSubagentRun: async (runId: string) => {
+    try {
+      await api.killSubagentRun(runId)
+      // State update comes via agent:subagent-update event automatically
+    } catch (error) {
+      logger.error('[ChatStore] Failed to kill subagent:', error)
+    }
   },
 
   // Handle user question from AskUserQuestion tool - pauses execution

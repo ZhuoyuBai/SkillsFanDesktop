@@ -8,7 +8,7 @@
 
 /* ========== Base ========== */
 .streamdown-content {
-  font-size: 15px;
+  font-size: 13px;
   line-height: 1.7;
   color: hsl(var(--foreground));
   overflow-x: auto;
@@ -16,11 +16,12 @@
 }
 
 /* ========== Headings ========== */
+/* Unified font size - only bold distinguishes headings */
 .streamdown-content h1 {
-  font-size: 1.25rem;
+  font-size: inherit;
   font-weight: 600;
-  margin-top: 1.5rem;
-  margin-bottom: 0.75rem;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
 }
 
 .streamdown-content h1:first-child {
@@ -28,9 +29,9 @@
 }
 
 .streamdown-content h2 {
-  font-size: 1.125rem;
+  font-size: inherit;
   font-weight: 600;
-  margin-top: 1.25rem;
+  margin-top: 0.75rem;
   margin-bottom: 0.5rem;
 }
 
@@ -39,10 +40,10 @@
 }
 
 .streamdown-content h3 {
-  font-size: 1rem;
+  font-size: inherit;
   font-weight: 600;
-  margin-top: 1rem;
-  margin-bottom: 0.5rem;
+  margin-top: 0.75rem;
+  margin-bottom: 0.375rem;
 }
 
 /* ========== Paragraphs ========== */
@@ -196,4 +197,10 @@
 .streamdown-content pre:hover [data-sd-copy],
 .streamdown-content pre:hover button[aria-label="Copy"] {
   opacity: 1;
+}
+
+/* ========== Thinking Context ========== */
+/* Inherit parent's muted color inside thinking blocks */
+.thinking-content .streamdown-content {
+  color: inherit;
 }

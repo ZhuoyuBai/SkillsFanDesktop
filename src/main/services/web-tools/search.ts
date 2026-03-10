@@ -119,12 +119,44 @@ async function readErrorText(response: Response): Promise<string> {
   }
 }
 
-function resolveKimiFallbackApiKey(): string {
+// ---------------------------------------------------------------------------
+// AI Source key resolution helpers
+// ---------------------------------------------------------------------------
+
+function getAiSourceApiKey(sourceKey: string): string {
   const config = getConfig()
-  const kimiSource = config.aiSources?.kimi as Record<string, unknown> | undefined
-  if (kimiSource && typeof kimiSource.apiKey === 'string') {
-    return kimiSource.apiKey.trim()
+  const source = config.aiSources?.[sourceKey] as Record<string, unknown> | undefined
+  if (source && typeof source.apiKey === 'string') {
+    return source.apiKey.trim()
   }
+  return ''
+}
+
+function resolveClaudeApiKeyFromSources(): string {
+  const config = getConfig()
+  const aiSources = config.aiSources as Record<string, unknown> | undefined
+  if (!aiSources) return ''
+
+  // Check 'custom' source with anthropic provider
+  const custom = aiSources.custom as Record<string, unknown> | undefined
+  if (custom && custom.provider === 'anthropic' && typeof custom.apiKey === 'string') {
+    return custom.apiKey.trim()
+  }
+
+  return ''
+}
+
+function resolveGptApiKeyFromSources(): string {
+  const config = getConfig()
+  const aiSources = config.aiSources as Record<string, unknown> | undefined
+  if (!aiSources) return ''
+
+  // Check 'custom' source with openai provider
+  const custom = aiSources.custom as Record<string, unknown> | undefined
+  if (custom && custom.provider === 'openai' && typeof custom.apiKey === 'string') {
+    return custom.apiKey.trim()
+  }
+
   return ''
 }
 
@@ -132,6 +164,10 @@ function getProviderRuntime() {
   const config = getConfig()
   return normalizeWebToolsConfig(config.tools)
 }
+
+// ---------------------------------------------------------------------------
+// DuckDuckGo
+// ---------------------------------------------------------------------------
 
 function buildDuckDuckGoQuery(query: string, domainFilter?: string[]): string {
   if (!domainFilter || domainFilter.length === 0) {
@@ -233,6 +269,10 @@ async function runDuckDuckGoSearch(args: {
   return results
 }
 
+// ---------------------------------------------------------------------------
+// Brave
+// ---------------------------------------------------------------------------
+
 async function runBraveSearch(args: {
   query: string
   count: number
@@ -288,6 +328,10 @@ async function runBraveSearch(args: {
   }))
 }
 
+// ---------------------------------------------------------------------------
+// Perplexity
+// ---------------------------------------------------------------------------
+
 async function runPerplexitySearch(args: {
   query: string
   count: number
@@ -342,6 +386,10 @@ async function runPerplexitySearch(args: {
     published: entry.date || entry.last_updated || undefined
   }))
 }
+
+// ---------------------------------------------------------------------------
+// Kimi (Moonshot)
+// ---------------------------------------------------------------------------
 
 function extractKimiMessageText(message?: {
   content?: string
@@ -510,33 +558,291 @@ async function runKimiSearch(args: {
   }
 }
 
+// ---------------------------------------------------------------------------
+// GLM (Zhipu AI)
+// ---------------------------------------------------------------------------
+
+async function runGlmSearch(args: {
+  query: string
+  timeoutSeconds: number
+  apiKey: string
+  baseUrl: string
+  model: string
+}) {
+  const endpoint = `${args.baseUrl.replace(/\/$/, '')}/chat/completions`
+
+  const response = await fetchWithTimeout(endpoint, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${args.apiKey}`
+    },
+    body: JSON.stringify({
+      model: args.model,
+      messages: [{ role: 'user', content: args.query }],
+      tools: [{ type: 'web_search', web_search: { enable: true } }]
+    })
+  }, args.timeoutSeconds)
+
+  if (!response.ok) {
+    throw new Error(`GLM Search API error (${response.status}): ${await readErrorText(response)}`)
+  }
+
+  const data = await response.json() as {
+    choices?: Array<{
+      message?: {
+        content?: string
+        tool_calls?: Array<{
+          type?: string
+          function?: { arguments?: string }
+        }>
+      }
+    }>
+    web_search?: Array<{ link?: string; title?: string }>
+  }
+
+  const content = data.choices?.[0]?.message?.content?.trim() || 'No response'
+  const citations: string[] = []
+
+  // Extract citations from web_search results
+  for (const entry of data.web_search || []) {
+    if (typeof entry.link === 'string' && entry.link.trim()) {
+      citations.push(entry.link.trim())
+    }
+  }
+
+  return { content, citations }
+}
+
+// ---------------------------------------------------------------------------
+// MiniMax
+// ---------------------------------------------------------------------------
+
+async function runMiniMaxSearch(args: {
+  query: string
+  timeoutSeconds: number
+  apiKey: string
+  baseUrl: string
+  model: string
+}) {
+  const endpoint = `${args.baseUrl.replace(/\/$/, '')}/text/chatcompletion_v2`
+
+  const response = await fetchWithTimeout(endpoint, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${args.apiKey}`
+    },
+    body: JSON.stringify({
+      model: args.model,
+      messages: [{ role: 'user', content: args.query }],
+      plugins: ['plugin_web_search']
+    })
+  }, args.timeoutSeconds)
+
+  if (!response.ok) {
+    throw new Error(`MiniMax Search API error (${response.status}): ${await readErrorText(response)}`)
+  }
+
+  const data = await response.json() as {
+    choices?: Array<{
+      message?: { content?: string }
+    }>
+    web_search?: Array<{ url?: string; title?: string }>
+  }
+
+  const content = data.choices?.[0]?.message?.content?.trim() || 'No response'
+  const citations: string[] = []
+
+  for (const entry of data.web_search || []) {
+    if (typeof entry.url === 'string' && entry.url.trim()) {
+      citations.push(entry.url.trim())
+    }
+  }
+
+  return { content, citations }
+}
+
+// ---------------------------------------------------------------------------
+// GPT (OpenAI) — uses gpt-4o-search-preview with built-in web search
+// ---------------------------------------------------------------------------
+
+async function runGptSearch(args: {
+  query: string
+  timeoutSeconds: number
+  apiKey: string
+  baseUrl: string
+  model: string
+}) {
+  const endpoint = `${args.baseUrl.replace(/\/$/, '')}/chat/completions`
+
+  const response = await fetchWithTimeout(endpoint, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${args.apiKey}`
+    },
+    body: JSON.stringify({
+      model: args.model,
+      messages: [{ role: 'user', content: args.query }]
+    })
+  }, args.timeoutSeconds)
+
+  if (!response.ok) {
+    throw new Error(`GPT Search API error (${response.status}): ${await readErrorText(response)}`)
+  }
+
+  const data = await response.json() as {
+    choices?: Array<{
+      message?: {
+        content?: string
+        annotations?: Array<{
+          type?: string
+          url?: string
+        }>
+      }
+    }>
+  }
+
+  const message = data.choices?.[0]?.message
+  const content = message?.content?.trim() || 'No response'
+  const citations: string[] = []
+
+  for (const annotation of message?.annotations || []) {
+    if (annotation.type === 'url_citation' && typeof annotation.url === 'string' && annotation.url.trim()) {
+      citations.push(annotation.url.trim())
+    }
+  }
+
+  return { content, citations }
+}
+
+// ---------------------------------------------------------------------------
+// Claude (Anthropic) — uses server-side web_search tool
+// ---------------------------------------------------------------------------
+
+async function runClaudeSearch(args: {
+  query: string
+  timeoutSeconds: number
+  apiKey: string
+  baseUrl: string
+  model: string
+}) {
+  const endpoint = `${args.baseUrl.replace(/\/$/, '')}/v1/messages`
+
+  const response = await fetchWithTimeout(endpoint, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': args.apiKey,
+      'anthropic-version': '2023-06-01'
+    },
+    body: JSON.stringify({
+      model: args.model,
+      max_tokens: 4096,
+      tools: [{
+        type: 'server_tool',
+        name: 'web_search_20250305'
+      }],
+      messages: [{ role: 'user', content: args.query }]
+    })
+  }, args.timeoutSeconds)
+
+  if (!response.ok) {
+    throw new Error(`Claude Search API error (${response.status}): ${await readErrorText(response)}`)
+  }
+
+  const data = await response.json() as {
+    content?: Array<{
+      type: string
+      text?: string
+      search_results?: Array<{ url?: string; title?: string }>
+    }>
+  }
+
+  let content = ''
+  const citations: string[] = []
+
+  for (const block of data.content || []) {
+    if (block.type === 'text' && block.text) {
+      content += (content ? '\n\n' : '') + block.text
+    }
+    if (block.type === 'web_search_tool_result') {
+      for (const result of block.search_results || []) {
+        if (typeof result.url === 'string' && result.url.trim()) {
+          citations.push(result.url.trim())
+        }
+      }
+    }
+  }
+
+  return { content: content.trim() || 'No response', citations }
+}
+
+// ---------------------------------------------------------------------------
+// Provider resolution — auto-detects from aiSources
+// ---------------------------------------------------------------------------
+
 function resolveSearchProvider(search: ReturnType<typeof getProviderRuntime>['web']['search']): {
   provider: WebSearchProvider
   apiKey?: string
 } {
+  // If user explicitly set a specific provider, honor it
+  if (search.provider !== 'duckduckgo') {
+    const braveKey = normalizeApiKey(search.apiKey || process.env.BRAVE_API_KEY)
+    const perplexityKey = normalizeApiKey(search.perplexity.apiKey || process.env.PERPLEXITY_API_KEY)
+    const kimiKey = normalizeApiKey(search.kimi.apiKey || process.env.KIMI_API_KEY || process.env.MOONSHOT_API_KEY || getAiSourceApiKey('kimi'))
+    const glmKey = normalizeApiKey(search.glm.apiKey || process.env.GLM_API_KEY || process.env.ZHIPU_API_KEY || getAiSourceApiKey('zhipu'))
+    const minimaxKey = normalizeApiKey(search.minimax.apiKey || process.env.MINIMAX_API_KEY || getAiSourceApiKey('minimax'))
+    const gptKey = normalizeApiKey(search.gpt.apiKey || process.env.OPENAI_API_KEY || resolveGptApiKeyFromSources())
+    const claudeKey = normalizeApiKey(search.claude.apiKey || process.env.ANTHROPIC_API_KEY || resolveClaudeApiKeyFromSources())
+
+    const keyMap: Record<string, string> = {
+      brave: braveKey,
+      perplexity: perplexityKey,
+      kimi: kimiKey,
+      glm: glmKey,
+      minimax: minimaxKey,
+      gpt: gptKey,
+      claude: claudeKey
+    }
+
+    const key = keyMap[search.provider]
+    if (key) {
+      return { provider: search.provider, apiKey: key }
+    }
+    // Explicit provider but no key → fall through to auto-detect
+  }
+
+  // Auto-detect: check aiSources for providers that support web search
+  const kimiKey = normalizeApiKey(getAiSourceApiKey('kimi') || process.env.KIMI_API_KEY || process.env.MOONSHOT_API_KEY || search.kimi.apiKey)
+  if (kimiKey) return { provider: 'kimi', apiKey: kimiKey }
+
+  const glmKey = normalizeApiKey(getAiSourceApiKey('zhipu') || process.env.GLM_API_KEY || process.env.ZHIPU_API_KEY || search.glm.apiKey)
+  if (glmKey) return { provider: 'glm', apiKey: glmKey }
+
+  const minimaxKey = normalizeApiKey(getAiSourceApiKey('minimax') || process.env.MINIMAX_API_KEY || search.minimax.apiKey)
+  if (minimaxKey) return { provider: 'minimax', apiKey: minimaxKey }
+
+  const claudeKey = normalizeApiKey(resolveClaudeApiKeyFromSources() || process.env.ANTHROPIC_API_KEY || search.claude.apiKey)
+  if (claudeKey) return { provider: 'claude', apiKey: claudeKey }
+
+  const gptKey = normalizeApiKey(resolveGptApiKeyFromSources() || process.env.OPENAI_API_KEY || search.gpt.apiKey)
+  if (gptKey) return { provider: 'gpt', apiKey: gptKey }
+
+  // Legacy standalone search APIs
   const braveKey = normalizeApiKey(search.apiKey || process.env.BRAVE_API_KEY)
+  if (braveKey) return { provider: 'brave', apiKey: braveKey }
+
   const perplexityKey = normalizeApiKey(search.perplexity.apiKey || process.env.PERPLEXITY_API_KEY)
-  const kimiKey = normalizeApiKey(
-    search.kimi.apiKey
-    || process.env.KIMI_API_KEY
-    || process.env.MOONSHOT_API_KEY
-    || resolveKimiFallbackApiKey()
-  )
-
-  if (search.provider === 'brave') {
-    return braveKey ? { provider: 'brave', apiKey: braveKey } : { provider: 'duckduckgo' }
-  }
-
-  if (search.provider === 'perplexity') {
-    return perplexityKey ? { provider: 'perplexity', apiKey: perplexityKey } : { provider: 'duckduckgo' }
-  }
-
-  if (search.provider === 'kimi') {
-    return kimiKey ? { provider: 'kimi', apiKey: kimiKey } : { provider: 'duckduckgo' }
-  }
+  if (perplexityKey) return { provider: 'perplexity', apiKey: perplexityKey }
 
   return { provider: 'duckduckgo' }
 }
+
+// ---------------------------------------------------------------------------
+// Main entry
+// ---------------------------------------------------------------------------
 
 export async function executeWebSearch(args: {
   query: string
@@ -556,8 +862,8 @@ export async function executeWebSearch(args: {
   const { provider, apiKey } = resolveSearchProvider(search)
 
   const count = Math.max(1, Math.min(10, Math.floor(args.count || search.maxResults)))
-  const country = args.country?.trim()
-  const language = args.language?.trim().toLowerCase()
+  const country = args.country?.trim().split(/[-_]/)[0].slice(0, 2).toUpperCase() || undefined
+  const language = args.language?.trim().split(/[-_]/)[0].slice(0, 2).toLowerCase() || undefined
   const freshness = args.freshness?.trim().toLowerCase()
   const domainFilter = (args.domainFilter || []).map((entry) => entry.trim()).filter(Boolean)
 
@@ -575,6 +881,59 @@ export async function executeWebSearch(args: {
 
   const start = Date.now()
 
+  // AI search providers (content + citations)
+  if (provider === 'kimi' || provider === 'glm' || provider === 'minimax' || provider === 'gpt' || provider === 'claude') {
+    const runFn = {
+      kimi: () => runKimiSearch({
+        query: args.query,
+        timeoutSeconds: search.timeoutSeconds,
+        apiKey: apiKey || '',
+        baseUrl: search.kimi.baseUrl,
+        model: search.kimi.model
+      }),
+      glm: () => runGlmSearch({
+        query: args.query,
+        timeoutSeconds: search.timeoutSeconds,
+        apiKey: apiKey || '',
+        baseUrl: search.glm.baseUrl,
+        model: search.glm.model
+      }),
+      minimax: () => runMiniMaxSearch({
+        query: args.query,
+        timeoutSeconds: search.timeoutSeconds,
+        apiKey: apiKey || '',
+        baseUrl: search.minimax.baseUrl,
+        model: search.minimax.model
+      }),
+      gpt: () => runGptSearch({
+        query: args.query,
+        timeoutSeconds: search.timeoutSeconds,
+        apiKey: apiKey || '',
+        baseUrl: search.gpt.baseUrl,
+        model: search.gpt.model
+      }),
+      claude: () => runClaudeSearch({
+        query: args.query,
+        timeoutSeconds: search.timeoutSeconds,
+        apiKey: apiKey || '',
+        baseUrl: search.claude.baseUrl,
+        model: search.claude.model
+      })
+    }[provider]
+
+    const result = await runFn()
+    const payload: SearchPayload = {
+      query: args.query,
+      provider,
+      tookMs: Date.now() - start,
+      content: result.content,
+      citations: result.citations
+    }
+    writeCachedPayload(cacheKey, search.cacheTtlMinutes, payload)
+    return payload
+  }
+
+  // Traditional search providers (results list)
   if (provider === 'duckduckgo') {
     const results = await runDuckDuckGoSearch({
       query: args.query,
@@ -621,31 +980,7 @@ export async function executeWebSearch(args: {
     return payload
   }
 
-  if (provider === 'kimi') {
-    if (country || language || freshness || domainFilter.length > 0) {
-      throw new Error('Kimi search only supports query and count right now.')
-    }
-
-    const result = await runKimiSearch({
-      query: args.query,
-      timeoutSeconds: search.timeoutSeconds,
-      apiKey: apiKey || '',
-      baseUrl: search.kimi.baseUrl,
-      model: search.kimi.model
-    })
-
-    const payload: SearchPayload = {
-      query: args.query,
-      provider,
-      tookMs: Date.now() - start,
-      content: result.content,
-      citations: result.citations
-    }
-    writeCachedPayload(cacheKey, search.cacheTtlMinutes, payload)
-    return payload
-  }
-
-  // Brave (default)
+  // Brave (default for legacy)
   const results = await runBraveSearch({
     query: args.query,
     count,

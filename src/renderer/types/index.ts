@@ -3,7 +3,7 @@
 // ============================================
 
 import type { ThinkingEffort } from '../../shared/utils/openai-models'
-import type { WebSearchProvider, WebToolsConfig } from '../../shared/types'
+import type { WebToolsConfig } from '../../shared/types'
 
 // API Provider Configuration
 export type ApiProvider = 'anthropic' | 'openai';
@@ -614,20 +614,10 @@ export const DEFAULT_CONFIG: HaloConfig = {
     web: {
       search: {
         enabled: true,
-        provider: 'duckduckgo' as WebSearchProvider,
         apiKey: '',
         maxResults: 5,
         timeoutSeconds: 30,
-        cacheTtlMinutes: 15,
-        perplexity: {
-          apiKey: '',
-          baseUrl: 'https://api.perplexity.ai'
-        },
-        kimi: {
-          apiKey: '',
-          baseUrl: 'https://api.moonshot.cn/v1',
-          model: 'moonshot-v1-128k'
-        }
+        cacheTtlMinutes: 15
       },
       fetch: {
         enabled: true,

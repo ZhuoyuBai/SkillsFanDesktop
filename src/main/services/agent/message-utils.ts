@@ -9,6 +9,10 @@
 
 import type { Thought, ImageAttachment, CanvasContext, Attachment, PdfAttachment, TextAttachment } from './types'
 import { sanitizeWebSearchInput } from './tool-input-utils'
+import {
+  shouldSuppressSetModelStatus,
+  stripLeadingSetModelStatus
+} from '../../../shared/utils/sdk-status'
 
 // ============================================
 // Canvas Context Formatting
@@ -157,6 +161,13 @@ export function buildMessageContent(
   return contentBlocks
 }
 
+/**
+ * Hide noisy SDK status lines that don't help the user.
+ */
+export function shouldSuppressSdkStatus(statusText: string): boolean {
+  return shouldSuppressSetModelStatus(statusText)
+}
+
 // ============================================
 // SDK Message Parsing
 // ============================================
@@ -228,10 +239,14 @@ export function parseSDKMessage(message: any, displayModel?: string, parentToolI
         }
         // Text blocks
         if (block.type === 'text') {
+          const visibleText = stripLeadingSetModelStatus(block.text || '')
+          if (!visibleText.trim()) {
+            return null
+          }
           return {
             id: generateThoughtId(),
             type: 'text',
-            content: block.text || '',
+            content: visibleText,
             timestamp
           }
         }

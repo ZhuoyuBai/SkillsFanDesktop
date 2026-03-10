@@ -12,10 +12,6 @@
 
 import { useState, useMemo, useEffect, useRef } from 'react'
 import {
-  Circle,
-  CheckCircle2,
-  Loader2,
-  ListTodo,
   ChevronDown,
   ChevronRight,
 } from 'lucide-react'
@@ -41,30 +37,29 @@ interface TodoCardProps {
   stepToolItems?: Map<string, TimelineItem[]>  // step content -> tool timeline items
 }
 
-// Get icon and style for todo status
+// Get CLI-style status display for todo status
 function getTodoStatusDisplay(status: TodoStatus) {
   switch (status) {
     case 'pending':
       return {
-        Icon: Circle,
-        color: 'text-muted-foreground/50',
-        bgColor: 'bg-transparent',
-        textStyle: 'text-muted-foreground',
+        symbol: '○',
+        symbolColor: 'text-foreground/50',
+        bgColor: '',
+        textStyle: 'text-foreground/70',
       }
     case 'in_progress':
       return {
-        Icon: Loader2,
-        color: 'text-primary',
-        bgColor: 'bg-primary/10 border-l-2 border-l-primary',
+        symbol: '●',
+        symbolColor: 'text-orange-500',
+        bgColor: 'border-l-2 border-l-orange-500',
         textStyle: 'text-foreground font-medium',
-        spin: true,
       }
     case 'completed':
       return {
-        Icon: CheckCircle2,
-        color: 'text-green-500',
-        bgColor: 'bg-green-500/10',
-        textStyle: 'text-muted-foreground line-through',
+        symbol: '✓',
+        symbolColor: 'text-green-600',
+        bgColor: '',
+        textStyle: 'text-foreground/40 line-through',
       }
   }
 }
@@ -97,7 +92,6 @@ function TodoItemRow({
   }, [item.status])
 
   const display = getTodoStatusDisplay(item.status)
-  const Icon = display.Icon
   const hasHistory = statusHistory && statusHistory.length > 0
   const toolCount = toolItems?.length ?? 0
   const hasExpandable = toolCount > 0 || hasHistory
@@ -111,28 +105,26 @@ function TodoItemRow({
     <div>
       <div
         className={`
-          flex items-start gap-3 px-3 py-2 rounded-lg transition-all duration-200
+          flex items-center gap-2 px-3 py-1.5 transition-all duration-200
           ${display.bgColor}
           ${item.status === 'in_progress' ? 'animate-fade-in' : ''}
-          ${hasExpandable ? 'cursor-pointer hover:bg-muted/30' : ''}
+          ${hasExpandable ? 'cursor-pointer hover:bg-muted/10' : ''}
         `}
         onClick={() => hasExpandable && setIsExpanded(!isExpanded)}
       >
-        <Icon
-          size={16}
-          className={`
-            flex-shrink-0 mt-0.5
-            ${display.color}
-            ${display.spin ? 'animate-spin' : ''}
-          `}
-        />
-        <span className={`text-sm leading-relaxed flex-1 ${display.textStyle}`}>
+        {/* CLI status symbol */}
+        <span className={`flex-shrink-0 text-[13px] ${display.symbolColor} ${
+          item.status === 'in_progress' ? 'animate-pulse' : ''
+        }`}>
+          {display.symbol}
+        </span>
+        <span className={`text-[13px] leading-relaxed flex-1 ${display.textStyle}`}>
           {displayText}
         </span>
 
-        {/* Tool count badge */}
+        {/* Tool count */}
         {toolCount > 0 && (
-          <span className="text-[10px] bg-muted/60 text-muted-foreground/70 px-1.5 py-0.5 rounded-full flex-shrink-0 mt-0.5 min-w-[20px] text-center">
+          <span className="text-[10px] text-foreground/40 flex-shrink-0">
             {toolCount}
           </span>
         )}
@@ -140,9 +132,9 @@ function TodoItemRow({
         {/* Expand/collapse chevron */}
         {hasExpandable && (
           <ChevronRight
-            size={14}
+            size={12}
             className={`
-              text-muted-foreground/40 flex-shrink-0 mt-0.5 transition-transform
+              text-foreground/30 flex-shrink-0 transition-transform
               ${isExpanded ? 'rotate-90' : ''}
             `}
           />
@@ -152,7 +144,9 @@ function TodoItemRow({
       {/* Expanded: tool calls list */}
       {isExpanded && toolCount > 0 && (
         <div className="ml-9 mt-1 mb-2 pl-3 border-l-2 border-primary/20 space-y-0.5">
-          {toolItems!.map((tool) => {
+          {(() => {
+            let taskColorIdx = 0
+            return toolItems!.map((tool) => {
             // Task (sub-agent) gets its own card
             if (tool.toolName === 'Task') {
               return (
@@ -164,7 +158,7 @@ function TodoItemRow({
                   isComplete={tool.isComplete || false}
                   isError={tool.isError || false}
                   duration={tool.duration}
-                  colorIndex={0}
+                  colorIndex={taskColorIdx++}
                 />
               )
             }
@@ -176,17 +170,19 @@ function TodoItemRow({
                 isComplete={tool.isComplete || false}
                 isError={tool.isError || false}
                 duration={tool.duration}
+                toolOutput={tool.toolOutput}
               />
             )
-          })}
+          })
+          })()}
         </div>
       )}
 
       {/* Status history (when expanded) */}
       {isExpanded && hasHistory && (
-        <div className="ml-9 mt-1 mb-2 pl-3 border-l-2 border-border/30 space-y-1">
+        <div className="ml-9 mt-1 mb-2 pl-3 border-l-2 border-border space-y-1">
           {statusHistory!.map((status, idx) => (
-            <div key={idx} className="text-xs text-muted-foreground/70">
+            <div key={idx} className="text-xs text-foreground/60">
               {status}
             </div>
           ))}
@@ -224,34 +220,29 @@ export function TodoCard({
 
   return (
     <div className="animate-fade-in">
-      <div className="rounded-xl border border-border/50 bg-card/50 overflow-hidden">
-        {/* Header */}
+      <div className="border border-border rounded overflow-hidden">
+        {/* Header - simplified CLI style */}
         <div
           className={`
-            flex items-center justify-between px-4 py-3 border-b border-border/30 bg-secondary/20
-            ${canCollapse ? 'cursor-pointer hover:bg-secondary/30 transition-colors' : ''}
+            flex items-center justify-between px-3 py-2
+            ${canCollapse ? 'cursor-pointer hover:bg-muted/10 transition-colors' : ''}
           `}
           onClick={onToggleCollapse}
         >
-          <div className="flex items-center gap-2">
-            <ListTodo size={16} className="text-primary" />
-            <span className="text-sm font-medium text-foreground">{t('Task progress')}</span>
-            {/* Progress indicator (n/m) */}
-            <span className="text-xs text-muted-foreground">
-              ({stats.completed}/{stats.total})
+          <div className="flex items-center gap-2 text-[13px]">
+            <span className="text-foreground font-medium">{t('Task progress')}</span>
+            <span className="text-foreground/70">
+              {stats.completed}/{stats.total}
             </span>
           </div>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2 text-[13px]">
             {stats.inProgress > 0 && (
-              <span className="text-primary font-medium">{t('{{count}} in progress', { count: stats.inProgress })}</span>
-            )}
-            {stats.pending > 0 && (
-              <span>{t('{{count}} pending', { count: stats.pending })}</span>
+              <span className="text-orange-500 font-medium">{t('{{count}} in progress', { count: stats.inProgress })}</span>
             )}
             {canCollapse && (
               <ChevronDown
-                size={16}
-                className={`text-muted-foreground transition-transform duration-200 ml-1 ${
+                size={14}
+                className={`text-foreground/40 transition-transform duration-200 ${
                   isCollapsed ? '-rotate-90' : ''
                 }`}
               />
@@ -259,11 +250,11 @@ export function TodoCard({
           </div>
         </div>
 
-        {/* Progress bar - always visible */}
+        {/* Thin progress bar */}
         {stats.total > 0 && (
-          <div className="h-1.5 bg-secondary/30">
+          <div className="h-[3px] bg-foreground/10">
             <div
-              className="h-full bg-primary transition-all duration-500 ease-out"
+              className="h-full bg-green-600 transition-all duration-500 ease-out"
               style={{ width: `${stats.progress}%` }}
             />
           </div>
@@ -276,8 +267,7 @@ export function TodoCard({
             ${isCollapsed ? 'max-h-0 opacity-0' : 'max-h-[800px] opacity-100'}
           `}
         >
-          {/* Todo items - scrollable when list is long */}
-          <div className="p-2 space-y-1 max-h-[600px] overflow-y-auto">
+          <div className="py-1 space-y-0 max-h-[600px] overflow-y-auto">
             {todos.map((item, index) => (
               <TodoItemRow
                 key={index}

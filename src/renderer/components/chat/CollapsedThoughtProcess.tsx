@@ -10,9 +10,6 @@
 
 import { useState, useMemo } from 'react'
 import {
-  Lightbulb,
-  Loader2,
-  XCircle,
   ChevronRight,
 } from 'lucide-react'
 import { TodoCard, parseTodoInput } from '../tool/TodoCard'
@@ -99,51 +96,38 @@ export function CollapsedThoughtProcess({
   }, [thoughts])
 
   return (
-    <div className="mb-2">
-      {/* Header button - toggle entire section */}
+    <div className="mb-1">
+      {/* Header - minimal CLI style */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className={`
-          flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs
-          transition-all duration-200 w-full
-          ${isExpanded
-            ? 'bg-muted/20 border border-border/30'
-            : 'bg-muted/10 hover:bg-muted/20 border border-transparent'
-          }
-        `}
+        className="flex items-center gap-1.5 py-0.5 text-[13px] w-full text-left
+          text-muted-foreground/50 hover:text-muted-foreground/70 transition-colors"
       >
-        {/* Expand icon */}
         <ChevronRight
-          size={12}
-          className={`text-muted-foreground/60 transition-transform duration-200 flex-shrink-0 ${isExpanded ? 'rotate-90' : ''}`}
+          size={10}
+          className={`flex-shrink-0 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
         />
 
-        {/* Icon - spinner when thinking, lightbulb when done */}
-        {isThinking ? (
-          <Loader2 size={14} className="text-muted-foreground/70 animate-spin flex-shrink-0" />
-        ) : errorCount > 0 ? (
-          <XCircle size={14} className="text-destructive/70 flex-shrink-0" />
-        ) : (
-          <Lightbulb size={14} className="text-muted-foreground/60 flex-shrink-0" />
-        )}
+        {/* Status symbol */}
+        <span className={`flex-shrink-0 ${
+          isThinking ? 'text-orange-400' : errorCount > 0 ? 'text-destructive/70' : 'text-muted-foreground/40'
+        }`}>
+          {isThinking ? '⟳' : errorCount > 0 ? '✗' : '⏺'}
+        </span>
 
-        {/* Label */}
-        <span className="text-muted-foreground/70">{t('Thought process')}</span>
+        <span>{t('Thought process')}</span>
 
         {/* Summary preview when collapsed */}
         {!isExpanded && thinkingSummary && (
-          <span className="text-muted-foreground/40 truncate max-w-[200px] text-[10px]">
+          <span className="text-muted-foreground/30 truncate max-w-[200px] text-[10px]">
             {thinkingSummary}
           </span>
         )}
 
         {/* Stats */}
-        <div className="flex items-center gap-2 text-muted-foreground/50 ml-auto flex-shrink-0">
-          {stats.running > 0 && (
-            <span className="text-muted-foreground/60">{t('{{count}} running', { count: stats.running })}</span>
-          )}
+        <div className="flex items-center gap-2 text-muted-foreground/40 ml-auto flex-shrink-0">
           {stats.completed > 0 && (
-            <span>{t('{{count}} completed', { count: stats.completed })}</span>
+            <span>{stats.completed} {t('tools')}</span>
           )}
           {!isThinking && stats.duration > 0 && (
             <span>{stats.duration.toFixed(1)}s</span>
@@ -151,10 +135,9 @@ export function CollapsedThoughtProcess({
         </div>
       </button>
 
-      {/* Expanded content */}
+      {/* Expanded content - border-left style */}
       {isExpanded && (
-        <div className="mt-1 px-3 py-2 bg-muted/10 rounded-lg border border-border/20 animate-slide-down">
-          {/* TodoCard at top - with its own collapse */}
+        <div className="ml-3 pl-3 border-l-2 border-muted-foreground/15 py-1 animate-slide-down">
           {hasTodos && (
             <div className="mb-2">
               <TodoCard
@@ -166,9 +149,8 @@ export function CollapsedThoughtProcess({
             </div>
           )}
 
-          {/* Tool calls list - using InlineActivity */}
           {hasActivity && (
-            <div className={hasTodos ? 'pt-2 border-t border-border/20' : ''}>
+            <div className={hasTodos ? 'pt-1' : ''}>
               <InlineActivity
                 thoughts={thoughts}
                 isThinking={isThinking}

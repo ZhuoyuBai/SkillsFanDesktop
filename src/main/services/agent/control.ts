@@ -15,6 +15,11 @@ import { getConversation, updateLastMessage } from '../conversation.service'
 import { sendMessage } from './send-message'
 import { agentQueue } from './lane-queue'
 import type { Thought, Attachment, ImageAttachment } from './types'
+import {
+  killSubagentRun,
+  listSubagentRunsForConversation,
+  suppressAutoAnnounceForConversation
+} from './subagent/runtime'
 
 const CONTINUATION_PREFIX_MAX_CHARS = 1200
 
@@ -72,6 +77,16 @@ function buildContinuationPrefix(previousUserMessage: string): string {
  */
 export async function stopGeneration(conversationId?: string): Promise<void> {
   if (conversationId) {
+    suppressAutoAnnounceForConversation(conversationId)
+
+    for (const run of listSubagentRunsForConversation(conversationId, { includeCompleted: false })) {
+      try {
+        killSubagentRun(run.runId)
+      } catch (error) {
+        console.error(`[Agent] Failed to stop hosted subagent ${run.runId}:`, error)
+      }
+    }
+
     // Clear queued messages for this conversation
     const cleared = agentQueue.clearQueue(conversationId)
     if (cleared > 0) {
@@ -106,6 +121,22 @@ export async function stopGeneration(conversationId?: string): Promise<void> {
     }
   } else {
     // Stop all sessions (backward compatibility)
+    const allConversationIds = new Set<string>([
+      ...Array.from(activeSessions.keys()),
+      ...Array.from(v2Sessions.keys())
+    ])
+
+    for (const convId of allConversationIds) {
+      suppressAutoAnnounceForConversation(convId)
+      for (const run of listSubagentRunsForConversation(convId, { includeCompleted: false })) {
+        try {
+          killSubagentRun(run.runId)
+        } catch (error) {
+          console.error(`[Agent] Failed to stop hosted subagent ${run.runId}:`, error)
+        }
+      }
+    }
+
     for (const [convId, session] of Array.from(activeSessions)) {
       session.abortController.abort()
 
@@ -250,15 +281,63 @@ export function getActiveSessions(): string[] {
 export function getSessionState(conversationId: string): {
   isActive: boolean
   thoughts: Thought[]
+  taskProgress: Array<{
+    taskId: string
+    toolUseId?: string
+    description: string
+    summary?: string
+    resultSummary?: string
+    lastToolName?: string
+    status: 'running' | 'completed' | 'failed' | 'stopped'
+    usage?: { total_tokens: number; tool_uses: number; duration_ms: number }
+    stepHistory: Array<{
+      toolName: string
+      summary?: string
+      timestamp: number
+      toolUseCount: number
+    }>
+  }>
+  subagentRuns: Array<{
+    runId: string
+    parentConversationId: string
+    parentSpaceId: string
+    childConversationId: string
+    status: 'queued' | 'running' | 'waiting_announce' | 'completed' | 'failed' | 'killed' | 'timeout'
+    task: string
+    label?: string
+    model?: string
+    modelSource?: string
+    thinkingEffort?: string
+    spawnedAt: string
+    startedAt?: string
+    endedAt?: string
+    latestSummary?: string
+    resultSummary?: string
+    error?: string
+    announcedAt?: string
+    tokenUsage?: {
+      inputTokens: number
+      outputTokens: number
+      totalCostUsd?: number
+    }
+    toolUseId?: string
+    durationMs?: number
+  }>
   spaceId?: string
 } {
   const session = activeSessions.get(conversationId)
+  const subagentRuns = listSubagentRunsForConversation(conversationId)
   if (!session) {
-    return { isActive: false, thoughts: [] }
+    return { isActive: false, thoughts: [], taskProgress: [], subagentRuns }
   }
   return {
     isActive: true,
     thoughts: [...session.thoughts],
+    taskProgress: Array.from(session.taskProgressMap.values()).map(task => ({
+      ...task,
+      stepHistory: [...task.stepHistory]
+    })),
+    subagentRuns,
     spaceId: session.spaceId
   }
 }

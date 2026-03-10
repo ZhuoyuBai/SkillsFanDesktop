@@ -74,8 +74,11 @@ export type OutboundEventType =
   | 'agent:error'
   | 'agent:compact'
   | 'agent:queued'
+  | 'agent:status'
   | 'agent:user-question'
   | 'agent:user-question-answered'
+  | 'agent:task-update'
+  | 'agent:subagent-update'
   | 'agent:mcp-status'
 
 /**

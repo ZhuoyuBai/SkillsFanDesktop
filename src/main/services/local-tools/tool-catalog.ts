@@ -94,6 +94,20 @@ const BASE_MCP_TOOLS: ToolCatalogEntry[] = [
     category: 'shell'
   },
   {
+    name: 'mcp__local-tools__subagent_spawn',
+    description: 'Launch a hosted subagent run managed by the app runtime.',
+    source: 'mcp',
+    server: 'local-tools',
+    category: 'tasks'
+  },
+  {
+    name: 'mcp__local-tools__subagents',
+    description: 'List, inspect, wait for, or kill hosted subagent runs in the current conversation.',
+    source: 'mcp',
+    server: 'local-tools',
+    category: 'tasks'
+  },
+  {
     name: 'mcp__web-tools__WebSearch',
     description: 'Search the web using the app-configured local search provider.',
     source: 'mcp',
@@ -133,8 +147,16 @@ const SKILL_TOOL: ToolCatalogEntry = {
 export function buildToolCatalog(options: {
   aiBrowserEnabled?: boolean
   includeSkillMcp?: boolean
+  includeSubagentTools?: boolean
 }): ToolCatalogEntry[] {
-  const catalog = [...BUILT_IN_TOOLS, ...BASE_MCP_TOOLS]
+  const baseTools = options.includeSubagentTools === false
+    ? BASE_MCP_TOOLS.filter(entry =>
+        entry.name !== 'mcp__local-tools__subagent_spawn'
+        && entry.name !== 'mcp__local-tools__subagents'
+      )
+    : BASE_MCP_TOOLS
+
+  const catalog = [...BUILT_IN_TOOLS, ...baseTools]
 
   if (options.aiBrowserEnabled) {
     catalog.push(...AI_BROWSER_TOOLS)

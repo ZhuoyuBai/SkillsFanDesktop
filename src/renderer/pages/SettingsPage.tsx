@@ -43,7 +43,6 @@ import { isElectron } from '../api/transport'
 import { useToastStore } from '../stores/toast.store'
 import { getProviderLogoById } from '../components/layout/ModelSelector'
 import type { SkillsFanAuthState } from '../../shared/types/skillsfan'
-import type { WebSearchProvider } from '../../shared/types'
 
 // Import provider logos
 import zhipuLogo from '../assets/providers/zhipu.jpg'
@@ -224,19 +223,15 @@ function resolveProviderFormValues(config: HaloConfig | undefined, providerId: s
 
 function resolveWebToolsFormValues(config: HaloConfig | undefined): {
   searchEnabled: boolean
-  provider: WebSearchProvider
   braveApiKey: string
   perplexityApiKey: string
-  kimiApiKey: string
 } {
   const search = config?.tools?.web?.search
 
   return {
     searchEnabled: search?.enabled !== false,
-    provider: search?.provider || 'duckduckgo',
     braveApiKey: search?.apiKey || '',
-    perplexityApiKey: search?.perplexity?.apiKey || '',
-    kimiApiKey: search?.kimi?.apiKey || ''
+    perplexityApiKey: search?.perplexity?.apiKey || ''
   }
 }
 
@@ -372,10 +367,8 @@ export function SettingsPage() {
   const [customInstructionsContent, setCustomInstructionsContent] = useState(config?.customInstructions?.content || '')
   const initialWebToolsValues = resolveWebToolsFormValues(config)
   const [webSearchEnabled, setWebSearchEnabled] = useState(initialWebToolsValues.searchEnabled)
-  const [webSearchProvider, setWebSearchProvider] = useState<WebSearchProvider>(initialWebToolsValues.provider)
   const [webSearchBraveApiKey, setWebSearchBraveApiKey] = useState(initialWebToolsValues.braveApiKey)
   const [webSearchPerplexityApiKey, setWebSearchPerplexityApiKey] = useState(initialWebToolsValues.perplexityApiKey)
-  const [webSearchKimiApiKey, setWebSearchKimiApiKey] = useState(initialWebToolsValues.kimiApiKey)
   const [showWebSearchKeys, setShowWebSearchKeys] = useState(false)
   const [isSavingWebTools, setIsSavingWebTools] = useState(false)
 
@@ -487,10 +480,8 @@ export function SettingsPage() {
   useEffect(() => {
     const values = resolveWebToolsFormValues(config)
     setWebSearchEnabled(values.searchEnabled)
-    setWebSearchProvider(values.provider)
     setWebSearchBraveApiKey(values.braveApiKey)
     setWebSearchPerplexityApiKey(values.perplexityApiKey)
-    setWebSearchKimiApiKey(values.kimiApiKey)
   }, [config?.tools])
 
   const loadSystemSettings = async () => {
@@ -702,15 +693,10 @@ export function SettingsPage() {
         search: {
           ...(config?.tools?.web?.search || {}),
           enabled,
-          provider: webSearchProvider,
           apiKey: webSearchBraveApiKey,
           perplexity: {
             ...(config?.tools?.web?.search?.perplexity || {}),
             apiKey: webSearchPerplexityApiKey
-          },
-          kimi: {
-            ...(config?.tools?.web?.search?.kimi || {}),
-            apiKey: webSearchKimiApiKey
           }
         },
         fetch: {
@@ -736,15 +722,10 @@ export function SettingsPage() {
         search: {
           ...(config?.tools?.web?.search || {}),
           enabled: webSearchEnabled,
-          provider: webSearchProvider,
           apiKey: webSearchBraveApiKey,
           perplexity: {
             ...(config?.tools?.web?.search?.perplexity || {}),
             apiKey: webSearchPerplexityApiKey
-          },
-          kimi: {
-            ...(config?.tools?.web?.search?.kimi || {}),
-            apiKey: webSearchKimiApiKey
           }
         },
         fetch: {
@@ -1732,31 +1713,16 @@ export function SettingsPage() {
                     <div className="flex-1">
                       <p className="font-medium">{t('Web Tools')}</p>
                       <p className="text-sm text-muted-foreground">
-                        {t('Enable local web search and page fetching. Default search uses no-key HTML result pages, and API providers remain available as an override.')}
+                        {t('Enable web search and page fetching. Search automatically uses your configured AI source (GLM, Kimi, MiniMax, Claude, GPT). No separate API key needed.')}
                       </p>
                     </div>
                     <Switch checked={webSearchEnabled} onChange={handleWebToolsEnabledChange} />
                   </div>
 
                   <div className={`space-y-4 transition-opacity ${webSearchEnabled ? '' : 'opacity-50 pointer-events-none'}`}>
-                    <div>
-                      <label className="block text-sm text-muted-foreground mb-2">{t('Search Provider')}</label>
-                      <Select<WebSearchProvider>
-                        value={webSearchProvider}
-                        onChange={setWebSearchProvider}
-                        options={[
-                          { value: 'duckduckgo', label: t('DuckDuckGo HTML (No API Key)') },
-                          { value: 'brave', label: t('Brave Search API') },
-                          { value: 'perplexity', label: t('Perplexity Search API') },
-                          { value: 'kimi', label: t('Kimi Search API') }
-                        ]}
-                      />
-                      <p className="mt-2 text-xs text-muted-foreground">
-                        {webSearchProvider === 'duckduckgo'
-                          ? t('Default mode. It scrapes public HTML search result pages without an API key, but stability depends on the target site.')
-                          : t('Selected API provider will be used when its key is present. If the key is empty, search falls back to the default no-key mode.')}
-                      </p>
-                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {t('Web search auto-detects your configured AI sources. Supported providers: Kimi, GLM (Zhipu), MiniMax, Claude, GPT. DeepSeek does not support web search. If no AI source is configured, DuckDuckGo HTML scraping is used as fallback.')}
+                    </p>
 
                     <div className="rounded-lg border border-border bg-secondary/20">
                       <button
@@ -1765,9 +1731,9 @@ export function SettingsPage() {
                         className="w-full px-4 py-3 flex items-center justify-between text-left"
                       >
                         <div>
-                          <p className="text-sm font-medium">{t('Optional Search API Keys')}</p>
+                          <p className="text-sm font-medium">{t('Standalone Search API Keys (Advanced)')}</p>
                           <p className="text-xs text-muted-foreground mt-1">
-                            {t('Keep these filled so you can switch to API-backed search at any time.')}
+                            {t('Optional: configure dedicated search API keys for Brave or Perplexity as additional fallback options.')}
                           </p>
                         </div>
                         {showWebSearchKeys ? <EyeOff className="w-4 h-4 text-muted-foreground" /> : <Eye className="w-4 h-4 text-muted-foreground" />}
@@ -1814,28 +1780,6 @@ export function SettingsPage() {
                             value={webSearchPerplexityApiKey}
                             onChange={(e) => setWebSearchPerplexityApiKey(e.target.value)}
                             placeholder="pplx-..."
-                            className="w-full px-3 py-2 text-sm bg-input rounded-lg border border-border focus:outline-none transition-colors"
-                          />
-                        </div>
-
-                        <div>
-                          <div className="flex items-center justify-between mb-2">
-                            <label className="text-sm text-muted-foreground">{t('Kimi Search API Key')}</label>
-                            <a
-                              href="https://platform.moonshot.cn/console/api-keys"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-xs text-primary hover:underline flex items-center gap-1"
-                            >
-                              <ExternalLink className="w-3 h-3" />
-                              {t('Get API Key')}
-                            </a>
-                          </div>
-                          <input
-                            type={showWebSearchKeys ? 'text' : 'password'}
-                            value={webSearchKimiApiKey}
-                            onChange={(e) => setWebSearchKimiApiKey(e.target.value)}
-                            placeholder="sk-..."
                             className="w-full px-3 py-2 text-sm bg-input rounded-lg border border-border focus:outline-none transition-colors"
                           />
                         </div>

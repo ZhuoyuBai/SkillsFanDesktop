@@ -226,6 +226,7 @@ export function createCanUseTool(
     if (
       toolName === 'mcp__local-tools__tool_search_tool_regex'
       || toolName === 'mcp__local-tools__tool_search_tool_bm25'
+      || toolName === 'mcp__local-tools__subagents'
     ) {
       return {
         behavior: 'allow' as const,
@@ -286,6 +287,52 @@ export function createCanUseTool(
         toolName,
         'Execute AppleScript for macOS UI automation'
       )
+    }
+
+    if (toolName === 'mcp__local-tools__subagent_spawn') {
+      const currentConfig = getConfig()
+      const permission = currentConfig.permissions.commandExecution
+
+      if (permission === 'deny') {
+        return {
+          behavior: 'deny' as const,
+          message: 'Hosted sub-agent execution is disabled'
+        }
+      }
+
+      if (permission !== 'ask' || currentConfig.permissions.trustMode) {
+        return { behavior: 'allow' as const, updatedInput: input }
+      }
+
+      const session = activeSessions.get(conversationId)
+      if (!session) {
+        return { behavior: 'deny' as const, message: 'Session not found' }
+      }
+
+      const toolCall: ToolCall = {
+        id: `tool-${Date.now()}`,
+        name: toolName,
+        status: 'waiting_approval',
+        input,
+        requiresApproval: true,
+        description: `Launch hosted sub-agent: ${(input as Record<string, string>).task || 'task'}`
+      }
+
+      sendToRenderer('agent:tool-call', spaceId, conversationId, toolCall as unknown as Record<string, unknown>)
+      session.pendingPermissionToolCall = toolCall
+
+      return new Promise((resolve) => {
+        session.pendingPermissionResolve = (approved: boolean) => {
+          if (approved) {
+            resolve({ behavior: 'allow' as const, updatedInput: input })
+          } else {
+            resolve({
+              behavior: 'deny' as const,
+              message: 'User rejected hosted sub-agent execution'
+            })
+          }
+        }
+      })
     }
 
     if (BLOCKED_SERVER_SIDE_TOOLS.has(toolName)) {

@@ -11,7 +11,9 @@ import { initializeApp } from '../../../src/main/services/config.service'
 import {
   addMessage,
   createConversation,
-  getConversation
+  getConversation,
+  listConversations,
+  updateLastMessage
 } from '../../../src/main/services/conversation.service'
 
 describe('Conversation Service', () => {
@@ -54,6 +56,39 @@ describe('Conversation Service', () => {
     expect(savedConversation?.messages[0].attachments).toEqual([imageAttachment, textAttachment])
 
     // Flush background index tasks before the test sandbox is cleaned up.
+    await new Promise(resolve => setTimeout(resolve, 0))
+  })
+
+  it('uses thought previews when assistant messages have no text content', async () => {
+    const conversation = createConversation('skillsfan-temp', 'Thought Preview')
+
+    addMessage('skillsfan-temp', conversation.id, {
+      role: 'user',
+      content: 'create a team'
+    })
+
+    addMessage('skillsfan-temp', conversation.id, {
+      role: 'assistant',
+      content: '',
+      toolCalls: []
+    })
+
+    updateLastMessage('skillsfan-temp', conversation.id, {
+      content: '',
+      thoughts: [{
+        id: 'tool-1',
+        type: 'tool_use',
+        content: '',
+        timestamp: '2026-03-10T00:00:00.000Z',
+        toolName: 'TeamCreate',
+        toolInput: { name: 'research-team' }
+      }]
+    })
+
+    const meta = listConversations('skillsfan-temp').find(item => item.id === conversation.id)
+
+    expect(meta?.preview).toBe('Tool: TeamCreate')
+
     await new Promise(resolve => setTimeout(resolve, 0))
   })
 })

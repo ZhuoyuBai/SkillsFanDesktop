@@ -13,8 +13,8 @@ const webSearchTool = tool(
   {
     query: z.string().min(2).describe('Search query'),
     count: z.number().int().min(1).max(10).optional().describe('Maximum results to return'),
-    country: z.string().length(2).optional().describe('Optional 2-letter country code'),
-    language: z.string().length(2).optional().describe('Optional 2-letter language code'),
+    country: z.string().max(10).optional().describe('Country code (e.g. US, CN) or locale like en-US'),
+    language: z.string().max(10).optional().describe('Language code (e.g. en, zh) or locale like zh-CN'),
     freshness: z.enum(['day', 'week', 'month', 'year']).optional().describe('Optional freshness filter'),
     domainFilter: z.array(z.string()).max(20).optional().describe('Optional domain filter list; currently supported by Perplexity only')
   },

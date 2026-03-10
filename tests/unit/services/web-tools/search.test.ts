@@ -249,4 +249,189 @@ describe('web-tools/search', () => {
       url: 'https://example.com/fallback'
     })
   })
+
+  it('auto-detects GLM from aiSources when no explicit provider is set', async () => {
+    mocks.getConfig.mockReturnValue({
+      tools: {
+        web: {
+          search: { enabled: true, timeoutSeconds: 5, cacheTtlMinutes: 15, maxResults: 5 },
+          fetch: { enabled: true }
+        }
+      },
+      aiSources: {
+        current: 'zhipu',
+        zhipu: { apiKey: 'glm-test-key', apiUrl: 'https://open.bigmodel.cn/api/anthropic', model: 'GLM-5' }
+      }
+    })
+
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({
+        choices: [{ message: { content: 'GLM search result about AI' } }],
+        web_search: [{ link: 'https://example.com/glm', title: 'GLM Result' }]
+      }), { status: 200, headers: { 'content-type': 'application/json' } })
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await executeWebSearch({ query: 'AI news' })
+
+    expect(result.provider).toBe('glm')
+    expect(result.content).toBe('GLM search result about AI')
+    expect(result.citations).toEqual(['https://example.com/glm'])
+    const init = fetchMock.mock.calls[0][1] as RequestInit
+    expect(init.headers).toMatchObject({ Authorization: 'Bearer glm-test-key' })
+    const body = JSON.parse(String(init.body))
+    expect(body.tools).toEqual([{ type: 'web_search', web_search: { enable: true } }])
+  })
+
+  it('auto-detects Kimi from aiSources with higher priority than GLM', async () => {
+    mocks.getConfig.mockReturnValue({
+      tools: {
+        web: {
+          search: { enabled: true, timeoutSeconds: 5, cacheTtlMinutes: 15, maxResults: 5 },
+          fetch: { enabled: true }
+        }
+      },
+      aiSources: {
+        current: 'zhipu',
+        kimi: { apiKey: 'kimi-test-key', apiUrl: 'https://api.moonshot.cn/anthropic', model: 'kimi-k2' },
+        zhipu: { apiKey: 'glm-test-key', apiUrl: 'https://open.bigmodel.cn/api/anthropic', model: 'GLM-5' }
+      }
+    })
+
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({
+        choices: [{ finish_reason: 'stop', message: { content: 'Kimi search result' } }]
+      }), { status: 200, headers: { 'content-type': 'application/json' } })
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await executeWebSearch({ query: 'test' })
+
+    expect(result.provider).toBe('kimi')
+    expect(result.content).toBe('Kimi search result')
+  })
+
+  it('auto-detects MiniMax from aiSources', async () => {
+    mocks.getConfig.mockReturnValue({
+      tools: {
+        web: {
+          search: { enabled: true, timeoutSeconds: 5, cacheTtlMinutes: 15, maxResults: 5 },
+          fetch: { enabled: true }
+        }
+      },
+      aiSources: {
+        current: 'minimax',
+        minimax: { apiKey: 'minimax-test-key', apiUrl: 'https://api.minimax.chat', model: 'MiniMax-Text-01' }
+      }
+    })
+
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({
+        choices: [{ message: { content: 'MiniMax search result' } }],
+        web_search: [{ url: 'https://example.com/minimax' }]
+      }), { status: 200, headers: { 'content-type': 'application/json' } })
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await executeWebSearch({ query: 'test' })
+
+    expect(result.provider).toBe('minimax')
+    expect(result.content).toBe('MiniMax search result')
+    expect(result.citations).toEqual(['https://example.com/minimax'])
+  })
+
+  it('auto-detects GPT from custom aiSource with openai provider', async () => {
+    mocks.getConfig.mockReturnValue({
+      tools: {
+        web: {
+          search: { enabled: true, timeoutSeconds: 5, cacheTtlMinutes: 15, maxResults: 5 },
+          fetch: { enabled: true }
+        }
+      },
+      aiSources: {
+        current: 'custom',
+        custom: { provider: 'openai', apiKey: 'sk-openai-key', apiUrl: 'https://api.openai.com/v1', model: 'gpt-4o' }
+      }
+    })
+
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({
+        choices: [{
+          message: {
+            content: 'GPT search result',
+            annotations: [{ type: 'url_citation', url: 'https://example.com/gpt' }]
+          }
+        }]
+      }), { status: 200, headers: { 'content-type': 'application/json' } })
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await executeWebSearch({ query: 'test' })
+
+    expect(result.provider).toBe('gpt')
+    expect(result.content).toBe('GPT search result')
+    expect(result.citations).toEqual(['https://example.com/gpt'])
+  })
+
+  it('auto-detects Claude from custom aiSource with anthropic provider', async () => {
+    mocks.getConfig.mockReturnValue({
+      tools: {
+        web: {
+          search: { enabled: true, timeoutSeconds: 5, cacheTtlMinutes: 15, maxResults: 5 },
+          fetch: { enabled: true }
+        }
+      },
+      aiSources: {
+        current: 'custom',
+        custom: { provider: 'anthropic', apiKey: 'sk-ant-key', apiUrl: 'https://api.anthropic.com', model: 'claude-sonnet-4-5' }
+      }
+    })
+
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({
+        content: [
+          { type: 'web_search_tool_result', search_results: [{ url: 'https://example.com/claude', title: 'Claude Result' }] },
+          { type: 'text', text: 'Claude search result' }
+        ]
+      }), { status: 200, headers: { 'content-type': 'application/json' } })
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await executeWebSearch({ query: 'test' })
+
+    expect(result.provider).toBe('claude')
+    expect(result.content).toBe('Claude search result')
+    expect(result.citations).toEqual(['https://example.com/claude'])
+    const init = fetchMock.mock.calls[0][1] as RequestInit
+    expect(init.headers).toMatchObject({ 'x-api-key': 'sk-ant-key' })
+  })
+
+  it('falls back to DuckDuckGo when only DeepSeek is configured (no web search support)', async () => {
+    mocks.getConfig.mockReturnValue({
+      tools: {
+        web: {
+          search: { enabled: true, timeoutSeconds: 5, cacheTtlMinutes: 15, maxResults: 5 },
+          fetch: { enabled: true }
+        }
+      },
+      aiSources: {
+        current: 'deepseek',
+        deepseek: { apiKey: 'deepseek-key', apiUrl: 'https://api.deepseek.com', model: 'deepseek-chat' }
+      }
+    })
+
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(`
+        <html><body>
+          <a class="result__a" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fexample.com%2Fddg">DDG result</a>
+          <div class="result__snippet">DDG snippet</div>
+        </body></html>
+      `, { status: 200, headers: { 'content-type': 'text/html' } })
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await executeWebSearch({ query: 'test' })
+
+    expect(result.provider).toBe('duckduckgo')
+  })
 })

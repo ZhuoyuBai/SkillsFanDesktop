@@ -1,11 +1,12 @@
 /**
- * ToolItem - Inline single-line tool activity display
+ * ToolItem - Inline tool activity display with expandable output
+ * Shows single-line status, click to expand tool output (Bash stdout, Edit diff, etc.)
  * Extracted from LinearStream for reuse in TodoCard step grouping
  */
 
-import { memo } from 'react'
-import { Loader2, Check, XCircle } from 'lucide-react'
-import { getToolIcon } from '../icons/ToolIcons'
+import { memo, useState, useEffect, useRef, useCallback } from 'react'
+import { ChevronRight, Maximize2 } from 'lucide-react'
+import { InlineDiff } from './InlineDiff'
 import { useTranslation } from '../../i18n'
 
 // ============================================
@@ -122,6 +123,16 @@ export function getActivityText(
         t('Running {{task}}...', { task: truncate(String(input.description || 'agent'), 25) }),
         t('Completed {{task}}', { task: truncate(String(input.description || 'agent'), 25) })
       )
+    case 'mcp__local-tools__subagent_spawn':
+      return getText(
+        t('Running {{task}}...', { task: truncate(String(input.task || input.label || 'hosted agent'), 25) }),
+        t('Completed {{task}}', { task: truncate(String(input.task || input.label || 'hosted agent'), 25) })
+      )
+    case 'mcp__local-tools__subagents':
+      return getText(
+        t('Checking subagents...'),
+        t('Checked subagents')
+      )
     case 'NotebookEdit':
       return getText(t('Editing notebook...'), t('Edited notebook'))
     case 'AskUserQuestion':
@@ -140,52 +151,180 @@ export function getActivityText(
 // Component
 // ============================================
 
-// Tool call - single line with status
+// Determine if a tool should auto-expand its output when complete
+function shouldAutoExpand(toolName: string, toolOutput?: string, isError?: boolean): boolean {
+  if (isError) return true
+  if (!toolOutput) return false
+
+  switch (toolName) {
+    case 'Bash':
+    case 'mcp__local-tools__bash_code_execution': {
+      // Auto-expand short Bash output (< 10 lines)
+      const lineCount = toolOutput.split('\n').length
+      return lineCount <= 10 && toolOutput.length > 0
+    }
+    case 'Edit':
+      // Always auto-expand Edit diffs
+      return true
+    case 'Write':
+    case 'Read':
+    case 'Glob':
+    case 'Grep':
+      // Don't auto-expand these (output can be long)
+      return false
+    default:
+      return false
+  }
+}
+
+// Check if tool has expandable content
+function hasExpandableContent(toolName: string, toolOutput?: string, toolInput?: Record<string, unknown>): boolean {
+  // Edit tool always has expandable diff (from toolInput)
+  if (toolName === 'Edit' && toolInput?.old_string && toolInput?.new_string) return true
+  // Other tools need toolOutput
+  return !!toolOutput && toolOutput.trim().length > 0
+}
+
+// Count lines in output for display
+function countLines(text: string): number {
+  return text.split('\n').length
+}
+
+// Tool call - single line with expandable output
 export const ToolItem = memo(function ToolItem({
   toolName,
   toolInput,
   isComplete,
   isError,
   duration,
+  toolOutput,
+  onOpenDiffModal,
 }: {
   toolName: string
   toolInput?: Record<string, unknown>
   isComplete: boolean
   isError: boolean
   duration?: number
+  toolOutput?: string
+  onOpenDiffModal?: () => void
 }) {
   const { t } = useTranslation()
-  const Icon = getToolIcon(toolName)
   const isRunning = !isComplete && !isError
+  const outputRef = useRef<HTMLDivElement>(null)
+
+  const expandable = hasExpandableContent(toolName, toolOutput, toolInput)
+  const autoExpand = shouldAutoExpand(toolName, toolOutput, isError)
+  const [isExpanded, setIsExpanded] = useState(false)
+
+  // Auto-expand when tool completes (only once)
+  const hasAutoExpanded = useRef(false)
+  useEffect(() => {
+    if (isComplete && autoExpand && !hasAutoExpanded.current) {
+      hasAutoExpanded.current = true
+      setIsExpanded(true)
+    }
+  }, [isComplete, autoExpand])
+
+  // Auto-scroll output to bottom when content updates
+  useEffect(() => {
+    if (isExpanded && outputRef.current) {
+      outputRef.current.scrollTop = outputRef.current.scrollHeight
+    }
+  }, [isExpanded, toolOutput])
+
+  const handleClick = useCallback(() => {
+    if (expandable) {
+      setIsExpanded(prev => !prev)
+    }
+  }, [expandable])
 
   const activityText = getActivityText(toolName, toolInput, isComplete, t)
 
+  // Determine what to render in the expanded area
+  const isEditTool = toolName === 'Edit'
+  const isBashTool = toolName === 'Bash' || toolName === 'mcp__local-tools__bash_code_execution'
+  const isWriteTool = toolName === 'Write'
+
   return (
-    <div
-      className={`flex items-center gap-2 py-0.5 text-xs ${
-        isError ? 'text-destructive/70' : isRunning ? 'text-muted-foreground/80' : 'text-muted-foreground/60'
-      }`}
-    >
-      {/* Status icon */}
-      {isError ? (
-        <XCircle size={14} className="text-destructive/70 flex-shrink-0" />
-      ) : isRunning ? (
-        <Loader2 size={14} className="animate-spin flex-shrink-0" />
-      ) : (
-        <Check size={14} className="flex-shrink-0" />
-      )}
+    <div className="py-0.5">
+      {/* Header line - CLI style with text status symbols */}
+      <div
+        onClick={handleClick}
+        className={`flex items-center gap-1.5 text-[13px] ${
+          expandable ? 'cursor-pointer hover:text-muted-foreground transition-colors' : ''
+        } ${
+          isError ? 'text-destructive/70' : isRunning ? 'text-muted-foreground/80' : 'text-muted-foreground'
+        }`}
+      >
+        {/* Expand chevron (only when expandable) */}
+        {expandable ? (
+          <ChevronRight
+            size={10}
+            className={`flex-shrink-0 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+          />
+        ) : (
+          <span className="w-2.5 flex-shrink-0" />
+        )}
 
-      {/* Tool icon */}
-      <Icon size={14} className="flex-shrink-0" />
-
-      {/* Activity text */}
-      <span className="truncate">{activityText}</span>
-
-      {/* Duration */}
-      {isComplete && duration && (
-        <span className="text-muted-foreground/50 flex-shrink-0">
-          ({(duration / 1000).toFixed(1)}s)
+        {/* CLI status symbol */}
+        <span className={`flex-shrink-0 ${
+          isError ? 'text-destructive/70' : isRunning ? 'text-orange-400' : 'text-green-500'
+        }`}>
+          {isError ? '✗' : isRunning ? '⟳' : '✓'}
         </span>
+
+        {/* Activity text */}
+        <span className="truncate">{activityText}</span>
+
+        {/* Duration */}
+        {isComplete && duration && (
+          <span className="text-muted-foreground/60 flex-shrink-0">
+            {(duration / 1000).toFixed(1)}s
+          </span>
+        )}
+
+        {/* Line count hint for collapsed Bash/Write */}
+        {isComplete && !isExpanded && toolOutput && (isBashTool || isWriteTool) && (
+          <span className="text-muted-foreground/30 flex-shrink-0 text-[10px]">
+            {countLines(toolOutput)} lines
+          </span>
+        )}
+      </div>
+
+      {/* Expanded output area - CLI style with border-left */}
+      {isExpanded && (
+        <div className="ml-5 mt-1 animate-slide-down">
+          {/* Edit tool: show inline diff */}
+          {isEditTool && toolInput?.old_string && toolInput?.new_string && (
+            <div className="relative group/diff">
+              <InlineDiff
+                oldString={String(toolInput.old_string)}
+                newString={String(toolInput.new_string)}
+              />
+              {onOpenDiffModal && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onOpenDiffModal() }}
+                  className="absolute top-1 right-1 p-1 rounded bg-muted/50 opacity-0 group-hover/diff:opacity-100 transition-opacity"
+                  title={t('View full diff')}
+                >
+                  <Maximize2 size={10} className="text-muted-foreground" />
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Bash / other tools: output with border-left */}
+          {!isEditTool && toolOutput && (
+            <div
+              ref={outputRef}
+              className={`border-l-2 pl-3 py-1 text-[11px] font-mono leading-[1.4] overflow-y-auto max-h-48 whitespace-pre-wrap break-all ${
+                isError ? 'border-destructive/40 text-destructive/80' : 'border-muted-foreground/20 text-muted-foreground/60'
+              }`}
+            >
+              {toolOutput}
+            </div>
+          )}
+        </div>
       )}
     </div>
   )

@@ -5,6 +5,12 @@ import type {
   WebToolsConfig
 } from '../../shared/types'
 
+export interface NormalizedProviderConfig {
+  apiKey: string
+  baseUrl: string
+  model: string
+}
+
 export interface NormalizedWebSearchConfig {
   enabled: boolean
   provider: WebSearchProvider
@@ -16,11 +22,11 @@ export interface NormalizedWebSearchConfig {
     apiKey: string
     baseUrl: string
   }
-  kimi: {
-    apiKey: string
-    baseUrl: string
-    model: string
-  }
+  kimi: NormalizedProviderConfig
+  glm: NormalizedProviderConfig
+  minimax: NormalizedProviderConfig
+  gpt: NormalizedProviderConfig
+  claude: NormalizedProviderConfig
 }
 
 export interface NormalizedWebFetchConfig {
@@ -50,7 +56,19 @@ export const DEFAULT_WEB_FETCH_MAX_REDIRECTS = 3
 export const DEFAULT_KIMI_BASE_URL = 'https://api.moonshot.cn/v1'
 export const DEFAULT_KIMI_MODEL = 'moonshot-v1-128k'
 export const DEFAULT_PERPLEXITY_BASE_URL = 'https://api.perplexity.ai'
+export const DEFAULT_GLM_BASE_URL = 'https://open.bigmodel.cn/api/paas/v4'
+export const DEFAULT_GLM_MODEL = 'glm-4-flash'
+export const DEFAULT_MINIMAX_BASE_URL = 'https://api.minimax.chat/v1'
+export const DEFAULT_MINIMAX_MODEL = 'MiniMax-Text-01'
+export const DEFAULT_GPT_BASE_URL = 'https://api.openai.com/v1'
+export const DEFAULT_GPT_MODEL = 'gpt-4o-search-preview'
+export const DEFAULT_CLAUDE_BASE_URL = 'https://api.anthropic.com'
+export const DEFAULT_CLAUDE_MODEL = 'claude-sonnet-4-20250514'
 export const DEFAULT_WEB_FETCH_USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_7_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+
+const VALID_PROVIDERS: WebSearchProvider[] = [
+  'duckduckgo', 'brave', 'perplexity', 'kimi', 'glm', 'minimax', 'gpt', 'claude'
+]
 
 function clampInt(value: unknown, fallback: number, min: number, max: number): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) {
@@ -62,6 +80,18 @@ function clampInt(value: unknown, fallback: number, min: number, max: number): n
 
 function trimString(value: unknown, fallback = ''): string {
   return typeof value === 'string' ? value.trim() : fallback
+}
+
+function normalizeProviderBlock(
+  config: { apiKey?: string; baseUrl?: string; model?: string } | undefined,
+  defaultBaseUrl: string,
+  defaultModel: string
+): NormalizedProviderConfig {
+  return {
+    apiKey: trimString(config?.apiKey),
+    baseUrl: trimString(config?.baseUrl, defaultBaseUrl) || defaultBaseUrl,
+    model: trimString(config?.model, defaultModel) || defaultModel
+  }
 }
 
 export const DEFAULT_WEB_TOOLS_CONFIG: NormalizedWebToolsConfig = {
@@ -77,11 +107,11 @@ export const DEFAULT_WEB_TOOLS_CONFIG: NormalizedWebToolsConfig = {
         apiKey: '',
         baseUrl: DEFAULT_PERPLEXITY_BASE_URL
       },
-      kimi: {
-        apiKey: '',
-        baseUrl: DEFAULT_KIMI_BASE_URL,
-        model: DEFAULT_KIMI_MODEL
-      }
+      kimi: { apiKey: '', baseUrl: DEFAULT_KIMI_BASE_URL, model: DEFAULT_KIMI_MODEL },
+      glm: { apiKey: '', baseUrl: DEFAULT_GLM_BASE_URL, model: DEFAULT_GLM_MODEL },
+      minimax: { apiKey: '', baseUrl: DEFAULT_MINIMAX_BASE_URL, model: DEFAULT_MINIMAX_MODEL },
+      gpt: { apiKey: '', baseUrl: DEFAULT_GPT_BASE_URL, model: DEFAULT_GPT_MODEL },
+      claude: { apiKey: '', baseUrl: DEFAULT_CLAUDE_BASE_URL, model: DEFAULT_CLAUDE_MODEL }
     },
     fetch: {
       enabled: true,
@@ -95,11 +125,8 @@ export const DEFAULT_WEB_TOOLS_CONFIG: NormalizedWebToolsConfig = {
 }
 
 export function normalizeWebSearchConfig(config?: WebSearchConfig): NormalizedWebSearchConfig {
-  const provider = config?.provider === 'duckduckgo'
-    || config?.provider === 'brave'
-    || config?.provider === 'perplexity'
-    || config?.provider === 'kimi'
-    ? config.provider
+  const provider = (VALID_PROVIDERS as string[]).includes(config?.provider || '')
+    ? config!.provider!
     : DEFAULT_WEB_SEARCH_PROVIDER
 
   return {
@@ -113,11 +140,11 @@ export function normalizeWebSearchConfig(config?: WebSearchConfig): NormalizedWe
       apiKey: trimString(config?.perplexity?.apiKey),
       baseUrl: trimString(config?.perplexity?.baseUrl, DEFAULT_PERPLEXITY_BASE_URL) || DEFAULT_PERPLEXITY_BASE_URL
     },
-    kimi: {
-      apiKey: trimString(config?.kimi?.apiKey),
-      baseUrl: trimString(config?.kimi?.baseUrl, DEFAULT_KIMI_BASE_URL) || DEFAULT_KIMI_BASE_URL,
-      model: trimString(config?.kimi?.model, DEFAULT_KIMI_MODEL) || DEFAULT_KIMI_MODEL
-    }
+    kimi: normalizeProviderBlock(config?.kimi, DEFAULT_KIMI_BASE_URL, DEFAULT_KIMI_MODEL),
+    glm: normalizeProviderBlock(config?.glm, DEFAULT_GLM_BASE_URL, DEFAULT_GLM_MODEL),
+    minimax: normalizeProviderBlock(config?.minimax, DEFAULT_MINIMAX_BASE_URL, DEFAULT_MINIMAX_MODEL),
+    gpt: normalizeProviderBlock(config?.gpt, DEFAULT_GPT_BASE_URL, DEFAULT_GPT_MODEL),
+    claude: normalizeProviderBlock(config?.claude, DEFAULT_CLAUDE_BASE_URL, DEFAULT_CLAUDE_MODEL)
   }
 }
 

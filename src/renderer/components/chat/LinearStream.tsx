@@ -10,21 +10,24 @@
  * - Skill: gradient label with child tools nested
  */
 
-import { useState, useMemo, memo } from 'react'
+import { useState, useMemo, useRef, memo } from 'react'
 import {
   ChevronRight,
-  Lightbulb,
   Loader2,
   XCircle,
 } from 'lucide-react'
 import { StreamdownRenderer } from './StreamdownRenderer'
-import { TodoCard, parseTodoInput } from '../tool/TodoCard'
+import { parseTodoInput } from '../tool/TodoCard'
 import { AgentTaskCard } from '../tool/AgentTaskCard'
+import { HostedSubagentCard } from '../tool/HostedSubagentCard'
 import { ToolItem } from '../tool/ToolItem'
 import { groupToolsByTodoSteps } from '../../utils/todo-grouping'
 import { HaloLogo } from '../brand/HaloLogo'
-import type { Thought, TimelineItem, TextSegment, TodoItem } from '../../types'
+import type { Thought, TimelineItem, TextSegment } from '../../types'
+import type { SubagentRunEntry } from '../../stores/chat.store'
 import { useTranslation } from '../../i18n'
+import { shouldSuppressSetModelStatus } from '../../../shared/utils/sdk-status'
+import { useTypewriter } from '../../hooks/useTypewriter'
 import {
   getLatestVisibleActiveToolUseIds,
   getMatchingToolResult
@@ -37,10 +40,22 @@ interface LinearStreamProps {
   lastSegmentIndex: number
   isStreaming: boolean
   isThinking: boolean
-  // TodoCard collapse state
-  todoCollapsed?: boolean
-  onToggleTodo?: () => void
-  taskStatusHistory?: Map<string, string[]>
+  // SDK status line (ephemeral progress message)
+  sdkStatus?: string | null
+  // Sub-agent task progress map (taskId -> progress)
+  taskProgressMap?: Map<string, {
+    taskId: string
+    toolUseId?: string
+    description: string
+    summary?: string
+    lastToolName?: string
+    status: 'running' | 'completed' | 'failed' | 'stopped'
+    usage?: { total_tokens: number; tool_uses: number; duration_ms: number }
+  }>
+  subagentRunMap?: Map<string, SubagentRunEntry>
+  // Hosted subagent callbacks
+  onViewSubagentDetails?: (runId: string) => void
+  onKillSubagent?: (runId: string) => void
 }
 
 // Utility functions and ToolItem component are in ../tool/ToolItem.tsx
@@ -49,112 +64,49 @@ interface LinearStreamProps {
 // Sub-components
 // ============================================
 
-// Process Tag - unified tag-style display for different processes
-// Types: thinking, tool, skill (each with different colors)
-const ProcessTag = memo(function ProcessTag({
-  type,
-  label,
-  icon: Icon,
+// Thinking block - CLI style with border-left, no italic
+const ThinkingItem = memo(function ThinkingItem({
   content,
-  isRunning = false,
-  duration,
-  className = '',
+  isNew = false,
 }: {
-  type: 'thinking' | 'tool' | 'skill' | 'error'
-  label: string
-  icon: React.ElementType
-  content?: string
-  isRunning?: boolean
-  duration?: number
-  className?: string
+  content: string
+  isNew?: boolean
 }) {
-  const [isExpanded, setIsExpanded] = useState(false)
-  const hasContent = content && content.trim().length > 0
-
-  // Tag styles based on type
-  const tagStyles = {
-    thinking: 'bg-muted/30 text-muted-foreground/70 border-muted-foreground/20',
-    tool: 'bg-muted/20 text-muted-foreground/60 border-muted-foreground/15',
-    skill: 'bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-500/30 font-semibold',
-    error: 'bg-destructive/10 text-destructive/80 border-destructive/30',
-  }
-
-  // Icon styles based on type
-  const iconStyles = {
-    thinking: 'text-blue-400/70',
-    tool: 'text-muted-foreground/60',
-    skill: 'text-violet-500',
-    error: 'text-destructive/70',
-  }
+  const { t } = useTranslation()
+  const [isExpanded, setIsExpanded] = useState(true)
+  const { displayText, isAnimating } = useTypewriter(content, {
+    enabled: isNew,
+    charsPerFrame: 8,
+  })
 
   return (
-    <div className={`py-0.5 ${className}`}>
-      {/* Tag header - clickable if has content */}
+    <div className="py-0.5">
+      {/* Clickable header - minimal CLI style */}
       <button
-        onClick={() => hasContent && setIsExpanded(!isExpanded)}
-        disabled={!hasContent}
-        className={`
-          inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs text-left
-          border transition-all
-          ${tagStyles[type]}
-          ${hasContent ? 'cursor-pointer hover:bg-muted/40' : 'cursor-default'}
-        `}
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="flex items-center gap-1.5 py-0.5 text-[13px] text-left w-full
+          text-muted-foreground cursor-pointer hover:text-foreground/70 transition-colors"
       >
-        {/* Expand arrow (only if has content) */}
-        {hasContent && (
-          <ChevronRight
-            size={10}
-            className={`flex-shrink-0 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
-          />
-        )}
-
-        {/* Icon */}
-        <Icon size={12} className={`flex-shrink-0 ${iconStyles[type]} ${isRunning ? 'animate-pulse' : ''}`} />
-
-        {/* Label */}
-        <span className={type === 'skill' ? 'font-semibold' : ''}>{label}</span>
-
-        {/* Running indicator */}
-        {isRunning && (
-          <Loader2 size={10} className="animate-spin flex-shrink-0 ml-0.5" />
-        )}
-
-        {/* Duration */}
-        {!isRunning && duration && (
-          <span className="text-muted-foreground/50 ml-0.5">
-            ({(duration / 1000).toFixed(1)}s)
-          </span>
-        )}
+        <ChevronRight
+          size={10}
+          className={`flex-shrink-0 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+        />
+        <span className="truncate">{t('Thinking')}</span>
       </button>
 
-      {/* Expanded content - code block style */}
-      {isExpanded && hasContent && (
-        <div className="mt-1 ml-4 p-2 rounded bg-muted/20 border border-border/20 text-xs text-muted-foreground/70 font-mono whitespace-pre-wrap overflow-x-auto max-h-40 overflow-y-auto">
-          {content}
+      {/* Expanded content - border-left style, no italic */}
+      {isExpanded && (
+        <div className="thinking-content ml-4 pl-3 py-1.5 border-l-2 border-muted-foreground/35 text-[13px] text-muted-foreground leading-relaxed overflow-x-auto max-h-60 overflow-y-auto bg-muted/20 rounded-r">
+          <StreamdownRenderer
+            content={displayText}
+            isStreaming={isAnimating}
+          />
+          {isAnimating && (
+            <span className="inline-block w-0.5 h-3 bg-muted-foreground/50 animate-pulse ml-0.5 align-middle" />
+          )}
         </div>
       )}
     </div>
-  )
-})
-
-// Thinking block - using ProcessTag
-const ThinkingItem = memo(function ThinkingItem({
-  content,
-  timestamp,
-}: {
-  content: string
-  timestamp: string
-}) {
-  const { t } = useTranslation()
-  const summary = content.length > 50 ? content.slice(0, 50) + '...' : content
-
-  return (
-    <ProcessTag
-      type="thinking"
-      label={`${t('Thinking')}: ${summary}`}
-      icon={Lightbulb}
-      content={content}
-    />
   )
 })
 
@@ -192,9 +144,9 @@ const SkillItem = memo(function SkillItem({
         {isRunning && <Loader2 size={12} className="text-white/80 animate-spin" />}
       </div>
 
-      {/* Child tools */}
+      {/* Child tools - CLI style border-left */}
       {childItems && childItems.length > 0 && (
-        <div className="ml-4 mt-1 border-l-2 border-orange-500/30 pl-3">
+        <div className="ml-3 mt-1 border-l-2 border-orange-500/30 pl-3">
           {childItems.map((child) => (
             <ToolItem
               key={child.id}
@@ -203,6 +155,7 @@ const SkillItem = memo(function SkillItem({
               isComplete={child.isComplete || false}
               isError={child.isError || false}
               duration={child.duration}
+              toolOutput={child.toolOutput}
             />
           ))}
         </div>
@@ -252,11 +205,16 @@ export function LinearStream({
   lastSegmentIndex,
   isStreaming,
   isThinking,
-  todoCollapsed = false,
-  onToggleTodo,
-  taskStatusHistory,
+  sdkStatus,
+  taskProgressMap,
+  subagentRunMap,
+  onViewSubagentDetails,
+  onKillSubagent,
 }: LinearStreamProps) {
   const { t } = useTranslation()
+
+  // Track which thinking IDs have been seen (for typewriter animation on new ones only)
+  const seenThinkingIds = useRef<Set<string>>(new Set())
 
   // Build timeline items from thoughts
   const timelineItems = useMemo(() => {
@@ -269,7 +227,7 @@ export function LinearStream({
     const getToolResult = (thought: Thought) => {
       const resultThought = getMatchingToolResult(thoughts, thought)
       if (resultThought) {
-        return { isError: resultThought.isError || false, duration: resultThought.duration }
+        return { isError: resultThought.isError || false, duration: resultThought.duration, toolOutput: resultThought.toolOutput }
       }
       return null
     }
@@ -316,6 +274,7 @@ export function LinearStream({
               type: 'tool_use',
               toolName: thought.toolName,
               toolInput: thought.toolInput,
+              toolOutput: result?.toolOutput,
               isComplete,
               isError: result?.isError || false,
               duration: result?.duration,
@@ -348,6 +307,7 @@ export function LinearStream({
             type: 'tool_use',
             toolName: thought.toolName,
             toolInput: thought.toolInput,
+            toolOutput: result?.toolOutput,
             isComplete,
             isError: result?.isError || false,
             duration: result?.duration,
@@ -397,18 +357,6 @@ export function LinearStream({
     return groupToolsByTodoSteps(thoughts, timelineItems)
   }, [thoughts, timelineItems])
 
-  // Build stepToolItems map for TodoCard
-  const stepToolItems = useMemo(() => {
-    if (!todoGrouping.hasTodos) return undefined
-    const map = new Map<string, TimelineItem[]>()
-    for (const step of todoGrouping.steps) {
-      if (step.toolItems.length > 0) {
-        map.set(step.content, step.toolItems)
-      }
-    }
-    return map
-  }, [todoGrouping])
-
   // Items to render flat (either all items or only ungrouped ones)
   const flatItems = useMemo(() => {
     if (!todoGrouping.hasTodos) return timelineItems
@@ -422,8 +370,14 @@ export function LinearStream({
     return streamingContent.slice(lastSegmentIndex)
   }, [streamingContent, lastSegmentIndex])
 
+  const subagentRuns = useMemo(() => {
+    return Array.from(subagentRunMap?.values() || []).sort(
+      (a, b) => new Date(a.spawnedAt).getTime() - new Date(b.spawnedAt).getTime()
+    )
+  }, [subagentRunMap])
+
   // Check if there's anything to display
-  const hasContent = timelineItems.length > 0 || latestTodos || currentText.trim() || isThinking
+  const hasContent = timelineItems.length > 0 || latestTodos || currentText.trim() || isThinking || subagentRuns.length > 0
 
   if (!hasContent) return null
 
@@ -431,17 +385,28 @@ export function LinearStream({
   const renderTimelineItem = (item: TimelineItem, taskColorCounter: { value: number }) => {
     switch (item.type) {
       case 'thinking':
+        const isNewThinking = !seenThinkingIds.current.has(item.id)
+        if (isNewThinking) seenThinkingIds.current.add(item.id)
         return (
           <ThinkingItem
             key={item.id}
             content={item.content || ''}
-            timestamp={item.timestamp}
+            isNew={isNewThinking}
           />
         )
       case 'tool_use':
         // Task (sub-agent) gets its own distinctive card with unique color
         if (item.toolName === 'Task') {
           const colorIdx = taskColorCounter.value++
+          // Find matching task progress by toolUseId
+          let taskProgress: { summary?: string; lastToolName?: string; usage?: { tool_uses: number } } | undefined
+          if (taskProgressMap) {
+            taskProgressMap.forEach((tp) => {
+              if (tp.toolUseId === item.id) {
+                taskProgress = tp
+              }
+            })
+          }
           return (
             <AgentTaskCard
               key={item.id}
@@ -452,6 +417,11 @@ export function LinearStream({
               isError={item.isError || false}
               duration={item.duration}
               colorIndex={colorIdx}
+              summary={taskProgress?.summary}
+              lastToolName={taskProgress?.lastToolName}
+              toolUses={taskProgress?.usage?.tool_uses}
+              stepHistory={(taskProgress as any)?.stepHistory}
+              resultSummary={(taskProgress as any)?.resultSummary}
             />
           )
         }
@@ -463,6 +433,7 @@ export function LinearStream({
             isComplete={item.isComplete || false}
             isError={item.isError || false}
             duration={item.duration}
+            toolOutput={item.toolOutput}
           />
         )
       case 'skill':
@@ -506,7 +477,7 @@ export function LinearStream({
   }
 
   return (
-    <div className="rounded-2xl px-4 py-3 message-assistant w-full overflow-y-hidden overflow-x-auto text-left">
+    <div className="px-0 py-1 w-full overflow-y-hidden overflow-x-auto text-left text-[13px]">
       {/* Pre-step items (tools before first TodoWrite), skip skill badges */}
       {todoGrouping.hasTodos && todoGrouping.preStepItems.length > 0 && (() => {
         const counter = { value: 0 }
@@ -515,24 +486,23 @@ export function LinearStream({
           .map(item => renderTimelineItem(item, counter))
       })()}
 
-      {/* TodoCard with grouped tool items */}
-      {latestTodos && latestTodos.length > 0 && (
-        <div className="mb-3">
-          <TodoCard
-            todos={latestTodos}
-            isCollapsed={todoCollapsed}
-            onToggleCollapse={onToggleTodo}
-            taskStatusHistory={taskStatusHistory}
-            stepToolItems={stepToolItems}
-          />
-        </div>
-      )}
+      {/* TodoCard rendered as floating indicator in ChatView instead */}
 
       {/* Flat timeline items (all items when no todos, or ungrouped items when todos exist) */}
       {(() => {
         const counter = { value: 0 }
         return flatItems.map(item => renderTimelineItem(item, counter))
       })()}
+
+      {subagentRuns.map((run, index) => (
+        <HostedSubagentCard
+          key={`hosted-${run.runId}`}
+          run={run}
+          colorIndex={index}
+          onViewDetails={onViewSubagentDetails || (() => {})}
+          onKill={onKillSubagent || (() => {})}
+        />
+      ))}
 
       {/* Current streaming text (content after last segment) */}
       {currentText.trim() && (
@@ -543,11 +513,18 @@ export function LinearStream({
         />
       )}
 
-      {/* Waiting indicator when thinking but no streaming */}
+      {/* Waiting indicator - CLI style */}
       {isThinking && !isStreaming && !currentText.trim() && (
-        <div className="py-2 flex items-center gap-2">
-          <HaloLogo size={16} animated={true} />
-          <span className="text-sm text-muted-foreground">{t('chat.thinking').replace(/\.{3}$/, '')}<span className="thinking-dots"><span className="dot">.</span><span className="dot">.</span><span className="dot">.</span></span></span>
+        <div className="py-1 flex flex-col gap-0.5">
+          <div className="flex items-center gap-2 text-[13px] text-muted-foreground">
+            <Loader2 size={12} className="animate-spin text-orange-400" />
+            <span>{t('chat.thinking').replace(/\.{3}$/, '')}<span className="thinking-dots"><span className="dot">.</span><span className="dot">.</span><span className="dot">.</span></span></span>
+          </div>
+          {sdkStatus && !shouldSuppressSetModelStatus(sdkStatus) && (
+            <div className="ml-6 text-xs text-muted-foreground/50 animate-pulse">
+              {sdkStatus}
+            </div>
+          )}
         </div>
       )}
     </div>

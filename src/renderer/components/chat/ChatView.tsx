@@ -10,6 +10,8 @@
  */
 
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
+import { parseTodoInput } from '../tool/TodoCard'
+import { FloatingTodoIndicator } from '../tool/FloatingTodoIndicator'
 import { useSpaceStore } from '../../stores/space.store'
 import { useChatStore } from '../../stores/chat.store'
 import { useOnboardingStore } from '../../stores/onboarding.store'
@@ -21,7 +23,6 @@ import { ToolCard } from '../tool/ToolCard'
 import type { ThinkingEffort } from '../../../shared/utils/openai-models'
 import { ScrollToBottomButton } from './ScrollToBottomButton'
 import { UserQuestionCard } from './UserQuestionCard'
-import { PromptSuggestions } from './PromptSuggestions'
 import { HaloLogo } from '../brand/HaloLogo'
 import { PenLine, BarChart3, Palette, FolderSearch, ShoppingBag, LucideIcon } from 'lucide-react'
 import {
@@ -31,6 +32,7 @@ import {
   getOnboardingPrompt,
 } from '../onboarding/onboardingData'
 import { api } from '../../api'
+import { HostedSubagentDetailSheet } from '../tool/HostedSubagentDetailSheet'
 import type { Attachment } from '../../types'
 import { useTranslation } from '../../i18n'
 
@@ -71,7 +73,8 @@ export function ChatView({ isCompact = false }: ChatViewProps) {
     stopGeneration,
     injectMessage,
     addMockMessage,
-    answerUserQuestion
+    answerUserQuestion,
+    killSubagentRun,
   } = useChatStore()
 
   // Onboarding state
@@ -192,11 +195,13 @@ export function ChatView({ isCompact = false }: ChatViewProps) {
     error,
     todoCollapsed,
     taskStatusHistory,
+    taskProgressMap,
+    subagentRunMap,
     textSegments,
     lastSegmentIndex,
     pendingToolApproval,
     pendingUserQuestion,
-    aiSuggestions
+    sdkStatus
   } = session
 
   // Create toggle callbacks for the current conversation
@@ -205,6 +210,16 @@ export function ChatView({ isCompact = false }: ChatViewProps) {
       toggleTodoCollapsed(currentConversation.id)
     }
   }, [currentConversation, toggleTodoCollapsed])
+
+  // Compute latest todos for floating indicator
+  const latestTodos = useMemo(() => {
+    const todoThoughts = thoughts.filter(
+      t => t.type === 'tool_use' && t.toolName === 'TodoWrite' && t.toolInput
+    )
+    if (todoThoughts.length === 0) return null
+    const latest = todoThoughts[todoThoughts.length - 1]
+    return parseTodoInput(latest.toolInput!)
+  }, [thoughts])
 
   // Smart auto-scroll: only scrolls when user is at bottom
   const {
@@ -301,23 +316,6 @@ export function ChatView({ isCompact = false }: ChatViewProps) {
     await injectMessage(content, attachments)
   }, [isGenerating, injectMessage])
 
-  // Get last assistant message info for PromptSuggestions
-  const lastAssistant = useMemo(() => {
-    const msgs = currentConversation?.messages || []
-    for (let i = msgs.length - 1; i >= 0; i--) {
-      if (msgs[i].role === 'assistant') {
-        return { thoughts: msgs[i].thoughts || [], content: msgs[i].content || '' }
-      }
-    }
-    return { thoughts: [] as import('../../types').Thought[], content: '' }
-  }, [currentConversation?.messages])
-
-  // Handle suggestion selection from PromptSuggestions
-  const handleSuggestionSelect = useCallback(async (suggestion: string) => {
-    if (isGenerating) return
-    await sendMessage(suggestion)
-  }, [isGenerating, sendMessage])
-
   // Combine real messages with mock onboarding messages
   const realMessages = currentConversation?.messages || []
   const displayMessages = mockUserMessage
@@ -343,6 +341,24 @@ export function ChatView({ isCompact = false }: ChatViewProps) {
   useEffect(() => {
     prevCompactRef.current = isCompact
   }, [isCompact])
+
+  // Hosted subagent detail sheet state
+  const [detailSheetRunId, setDetailSheetRunId] = useState<string | null>(null)
+  const detailSheetRun = detailSheetRunId
+    ? subagentRunMap?.get(detailSheetRunId) ?? null
+    : null
+
+  const handleViewSubagentDetails = useCallback((runId: string) => {
+    setDetailSheetRunId(runId)
+  }, [])
+
+  const handleKillSubagent = useCallback((runId: string) => {
+    killSubagentRun(runId)
+  }, [killSubagentRun])
+
+  const handleCloseDetailSheet = useCallback(() => {
+    setDetailSheetRunId(null)
+  }, [])
 
   // Quick suggestion content state
   const [suggestedContent, setSuggestedContent] = useState<string>('')
@@ -421,28 +437,29 @@ export function ChatView({ isCompact = false }: ChatViewProps) {
                 compactInfo={compactInfo}
                 error={error}
                 isCompact={isCompact}
-                todoCollapsed={todoCollapsed}
-                onToggleTodo={handleToggleTodo}
-                taskStatusHistory={taskStatusHistory}
+                taskProgressMap={taskProgressMap}
+                subagentRunMap={subagentRunMap}
                 textSegments={textSegments}
                 lastSegmentIndex={lastSegmentIndex}
-
+                sdkStatus={sdkStatus}
+                onViewSubagentDetails={handleViewSubagentDetails}
+                onKillSubagent={handleKillSubagent}
               />
-              {/* Prompt Suggestions - tight below last assistant message */}
-              {!isGenerating && (lastAssistant.thoughts.length > 0 || lastAssistant.content) && (
-                <div className={`mt-1 ${isCompact ? '' : 'max-w-3xl mx-auto w-full'}`}>
-                  <PromptSuggestions
-                    thoughts={lastAssistant.thoughts}
-                    content={lastAssistant.content}
-                    aiSuggestions={aiSuggestions}
-                    onSelect={handleSuggestionSelect}
-                  />
-                </div>
-              )}
               <div ref={bottomRef} />
             </>
           )}
         </div>
+
+        {/* Floating task progress indicator */}
+        {latestTodos && latestTodos.length > 0 && (
+          <FloatingTodoIndicator
+            todos={latestTodos}
+            isCollapsed={todoCollapsed}
+            onToggleCollapse={handleToggleTodo}
+            taskStatusHistory={taskStatusHistory}
+            visible={isGenerating}
+          />
+        )}
 
         {/* Scroll to bottom button - positioned outside scroll container */}
         <ScrollToBottomButton
@@ -474,6 +491,14 @@ export function ChatView({ isCompact = false }: ChatViewProps) {
 
       {/* Input area - only show at bottom when there are messages */}
       {hasMessages && <div className="shrink-0">{bottomInputArea}</div>}
+
+      {/* Hosted subagent detail sheet */}
+      <HostedSubagentDetailSheet
+        isOpen={detailSheetRunId !== null}
+        run={detailSheetRun}
+        onClose={handleCloseDetailSheet}
+        onKill={handleKillSubagent}
+      />
     </div>
   )
 }

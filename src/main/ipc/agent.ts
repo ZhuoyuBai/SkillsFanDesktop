@@ -3,7 +3,7 @@
  */
 
 import { ipcMain, BrowserWindow } from 'electron'
-import { sendMessage, stopGeneration, interruptAndInject, handleToolApproval, handleUserQuestionAnswer, getSessionState, ensureSessionWarm, testMcpConnections, getV2Session } from '../services/agent'
+import { sendMessage, stopGeneration, interruptAndInject, handleToolApproval, handleUserQuestionAnswer, getSessionState, ensureSessionWarm, testMcpConnections, getV2Session, killSubagentRun, getSubagentRun } from '../services/agent'
 import type { Attachment, ImageAttachment } from '../services/agent/types'
 import type { ThinkingEffort } from '../../shared/utils/openai-models'
 import { ipcHandle } from './utils'
@@ -64,6 +64,16 @@ export function registerAgentHandlers(window: BrowserWindow | null): void {
     ensureSessionWarm(spaceId, conversationId).catch((error: unknown) => {
       console.error('[IPC] ensureSessionWarm error:', error)
     })
+  })
+
+  // Kill a hosted subagent run
+  ipcHandle('agent:kill-subagent', (_e, runId: string) => {
+    return killSubagentRun(runId)
+  })
+
+  // Get detailed info for a hosted subagent run
+  ipcHandle('agent:get-subagent-detail', (_e, runId: string) => {
+    return getSubagentRun(runId)
   })
 
   // Rewind files - has custom error handling with logging, keep ipcMain.handle

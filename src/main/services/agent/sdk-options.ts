@@ -86,6 +86,7 @@ export interface BuildSdkOptionsParams {
   aiBrowserEnabled?: boolean
   thinkingEnabled?: boolean
   includeSkillMcp?: boolean
+  includeSubagentTools?: boolean
   ralphSystemPromptAppend?: string
   /** Whether the API goes through the OpenAI-compat router (non-Anthropic backend) */
   routed?: boolean
@@ -156,6 +157,7 @@ export async function buildSdkOptions(params: BuildSdkOptionsParams): Promise<{
     aiBrowserEnabled = false,
     thinkingEnabled = false,
     includeSkillMcp = false,
+    includeSubagentTools = true,
     ralphSystemPromptAppend = '',
     routed = false
   } = params
@@ -185,7 +187,8 @@ export async function buildSdkOptions(params: BuildSdkOptionsParams): Promise<{
     spaceId,
     conversationId,
     aiBrowserEnabled: effectiveAiBrowserEnabled,
-    includeSkillMcp
+    includeSkillMcp,
+    includeSubagentTools
   })
   addedMcpServers.push('local-tools')
 
@@ -292,7 +295,7 @@ export async function buildSdkOptions(params: BuildSdkOptionsParams): Promise<{
     settingSources: ['user', 'project'],
     // Enable file checkpointing for rewind support
     enableFileCheckpointing: true,
-    ...(thinkingEnabled ? { maxThinkingTokens: MAX_THINKING_TOKENS } : {}),
+    ...(thinkingEnabled ? { thinking: { type: 'enabled' as const, budgetTokens: MAX_THINKING_TOKENS } } : {}),
     ...(Object.keys(mcpServers).length > 0 ? { mcpServers } : {}),
     ...(agents ? { agents } : {}),
     ...(additionalDirectories.length > 0 ? { additionalDirectories } : {}),

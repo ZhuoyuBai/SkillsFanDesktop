@@ -140,13 +140,13 @@ function buildComponents(filePathMap?: Record<string, string>) {
 
   // Headings
   h1: ({ children }: { children?: React.ReactNode }) => (
-    <h1 className="text-xl font-semibold mt-6 mb-3 first:mt-0">{children}</h1>
+    <h1 className="font-semibold mt-4 mb-2 first:mt-0">{children}</h1>
   ),
   h2: ({ children }: { children?: React.ReactNode }) => (
-    <h2 className="text-lg font-semibold mt-5 mb-2 first:mt-0">{children}</h2>
+    <h2 className="font-semibold mt-3 mb-2 first:mt-0">{children}</h2>
   ),
   h3: ({ children }: { children?: React.ReactNode }) => (
-    <h3 className="text-base font-semibold mt-4 mb-2 first:mt-0">{children}</h3>
+    <h3 className="font-semibold mt-3 mb-1.5 first:mt-0">{children}</h3>
   ),
 
   // Lists

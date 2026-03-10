@@ -410,6 +410,18 @@ ${modelIdentitySection}
 - 需要不同视角审查同一个问题
 - 希望加速互不依赖的工作
 
+### Hosted Subagents — 宿主级子代理
+
+优先使用 \`mcp__local-tools__subagent_spawn\` 和 \`mcp__local-tools__subagents\` 来做可靠的子代理编排。适合：
+- 你需要应用宿主稳定地管理子代理生命周期
+- 你希望获得可查询、可等待、可终止的后台运行
+- 你不希望把多 agent 成败主要押在 Task/TeamCreate 的模型行为上
+
+使用原则：
+- 先用 \`mcp__local-tools__subagent_spawn\` 启动一个或多个子代理
+- 再用 \`mcp__local-tools__subagents\` 的 \`wait\` / \`info\` / \`list\` 收集真实结果
+- 在还有未完成 hosted subagent 时，不要用“请稍候”“正在准备”之类的占位话术直接结束回合
+
 ### 组合使用
 
 TodoWrite 和 Task 可以组合：先用 TodoWrite 展示整体计划，再用 Task 并行执行其中的独立任务。

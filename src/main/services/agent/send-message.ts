@@ -9,6 +9,7 @@
  * - Error handling and recovery
  */
 
+import fs from 'node:fs/promises'
 import { BrowserWindow } from 'electron'
 import { getConfig } from '../config.service'
 import { getConversation, saveSessionId, addMessage, updateLastMessage } from '../conversation.service'
@@ -20,6 +21,7 @@ import type {
   AgentRequest,
   ToolCall,
   Thought,
+  SessionState,
   SessionConfig,
   TokenUsage,
   SingleCallUsage
@@ -43,10 +45,10 @@ import {
 import { broadcastMcpStatus } from './mcp-manager'
 import { buildSdkOptions, resolveSdkTransport } from './sdk-options'
 import { preprocessImages } from './image-preprocess'
-import { generateSuggestions } from './suggestion-generator'
 import {
   formatCanvasContext,
   buildMessageContent,
+  shouldSuppressSdkStatus,
   parseSDKMessage,
   extractSingleUsage,
   extractResultUsage
@@ -67,6 +69,7 @@ import {
   thinkingEffortToBudgetTokens
 } from '../../../shared/utils/openai-models'
 import { isDuplicateActiveToolUse } from '../../../shared/utils/thought-dedupe'
+import { stripLeadingSetModelStatus } from '../../../shared/utils/sdk-status'
 
 function getRuntimeModelDisplayName(config: Record<string, any>, modelId: string): string {
   const aiSources = config.aiSources || {}
@@ -107,6 +110,103 @@ function getDirectRuntimeModelReply(
     : `当前运行模型是 ${displayName}（ID: \`${modelId}\`）。`
 }
 
+const SESSION_RECOVERY_MAX_ATTEMPTS = 2
+const SESSION_RECOVERY_ERROR_MESSAGE = 'Agent session disconnected while responding. Automatically retried once, but it still failed.'
+const EMPTY_RESPONSE_ERROR_MESSAGE = 'Agent session ended without producing any response text.'
+
+interface ProcessMessageStreamResult {
+  finalContent: string
+  hadTextContent: boolean
+  hadPersistentActivity: boolean
+  sawAnySdkMessage: boolean
+  sawResult: boolean
+  tokenUsage: TokenUsage | null
+  userMessageUuid?: string
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message
+  if (typeof error === 'string') return error
+  return String(error)
+}
+
+function isRecoverableSessionError(error: unknown): boolean {
+  const message = getErrorMessage(error).toLowerCase()
+  return message.includes('processtransport is not ready for writing')
+    || message.includes('cannot write to terminated process')
+    || message.includes('cannot write to process that exited with error')
+    || message.includes('failed to write to process stdin')
+    || message.includes('query closed before response received')
+}
+
+function canRetrySessionRecovery(sessionState: SessionState): boolean {
+  if (sessionState.currentStreamingContent.trim()) {
+    return false
+  }
+
+  return !sessionState.thoughts.some(thought =>
+    thought.type === 'text'
+    || thought.type === 'tool_use'
+    || thought.type === 'tool_result'
+    || thought.type === 'result'
+  )
+}
+
+function resetSessionStateForRetry(sessionState: SessionState): void {
+  sessionState.pendingPermissionResolve = null
+  sessionState.pendingPermissionToolCall = null
+  sessionState.pendingUserQuestion = null
+  sessionState.currentStreamingContent = ''
+  sessionState.thoughts.length = 0
+}
+
+function persistAssistantSnapshot(
+  spaceId: string,
+  conversationId: string,
+  snapshot: {
+    content?: string
+    thoughts?: Thought[]
+    tokenUsage?: TokenUsage | null
+    userMessageUuid?: string
+  },
+  mode: 'update_last' | 'append_new' | 'none' = 'update_last'
+): boolean {
+  if (mode === 'none') {
+    return false
+  }
+
+  const hasThoughts = Array.isArray(snapshot.thoughts) && snapshot.thoughts.length > 0
+  const hasContent = typeof snapshot.content === 'string' && snapshot.content.length > 0
+  const hasMetadata = Boolean(snapshot.tokenUsage || snapshot.userMessageUuid)
+
+  if (!hasThoughts && !hasContent && !hasMetadata) {
+    return false
+  }
+
+  if (mode === 'append_new') {
+    if (!hasContent) {
+      return false
+    }
+
+    addMessage(spaceId, conversationId, {
+      role: 'assistant',
+      content: snapshot.content ?? '',
+      toolCalls: [],
+      thoughts: hasThoughts ? [...snapshot.thoughts!] : undefined,
+      tokenUsage: snapshot.tokenUsage || undefined,
+      userMessageUuid: snapshot.userMessageUuid
+    })
+    return true
+  }
+
+  return Boolean(updateLastMessage(spaceId, conversationId, {
+    content: snapshot.content ?? '',
+    thoughts: hasThoughts ? [...snapshot.thoughts!] : undefined,
+    tokenUsage: snapshot.tokenUsage || undefined,
+    userMessageUuid: snapshot.userMessageUuid
+  }))
+}
+
 // ============================================
 // Send Message
 // ============================================
@@ -122,10 +222,11 @@ export async function sendMessage(
   request: AgentRequest
 ): Promise<void> {
   const { conversationId } = request
+  const suppressQueuedEvent = request.internalMessage?.suppressQueuedEvent === true
 
   // Check queue status and notify frontend if queued
   const status = agentQueue.getStatus(conversationId)
-  if (status.running) {
+  if (status.running && !suppressQueuedEvent) {
     console.log(`[Agent] Message queued for conv=${conversationId}, position=${status.queued + 1}`)
     sendToRenderer('agent:queued', request.spaceId, conversationId, {
       type: 'queued',
@@ -161,8 +262,13 @@ async function sendMessageInternal(
     aiBrowserEnabled,
     thinkingEnabled,
     canvasContext,
-    ralphMode
+    ralphMode,
+    internalMessage
   } = request
+  const assistantPersistMode = internalMessage?.persistAssistantMode ?? 'update_last'
+  const shouldPersistConversation = !ralphMode?.enabled
+  const shouldPersistUserMessage = shouldPersistConversation && internalMessage?.persistUserMessage !== false
+  const shouldCreateAssistantPlaceholder = shouldPersistConversation && assistantPersistMode === 'update_last'
 
   // Notify frontend that this queued message is now actually executing
   sendToRenderer('agent:start', spaceId, conversationId, {})
@@ -209,7 +315,8 @@ async function sendMessageInternal(
   }
   console.log(`[Agent] sendMessage using: ${credentials.provider}, model: ${credentials.model}${request.model ? ' (task override)' : ''}${request.modelSource ? ` source: ${request.modelSource}` : ''}`)
 
-  const directRuntimeModelReply = !ralphMode?.enabled &&
+  const directRuntimeModelReply = !internalMessage &&
+    !ralphMode?.enabled &&
     !messagePrefix &&
     (!images || images.length === 0) &&
     (!attachments || attachments.length === 0)
@@ -270,16 +377,16 @@ async function sendMessageInternal(
   const sessionState = createSessionState(spaceId, conversationId, abortController)
   registerActiveSession(conversationId, sessionState)
 
-  // Add user message to conversation (skip for Ralph mode - no conversation history needed)
-  if (!ralphMode?.enabled) {
+  if (shouldPersistUserMessage) {
     addMessage(spaceId, conversationId, {
       role: 'user',
       content: message,
       images: images,  // Include legacy images in the saved message
       attachments: attachments  // Persist all attachments for renderer restore
     })
+  }
 
-    // Add placeholder for assistant response
+  if (shouldCreateAssistantPlaceholder) {
     addMessage(spaceId, conversationId, {
       role: 'assistant',
       content: '',
@@ -296,41 +403,6 @@ async function sendMessageInternal(
     // This determines if Skill MCP server should be added and triggers session rebuild if needed
     await ensureSkillsInitialized()
     const skillsAvailable = hasSkills()
-
-    const { sdkOptions, addedMcpServers } = await buildSdkOptions({
-      conversationId,
-      spaceId,
-      workDir,
-      config: config as Record<string, any>,
-      abortController,
-      sdkModel,
-      credentialsModel: credentials.model,
-      anthropicBaseUrl,
-      anthropicApiKey,
-      electronPath,
-      onStderr: (data: string) => {
-        console.error(`[Agent][${conversationId}] CLI stderr:`, data)
-        stderrBuffer += data
-      },
-      aiBrowserEnabled: !!aiBrowserEnabled,
-      thinkingEnabled: !!thinkingEnabled,
-      includeSkillMcp: skillsAvailable,
-      ralphSystemPromptAppend: ralphMode?.systemPromptAppend || '',
-      routed: transport.routed
-    })
-
-    if (addedMcpServers.includes('ai-browser')) {
-      console.log(`[Agent][${conversationId}] AI Browser MCP server added`)
-    }
-    if (addedMcpServers.includes('web-tools')) {
-      console.log(`[Agent][${conversationId}] Web Tools MCP server added`)
-    }
-    if (addedMcpServers.includes('skill')) {
-      console.log(`[Agent][${conversationId}] Skill MCP server added`)
-    }
-
-    const t0 = Date.now()
-    console.log(`[Agent][${conversationId}] Getting or creating V2 session...`)
 
     // Log MCP servers if configured (only enabled ones)
     const enabledMcpServers = getEnabledMcpServers(config.mcpServers || {})
@@ -352,54 +424,165 @@ async function sendMessageInternal(
       extensionHash: getExtensionHash()
     }
 
-    // Get or create persistent V2 session for this conversation
-    // Pass config for rebuild detection when aiBrowserEnabled changes
-    const v2Session = await getOrCreateV2Session(spaceId, conversationId, sdkOptions, sessionId, sessionConfig)
+    for (let attempt = 1; attempt <= SESSION_RECOVERY_MAX_ATTEMPTS; attempt++) {
+      const t0 = Date.now()
+      console.log(`[Agent][${conversationId}] Getting or creating V2 session (attempt ${attempt}/${SESSION_RECOVERY_MAX_ATTEMPTS})...`)
 
-    // Dynamic runtime parameter adjustment (via SDK patch)
-    // These can be changed without rebuilding the session
-    try {
-      // Only push model changes into the SDK for native Anthropic sessions.
-      // Routed OpenAI/Codex sessions use a Claude-compatible transport model internally,
-      // and surfacing that internal model name causes the assistant to misreport itself.
-      if (v2Session.setModel && !transport.routed) {
-        await v2Session.setModel(sdkModel)
-        console.log(`[Agent][${conversationId}] Model set: ${sdkModel}`)
-      } else if (transport.routed) {
-        console.log(`[Agent][${conversationId}] Routed provider active, keeping runtime display model: ${credentials.model}`)
+      if (attempt > 1) {
+        console.warn(`[Agent][${conversationId}] Rebuilding V2 session and retrying message (${attempt}/${SESSION_RECOVERY_MAX_ATTEMPTS})`)
+        sendToRenderer('agent:status', spaceId, conversationId, {
+          type: 'status',
+          message: 'Session disconnected. Reconnecting and continuing...',
+          subtype: 'session_recovery'
+        })
+        resetSessionStateForRetry(sessionState)
       }
 
-      // Set thinking tokens dynamically (support effort levels)
-      if (v2Session.setMaxThinkingTokens) {
-        const effort = normalizeThinkingEffortForModel(
+      const { sdkOptions, addedMcpServers } = await buildSdkOptions({
+        conversationId,
+        spaceId,
+        workDir,
+        config: config as Record<string, any>,
+        abortController,
+        sdkModel,
+        credentialsModel: credentials.model,
+        anthropicBaseUrl,
+        anthropicApiKey,
+        electronPath,
+        onStderr: (data: string) => {
+          console.error(`[Agent][${conversationId}] CLI stderr:`, data)
+          stderrBuffer += data
+        },
+        aiBrowserEnabled: !!aiBrowserEnabled,
+        thinkingEnabled: !!thinkingEnabled,
+        includeSkillMcp: skillsAvailable,
+        ralphSystemPromptAppend: ralphMode?.systemPromptAppend || '',
+        routed: transport.routed
+      })
+
+      if (addedMcpServers.includes('ai-browser')) {
+        console.log(`[Agent][${conversationId}] AI Browser MCP server added`)
+      }
+      if (addedMcpServers.includes('web-tools')) {
+        console.log(`[Agent][${conversationId}] Web Tools MCP server added`)
+      }
+      if (addedMcpServers.includes('skill')) {
+        console.log(`[Agent][${conversationId}] Skill MCP server added`)
+      }
+
+      // Get or create persistent V2 session for this conversation
+      // Pass config for rebuild detection when aiBrowserEnabled changes
+      const v2Session = await getOrCreateV2Session(spaceId, conversationId, sdkOptions, sessionId, sessionConfig)
+
+      try {
+        // Probe the transport before sending user input so dead cached sessions are rebuilt
+        // here instead of surfacing as an empty completion later.
+        if (v2Session.setPermissionMode) {
+          await v2Session.setPermissionMode('acceptEdits')
+        }
+
+        // Dynamic runtime parameter adjustment (via SDK patch)
+        // These can be changed without rebuilding the session
+        try {
+          // Only push model changes into the SDK for native Anthropic sessions.
+          // Routed OpenAI/Codex sessions use a Claude-compatible transport model internally,
+          // and surfacing that internal model name causes the assistant to misreport itself.
+          if (v2Session.setModel && !transport.routed) {
+            await v2Session.setModel(sdkModel)
+            console.log(`[Agent][${conversationId}] Model set: ${sdkModel}`)
+          } else if (transport.routed) {
+            console.log(`[Agent][${conversationId}] Routed provider active, keeping runtime display model: ${credentials.model}`)
+          }
+
+          // Set thinking tokens dynamically (support effort levels)
+          if (v2Session.setMaxThinkingTokens) {
+            const effort = normalizeThinkingEffortForModel(
+              credentials.model,
+              request.thinkingEffort ?? (thinkingEnabled ? 'high' : undefined)
+            )
+            const thinkingTokens = thinkingEffortToBudgetTokens(effort)
+            await v2Session.setMaxThinkingTokens(thinkingTokens)
+            console.log(`[Agent][${conversationId}] Thinking: effort=${effort}, tokens=${thinkingTokens}`)
+          }
+        } catch (e) {
+          if (isRecoverableSessionError(e)) {
+            throw e
+          }
+          console.error(`[Agent][${conversationId}] Failed to set dynamic params:`, e)
+        }
+        console.log(`[Agent][${conversationId}] ⏱️ V2 session ready: ${Date.now() - t0}ms`)
+
+        const streamResult = await processMessageStream(
+          v2Session,
+          sessionState,
+          spaceId,
+          conversationId,
+          workDir,
+          message,
+          messagePrefix,
+          images,
+          attachments,
+          canvasContext,
           credentials.model,
-          request.thinkingEffort ?? (thinkingEnabled ? 'high' : undefined)
+          abortController,
+          assistantPersistMode,
+          !internalMessage,
+          ralphMode
         )
-        const thinkingTokens = thinkingEffortToBudgetTokens(effort)
-        await v2Session.setMaxThinkingTokens(thinkingTokens)
-        console.log(`[Agent][${conversationId}] Thinking: effort=${effort}, tokens=${thinkingTokens}`)
-      }
-    } catch (e) {
-      console.error(`[Agent][${conversationId}] Failed to set dynamic params:`, e)
-    }
-    console.log(`[Agent][${conversationId}] ⏱️ V2 session ready: ${Date.now() - t0}ms`)
 
-    // Process the stream
-    await processMessageStream(
-      v2Session,
-      sessionState,
-      spaceId,
-      conversationId,
-      message,
-      messagePrefix,
-      images,
-      attachments,
-      canvasContext,
-      credentials.model,
-      abortController,
-      t0,
-      ralphMode
-    )
+        if (abortController.signal.aborted) {
+          console.log(`[Agent][${conversationId}] Aborted by user`)
+          return
+        }
+
+        if (!streamResult.hadTextContent) {
+          console.warn(
+            `[Agent][${conversationId}] Session completed without text (sdkMessages=${streamResult.sawAnySdkMessage}, result=${streamResult.sawResult})`
+          )
+
+          if (!internalMessage && streamResult.hadPersistentActivity) {
+            console.log(`[Agent][${conversationId}] Treating non-text assistant activity as a completed response`)
+            return
+          }
+
+          if (attempt < SESSION_RECOVERY_MAX_ATTEMPTS && canRetrySessionRecovery(sessionState)) {
+            closeV2Session(conversationId)
+            continue
+          }
+
+          throw new Error(EMPTY_RESPONSE_ERROR_MESSAGE)
+        }
+
+        if (internalMessage?.onComplete) {
+          try {
+            internalMessage.onComplete({
+              finalContent: streamResult.finalContent,
+              hadPersistentActivity: streamResult.hadPersistentActivity,
+              tokenUsage: streamResult.tokenUsage,
+              userMessageUuid: streamResult.userMessageUuid
+            })
+          } catch (callbackError) {
+            console.error(`[Agent][${conversationId}] internalMessage.onComplete failed:`, callbackError)
+          }
+        }
+
+        return
+      } catch (error) {
+        if (attempt < SESSION_RECOVERY_MAX_ATTEMPTS && isRecoverableSessionError(error) && canRetrySessionRecovery(sessionState)) {
+          console.warn(
+            `[Agent][${conversationId}] Recoverable V2 session failure, retrying with fresh session: ${getErrorMessage(error)}`
+          )
+          closeV2Session(conversationId)
+          continue
+        }
+
+        if (isRecoverableSessionError(error)) {
+          throw new Error(`${SESSION_RECOVERY_ERROR_MESSAGE} Technical details: ${getErrorMessage(error)}`)
+        }
+
+        throw error
+      }
+    }
 
   } catch (error: unknown) {
     const err = error as Error
@@ -472,11 +655,35 @@ async function sendMessageInternal(
       errorCode = parseInt(httpCodeMatch[1], 10)
     }
 
-    sendToRenderer('agent:error', spaceId, conversationId, {
-      type: 'error',
-      error: errorMessage,
-      errorCode
-    })
+    if (!ralphMode?.enabled && assistantPersistMode === 'update_last') {
+      const errorThought: Thought = {
+        id: `thought-error-${Date.now()}`,
+        type: 'error',
+        content: errorMessage,
+        timestamp: new Date().toISOString(),
+        isError: true
+      }
+      const persistedThoughts = [...sessionState.thoughts, errorThought]
+      if (persistAssistantSnapshot(spaceId, conversationId, { thoughts: persistedThoughts }, 'update_last')) {
+        console.log(`[Agent][${conversationId}] Persisted assistant snapshot for error recovery`)
+      }
+    }
+
+    if (!internalMessage?.suppressErrorEvent) {
+      sendToRenderer('agent:error', spaceId, conversationId, {
+        type: 'error',
+        error: errorMessage,
+        errorCode
+      })
+    }
+
+    if (internalMessage?.onError) {
+      try {
+        internalMessage.onError(errorMessage)
+      } catch (callbackError) {
+        console.error(`[Agent][${conversationId}] internalMessage.onError failed:`, callbackError)
+      }
+    }
 
     // Ralph mode: call onError callback
     if (ralphMode?.onError) {
@@ -501,9 +708,10 @@ async function sendMessageInternal(
  */
 async function processMessageStream(
   v2Session: any,
-  sessionState: any,
+  sessionState: SessionState,
   spaceId: string,
   conversationId: string,
+  workDir: string,
   message: string,
   messagePrefix: AgentRequest['messagePrefix'],
   images: AgentRequest['images'],
@@ -511,9 +719,10 @@ async function processMessageStream(
   canvasContext: AgentRequest['canvasContext'],
   displayModel: string,
   abortController: AbortController,
-  t0: number,
+  assistantPersistMode: 'update_last' | 'append_new' | 'none',
+  allowThoughtOnlyCompletion: boolean,
   ralphMode?: AgentRequest['ralphMode']
-): Promise<void> {
+): Promise<ProcessMessageStreamResult> {
   // Accumulate ALL text blocks (separated by double newlines) for complete output
   let accumulatedTextContent = ''
   let textBlockCount = 0
@@ -528,7 +737,8 @@ async function processMessageStream(
   // Token-level streaming state
   let currentStreamingText = ''  // Accumulates text_delta tokens
   let isStreamingTextBlock = false  // True when inside a text content block
-  const STREAM_THROTTLE_MS = 30  // Throttle updates to ~33fps
+  let sawAnySdkMessage = false
+  let sawResult = false
 
   // Tool call stack for parent-child relationship tracking
   // When a Skill tool is active, subsequent tool calls are marked as children
@@ -537,6 +747,8 @@ async function processMessageStream(
     toolName: string
   }
   let activeToolStack: ActiveToolCall[] = []
+
+  const getVisibleAssistantContent = (content: string): string => stripLeadingSetModelStatus(content)
 
   const t1 = Date.now()
   console.log(`[Agent][${conversationId}] Sending message to V2 session...`)
@@ -639,7 +851,7 @@ async function processMessageStream(
       type: 'status',
       content: 'Analyzing images...'
     })
-    const preprocessResult = await preprocessImages(messageWithContext, credentials.model, images, attachments)
+    const preprocessResult = await preprocessImages(messageWithContext, displayModel, images, attachments)
     if (preprocessResult.preprocessed) {
       finalMessage = preprocessResult.enhancedMessage
       finalImages = preprocessResult.filteredImages
@@ -672,12 +884,124 @@ async function processMessageStream(
     v2Session.send(userMessage as any)
   }
 
+  // Track sub-agent step histories for expandable UI
+  const taskStepHistories = new Map<string, Array<{ toolName: string; summary?: string; timestamp: number; toolUseCount: number }>>()
+
   // Stream messages from V2 session
   for await (const sdkMessage of v2Session.stream()) {
+    sawAnySdkMessage = true
+
     // Handle abort - check this session's controller
     if (abortController.signal.aborted) {
       console.log(`[Agent][${conversationId}] Aborted`)
       break
+    }
+
+    // SDK status/progress messages → send as ephemeral status to frontend
+    // These are the "status line" messages from Claude Code CLI (e.g., "Set model to ...", "Connecting to MCP...")
+    if (sdkMessage.type === 'system') {
+      const sub = (sdkMessage as any).subtype
+      if (sub === 'local_command_output' || sub === 'status') {
+        const statusText = (sdkMessage as any).content || (sdkMessage as any).status || ''
+        console.log(`[Agent][${conversationId}] SDK status: ${sub} → ${JSON.stringify(statusText)} (suppress=${shouldSuppressSdkStatus(statusText)})`)
+        if (!shouldSuppressSdkStatus(statusText)) {
+          sendToRenderer('agent:status', spaceId, conversationId, {
+            type: 'status',
+            message: statusText,
+            subtype: sub
+          })
+        }
+        // Don't generate thought for status messages, but continue processing for session ID capture below
+      }
+
+      // Sub-agent task lifecycle events → forward to frontend for AgentTaskCard display
+      if (sub === 'task_started') {
+        const { task_id, tool_use_id, description } = sdkMessage as any
+        console.log(`[Agent][${conversationId}] Task started: ${task_id} → ${description}`)
+        taskStepHistories.set(task_id, [])
+        sessionState.taskProgressMap.set(task_id, {
+          taskId: task_id,
+          toolUseId: tool_use_id,
+          description: description || 'agent',
+          status: 'running',
+          stepHistory: []
+        })
+        sendToRenderer('agent:task-update', spaceId, conversationId, {
+          type: 'task_started',
+          taskId: task_id,
+          toolUseId: tool_use_id,
+          description,
+        })
+      }
+
+      if (sub === 'task_progress') {
+        const { task_id, description, usage, last_tool_name, summary } = sdkMessage as any
+        // Accumulate step history: append when tool name differs from last entry
+        const history = taskStepHistories.get(task_id) || []
+        if (last_tool_name) {
+          const lastEntry = history[history.length - 1]
+          if (!lastEntry || lastEntry.toolName !== last_tool_name) {
+            history.push({
+              toolName: last_tool_name,
+              summary,
+              timestamp: Date.now(),
+              toolUseCount: usage?.tool_uses || history.length + 1,
+            })
+          }
+        }
+        const existingTask = sessionState.taskProgressMap.get(task_id)
+        if (existingTask) {
+          sessionState.taskProgressMap.set(task_id, {
+            ...existingTask,
+            summary: summary || existingTask.summary,
+            lastToolName: last_tool_name || existingTask.lastToolName,
+            usage: usage || existingTask.usage,
+            stepHistory: [...history]
+          })
+        }
+        sendToRenderer('agent:task-update', spaceId, conversationId, {
+          type: 'task_progress',
+          taskId: task_id,
+          description,
+          summary,
+          lastToolName: last_tool_name,
+          usage,
+          stepHistory: history,
+        })
+      }
+
+      if (sub === 'task_notification') {
+        const { task_id, status, summary, usage, output_file } = sdkMessage as any
+        console.log(`[Agent][${conversationId}] Task ${status}: ${task_id}`)
+        const history = taskStepHistories.get(task_id) || []
+        // Read agent output from output_file if available
+        let resultSummary = summary
+        if (output_file) {
+          try {
+            resultSummary = await fs.readFile(output_file, 'utf-8')
+          } catch { /* fallback to summary */ }
+        }
+        const existingTask = sessionState.taskProgressMap.get(task_id)
+        if (existingTask) {
+          sessionState.taskProgressMap.set(task_id, {
+            ...existingTask,
+            status: status || existingTask.status,
+            summary: summary || existingTask.summary,
+            resultSummary: resultSummary || existingTask.resultSummary,
+            usage: usage || existingTask.usage,
+            stepHistory: [...history]
+          })
+        }
+        sendToRenderer('agent:task-update', spaceId, conversationId, {
+          type: 'task_notification',
+          taskId: task_id,
+          status,
+          summary,
+          resultSummary,
+          usage,
+          stepHistory: history,
+        })
+      }
     }
 
     // Handle stream_event for token-level streaming (text only)
@@ -719,17 +1043,18 @@ async function processMessageStream(
         currentStreamingText += delta
 
         // Update session state for inject feature
-        sessionState.currentStreamingContent = accumulatedTextContent + currentStreamingText
+        sessionState.currentStreamingContent = getVisibleAssistantContent(accumulatedTextContent + currentStreamingText)
 
         // Ralph mode: call onOutput callback with full accumulated content
         if (ralphMode?.onOutput) {
-          ralphMode.onOutput(accumulatedTextContent + currentStreamingText)
+          ralphMode.onOutput(getVisibleAssistantContent(accumulatedTextContent + currentStreamingText))
         }
 
         // Send full accumulated content (not just delta) for proper display
+        const visibleContent = getVisibleAssistantContent(accumulatedTextContent + currentStreamingText)
         sendToRenderer('agent:message', spaceId, conversationId, {
           type: 'message',
-          content: accumulatedTextContent + currentStreamingText,
+          content: visibleContent,
           isComplete: false,
           isStreaming: true
         })
@@ -742,12 +1067,13 @@ async function processMessageStream(
         accumulatedTextContent += currentStreamingText
 
         // Update session state for inject feature
-        sessionState.currentStreamingContent = accumulatedTextContent
+        sessionState.currentStreamingContent = getVisibleAssistantContent(accumulatedTextContent)
 
         // Send full accumulated content
+        const visibleContent = getVisibleAssistantContent(accumulatedTextContent)
         sendToRenderer('agent:message', spaceId, conversationId, {
           type: 'message',
-          content: accumulatedTextContent,
+          content: visibleContent,
           isComplete: false,
           isStreaming: false
         })
@@ -839,7 +1165,7 @@ async function processMessageStream(
         // Only use this fallback for non-streaming SDKs (when textBlockCount is still 0)
         // If textBlockCount > 0, content was already accumulated via stream_event - skip to avoid duplication
         if (textBlockCount === 0) {
-          accumulatedTextContent += thought.content
+          accumulatedTextContent = getVisibleAssistantContent(accumulatedTextContent + thought.content)
           textBlockCount++
 
           // Ralph mode: non-streaming fallback still needs output callback.
@@ -877,7 +1203,7 @@ async function processMessageStream(
         }
       } else if (thought.type === 'result') {
         // Final result - use accumulated text content
-        const finalContent = accumulatedTextContent || thought.content
+        const finalContent = getVisibleAssistantContent(accumulatedTextContent || thought.content)
         sendToRenderer('agent:message', spaceId, conversationId, {
           type: 'message',
           content: finalContent,
@@ -885,7 +1211,7 @@ async function processMessageStream(
         })
         // Fallback: if no text block was received, use result content for persistence
         if (!accumulatedTextContent && thought.content) {
-          accumulatedTextContent = thought.content
+          accumulatedTextContent = finalContent
         }
         // Note: updateLastMessage is called after loop to include tokenUsage
         console.log(`[Agent][${conversationId}] Result thought received, ${sessionState.thoughts.length} thoughts accumulated`)
@@ -939,6 +1265,8 @@ async function processMessageStream(
         console.log(`[Agent][${conversationId}] Available tools: ${tools.length}`)
       }
     } else if (sdkMessage.type === 'result') {
+      sawResult = true
+
       if (!capturedSessionId) {
         const sessionIdFromMsg = msg.session_id || (msg.message as Record<string, unknown>)?.session_id
         capturedSessionId = sessionIdFromMsg as string
@@ -976,69 +1304,49 @@ async function processMessageStream(
   }
 
   // Ensure complete event is sent even if no result message was received
-  if (accumulatedTextContent) {
-    console.log(`[Agent][${conversationId}] Sending final complete event with accumulated text (${textBlockCount} blocks)`)
-    // Backend saves complete message with thoughts and tokenUsage (Single Source of Truth)
-    // Skip for Ralph mode - no conversation history needed
-    if (!ralphMode?.enabled) {
-      updateLastMessage(spaceId, conversationId, {
-        content: accumulatedTextContent,
-        thoughts: sessionState.thoughts.length > 0 ? [...sessionState.thoughts] : undefined,
-        tokenUsage: tokenUsage || undefined,  // Include token usage if available
-        userMessageUuid: lastUserMessageUuid  // SDK UUID for file rewind
-      })
-      console.log(`[Agent][${conversationId}] Saved ${sessionState.thoughts.length} thoughts${tokenUsage ? ' with tokenUsage' : ''} to backend, userMessageUuid=${lastUserMessageUuid ?? 'NONE'}`)
+  let finalContent = accumulatedTextContent
+  if (!finalContent) {
+    if (currentStreamingText) {
+      console.log(`[Agent][${conversationId}] Using fallback content from currentStreamingText: ${currentStreamingText.length} chars`)
+      finalContent = currentStreamingText
+    } else {
+      console.log(`[Agent][${conversationId}] WARNING: No text content after SDK query completed`)
     }
+  }
+  finalContent = getVisibleAssistantContent(finalContent)
+
+  const hadPersistentActivity = sessionState.thoughts.length > 0 || Boolean(tokenUsage) || Boolean(lastUserMessageUuid)
+
+  if (!ralphMode?.enabled) {
+    const persisted = persistAssistantSnapshot(spaceId, conversationId, {
+      content: finalContent,
+      thoughts: sessionState.thoughts,
+      tokenUsage,
+      userMessageUuid: lastUserMessageUuid
+    }, assistantPersistMode)
+    if (persisted) {
+      console.log(
+        `[Agent][${conversationId}] Saved assistant snapshot (${finalContent ? 'text' : 'thought-only'}) with ${sessionState.thoughts.length} thoughts${tokenUsage ? ' and tokenUsage' : ''}, userMessageUuid=${lastUserMessageUuid ?? 'NONE'}`
+      )
+    }
+  }
+
+  if (finalContent || (hadPersistentActivity && allowThoughtOnlyCompletion)) {
+    console.log(
+      `[Agent][${conversationId}] Sending final complete event ${finalContent ? `with text (${textBlockCount} blocks)` : 'without text'}`
+    )
     const compactStatus = getCompactionStatus(conversationId)
     sendToRenderer('agent:complete', spaceId, conversationId, {
       type: 'complete',
       duration: 0,
-      tokenUsage,  // Include token usage data
-      userMessageUuid: lastUserMessageUuid,  // For file rewind support
-      contextUsage: compactStatus ? compactStatus.usageRatio : undefined  // Context window usage ratio
+      tokenUsage,
+      userMessageUuid: lastUserMessageUuid,
+      contextUsage: compactStatus ? compactStatus.usageRatio : undefined
     })
-  } else {
-    console.log(`[Agent][${conversationId}] WARNING: No text content after SDK query completed`)
-    // CRITICAL: Still send complete event to unblock frontend
-    // This can happen if content_block_stop is missing from SDK response
-
-    // Fallback: Try to use currentStreamingText if available (content_block_stop was missed)
-    const fallbackContent = currentStreamingText || ''
-    if (fallbackContent && !ralphMode?.enabled) {
-      console.log(`[Agent][${conversationId}] Using fallback content from currentStreamingText: ${fallbackContent.length} chars`)
-      updateLastMessage(spaceId, conversationId, {
-        content: fallbackContent,
-        thoughts: sessionState.thoughts.length > 0 ? [...sessionState.thoughts] : undefined,
-        tokenUsage: tokenUsage || undefined
-      })
-    }
-
-    sendToRenderer('agent:complete', spaceId, conversationId, {
-      type: 'complete',
-      duration: 0,
-      tokenUsage,  // Include token usage data
-      userMessageUuid: lastUserMessageUuid  // For file rewind support
-    })
-  }
-
-  // AI-powered follow-up suggestions - fire and forget, don't block completion
-  if (!ralphMode?.enabled && (accumulatedTextContent || currentStreamingText)) {
-    const sugContent = accumulatedTextContent || currentStreamingText || ''
-    const toolsUsed = sessionState.thoughts
-      .filter((t: any) => t.type === 'tool_use' && t.toolName)
-      .map((t: any) => t.toolName!)
-    generateSuggestions(message, sugContent, [...new Set(toolsUsed)])
-      .then(suggestions => {
-        if (suggestions.length > 0) {
-          sendToRenderer('agent:suggestions', spaceId, conversationId, { type: 'suggestions', suggestions })
-        }
-      })
-      .catch(() => {}) // Silent failure - frontend falls back to static suggestions
   }
 
   // Extension hook: notify extensions that message is complete
-  if (enabledExtensions.length > 0 && !ralphMode?.enabled) {
-    const finalContent = accumulatedTextContent || currentStreamingText || ''
+  if (finalContent && enabledExtensions.length > 0 && !ralphMode?.enabled) {
     runHook(enabledExtensions, 'onAfterMessage', {
       spaceId,
       conversationId,
@@ -1053,12 +1361,22 @@ async function processMessageStream(
 
   // Ralph mode: call onComplete callback
   // Ensure Ralph receives final accumulated output even when token-level stream events are unavailable.
-  const finalRalphOutput = accumulatedTextContent || currentStreamingText
+  const finalRalphOutput = finalContent
   if (ralphMode?.onOutput && finalRalphOutput) {
     ralphMode.onOutput(finalRalphOutput)
   }
 
   if (ralphMode?.onComplete) {
     ralphMode.onComplete()
+  }
+
+  return {
+    finalContent,
+    hadTextContent: Boolean(finalContent),
+    hadPersistentActivity,
+    sawAnySdkMessage,
+    sawResult,
+    tokenUsage,
+    userMessageUuid: lastUserMessageUuid
   }
 }

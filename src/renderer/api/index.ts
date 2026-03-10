@@ -479,6 +479,21 @@ export const api = {
     return httpRequest('POST', '/api/agent/reject', { conversationId })
   },
 
+  // Hosted subagent actions
+  killSubagentRun: async (runId: string): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.skillsfan.killSubagentRun(runId)
+    }
+    return httpRequest('POST', '/api/agent/kill-subagent', { runId })
+  },
+
+  getSubagentRunDetail: async (runId: string): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.skillsfan.getSubagentRunDetail(runId)
+    }
+    return httpRequest('GET', `/api/agent/subagent/${runId}`)
+  },
+
   // Get current session state for recovery after refresh
   getSessionState: async (conversationId: string): Promise<ApiResponse> => {
     if (isElectron()) {
@@ -913,12 +928,16 @@ export const api = {
     onEvent('agent:mcp-status', callback),
   onAgentCompact: (callback: (data: unknown) => void) =>
     onEvent('agent:compact', callback),
-  onAgentSuggestions: (callback: (data: unknown) => void) =>
-    onEvent('agent:suggestions', callback),
+  onAgentStatus: (callback: (data: unknown) => void) =>
+    onEvent('agent:status', callback),
   onAgentUserQuestion: (callback: (data: unknown) => void) =>
     onEvent('agent:user-question', callback),
   onAgentUserQuestionAnswered: (callback: (data: unknown) => void) =>
     onEvent('agent:user-question-answered', callback),
+  onAgentTaskUpdate: (callback: (data: unknown) => void) =>
+    onEvent('agent:task-update', callback),
+  onAgentSubagentUpdate: (callback: (data: unknown) => void) =>
+    onEvent('agent:subagent-update', callback),
   onRemoteStatusChange: (callback: (data: unknown) => void) =>
     onEvent('remote:status-change', callback),
 

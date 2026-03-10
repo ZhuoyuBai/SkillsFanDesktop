@@ -162,9 +162,11 @@ export interface SkillsFanAPI {
   onAgentThought: (callback: (data: unknown) => void) => () => void
   onAgentMcpStatus: (callback: (data: unknown) => void) => () => void
   onAgentCompact: (callback: (data: unknown) => void) => () => void
-  onAgentSuggestions: (callback: (data: unknown) => void) => () => void
+  onAgentStatus: (callback: (data: unknown) => void) => () => void
   onAgentUserQuestion: (callback: (data: unknown) => void) => () => void
   onAgentUserQuestionAnswered: (callback: (data: unknown) => void) => () => void
+  onAgentTaskUpdate: (callback: (data: unknown) => void) => () => void
+  onAgentSubagentUpdate: (callback: (data: unknown) => void) => () => void
 
   // Artifact
   listArtifacts: (spaceId: string) => Promise<IpcResponse>
@@ -558,9 +560,15 @@ const api: SkillsFanAPI = {
   onAgentThought: (callback) => createEventListener('agent:thought', callback),
   onAgentMcpStatus: (callback) => createEventListener('agent:mcp-status', callback),
   onAgentCompact: (callback) => createEventListener('agent:compact', callback),
-  onAgentSuggestions: (callback) => createEventListener('agent:suggestions', callback),
+  onAgentStatus: (callback) => createEventListener('agent:status', callback),
   onAgentUserQuestion: (callback) => createEventListener('agent:user-question', callback),
   onAgentUserQuestionAnswered: (callback) => createEventListener('agent:user-question-answered', callback),
+  onAgentTaskUpdate: (callback) => createEventListener('agent:task-update', callback),
+  onAgentSubagentUpdate: (callback) => createEventListener('agent:subagent-update', callback),
+
+  // Hosted subagent actions
+  killSubagentRun: (runId: string) => ipcRenderer.invoke('agent:kill-subagent', runId),
+  getSubagentRunDetail: (runId: string) => ipcRenderer.invoke('agent:get-subagent-detail', runId),
 
   // Artifact
   listArtifacts: (spaceId) => ipcRenderer.invoke('artifact:list', spaceId),

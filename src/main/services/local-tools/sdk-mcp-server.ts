@@ -17,12 +17,28 @@ export interface CreateLocalToolsMcpServerOptions {
   conversationId: string
   aiBrowserEnabled?: boolean
   includeSkillMcp?: boolean
+  includeSubagentTools?: boolean
+}
+
+function getToolUseId(extra: unknown): string | undefined {
+  if (!extra || typeof extra !== 'object') return undefined
+
+  const record = extra as Record<string, unknown>
+  const candidates = [
+    record.toolUseId,
+    record.tool_use_id,
+    record.toolUseID,
+    record.id
+  ]
+
+  return candidates.find((value): value is string => typeof value === 'string' && value.length > 0)
 }
 
 export function createLocalToolsMcpServer(options: CreateLocalToolsMcpServerOptions) {
   const catalog = buildToolCatalog({
     aiBrowserEnabled: options.aiBrowserEnabled,
-    includeSkillMcp: options.includeSkillMcp
+    includeSkillMcp: options.includeSkillMcp,
+    includeSubagentTools: options.includeSubagentTools
   })
 
   const memoryTool = tool(
@@ -299,19 +315,175 @@ export function createLocalToolsMcpServer(options: CreateLocalToolsMcpServerOpti
     }
   )
 
+  const subagentSpawnTool = options.includeSubagentTools === false
+    ? null
+    : tool(
+        'subagent_spawn',
+        'Launch a hosted subagent run managed by the SkillsFan app runtime. Prefer this over Task or TeamCreate when you want reliable background subagents.',
+        {
+          task: z.string().min(1).describe('The task the hosted subagent should complete'),
+          label: z.string().optional().describe('Short label for UI display'),
+          model: z.string().optional().describe('Optional model override for this hosted subagent'),
+          modelSource: z.string().optional().describe('Optional provider/source override for this hosted subagent'),
+          thinkingEffort: z.enum(['off', 'low', 'medium', 'high', 'xhigh']).optional().describe('Optional reasoning effort override'),
+          timeoutMs: z.number().int().min(5_000).max(1_800_000).optional().describe('Optional overall timeout for the hosted subagent run')
+        },
+        async (args, extra) => {
+          try {
+            const { spawnSubagent } = await import('../agent/subagent/runtime')
+            const run = await spawnSubagent({
+              parentSpaceId: options.spaceId,
+              parentConversationId: options.conversationId,
+              workDir: options.workDir,
+              task: args.task,
+              label: args.label,
+              model: args.model,
+              modelSource: args.modelSource,
+              thinkingEffort: args.thinkingEffort,
+              timeoutMs: args.timeoutMs,
+              toolUseId: getToolUseId(extra)
+            })
+            return {
+              content: [{
+                type: 'text' as const,
+                text: toToolText({
+                  ok: true,
+                  run,
+                  next: {
+                    tool: 'mcp__local-tools__subagents',
+                    action: 'wait',
+                    runId: run.runId
+                  }
+                })
+              }]
+            }
+          } catch (error) {
+            return {
+              content: [{ type: 'text' as const, text: (error as Error).message }],
+              isError: true
+            }
+          }
+        }
+      )
+
+  const subagentsTool = options.includeSubagentTools === false
+    ? null
+    : tool(
+        'subagents',
+        'Inspect, wait for, or terminate hosted subagent runs created by subagent_spawn in this conversation.',
+        {
+          action: z.enum(['list', 'info', 'wait', 'kill']),
+          runId: z.string().optional().describe('Specific run ID. Omit for list, or to wait on all active hosted subagents in this conversation'),
+          limit: z.number().int().min(1).max(20).optional().describe('Maximum number of runs to include when action=list'),
+          includeCompleted: z.boolean().optional().describe('Whether action=list should include completed runs'),
+          timeoutMs: z.number().int().min(1_000).max(1_800_000).optional().describe('Optional timeout when action=wait')
+        },
+        async (args) => {
+          try {
+            const {
+              acknowledgeSubagentRuns,
+              getSubagentRun,
+              killSubagentRun,
+              listSubagentRunsForConversation,
+              waitForConversationSubagents,
+              waitForSubagentRun
+            } = await import('../agent/subagent/runtime')
+
+            if (args.action === 'list') {
+              const runs = listSubagentRunsForConversation(options.conversationId, {
+                includeCompleted: args.includeCompleted,
+                limit: args.limit
+              })
+              acknowledgeSubagentRuns(
+                runs
+                  .filter((run) => ['completed', 'failed', 'killed', 'timeout'].includes(run.status))
+                  .map((run) => run.runId)
+              )
+              return {
+                content: [{ type: 'text' as const, text: toToolText({ runs }) }]
+              }
+            }
+
+            if (args.action === 'info') {
+              if (!args.runId) {
+                throw new Error('runId is required for action=info')
+              }
+              const run = getSubagentRun(args.runId)
+              if (!run) {
+                throw new Error(`Subagent run not found: ${args.runId}`)
+              }
+              if (['completed', 'failed', 'killed', 'timeout'].includes(run.status)) {
+                acknowledgeSubagentRuns([run.runId])
+              }
+              return {
+                content: [{ type: 'text' as const, text: toToolText({ run }) }]
+              }
+            }
+
+            if (args.action === 'kill') {
+              if (!args.runId) {
+                throw new Error('runId is required for action=kill')
+              }
+              const run = killSubagentRun(args.runId)
+              if (['completed', 'failed', 'killed', 'timeout'].includes(run.status)) {
+                acknowledgeSubagentRuns([run.runId])
+              }
+              return {
+                content: [{ type: 'text' as const, text: toToolText({ run }) }]
+              }
+            }
+
+            if (args.runId) {
+              const run = await waitForSubagentRun(args.runId, args.timeoutMs)
+              if (['completed', 'failed', 'killed', 'timeout'].includes(run.status)) {
+                acknowledgeSubagentRuns([run.runId])
+              }
+              return {
+                content: [{ type: 'text' as const, text: toToolText({ run }) }]
+              }
+            }
+
+            const runs = await waitForConversationSubagents(options.conversationId, args.timeoutMs)
+            acknowledgeSubagentRuns(
+              runs
+                .filter((run) => ['completed', 'failed', 'killed', 'timeout'].includes(run.status))
+                .map((run) => run.runId)
+            )
+            return {
+              content: [{ type: 'text' as const, text: toToolText({ runs }) }]
+            }
+          } catch (error) {
+            return {
+              content: [{ type: 'text' as const, text: (error as Error).message }],
+              isError: true
+            }
+          }
+        }
+      )
+
+  const tools: Array<any> = [
+    memoryTool,
+    codeExecutionTool,
+    bashCodeExecutionTool,
+    textEditorTool,
+    openUrlTool,
+    openApplicationTool,
+    runAppleScriptTool,
+    regexToolSearch,
+    bm25ToolSearch
+  ]
+
+  if (subagentSpawnTool) {
+    tools.push(subagentSpawnTool)
+  }
+
+  if (subagentsTool) {
+    tools.push(subagentsTool)
+  }
+
   return createSdkMcpServer({
     name: 'local-tools',
     version: '1.0.0',
-    tools: [
-      memoryTool,
-      codeExecutionTool,
-      bashCodeExecutionTool,
-      textEditorTool,
-      openUrlTool,
-      openApplicationTool,
-      runAppleScriptTool,
-      regexToolSearch,
-      bm25ToolSearch
-    ]
+    tools
   })
 }

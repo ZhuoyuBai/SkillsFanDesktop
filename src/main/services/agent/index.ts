@@ -97,3 +97,15 @@ export { parseSDKMessage, buildMessageContent, formatCanvasContext } from './mes
 export { getOrCreateV2Session, getV2Session, activeSessions, v2Sessions } from './session-manager'
 export { broadcastMcpStatus } from './mcp-manager'
 export { agentQueue } from './lane-queue'
+export {
+  initializeSubagentRuntime,
+  shutdownSubagentRuntime,
+  spawnSubagent,
+  getSubagentRun,
+  listSubagentRunsForConversation,
+  waitForConversationSubagents,
+  waitForSubagentRun,
+  killSubagentRun,
+  acknowledgeSubagentRuns,
+  suppressAutoAnnounceForConversation
+} from './subagent/runtime'

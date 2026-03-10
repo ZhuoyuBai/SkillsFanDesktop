@@ -112,6 +112,30 @@ export interface RalphModeConfig {
 
 import type { ThinkingEffort } from '../../../shared/utils/openai-models'
 
+export interface InternalMessageResult {
+  finalContent: string
+  hadPersistentActivity: boolean
+  tokenUsage?: {
+    inputTokens: number
+    outputTokens: number
+    cacheReadTokens: number
+    cacheCreationTokens: number
+    totalCostUsd: number
+    contextWindow: number
+  } | null
+  userMessageUuid?: string
+}
+
+export interface InternalMessageConfig {
+  kind: 'subagent_completion'
+  persistUserMessage?: boolean
+  persistAssistantMode?: 'update_last' | 'append_new' | 'none'
+  suppressQueuedEvent?: boolean
+  suppressErrorEvent?: boolean
+  onComplete?: (result: InternalMessageResult) => void
+  onError?: (errorMessage: string) => void
+}
+
 export interface AgentRequest {
   spaceId: string
   conversationId: string
@@ -128,6 +152,7 @@ export interface AgentRequest {
   modelSource?: string        // AI source/provider override (e.g. 'skillsfan-credits', 'deepseek')
   canvasContext?: CanvasContext  // Current canvas state for AI awareness
   ralphMode?: RalphModeConfig    // Ralph autonomous loop mode
+  internalMessage?: InternalMessageConfig
 }
 
 // ============================================
@@ -168,6 +193,25 @@ export interface Thought {
   isSkillInvocation?: boolean
 }
 
+export interface TaskStepEntry {
+  toolName: string
+  summary?: string
+  timestamp: number
+  toolUseCount: number
+}
+
+export interface TaskProgress {
+  taskId: string
+  toolUseId?: string
+  description: string
+  summary?: string
+  resultSummary?: string
+  lastToolName?: string
+  status: 'running' | 'completed' | 'failed' | 'stopped'
+  usage?: { total_tokens: number; tool_uses: number; duration_ms: number }
+  stepHistory: TaskStepEntry[]
+}
+
 // ============================================
 // Session State
 // ============================================
@@ -202,6 +246,8 @@ export interface SessionState {
   pendingUserQuestion: UserQuestionInfo | null
   /** Current streaming text content (for inject feature) */
   currentStreamingContent: string
+  /** Sub-agent task progress for refresh recovery */
+  taskProgressMap: Map<string, TaskProgress>
 }
 
 // ============================================
@@ -222,8 +268,17 @@ export type V2SDKSession = {
   // Dynamic runtime methods (exposed via patch)
   setModel?: (model: string | undefined) => Promise<void>
   setMaxThinkingTokens?: (maxThinkingTokens: number | null) => Promise<void>
-  setPermissionMode?: (mode: 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan') => Promise<void>
-  rewindFiles?: (userMessageId: string) => Promise<void>
+  setPermissionMode?: (mode: 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan' | 'dontAsk') => Promise<void>
+  rewindFiles?: (userMessageId: string, options?: { dryRun?: boolean }) => Promise<any>
+  // New methods added in SDK 0.2.72
+  reconnectMcpServer?: (serverName: string) => Promise<void>
+  toggleMcpServer?: (serverName: string, enabled: boolean) => Promise<void>
+  setMcpServers?: (servers: Record<string, any>) => Promise<any>
+  stopTask?: (taskId: string) => Promise<void>
+  initializationResult?: () => Promise<any>
+  supportedModels?: () => Promise<any[]>
+  supportedAgents?: () => Promise<any[]>
+  mcpServerStatus?: () => Promise<any[]>
 }
 
 /**
@@ -264,12 +319,15 @@ export interface V2SessionInfo {
  */
 export interface McpServerStatusInfo {
   name: string
-  status: 'connected' | 'failed' | 'needs-auth' | 'pending'
+  status: 'connected' | 'failed' | 'needs-auth' | 'pending' | 'disabled'
   serverInfo?: {
     name: string
     version: string
   }
   error?: string
+  config?: Record<string, any>
+  scope?: string
+  tools?: string[]
 }
 
 // ============================================

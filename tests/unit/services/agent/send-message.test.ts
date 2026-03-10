@@ -3,7 +3,29 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
   getStatus: vi.fn(),
   enqueue: vi.fn(),
-  sendToRenderer: vi.fn()
+  sendToRenderer: vi.fn(),
+  getConversation: vi.fn(() => null),
+  saveSessionId: vi.fn(),
+  addMessage: vi.fn(),
+  updateLastMessage: vi.fn(),
+  getOrCreateV2Session: vi.fn(),
+  closeV2Session: vi.fn(),
+  createSessionState: vi.fn(),
+  registerActiveSession: vi.fn(),
+  unregisterActiveSession: vi.fn(),
+  parseSDKMessage: vi.fn(),
+  buildMessageContent: vi.fn(),
+  preprocessImages: vi.fn(),
+  getEnabledExtensions: vi.fn(),
+  runBeforeSendMessageHooks: vi.fn(),
+  runHook: vi.fn(),
+  getExtensionHash: vi.fn(),
+  updateCompactionState: vi.fn(),
+  shouldTriggerCompaction: vi.fn(),
+  markCompactionTriggered: vi.fn(),
+  buildCompactionPrompt: vi.fn(),
+  getCompactionStatus: vi.fn(),
+  clearCompactionState: vi.fn()
 }))
 
 vi.mock('../../../../src/main/services/agent/lane-queue', () => ({
@@ -18,10 +40,10 @@ vi.mock('../../../../src/main/services/config.service', () => ({
 }))
 
 vi.mock('../../../../src/main/services/conversation.service', () => ({
-  getConversation: vi.fn(() => null),
-  saveSessionId: vi.fn(),
-  addMessage: vi.fn(),
-  updateLastMessage: vi.fn()
+  getConversation: mocks.getConversation,
+  saveSessionId: mocks.saveSessionId,
+  addMessage: mocks.addMessage,
+  updateLastMessage: mocks.updateLastMessage
 }))
 
 vi.mock('../../../../src/main/services/ai-browser/tool-utils', () => ({
@@ -48,11 +70,11 @@ vi.mock('../../../../src/main/services/agent/helpers', () => ({
 }))
 
 vi.mock('../../../../src/main/services/agent/session-manager', () => ({
-  getOrCreateV2Session: vi.fn(),
-  closeV2Session: vi.fn(),
-  createSessionState: vi.fn(),
-  registerActiveSession: vi.fn(),
-  unregisterActiveSession: vi.fn(),
+  getOrCreateV2Session: mocks.getOrCreateV2Session,
+  closeV2Session: mocks.closeV2Session,
+  createSessionState: mocks.createSessionState,
+  registerActiveSession: mocks.registerActiveSession,
+  unregisterActiveSession: mocks.unregisterActiveSession,
   v2Sessions: new Map()
 }))
 
@@ -72,10 +94,30 @@ vi.mock('../../../../src/main/services/agent/sdk-options', () => ({
 
 vi.mock('../../../../src/main/services/agent/message-utils', () => ({
   formatCanvasContext: vi.fn(() => ''),
-  buildMessageContent: vi.fn(() => ''),
-  parseSDKMessage: vi.fn(() => null),
+  buildMessageContent: mocks.buildMessageContent,
+  parseSDKMessage: mocks.parseSDKMessage,
   extractSingleUsage: vi.fn(() => null),
   extractResultUsage: vi.fn(() => null)
+}))
+
+vi.mock('../../../../src/main/services/agent/image-preprocess', () => ({
+  preprocessImages: mocks.preprocessImages
+}))
+
+vi.mock('../../../../src/main/services/extension', () => ({
+  getEnabledExtensions: mocks.getEnabledExtensions,
+  runBeforeSendMessageHooks: mocks.runBeforeSendMessageHooks,
+  runHook: mocks.runHook,
+  getExtensionHash: mocks.getExtensionHash
+}))
+
+vi.mock('../../../../src/main/services/agent/compaction-monitor', () => ({
+  updateCompactionState: mocks.updateCompactionState,
+  shouldTriggerCompaction: mocks.shouldTriggerCompaction,
+  markCompactionTriggered: mocks.markCompactionTriggered,
+  buildCompactionPrompt: mocks.buildCompactionPrompt,
+  getCompactionStatus: mocks.getCompactionStatus,
+  clearCompactionState: mocks.clearCompactionState
 }))
 
 vi.mock('../../../../src/main/services/memory', () => ({
@@ -98,6 +140,33 @@ describe('send-message', () => {
     vi.clearAllMocks()
     mocks.getStatus.mockReturnValue({ running: false, queued: 0 })
     mocks.enqueue.mockResolvedValue(undefined)
+    mocks.buildMessageContent.mockReturnValue('hello')
+    mocks.preprocessImages.mockResolvedValue({
+      preprocessed: false,
+      enhancedMessage: 'hello',
+      filteredImages: undefined,
+      filteredAttachments: undefined,
+      error: undefined
+    })
+    mocks.getEnabledExtensions.mockReturnValue([])
+    mocks.runBeforeSendMessageHooks.mockImplementation(async (message: string) => message)
+    mocks.runHook.mockResolvedValue(undefined)
+    mocks.getExtensionHash.mockReturnValue('test-extension-hash')
+    mocks.shouldTriggerCompaction.mockReturnValue(false)
+    mocks.buildCompactionPrompt.mockReturnValue('')
+    mocks.getCompactionStatus.mockReturnValue(null)
+    mocks.createSessionState.mockImplementation((spaceId: string, conversationId: string, abortController: AbortController) => ({
+      spaceId,
+      conversationId,
+      abortController,
+      currentStreamingContent: '',
+      thoughts: [],
+      pendingPermissionResolve: null,
+      pendingPermissionToolCall: null,
+      pendingUserQuestion: null
+    }))
+    mocks.updateLastMessage.mockReturnValue({ id: 'assistant-1' })
+    mocks.parseSDKMessage.mockReturnValue(null)
   })
 
   it('notifies renderer when message is queued behind a running task', async () => {
@@ -136,5 +205,43 @@ describe('send-message', () => {
     mocks.enqueue.mockRejectedValueOnce(enqueueError)
 
     await expect(sendMessage(null, request)).rejects.toThrow('queue rejected')
+  })
+
+  it('persists thought-only assistant activity without raising empty response errors', async () => {
+    const toolThought = {
+      id: 'tool-1',
+      type: 'tool_use',
+      content: '',
+      timestamp: '2026-03-10T00:00:00.000Z',
+      toolName: 'TeamCreate',
+      toolInput: { name: 'research-team' }
+    }
+
+    mocks.enqueue.mockImplementationOnce(async (_conversationId: string, run: () => Promise<void>) => run())
+    mocks.parseSDKMessage.mockImplementation((sdkMessage: { type: string }) => {
+      if (sdkMessage.type === 'assistant') return toolThought
+      return null
+    })
+    mocks.getOrCreateV2Session.mockResolvedValue({
+      setPermissionMode: vi.fn(async () => {}),
+      send: vi.fn(),
+      stream: async function* () {
+        yield { type: 'assistant', message: { content: [] } }
+        yield { type: 'result' }
+      }
+    })
+
+    await expect(sendMessage(null, request)).resolves.toBeUndefined()
+
+    expect(mocks.updateLastMessage).toHaveBeenCalledWith(
+      'space-1',
+      'conv-1',
+      expect.objectContaining({
+        content: '',
+        thoughts: [toolThought]
+      })
+    )
+    expect(mocks.sendToRenderer.mock.calls.some(([eventName]) => eventName === 'agent:complete')).toBe(true)
+    expect(mocks.sendToRenderer.mock.calls.some(([eventName]) => eventName === 'agent:error')).toBe(false)
   })
 })

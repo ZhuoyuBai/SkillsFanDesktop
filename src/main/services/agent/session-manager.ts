@@ -396,7 +396,8 @@ export function createSessionState(
     pendingPermissionToolCall: null,
     thoughts: [],
     pendingUserQuestion: null,
-    currentStreamingContent: ''
+    currentStreamingContent: '',
+    taskProgressMap: new Map()
   }
 }
 

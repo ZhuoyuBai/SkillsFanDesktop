@@ -40,6 +40,7 @@ import { registerExtensionHandlers } from '../ipc/extension'
 import { initializeExtensions as initExtensions, shutdownExtensions } from '../services/extension'
 import { FeishuChannel } from '../services/channel/adapters/feishu.channel'
 import { getChannelManager } from '../services/channel'
+import { initializeSubagentRuntime, shutdownSubagentRuntime } from '../services/agent'
 import { shutdownScheduler } from '../services/scheduler.service'
 import { recoverInterruptedTasks } from '../services/loop-task.service'
 import { cancelAllRetries } from '../services/retry-handler'
@@ -93,6 +94,9 @@ export function initializeExtendedServices(mainWindow: BrowserWindow): void {
 
   // Loop Task: Persistent loop task storage
   registerLoopTaskHandlers(mainWindow)
+
+  // Hosted subagent runtime: recover persisted run registry
+  initializeSubagentRuntime()
 
   // Skill: Settings and slash-command APIs
   registerSkillHandlers()
@@ -166,6 +170,8 @@ export function initializeExtendedServices(mainWindow: BrowserWindow): void {
  * Called during window-all-closed to properly release resources.
  */
 export function cleanupExtendedServices(): void {
+  shutdownSubagentRuntime()
+
   // AI Browser: Cleanup MCP server and browser context
   cleanupAIBrowserHandlers()
 
