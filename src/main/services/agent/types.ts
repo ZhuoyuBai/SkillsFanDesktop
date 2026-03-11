@@ -22,7 +22,7 @@ export interface ApiCredentials {
   provider: 'anthropic' | 'openai' | 'oauth'
   /** True only for Anthropic's official API endpoints with native server-side tools. */
   nativeAnthropicServerTools?: boolean
-  /** Custom headers for OAuth providers */
+  /** Custom headers for provider-specific endpoints. */
   customHeaders?: Record<string, string>
   /** API type for OpenAI compatible providers */
   apiType?: 'chat_completions' | 'responses'

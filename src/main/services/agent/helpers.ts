@@ -206,17 +206,24 @@ export async function getApiCredentials(config: ReturnType<typeof getConfig>): P
     console.log('[AgentService] Token check result:', tokenResult.success)
     if (!tokenResult.success) {
       oauthTokenValid = false
-      // Don't throw immediately - manager.getBackendConfig() may fall back to custom API
-      console.log('[AgentService] OAuth token invalid, will try fallback in getBackendConfig')
+      // Don't throw immediately - endpoint resolution may still fall back to a custom API source.
+      console.log('[AgentService] OAuth token invalid, will try fallback in resolveRuntimeEndpoint')
     }
   }
 
-  // Get backend config from manager (handles OAuth → custom API fallback)
-  console.log('[AgentService] Calling manager.getBackendConfig()')
-  const backendConfig = manager.getBackendConfig()
-  console.log('[AgentService] backendConfig:', backendConfig ? { url: backendConfig.url, model: backendConfig.model, hasKey: !!backendConfig.key } : null)
+  // Resolve the runtime-ready endpoint (handles OAuth → custom API fallback)
+  console.log('[AgentService] Calling manager.resolveRuntimeEndpoint()')
+  const runtimeEndpoint = manager.resolveRuntimeEndpoint(currentSource)
+  console.log('[AgentService] runtimeEndpoint:', runtimeEndpoint ? {
+    source: runtimeEndpoint.source,
+    authMode: runtimeEndpoint.authMode,
+    provider: runtimeEndpoint.provider,
+    baseUrl: runtimeEndpoint.baseUrl,
+    model: runtimeEndpoint.model,
+    hasKey: !!runtimeEndpoint.apiKey
+  } : null)
 
-  if (!backendConfig) {
+  if (!runtimeEndpoint) {
     // No config available and no fallback - give specific error
     if (isOAuthProvider && !oauthTokenValid) {
       if (currentSource === 'skillsfan-credits') {
@@ -227,31 +234,26 @@ export async function getApiCredentials(config: ReturnType<typeof getConfig>): P
     throw new Error('No AI source configured. Please configure an API key or login.')
   }
 
-  // Determine provider type based on whether we're using OAuth or custom API (including fallback)
-  let provider: 'anthropic' | 'openai' | 'oauth'
-  let nativeAnthropicServerTools = false
+  const provider = runtimeEndpoint.provider
+  const nativeAnthropicServerTools =
+    provider === 'anthropic' && isNativeAnthropicBaseUrl(runtimeEndpoint.baseUrl)
 
-  if (isOAuthProvider && oauthTokenValid) {
-    provider = 'oauth'
+  if (runtimeEndpoint.authMode === 'oauth') {
     console.log(`[Agent] Using OAuth provider ${currentSource} via AISourceManager`)
+  } else if (runtimeEndpoint.authMode === 'fallback') {
+    console.log(`[Agent] Using fallback API provider ${provider} for source ${currentSource} via AISourceManager (resolved via ${runtimeEndpoint.source})`)
   } else {
-    // Custom API (either direct or fallback from OAuth provider)
-    // Find the actual config that provided the backend config
-    const effectiveConfig = currentConfig?.apiKey ? currentConfig : null
-    const providerType = effectiveConfig?.provider || aiSources?.custom?.provider
-    provider = providerType === 'openai' ? 'openai' : 'anthropic'
-    nativeAnthropicServerTools = provider === 'anthropic' && isNativeAnthropicBaseUrl(backendConfig.url)
     console.log(`[Agent] Using custom API (${provider}) for source ${currentSource} via AISourceManager`)
   }
 
   return {
-    baseUrl: backendConfig.url,
-    apiKey: backendConfig.key,
-    model: backendConfig.model || 'claude-opus-4-5-20251101',
+    baseUrl: runtimeEndpoint.baseUrl,
+    apiKey: runtimeEndpoint.apiKey,
+    model: runtimeEndpoint.model || 'claude-opus-4-5-20251101',
     provider,
     nativeAnthropicServerTools,
-    customHeaders: backendConfig.headers,
-    apiType: backendConfig.apiType
+    customHeaders: runtimeEndpoint.headers,
+    apiType: runtimeEndpoint.apiType
   }
 }
 

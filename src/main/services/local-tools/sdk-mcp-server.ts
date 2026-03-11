@@ -1,7 +1,8 @@
 import { z } from 'zod'
 import { createSdkMcpServer, tool } from '@anthropic-ai/claude-agent-sdk'
+import { hostRuntime } from '../../../gateway/host-runtime'
+import { recordToolExecutionStep } from '../../../gateway/host-runtime/step-reporter/tool-reporting'
 import { executeCodeSnippet, executeShellCommand } from './code-execution'
-import { executeAppleScript, openMacOSApplication } from './macos-ui'
 import { executeMemoryCommand } from './memory-tool'
 import { executeTextEditorCommand } from './text-editor'
 import { buildToolCatalog } from './tool-catalog'
@@ -192,9 +193,9 @@ export function createLocalToolsMcpServer(options: CreateLocalToolsMcpServerOpti
       activate: z.boolean().optional().describe('Whether to bring the application to the front (default: true)'),
       timeoutMs: z.number().int().min(1_000).max(120_000).optional().describe('Execution timeout in milliseconds')
     },
-    async (args) => {
+    async (args, extra) => {
       try {
-        const result = await openMacOSApplication({
+        const result = await hostRuntime.desktop.openApplication({
           workDir: options.workDir,
           application: args.application,
           target: args.target,
@@ -204,21 +205,67 @@ export function createLocalToolsMcpServer(options: CreateLocalToolsMcpServerOpti
 
         if (result.returnCode !== 0 || result.timedOut) {
           const detail = result.stderr || result.stdout || 'Unknown error'
-          return {
+          const response = {
             content: [{ type: 'text' as const, text: `Failed to open ${args.application}: ${detail}` }],
             isError: true
           }
+          recordToolExecutionStep({
+            defaultTaskId: options.conversationId,
+            defaultSpaceId: options.spaceId,
+            defaultConversationId: options.conversationId,
+            extra,
+            category: 'desktop',
+            action: 'open_application',
+            toolArgs: args,
+            result: response,
+            metadata: {
+              application: args.application,
+              target: args.target,
+              returnCode: result.returnCode,
+              timedOut: result.timedOut
+            }
+          })
+          return response
         }
 
         const targetText = args.target ? ` with ${args.target}` : ''
-        return {
+        const response = {
           content: [{ type: 'text' as const, text: `Opened ${args.application}${targetText}.` }]
         }
+        recordToolExecutionStep({
+          defaultTaskId: options.conversationId,
+          defaultSpaceId: options.spaceId,
+          defaultConversationId: options.conversationId,
+          extra,
+          category: 'desktop',
+          action: 'open_application',
+          toolArgs: args,
+          result: response,
+          metadata: {
+            application: args.application,
+            target: args.target,
+            returnCode: result.returnCode,
+            timedOut: result.timedOut
+          }
+        })
+        return response
       } catch (error) {
-        return {
+        const response = {
           content: [{ type: 'text' as const, text: (error as Error).message }],
           isError: true
         }
+        recordToolExecutionStep({
+          defaultTaskId: options.conversationId,
+          defaultSpaceId: options.spaceId,
+          defaultConversationId: options.conversationId,
+          extra,
+          category: 'desktop',
+          action: 'open_application',
+          toolArgs: args,
+          result: response,
+          metadata: { thrown: true, application: args.application, target: args.target }
+        })
+        return response
       }
     }
   )
@@ -230,9 +277,9 @@ export function createLocalToolsMcpServer(options: CreateLocalToolsMcpServerOpti
       script: z.string().min(1).describe('AppleScript source code to execute'),
       timeoutMs: z.number().int().min(1_000).max(120_000).optional().describe('Execution timeout in milliseconds')
     },
-    async (args) => {
+    async (args, extra) => {
       try {
-        const result = await executeAppleScript({
+        const result = await hostRuntime.desktop.runAppleScript({
           workDir: options.workDir,
           script: args.script,
           timeoutMs: args.timeoutMs
@@ -240,23 +287,74 @@ export function createLocalToolsMcpServer(options: CreateLocalToolsMcpServerOpti
 
         if (result.returnCode !== 0 || result.timedOut) {
           const detail = result.stderr || result.stdout || 'Unknown error'
-          return {
+          const response = {
             content: [{ type: 'text' as const, text: `AppleScript failed: ${detail}` }],
             isError: true
           }
+          recordToolExecutionStep({
+            defaultTaskId: options.conversationId,
+            defaultSpaceId: options.spaceId,
+            defaultConversationId: options.conversationId,
+            extra,
+            category: 'desktop',
+            action: 'run_applescript',
+            toolArgs: {
+              timeoutMs: args.timeoutMs,
+              scriptPreview: args.script.slice(0, 200)
+            },
+            result: response,
+            metadata: {
+              returnCode: result.returnCode,
+              timedOut: result.timedOut
+            }
+          })
+          return response
         }
 
-        return {
+        const response = {
           content: [{
             type: 'text' as const,
             text: result.stdout.trim() ? `AppleScript completed:\n${result.stdout.trim()}` : 'AppleScript completed.'
           }]
         }
+        recordToolExecutionStep({
+          defaultTaskId: options.conversationId,
+          defaultSpaceId: options.spaceId,
+          defaultConversationId: options.conversationId,
+          extra,
+          category: 'desktop',
+          action: 'run_applescript',
+          toolArgs: {
+            timeoutMs: args.timeoutMs,
+            scriptPreview: args.script.slice(0, 200)
+          },
+          result: response,
+          metadata: {
+            returnCode: result.returnCode,
+            timedOut: result.timedOut
+          }
+        })
+        return response
       } catch (error) {
-        return {
+        const response = {
           content: [{ type: 'text' as const, text: (error as Error).message }],
           isError: true
         }
+        recordToolExecutionStep({
+          defaultTaskId: options.conversationId,
+          defaultSpaceId: options.spaceId,
+          defaultConversationId: options.conversationId,
+          extra,
+          category: 'desktop',
+          action: 'run_applescript',
+          toolArgs: {
+            timeoutMs: args.timeoutMs,
+            scriptPreview: args.script.slice(0, 200)
+          },
+          result: response,
+          metadata: { thrown: true }
+        })
+        return response
       }
     }
   )

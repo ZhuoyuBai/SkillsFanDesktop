@@ -33,7 +33,7 @@ import {
 } from '../onboarding/onboardingData'
 import { api } from '../../api'
 import { HostedSubagentDetailSheet } from '../tool/HostedSubagentDetailSheet'
-import type { Attachment } from '../../types'
+import type { Attachment, HostEnvironmentStatus } from '../../types'
 import { useTranslation } from '../../i18n'
 
 // Mobile breakpoint (matches Tailwind sm: 640px)
@@ -64,6 +64,7 @@ interface ChatViewProps {
 
 export function ChatView({ isCompact = false }: ChatViewProps) {
   const { t } = useTranslation()
+  const [hostStatus, setHostStatus] = useState<HostEnvironmentStatus | null>(null)
   const isMobile = useIsMobile()
   const { currentSpace } = useSpaceStore()
   const {
@@ -183,7 +184,7 @@ export function ChatView({ isCompact = false }: ChatViewProps) {
 
   // Get current conversation and its session state
   const currentConversation = getCurrentConversation()
-  const { isLoadingConversation, toggleTodoCollapsed } = useChatStore()
+  const { isLoadingConversation, toggleTodoCollapsed, toggleActivityCollapsed } = useChatStore()
   const session = getCurrentSession()
   const {
     isGenerating,
@@ -201,7 +202,9 @@ export function ChatView({ isCompact = false }: ChatViewProps) {
     lastSegmentIndex,
     pendingToolApproval,
     pendingUserQuestion,
-    sdkStatus
+    sdkStatus,
+    hostSteps,
+    activityCollapsed
   } = session
 
   // Create toggle callbacks for the current conversation
@@ -210,6 +213,12 @@ export function ChatView({ isCompact = false }: ChatViewProps) {
       toggleTodoCollapsed(currentConversation.id)
     }
   }, [currentConversation, toggleTodoCollapsed])
+
+  const handleToggleActivity = useCallback(() => {
+    if (currentConversation) {
+      toggleActivityCollapsed(currentConversation.id)
+    }
+  }, [currentConversation, toggleActivityCollapsed])
 
   // Compute latest todos for floating indicator
   const latestTodos = useMemo(() => {
@@ -236,6 +245,36 @@ export function ChatView({ isCompact = false }: ChatViewProps) {
   const onboardingPrompt = getOnboardingPrompt(t)
   const onboardingResponse = getOnboardingAiResponse(t)
   const onboardingHtml = getOnboardingHtmlArtifact(t)
+
+  useEffect(() => {
+    if (!currentConversation) {
+      setHostStatus(null)
+      return
+    }
+
+    if (!isGenerating && hostSteps.length === 0) {
+      setHostStatus(null)
+      return
+    }
+
+    let cancelled = false
+
+    void api.getHostStatus()
+      .then((response) => {
+        if (!cancelled && response.success && response.data) {
+          setHostStatus(response.data as HostEnvironmentStatus)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setHostStatus(null)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [currentConversation?.id, isGenerating, hostSteps.length])
 
   // Handle mock onboarding send
   const handleOnboardingSend = useCallback(async () => {
@@ -442,6 +481,10 @@ export function ChatView({ isCompact = false }: ChatViewProps) {
                 textSegments={textSegments}
                 lastSegmentIndex={lastSegmentIndex}
                 sdkStatus={sdkStatus}
+                hostSteps={hostSteps}
+                hostStatus={hostStatus}
+                activityCollapsed={activityCollapsed}
+                onToggleActivity={handleToggleActivity}
                 onViewSubagentDetails={handleViewSubagentDetails}
                 onKillSubagent={handleKillSubagent}
               />

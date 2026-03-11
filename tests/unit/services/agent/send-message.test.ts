@@ -25,7 +25,8 @@ const mocks = vi.hoisted(() => ({
   markCompactionTriggered: vi.fn(),
   buildCompactionPrompt: vi.fn(),
   getCompactionStatus: vi.fn(),
-  clearCompactionState: vi.fn()
+  clearCompactionState: vi.fn(),
+  clearHostSteps: vi.fn()
 }))
 
 vi.mock('../../../../src/main/services/agent/lane-queue', () => ({
@@ -125,6 +126,14 @@ vi.mock('../../../../src/main/services/memory', () => ({
     searchRelevant: vi.fn(async () => []),
     add: vi.fn(async () => {})
   }))
+}))
+
+vi.mock('../../../../src/gateway/host-runtime', () => ({
+  hostRuntime: {
+    stepReporter: {
+      clearTask: mocks.clearHostSteps
+    }
+  }
 }))
 
 import { sendMessage } from '../../../../src/main/services/agent/send-message'
@@ -243,5 +252,6 @@ describe('send-message', () => {
     )
     expect(mocks.sendToRenderer.mock.calls.some(([eventName]) => eventName === 'agent:complete')).toBe(true)
     expect(mocks.sendToRenderer.mock.calls.some(([eventName]) => eventName === 'agent:error')).toBe(false)
+    expect(mocks.clearHostSteps).toHaveBeenCalledWith('conv-1')
   })
 })

@@ -90,6 +90,7 @@ export default function App() {
     handleAgentUserQuestionAnswered,
     handleAgentTaskUpdate,
     handleAgentSubagentUpdate,
+    handleAgentHostStep,
     currentSpaceId,
     setCurrentSpace: setChatCurrentSpace,
     loadConversations,
@@ -286,6 +287,25 @@ export default function App() {
       })
     })
 
+    const unsubHostStep = api.onAgentHostStep((data) => {
+      handleAgentHostStep(data as AgentEventBase & {
+        taskId: string
+        stepId: string
+        timestamp: number
+        category: 'browser' | 'desktop' | 'perception' | 'system'
+        action: string
+        summary?: string
+        artifacts?: Array<{
+          kind: 'screenshot' | 'snapshot' | 'log' | 'file'
+          label?: string
+          path?: string
+          mimeType?: string
+          metadata?: Record<string, unknown>
+        }>
+        metadata?: Record<string, unknown>
+      })
+    })
+
     // MCP status updates (global - not per-conversation)
     const unsubMcpStatus = api.onAgentMcpStatus((data) => {
       logger.debug('[App] Received agent:mcp-status event:', data)
@@ -352,6 +372,7 @@ export default function App() {
       unsubUserQuestionAnswered()
       unsubTaskUpdate()
       unsubSubagentUpdate()
+      unsubHostStep()
       unsubMcpStatus()
       unsubSkillsFanLogin()
       unsubSkillsFanLogout()
@@ -370,6 +391,7 @@ export default function App() {
     handleAgentUserQuestionAnswered,
     handleAgentTaskUpdate,
     handleAgentSubagentUpdate,
+    handleAgentHostStep,
     setMcpStatus
   ])
 

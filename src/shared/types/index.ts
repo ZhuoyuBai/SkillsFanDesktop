@@ -19,3 +19,6 @@ export * from './feishu'
 
 // Web tool config types
 export * from './web-tools'
+
+// Host runtime step/activity types
+export * from './host-runtime'

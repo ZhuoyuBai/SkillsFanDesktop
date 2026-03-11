@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
   ensureOpenAICompatRouter: vi.fn(),
   encodeBackendConfig: vi.fn(),
-  createAIBrowserMcpServer: vi.fn(),
+  createBrowserMcpServer: vi.fn(),
   createLocalToolsMcpServer: vi.fn(),
   createWebToolsMcpServer: vi.fn(),
   createSkillMcpServer: vi.fn(),
@@ -22,8 +22,12 @@ vi.mock('../../../../src/main/services/ai-browser/prompt', () => ({
   AI_BROWSER_SYSTEM_PROMPT: '[AI_BROWSER_PROMPT]'
 }))
 
-vi.mock('../../../../src/main/services/automated-browser/sdk-mcp-server', () => ({
-  createAutomatedBrowserMcpServer: mocks.createAIBrowserMcpServer
+vi.mock('../../../../src/gateway/host-runtime', () => ({
+  hostRuntime: {
+    browser: {
+      createMcpServer: mocks.createBrowserMcpServer
+    }
+  }
 }))
 
 vi.mock('../../../../src/main/services/local-tools/sdk-mcp-server', () => ({
@@ -55,7 +59,7 @@ describe('sdk-options', () => {
     vi.clearAllMocks()
     mocks.ensureOpenAICompatRouter.mockResolvedValue({ baseUrl: 'http://router.local' })
     mocks.encodeBackendConfig.mockReturnValue('encoded-backend-config')
-    mocks.createAIBrowserMcpServer.mockReturnValue({ type: 'stdio', command: 'ai-browser' })
+    mocks.createBrowserMcpServer.mockReturnValue({ type: 'stdio', command: 'ai-browser' })
     mocks.createLocalToolsMcpServer.mockReturnValue({ type: 'stdio', command: 'local-tools' })
     mocks.createWebToolsMcpServer.mockReturnValue({ type: 'stdio', command: 'web-tools' })
     mocks.createSkillMcpServer.mockResolvedValue({ type: 'stdio', command: 'skill' })
@@ -215,7 +219,8 @@ describe('sdk-options', () => {
         spaceId: 'space-1',
         conversationId: 'conv-1',
         aiBrowserEnabled: false,
-        includeSkillMcp: false
+        includeSkillMcp: false,
+        includeSubagentTools: true
       })
       expect(mocks.createCanUseTool).toHaveBeenCalledWith('/tmp/space-1', 'space-1', 'conv-1')
       expect(mocks.buildSystemPromptAppend).toHaveBeenCalledWith('/tmp/space-1', 'glm-5', true)
@@ -249,7 +254,11 @@ describe('sdk-options', () => {
       })
 
       expect(addedMcpServers).toEqual(['local-tools', 'web-tools', 'ai-browser', 'skill'])
-      expect(mocks.createAIBrowserMcpServer).toHaveBeenCalledTimes(1)
+      expect(mocks.createBrowserMcpServer).toHaveBeenCalledTimes(1)
+      expect(mocks.createBrowserMcpServer).toHaveBeenCalledWith('automated', {
+        spaceId: 'space-2',
+        conversationId: 'conv-2'
+      })
       expect(mocks.createLocalToolsMcpServer).toHaveBeenCalledTimes(1)
       expect(mocks.createWebToolsMcpServer).toHaveBeenCalledTimes(1)
       expect(mocks.createSkillMcpServer).toHaveBeenCalledTimes(1)
@@ -304,13 +313,14 @@ describe('sdk-options', () => {
       })
 
       expect(addedMcpServers).toEqual(['local-tools', 'web-tools'])
-      expect(mocks.createAIBrowserMcpServer).not.toHaveBeenCalled()
+      expect(mocks.createBrowserMcpServer).not.toHaveBeenCalled()
       expect(mocks.createLocalToolsMcpServer).toHaveBeenCalledWith({
         workDir: '/tmp/space-3',
         spaceId: 'space-3',
         conversationId: 'conv-3',
         aiBrowserEnabled: false,
-        includeSkillMcp: false
+        includeSkillMcp: false,
+        includeSubagentTools: true
       })
       expect(sdkOptions.systemPrompt.append).toContain('System Browser Mode')
       expect(sdkOptions.systemPrompt.append).toContain('mcp__local-tools__open_url')
@@ -349,7 +359,7 @@ describe('sdk-options', () => {
       })
 
       expect(addedMcpServers).toEqual(['local-tools', 'web-tools'])
-      expect(mocks.createAIBrowserMcpServer).not.toHaveBeenCalled()
+      expect(mocks.createBrowserMcpServer).not.toHaveBeenCalled()
       expect(sdkOptions.mcpServers).toEqual({
         github: { type: 'stdio', command: 'github-mcp' },
         'local-tools': { type: 'stdio', command: 'local-tools' },

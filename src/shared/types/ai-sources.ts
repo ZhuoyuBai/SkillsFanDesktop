@@ -114,6 +114,8 @@ export interface CustomSourceConfig extends AISourceBaseConfig {
   provider: ApiProvider
   apiKey: string
   apiUrl: string
+  customHeaders?: Record<string, string>
+  apiType?: 'chat_completions' | 'responses'
 }
 
 /**
@@ -138,6 +140,21 @@ export interface AISourcesConfig {
 export interface BackendRequestConfig {
   url: string
   key: string
+  model?: string
+  headers?: Record<string, string>
+  apiType?: 'chat_completions' | 'responses'
+  forceStream?: boolean
+}
+
+export type RuntimeAuthMode = 'api-key' | 'oauth' | 'fallback'
+
+export interface RuntimeEndpoint {
+  requestedSource: AISourceType
+  source: AISourceType
+  authMode: RuntimeAuthMode
+  provider: 'anthropic' | 'openai' | 'oauth'
+  baseUrl: string
+  apiKey: string
   model?: string
   headers?: Record<string, string>
   apiType?: 'chat_completions' | 'responses'
@@ -261,4 +278,3 @@ export function getAvailableModels(aiSources: AISourcesConfig, source: AISourceT
   }
   return []
 }
-

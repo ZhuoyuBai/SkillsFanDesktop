@@ -7,6 +7,7 @@
  */
 
 import * as lark from '@larksuiteoapi/node-sdk'
+import { createReadStream } from 'fs'
 import type { FeishuConfig, FeishuStatus } from '@shared/types/feishu'
 
 export interface FeishuMessageEvent {
@@ -181,6 +182,62 @@ export class FeishuBotService {
         receive_id: chatId,
         msg_type: 'post',
         content: JSON.stringify(content)
+      }
+    })
+
+    return res?.data?.message_id
+  }
+
+  /**
+   * Upload an image to Feishu and return the image key.
+   */
+  async uploadImage(
+    image: Buffer | string,
+    imageType: 'message' | 'avatar' = 'message'
+  ): Promise<string> {
+    if (!this.client) throw new Error('Feishu client not initialized')
+
+    const imageData = typeof image === 'string' ? createReadStream(image) : image
+    const res = await this.client.im.image.create({
+      data: {
+        image_type: imageType,
+        image: imageData as any
+      }
+    })
+
+    const response = res as unknown as {
+      code?: number
+      msg?: string
+      image_key?: string
+      data?: {
+        image_key?: string
+      }
+    }
+
+    if (response.code !== undefined && response.code !== 0) {
+      throw new Error(`Feishu image upload failed: ${response.msg || `code ${response.code}`}`)
+    }
+
+    const imageKey = response.image_key || response.data?.image_key
+    if (!imageKey) {
+      throw new Error('Feishu image upload failed: no image_key returned')
+    }
+
+    return imageKey
+  }
+
+  /**
+   * Send an image message to a chat.
+   */
+  async sendImage(chatId: string, imageKey: string): Promise<string | undefined> {
+    if (!this.client) throw new Error('Feishu client not initialized')
+
+    const res = await this.client.im.message.create({
+      params: { receive_id_type: 'chat_id' },
+      data: {
+        receive_id: chatId,
+        msg_type: 'image',
+        content: JSON.stringify({ image_key: imageKey })
       }
     })
 

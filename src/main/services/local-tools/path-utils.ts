@@ -1,4 +1,5 @@
 import path from 'path'
+import { homedir } from 'os'
 
 export interface ResolvedPath {
   absolutePath: string
@@ -47,4 +48,66 @@ export function normalizeLineRange(range?: number[]): [number, number] | null {
 
 export function truncateText(value: string, maxChars: number): string {
   return value.length > maxChars ? `${value.slice(0, maxChars)}...` : value
+}
+
+function normalizeFileUrl(targetPath: string): string {
+  if (!targetPath.startsWith('file://')) {
+    return targetPath
+  }
+
+  try {
+    const parsed = new URL(targetPath)
+    return decodeURIComponent(parsed.pathname)
+  } catch {
+    return targetPath
+  }
+}
+
+function normalizeMacOSHfsPath(targetPath: string): string {
+  if (
+    process.platform !== 'darwin'
+    || path.isAbsolute(targetPath)
+    || targetPath.includes('/')
+    || targetPath.includes('\\')
+    || !targetPath.includes(':')
+  ) {
+    return targetPath
+  }
+
+  const segments = targetPath.split(':').filter(Boolean)
+  if (segments.length < 2) {
+    return targetPath
+  }
+
+  const [volumeName, ...rest] = segments
+  const basePath = volumeName === 'Macintosh HD'
+    ? path.sep
+    : path.join(path.sep, 'Volumes', volumeName)
+
+  return path.resolve(basePath, ...rest)
+}
+
+export function normalizeLocalFilePath(targetPath: string, workDir?: string): string {
+  let normalized = targetPath.trim()
+  if (!normalized) {
+    return normalized
+  }
+
+  normalized = normalizeFileUrl(normalized)
+
+  if (normalized.startsWith('~')) {
+    normalized = path.join(homedir(), normalized.slice(1))
+  }
+
+  normalized = normalizeMacOSHfsPath(normalized)
+
+  if (path.isAbsolute(normalized)) {
+    return path.resolve(normalized)
+  }
+
+  if (workDir) {
+    return path.resolve(workDir, normalized)
+  }
+
+  return normalized
 }

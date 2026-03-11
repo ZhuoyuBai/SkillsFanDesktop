@@ -239,6 +239,7 @@ export function onEvent(channel: string, callback: (data: unknown) => void): () 
       'agent:user-question-answered': 'onAgentUserQuestionAnswered',
       'agent:task-update': 'onAgentTaskUpdate',
       'agent:subagent-update': 'onAgentSubagentUpdate',
+      'agent:host-step': 'onAgentHostStep',
       'remote:status-change': 'onRemoteStatusChange',
       'browser:state-change': 'onBrowserStateChange',
       'browser:zoom-changed': 'onBrowserZoomChanged',

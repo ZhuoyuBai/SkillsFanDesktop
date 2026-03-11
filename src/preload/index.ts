@@ -149,6 +149,7 @@ export interface SkillsFanAPI {
   testMcpConnections: () => Promise<{ success: boolean; servers: unknown[]; error?: string }>
   answerUserQuestion: (conversationId: string, answers: Record<string, string>) => Promise<IpcResponse>
   rewindFiles: (conversationId: string, userMessageUuid: string) => Promise<IpcResponse>
+  getHostStatus: () => Promise<IpcResponse>
 
   // Event listeners
   onAgentStart: (callback: (data: unknown) => void) => () => void
@@ -167,6 +168,7 @@ export interface SkillsFanAPI {
   onAgentUserQuestionAnswered: (callback: (data: unknown) => void) => () => void
   onAgentTaskUpdate: (callback: (data: unknown) => void) => () => void
   onAgentSubagentUpdate: (callback: (data: unknown) => void) => () => void
+  onAgentHostStep: (callback: (data: unknown) => void) => () => void
 
   // Artifact
   listArtifacts: (spaceId: string) => Promise<IpcResponse>
@@ -547,6 +549,7 @@ const api: SkillsFanAPI = {
   testMcpConnections: () => ipcRenderer.invoke('agent:test-mcp'),
   answerUserQuestion: (conversationId, answers) => ipcRenderer.invoke('agent:answer-question', conversationId, answers),
   rewindFiles: (conversationId, userMessageUuid) => ipcRenderer.invoke('agent:rewind-files', conversationId, userMessageUuid),
+  getHostStatus: () => ipcRenderer.invoke('agent:get-host-status'),
 
   // Event listeners
   onAgentStart: (callback) => createEventListener('agent:start', callback),
@@ -565,6 +568,7 @@ const api: SkillsFanAPI = {
   onAgentUserQuestionAnswered: (callback) => createEventListener('agent:user-question-answered', callback),
   onAgentTaskUpdate: (callback) => createEventListener('agent:task-update', callback),
   onAgentSubagentUpdate: (callback) => createEventListener('agent:subagent-update', callback),
+  onAgentHostStep: (callback) => createEventListener('agent:host-step', callback),
 
   // Hosted subagent actions
   killSubagentRun: (runId: string) => ipcRenderer.invoke('agent:kill-subagent', runId),

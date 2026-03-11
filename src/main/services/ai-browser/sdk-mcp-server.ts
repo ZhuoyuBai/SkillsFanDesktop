@@ -10,9 +10,15 @@
 
 import { z } from 'zod'
 import { tool, createSdkMcpServer } from '@anthropic-ai/claude-agent-sdk'
+import { recordToolExecutionStep } from '../../../gateway/host-runtime/step-reporter/tool-reporting'
 import type { BrowserContextInterface } from './types'
 import { browserContext } from './context'
 import { chromeConnection } from './chrome-connection'
+
+interface BrowserMcpServerOptions {
+  spaceId?: string
+  conversationId?: string
+}
 
 // ============================================
 // Navigation Tools
@@ -587,7 +593,10 @@ const browser_screenshot = tool(
         const buffer = Buffer.from(result.data, 'base64')
         writeFileSync(args.filePath, buffer)
         return {
-          content: [{ type: 'text' as const, text: `Screenshot saved to: ${args.filePath}` }]
+          content: [
+            { type: 'text' as const, text: `Screenshot saved to: ${args.filePath}` },
+            { type: 'image' as const, data: result.data, mimeType: result.mimeType }
+          ]
         }
       }
 
@@ -997,15 +1006,56 @@ const allSdkTools = [
   browser_perf_insight
 ]
 
+const instrumentedSdkTools = allSdkTools.map((toolDefinition) => ({
+  ...toolDefinition
+}))
+
 /**
  * Create AI Browser SDK MCP Server
  * This server runs in-process and handles all browser_* tools
  */
-export function createAIBrowserMcpServer() {
+export function createAIBrowserMcpServer(options: BrowserMcpServerOptions = {}) {
+  const tools = instrumentedSdkTools.map((toolDefinition) => ({
+    ...toolDefinition,
+    handler: async (args: unknown, extra?: unknown) => {
+      try {
+        const result = await toolDefinition.handler(args, extra)
+        recordToolExecutionStep({
+          defaultTaskId: options.conversationId || 'browser:connected',
+          defaultSpaceId: options.spaceId,
+          defaultConversationId: options.conversationId,
+          extra,
+          category: 'browser',
+          action: toolDefinition.name,
+          toolArgs: args,
+          result,
+          metadata: { backend: 'connected' }
+        })
+        return result
+      } catch (error) {
+        recordToolExecutionStep({
+          defaultTaskId: options.conversationId || 'browser:connected',
+          defaultSpaceId: options.spaceId,
+          defaultConversationId: options.conversationId,
+          extra,
+          category: 'browser',
+          action: toolDefinition.name,
+          toolArgs: args,
+          result: {
+            content: [{ type: 'text' as const, text: (error as Error).message }],
+            isError: true
+          },
+          metadata: { backend: 'connected', thrown: true }
+        })
+        throw error
+      }
+    }
+  }))
+
   return createSdkMcpServer({
     name: 'ai-browser',
     version: '1.0.0',
-    tools: allSdkTools
+    tools
   })
 }
 
@@ -1013,5 +1063,5 @@ export function createAIBrowserMcpServer() {
  * Get all AI Browser tool names
  */
 export function getAIBrowserSdkToolNames(): string[] {
-  return allSdkTools.map(t => t.name)
+  return instrumentedSdkTools.map(t => t.name)
 }

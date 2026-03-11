@@ -59,6 +59,11 @@ export function registerAgentHandlers(window: BrowserWindow | null): void {
     getSessionState(conversationId)
   )
 
+  ipcHandle('agent:get-host-status', async () => {
+    const { hostRuntime } = await import('../../gateway/host-runtime')
+    return hostRuntime.status.getEnvironmentStatus()
+  })
+
   // Warm up V2 session - non-blocking, fire-and-forget
   ipcHandle('agent:ensure-session-warm', (_e, spaceId: string, conversationId: string) => {
     ensureSessionWarm(spaceId, conversationId).catch((error: unknown) => {

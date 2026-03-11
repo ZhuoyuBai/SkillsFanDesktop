@@ -77,6 +77,7 @@ describe('Config Service', () => {
       expect(config.api.apiUrl).toBe('https://api.anthropic.com')
       expect(config.permissions.commandExecution).toBe('ask')
       expect(config.appearance.theme).toBe('light')
+      expect(config.runtime?.mode).toBe('claude-sdk')
       expect(config.tools?.web.search.provider).toBe('duckduckgo')
       expect(config.tools?.web.fetch.enabled).toBe(true)
       expect(config.isFirstLaunch).toBe(true)
@@ -143,6 +144,16 @@ describe('Config Service', () => {
       const config = getConfig()
       expect(config.api.apiKey).toBe('test-key')
       expect(config.api.model).toBe('claude-3-opus')
+    })
+
+    it('should merge runtime config with defaults', () => {
+      saveConfig({
+        runtime: { mode: 'native' }
+      } as any)
+
+      const config = getConfig()
+      expect(config.runtime?.mode).toBe('native')
+      expect(config.browserAutomation?.mode).toBe('ai-browser')
     })
 
     it('should replace mcpServers entirely', () => {

@@ -12,13 +12,12 @@
  *
  * Content types and rendering:
  * - code/markdown/json/csv/text: Load content via IPC, render in React
- * - image: Use halo-file:// protocol (bypasses CSP in renderer)
+ * - image: Load base64 content via IPC and render in React
  * - pdf: Use BrowserView with file:// (BrowserView has no cross-origin restrictions)
  * - browser: Use BrowserView with https:// URLs
  *
  * Protocol: halo-file://
- * - Custom protocol registered in main process (protocol.service.ts)
- * - Used by <img> tags in renderer to bypass CSP restrictions
+ * - Still available as a fallback for local image resources
  * - NOT used for BrowserView (BrowserView can access file:// directly)
  *
  * Design principles:
@@ -402,13 +401,6 @@ class CanvasLifecycle {
     const tab = this.tabs.get(tabId)
     if (!tab) return
 
-    // Images use halo-file:// protocol directly (no content loading needed)
-    if (type === 'image') {
-      tab.isLoading = false
-      this.notifyTabsChange()
-      return
-    }
-
     try {
       const response = await api.readArtifactContent(path)
 
@@ -468,14 +460,8 @@ class CanvasLifecycle {
   private async handleFileChanged(filePath: string): Promise<void> {
     for (const [tabId, tab] of this.tabs) {
       if (tab.path === filePath) {
-        if (tab.type === 'image') {
-          // For images, update lastModified to bust cache
-          tab.lastModified = Date.now()
-          this.notifyTabsChange()
-        } else {
-          // For text-based files, reload content
-          await this.loadFileContent(tabId, filePath, tab.type)
-        }
+        tab.lastModified = Date.now()
+        await this.loadFileContent(tabId, filePath, tab.type)
       }
     }
   }

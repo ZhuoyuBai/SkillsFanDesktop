@@ -55,6 +55,7 @@ class BrowserViewManager {
   private views: Map<string, BrowserView> = new Map()
   private states: Map<string, BrowserViewState> = new Map()
   private mainWindow: BrowserWindow | null = null
+  private captureWindow: BrowserWindow | null = null
   private activeViewId: string | null = null
 
   // Debounce timers for state change events
@@ -71,6 +72,7 @@ class BrowserViewManager {
     // Clean up views when window is closed
     mainWindow.on('closed', () => {
       this.destroyAll()
+      this.destroyCaptureWindow()
     })
   }
 
@@ -321,6 +323,150 @@ class BrowserViewManager {
     return true
   }
 
+  private isViewAttachedToWindow(window: BrowserWindow | null, view: BrowserView): boolean {
+    if (!window || typeof window.getBrowserViews !== 'function') {
+      return false
+    }
+
+    return window.getBrowserViews().includes(view)
+  }
+
+  private ensureCaptureWindow(bounds: BrowserViewBounds): BrowserWindow | null {
+    const width = Math.max(Math.round(bounds.width), 1280)
+    const height = Math.max(Math.round(bounds.height), 720)
+    const x = -(width + 240)
+
+    if (!this.captureWindow || this.captureWindow.isDestroyed()) {
+      this.captureWindow = new BrowserWindow({
+        show: false,
+        frame: false,
+        transparent: true,
+        focusable: false,
+        skipTaskbar: true,
+        hasShadow: false,
+        resizable: false,
+        minimizable: false,
+        maximizable: false,
+        closable: false,
+        x,
+        y: 0,
+        width,
+        height,
+        paintWhenInitiallyHidden: true,
+        backgroundColor: '#00000000',
+        webPreferences: {
+          sandbox: true,
+          contextIsolation: true,
+          nodeIntegration: false
+        }
+      })
+
+      this.captureWindow.on('closed', () => {
+        this.captureWindow = null
+      })
+
+      void this.captureWindow.loadURL('about:blank').catch((error) => {
+        console.error('[BrowserView] Failed to initialize hidden capture window:', error)
+      })
+    } else {
+      this.captureWindow.setBounds({ x, y: 0, width, height })
+    }
+
+    if (!this.captureWindow.isVisible()) {
+      this.captureWindow.showInactive()
+    }
+
+    return this.captureWindow
+  }
+
+  private destroyCaptureWindow(): void {
+    if (!this.captureWindow || this.captureWindow.isDestroyed()) {
+      this.captureWindow = null
+      return
+    }
+
+    try {
+      this.captureWindow.close()
+    } catch (error) {
+      console.error('[BrowserView] Failed to close hidden capture window:', error)
+    } finally {
+      this.captureWindow = null
+    }
+  }
+
+  private getBackgroundCaptureBounds(): BrowserViewBounds {
+    const hostWindow = this.mainWindow && !this.mainWindow.isDestroyed()
+      ? this.mainWindow
+      : this.captureWindow
+
+    if (!hostWindow) {
+      return { x: -1280, y: 0, width: 1280, height: 720 }
+    }
+
+    const [winWidth, winHeight] = hostWindow.getContentSize()
+    const width = Math.max(winWidth || 0, 1280)
+    const height = Math.max(winHeight || 0, 720)
+
+    return {
+      x: -width,
+      y: 0,
+      width,
+      height
+    }
+  }
+
+  private async attachViewForBackgroundCapture(view: BrowserView): Promise<boolean> {
+    if (this.isViewAttachedToWindow(this.mainWindow, view)) {
+      return false
+    }
+
+    const captureWindow = this.ensureCaptureWindow(this.getBackgroundCaptureBounds())
+    if (!captureWindow) {
+      return false
+    }
+
+    if (this.isViewAttachedToWindow(captureWindow, view)) {
+      return false
+    }
+
+    captureWindow.addBrowserView(view)
+    view.setBounds({
+      x: 0,
+      y: 0,
+      width: Math.round(captureWindow.getContentBounds().width),
+      height: Math.round(captureWindow.getContentBounds().height)
+    })
+    await new Promise((resolve) => setTimeout(resolve, 80))
+    return true
+  }
+
+  private detachViewAfterBackgroundCapture(view: BrowserView): void {
+    if (!this.captureWindow || this.captureWindow.isDestroyed()) {
+      return
+    }
+
+    if (!this.isViewAttachedToWindow(this.captureWindow, view)) {
+      return
+    }
+
+    view.setBounds({ x: 0, y: 0, width: 0, height: 0 })
+
+    try {
+      this.captureWindow.removeBrowserView(view)
+    } catch (error) {
+      // Ignore duplicate cleanup.
+    }
+
+    this.captureWindow.hide()
+  }
+
+  private isValidScreenshotDataUrl(dataUrl: string | null | undefined): boolean {
+    if (!dataUrl) return false
+
+    const match = dataUrl.match(/^data:image\/[a-zA-Z0-9.+-]+;base64,(.+)$/)
+    return Boolean(match?.[1])
+  }
+
   /**
    * Capture screenshot of the view
    */
@@ -328,19 +474,40 @@ class BrowserViewManager {
     const view = this.views.get(viewId)
     if (!view) return null
 
+    let attachedForCapture = false
+
     try {
-      const image = rect
-        ? await view.webContents.capturePage({
-          x: Math.round(rect.x),
-          y: Math.round(rect.y),
-          width: Math.round(rect.width),
-          height: Math.round(rect.height)
-        })
-        : await view.webContents.capturePage()
-      return image.toDataURL()
+      attachedForCapture = await this.attachViewForBackgroundCapture(view)
+
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        const image = rect
+          ? await view.webContents.capturePage({
+            x: Math.round(rect.x),
+            y: Math.round(rect.y),
+            width: Math.round(rect.width),
+            height: Math.round(rect.height)
+          })
+          : await view.webContents.capturePage()
+
+        const dataUrl = image.toDataURL()
+        if (this.isValidScreenshotDataUrl(dataUrl)) {
+          return dataUrl
+        }
+
+        if (attempt === 0) {
+          await new Promise((resolve) => setTimeout(resolve, 120))
+        }
+      }
+
+      console.error('[BrowserView] Screenshot returned empty image data')
+      return null
     } catch (error) {
       console.error('[BrowserView] Screenshot failed:', error)
       return null
+    } finally {
+      if (attachedForCapture) {
+        this.detachViewAfterBackgroundCapture(view)
+      }
     }
   }
 
@@ -451,6 +618,8 @@ class BrowserViewManager {
     for (const viewId of this.views.keys()) {
       this.destroy(viewId)
     }
+
+    this.destroyCaptureWindow()
   }
 
   /**

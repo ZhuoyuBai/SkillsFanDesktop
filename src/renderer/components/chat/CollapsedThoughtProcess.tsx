@@ -9,9 +9,6 @@
  */
 
 import { useState, useMemo } from 'react'
-import {
-  ChevronRight,
-} from 'lucide-react'
 import { TodoCard, parseTodoInput } from '../tool/TodoCard'
 import { InlineActivity } from './InlineActivity'
 import type { Thought } from '../../types'
@@ -73,9 +70,6 @@ export function CollapsedThoughtProcess({
 
   if (!hasContent) return null
 
-  // Count errors
-  const errorCount = thoughts.filter(t => t.type === 'error').length
-
   // Calculate stats
   const stats = useMemo(() => {
     const toolUses = thoughts.filter(t => t.type === 'tool_use' && !t.parentToolId && t.toolName !== 'TodoWrite')
@@ -96,36 +90,28 @@ export function CollapsedThoughtProcess({
   }, [thoughts])
 
   return (
-    <div className="mb-1">
+    <div className="mb-1 px-3">
       {/* Header - minimal CLI style */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="flex items-center gap-1.5 py-0.5 text-[13px] w-full text-left
-          text-muted-foreground/50 hover:text-muted-foreground/70 transition-colors"
+        className="flex items-center gap-2.5 py-0.5 text-[13px] w-full text-left
+          text-muted-foreground/70 hover:text-muted-foreground transition-colors"
       >
-        <ChevronRight
-          size={10}
-          className={`flex-shrink-0 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
-        />
-
-        {/* Status symbol */}
-        <span className={`flex-shrink-0 ${
-          isThinking ? 'text-orange-400' : errorCount > 0 ? 'text-destructive/70' : 'text-muted-foreground/40'
-        }`}>
-          {isThinking ? '⟳' : errorCount > 0 ? '✗' : '⏺'}
+        <span className={`flex-shrink-0 text-[13px] leading-relaxed select-none transition-transform inline-block ${isExpanded ? 'rotate-90' : ''}`}>
+          ❯
         </span>
 
         <span>{t('Thought process')}</span>
 
         {/* Summary preview when collapsed */}
         {!isExpanded && thinkingSummary && (
-          <span className="text-muted-foreground/30 truncate max-w-[200px] text-[10px]">
+          <span className="text-muted-foreground/50 truncate max-w-[200px]">
             {thinkingSummary}
           </span>
         )}
 
         {/* Stats */}
-        <div className="flex items-center gap-2 text-muted-foreground/40 ml-auto flex-shrink-0">
+        <div className="flex items-center gap-2 text-muted-foreground/50 ml-auto flex-shrink-0">
           {stats.completed > 0 && (
             <span>{stats.completed} {t('tools')}</span>
           )}

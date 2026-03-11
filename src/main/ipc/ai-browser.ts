@@ -18,11 +18,35 @@
  */
 
 import { ipcMain, BrowserWindow } from 'electron'
+import type { BrowserHostRuntime } from '../../gateway/host-runtime'
+import { recordToolExecutionStep } from '../../gateway/host-runtime/step-reporter/tool-reporting'
 
 // Lazy-loaded module references
 let aiBrowserModule: typeof import('../services/ai-browser') | null = null
+let browserHostRuntime: BrowserHostRuntime | null = null
 let mainWindowRef: BrowserWindow | null = null
 let initialized = false
+
+async function ensureBrowserHostRuntime(): Promise<BrowserHostRuntime> {
+  if (!browserHostRuntime) {
+    const { hostRuntime } = await import('../../gateway/host-runtime')
+    browserHostRuntime = hostRuntime.browser
+  }
+
+  return browserHostRuntime
+}
+
+async function ensureBrowserRuntimeInitialized(): Promise<BrowserHostRuntime> {
+  const runtime = await ensureBrowserHostRuntime()
+
+  if (!initialized && mainWindowRef) {
+    console.log('[AI Browser IPC] Initializing AI Browser through HostRuntime...')
+    runtime.initialize(mainWindowRef)
+    initialized = true
+  }
+
+  return runtime
+}
 
 /**
  * Ensure AI Browser module is loaded and initialized
@@ -40,11 +64,7 @@ async function ensureInitialized(): Promise<typeof import('../services/ai-browse
     console.log(`[AI Browser IPC] Module loaded in ${duration.toFixed(1)}ms`)
   }
 
-  if (!initialized && mainWindowRef) {
-    console.log('[AI Browser IPC] Initializing AI Browser...')
-    aiBrowserModule.initializeAIBrowser(mainWindowRef)
-    initialized = true
-  }
+  await ensureBrowserRuntimeInitialized()
 
   return aiBrowserModule
 }
@@ -76,8 +96,8 @@ export function registerAIBrowserHandlers(mainWindow: BrowserWindow | null): voi
    */
   ipcMain.handle('ai-browser:get-tool-names', async () => {
     try {
-      const module = await ensureInitialized()
-      const toolNames = module.getAIBrowserToolNames()
+      const runtime = await ensureBrowserRuntimeInitialized()
+      const toolNames = runtime.getToolNames('connected')
       return { success: true, data: toolNames }
     } catch (error) {
       console.error('[AI Browser IPC] Get tool names failed:', error)
@@ -125,8 +145,92 @@ export function registerAIBrowserHandlers(mainWindow: BrowserWindow | null): voi
       console.log(`[AI Browser IPC] >>> execute-tool: ${toolName}`)
 
       try {
-        const module = await ensureInitialized()
-        const result = await module.executeAIBrowserTool(toolName, params)
+        const runtime = await ensureBrowserRuntimeInitialized()
+        const { hostRuntime } = await import('../../gateway/host-runtime')
+
+        let result: {
+          content: string
+          images?: Array<{ data: string; mimeType: string }>
+          isError?: boolean
+        }
+
+        if (toolName === 'browser_snapshot') {
+          const snapshot = await hostRuntime.perception.captureBrowserSnapshot({
+            backend: 'connected',
+            verbose: params.verbose === true,
+            filePath: typeof params.filePath === 'string' ? params.filePath : undefined,
+            taskId: 'ai-browser-ipc'
+          })
+
+          result = {
+            content: snapshot.filePath
+              ? `Snapshot saved to: ${snapshot.filePath}\n\nPage: ${snapshot.title}\nURL: ${snapshot.url}\nElements: ${snapshot.elementCount}`
+              : snapshot.text
+          }
+        } else if (toolName === 'browser_screenshot') {
+          if (params.uid && params.fullPage) {
+            result = {
+              content: 'Providing both "uid" and "fullPage" is not allowed.',
+              isError: true
+            }
+          } else {
+            const screenshot = await hostRuntime.perception.captureBrowserScreenshot({
+              backend: 'connected',
+              format: (params.format as 'png' | 'jpeg' | 'webp') || 'png',
+              quality: typeof params.quality === 'number' ? params.quality : undefined,
+              uid: typeof params.uid === 'string' ? params.uid : undefined,
+              fullPage: params.fullPage === true,
+              filePath: typeof params.filePath === 'string' ? params.filePath : undefined,
+              taskId: 'ai-browser-ipc'
+            })
+
+            let message: string
+            if (params.uid) {
+              message = `Took a screenshot of node with uid "${params.uid}".`
+            } else if (params.fullPage === true) {
+              message = 'Took a screenshot of the full current page.'
+            } else {
+              message = "Took a screenshot of the current page's viewport."
+            }
+
+            result = screenshot.filePath
+              ? {
+                  content: `${message}\nSaved screenshot to ${screenshot.filePath}.`,
+                  images: screenshot.data
+                    ? [{ data: screenshot.data, mimeType: screenshot.mimeType }]
+                    : undefined
+                }
+              : {
+                  content: message,
+                  images: screenshot.data
+                    ? [{ data: screenshot.data, mimeType: screenshot.mimeType }]
+                    : undefined
+                }
+          }
+        } else {
+          const module = await ensureInitialized()
+          result = await module.executeAIBrowserTool(toolName, params)
+          recordToolExecutionStep({
+            defaultTaskId: 'ai-browser-ipc',
+            category: 'browser',
+            action: toolName,
+            toolArgs: params,
+            result: {
+              content: [
+                { type: 'text' as const, text: result.content },
+                ...(result.images || []).map((image) => ({
+                  type: 'image' as const,
+                  data: image.data,
+                  mimeType: image.mimeType
+                }))
+              ],
+              isError: result.isError
+            },
+            metadata: { backend: 'connected', source: 'ipc' }
+          })
+        }
+
+        void runtime
 
         console.log(`[AI Browser IPC] <<< execute-tool success: ${toolName}`)
         return {
@@ -182,13 +286,14 @@ export function registerAIBrowserHandlers(mainWindow: BrowserWindow | null): voi
  */
 export function cleanupAIBrowserHandlers(): void {
   // Only cleanup if module was actually loaded
-  if (aiBrowserModule && initialized) {
-    aiBrowserModule.cleanupAIBrowser()
+  if (browserHostRuntime && initialized) {
+    browserHostRuntime.cleanup()
     console.log('[AI Browser IPC] Module cleaned up')
   }
 
   // Reset state
   aiBrowserModule = null
+  browserHostRuntime = null
   mainWindowRef = null
   initialized = false
 

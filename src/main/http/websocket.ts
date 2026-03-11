@@ -44,6 +44,7 @@ export function getSendStrategy(channel: string): SendStrategy {
     case 'agent:tool-approval-resolved':          // Tool approval decision
     case 'agent:compact':                         // Context compression
     case 'agent:queued':                          // Queue notification
+    case 'agent:host-step':                       // Host/browser/desktop activity
     case 'agent:subagent-update':                 // Hosted subagent lifecycle
     case 'agent:start':     return 'reliable'     // Must deliver
     default:                return 'dropIfSlow'

@@ -178,7 +178,7 @@ export function HostedSubagentDetailSheet({
                 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2 hover:text-foreground/70 transition-colors"
               >
                 <ChevronRight
-                  size={10}
+                  size={12}
                   className={`transition-transform ${isTechExpanded ? 'rotate-90' : ''}`}
                 />
                 {t('Technical Details')}

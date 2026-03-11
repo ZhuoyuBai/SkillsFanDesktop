@@ -4,6 +4,7 @@
 
 import type { ThinkingEffort } from '../../shared/utils/openai-models'
 import type { WebToolsConfig } from '../../shared/types'
+import type { HostEnvironmentStatus, HostStep } from '../../shared/types/host-runtime'
 
 // API Provider Configuration
 export type ApiProvider = 'anthropic' | 'openai';
@@ -194,6 +195,10 @@ export interface BrowserAutomationConfig {
   mode: 'ai-browser' | 'system-browser';
 }
 
+export interface RuntimeConfig {
+  mode: 'claude-sdk' | 'hybrid' | 'native';
+}
+
 export interface HaloConfig {
   api: ApiConfig;  // Legacy, kept for backward compatibility
   aiSources?: AISourcesConfig;  // New multi-source configuration
@@ -205,6 +210,7 @@ export interface HaloConfig {
   spaces?: SpacesConfig;  // Space settings (default space, etc.)
   memory?: MemoryConfig;  // Cross-conversation memory settings
   browserAutomation?: BrowserAutomationConfig;  // Browser automation mode preference
+  runtime?: RuntimeConfig;  // Runtime orchestrator mode
   thinkingEffort?: ThinkingEffort;  // Default thinking effort level
   tools?: WebToolsConfig;  // Local web search/fetch tool settings
   customInstructions?: {  // Global custom instructions appended to system prompt
@@ -506,6 +512,8 @@ export interface AgentErrorEvent extends AgentEventBase {
   error: string;
 }
 
+export type { HostEnvironmentStatus, HostStep };
+
 // Token usage statistics from SDK result message
 export interface TokenUsage {
   inputTokens: number;
@@ -609,6 +617,9 @@ export const DEFAULT_CONFIG: HaloConfig = {
   },
   browserAutomation: {
     mode: 'ai-browser'
+  },
+  runtime: {
+    mode: 'claude-sdk'
   },
   tools: {
     web: {

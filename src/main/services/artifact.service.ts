@@ -8,6 +8,7 @@ import { join, extname, basename } from 'path'
 import type { BrowserWindow } from 'electron'
 import { getTempSpacePath } from './config.service'
 import { getSpace } from './space.service'
+import { normalizeLocalFilePath } from './local-tools/path-utils'
 
 // File type icon IDs mapping (mapped to Lucide icon names in renderer)
 const FILE_ICON_IDS: Record<string, string> = {
@@ -253,47 +254,49 @@ export function setFileWatcherWindow(window: BrowserWindow): void {
  * Watch a single file for changes and notify renderer via IPC
  */
 export function watchFile(filePath: string): void {
-  // Already watching this file
-  if (fileWatchers.has(filePath)) return
+  const normalizedPath = normalizeLocalFilePath(filePath)
 
-  if (!existsSync(filePath)) {
-    console.warn(`[Artifact] Cannot watch non-existent file: ${filePath}`)
+  // Already watching this file
+  if (fileWatchers.has(normalizedPath)) return
+
+  if (!existsSync(normalizedPath)) {
+    console.warn(`[Artifact] Cannot watch non-existent file: ${normalizedPath}`)
     return
   }
 
   try {
-    const watcher = watch(filePath, (eventType) => {
+    const watcher = watch(normalizedPath, (eventType) => {
       // Debounce: 300ms to avoid multiple rapid notifications
-      const existing = fileWatchDebounceTimers.get(filePath)
+      const existing = fileWatchDebounceTimers.get(normalizedPath)
       if (existing) clearTimeout(existing)
 
-      fileWatchDebounceTimers.set(filePath, setTimeout(() => {
-        fileWatchDebounceTimers.delete(filePath)
+      fileWatchDebounceTimers.set(normalizedPath, setTimeout(() => {
+        fileWatchDebounceTimers.delete(normalizedPath)
 
         // After rename, the file may have a new inode - check it still exists
-        if (!existsSync(filePath)) return
+        if (!existsSync(normalizedPath)) return
 
         if (watcherWindow && !watcherWindow.isDestroyed()) {
-          watcherWindow.webContents.send('artifact:file-changed', { filePath })
+          watcherWindow.webContents.send('artifact:file-changed', { filePath: normalizedPath })
         }
 
         // After rename event, re-establish watcher (inode may have changed)
         if (eventType === 'rename') {
-          unwatchFile(filePath)
-          watchFile(filePath)
+          unwatchFile(normalizedPath)
+          watchFile(normalizedPath)
         }
       }, 300))
     })
 
     watcher.on('error', (err) => {
-      console.error(`[Artifact] File watcher error for ${filePath}:`, err)
-      unwatchFile(filePath)
+      console.error(`[Artifact] File watcher error for ${normalizedPath}:`, err)
+      unwatchFile(normalizedPath)
     })
 
-    fileWatchers.set(filePath, watcher)
-    console.log(`[Artifact] Watching file: ${filePath}`)
+    fileWatchers.set(normalizedPath, watcher)
+    console.log(`[Artifact] Watching file: ${normalizedPath}`)
   } catch (err) {
-    console.error(`[Artifact] Failed to watch file ${filePath}:`, err)
+    console.error(`[Artifact] Failed to watch file ${normalizedPath}:`, err)
   }
 }
 
@@ -301,16 +304,17 @@ export function watchFile(filePath: string): void {
  * Stop watching a single file
  */
 export function unwatchFile(filePath: string): void {
-  const watcher = fileWatchers.get(filePath)
+  const normalizedPath = normalizeLocalFilePath(filePath)
+  const watcher = fileWatchers.get(normalizedPath)
   if (watcher) {
     watcher.close()
-    fileWatchers.delete(filePath)
-    const timer = fileWatchDebounceTimers.get(filePath)
+    fileWatchers.delete(normalizedPath)
+    const timer = fileWatchDebounceTimers.get(normalizedPath)
     if (timer) {
       clearTimeout(timer)
-      fileWatchDebounceTimers.delete(filePath)
+      fileWatchDebounceTimers.delete(normalizedPath)
     }
-    console.log(`[Artifact] Unwatched file: ${filePath}`)
+    console.log(`[Artifact] Unwatched file: ${normalizedPath}`)
   }
 }
 
@@ -503,18 +507,19 @@ export interface ArtifactContent {
 }
 
 export function readArtifactContent(filePath: string): ArtifactContent {
-  console.log(`[Artifact] Reading content: ${filePath}`)
+  const normalizedPath = normalizeLocalFilePath(filePath)
+  console.log(`[Artifact] Reading content: ${normalizedPath}`)
 
-  if (!existsSync(filePath)) {
-    throw new Error(`File not found: ${filePath}`)
+  if (!existsSync(normalizedPath)) {
+    throw new Error(`File not found: ${normalizedPath}`)
   }
 
-  const stats = statSync(filePath)
+  const stats = statSync(normalizedPath)
   if (stats.isDirectory()) {
-    throw new Error(`Cannot read directory content: ${filePath}`)
+    throw new Error(`Cannot read directory content: ${normalizedPath}`)
   }
 
-  const ext = extname(filePath)
+  const ext = extname(normalizedPath)
   const mimeType = getMimeType(ext)
 
   // Check file size limit (10MB for text, 50MB for binary)
@@ -530,7 +535,7 @@ export function readArtifactContent(filePath: string): ArtifactContent {
   try {
     if (isBinary) {
       // Read as base64 for binary files
-      const buffer = readFileSync(filePath)
+      const buffer = readFileSync(normalizedPath)
       return {
         content: buffer.toString('base64'),
         mimeType,
@@ -539,7 +544,7 @@ export function readArtifactContent(filePath: string): ArtifactContent {
       }
     } else {
       // Read as UTF-8 for text files
-      const content = readFileSync(filePath, 'utf-8')
+      const content = readFileSync(normalizedPath, 'utf-8')
       return {
         content,
         mimeType,
@@ -548,7 +553,7 @@ export function readArtifactContent(filePath: string): ArtifactContent {
       }
     }
   } catch (error) {
-    console.error(`[Artifact] Failed to read file: ${filePath}`, error)
+    console.error(`[Artifact] Failed to read file: ${normalizedPath}`, error)
     throw new Error(`Failed to read file: ${(error as Error).message}`)
   }
 }
@@ -562,16 +567,18 @@ export function getArtifactDownloadInfo(filePath: string): {
   size: number
   mimeType: string
 } | null {
-  if (!existsSync(filePath)) {
+  const normalizedPath = normalizeLocalFilePath(filePath)
+
+  if (!existsSync(normalizedPath)) {
     return null
   }
 
   try {
-    const stats = statSync(filePath)
-    const ext = extname(filePath)
+    const stats = statSync(normalizedPath)
+    const ext = extname(normalizedPath)
     return {
       exists: true,
-      name: basename(filePath),
+      name: basename(normalizedPath),
       size: stats.size,
       mimeType: getMimeType(ext)
     }

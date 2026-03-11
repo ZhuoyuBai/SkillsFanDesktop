@@ -2,7 +2,13 @@ import { writeFileSync } from 'fs'
 import { BrowserWindow } from 'electron'
 import { z } from 'zod'
 import { createSdkMcpServer, tool } from '@anthropic-ai/claude-agent-sdk'
+import { recordToolExecutionStep } from '../../../gateway/host-runtime/step-reporter/tool-reporting'
 import { browserViewManager } from '../browser-view.service'
+
+interface BrowserMcpServerOptions {
+  spaceId?: string
+  conversationId?: string
+}
 
 type ManagedViewState = {
   id: string
@@ -167,6 +173,182 @@ function dataUrlToImagePayload(dataUrl: string): { data: string; mimeType: strin
   return {
     mimeType: match[1],
     data: match[2]
+  }
+}
+
+export async function captureAutomatedBrowserSnapshot(args?: {
+  verbose?: boolean
+  filePath?: string
+}): Promise<{
+  backend: 'automated'
+  title: string
+  url: string
+  text: string
+  elementCount: number
+  filePath?: string
+}> {
+  const viewId = getRequiredActiveViewId()
+  const verbose = Boolean(args?.verbose)
+  const payload = await executeInView<{
+    title: string
+    url: string
+    bodyText: string
+    elements: Array<{
+      selector: string
+      tag: string
+      role: string
+      text: string
+      placeholder: string
+      type: string
+    }>
+  }>(
+    viewId,
+    `(() => {
+      const selector = [
+        'a[href]',
+        'button',
+        'input',
+        'textarea',
+        'select',
+        '[role="button"]',
+        '[role="link"]',
+        '[role="textbox"]',
+        '[contenteditable="true"]',
+        '[tabindex]:not([tabindex="-1"])'
+      ].join(',')
+      const limit = ${verbose ? 300 : 120}
+      const textLimit = ${verbose ? 6000 : 2500}
+      const isVisible = (el) => {
+        const style = window.getComputedStyle(el)
+        const rect = el.getBoundingClientRect()
+        return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0
+      }
+      const cssPath = (element) => {
+        const parts = []
+        let current = element
+        while (current && current.nodeType === Node.ELEMENT_NODE && current.tagName.toLowerCase() !== 'html') {
+          let part = current.tagName.toLowerCase()
+          if (current.id) {
+            part += '#' + CSS.escape(current.id)
+            parts.unshift(part)
+            break
+          }
+          let sibling = current
+          let index = 1
+          while ((sibling = sibling.previousElementSibling)) {
+            if (sibling.tagName === current.tagName) index += 1
+          }
+          part += ':nth-of-type(' + index + ')'
+          parts.unshift(part)
+          current = current.parentElement
+        }
+        return parts.join(' > ')
+      }
+      const normalize = (value) => (value || '').replace(/\\s+/g, ' ').trim()
+      const elements = Array.from(document.querySelectorAll(selector))
+        .filter(isVisible)
+        .slice(0, limit)
+        .map((el) => ({
+          selector: cssPath(el),
+          tag: el.tagName.toLowerCase(),
+          role: el.getAttribute('role') || '',
+          text: normalize(el.innerText || el.textContent || '').slice(0, 160),
+          placeholder: 'placeholder' in el ? normalize(el.placeholder || '').slice(0, 120) : '',
+          type: 'type' in el ? normalize(el.type || '').slice(0, 40) : ''
+        }))
+      return {
+        title: document.title,
+        url: location.href,
+        bodyText: normalize(document.body ? document.body.innerText : '').slice(0, textLimit),
+        elements
+      }
+    })()`
+  )
+
+  const elementMap = new Map<string, SnapshotElement>()
+  const formattedElements = payload.elements.map((element, index) => {
+    const uid = `e${index + 1}`
+    const snapshotElement: SnapshotElement = { uid, ...element }
+    elementMap.set(uid, snapshotElement)
+    return snapshotElement
+  })
+
+  snapshotCache.set(viewId, elementMap)
+
+  const text = formatSnapshot({
+    title: payload.title,
+    url: payload.url,
+    bodyText: payload.bodyText,
+    elements: formattedElements
+  })
+
+  if (args?.filePath) {
+    writeFileSync(args.filePath, text, 'utf-8')
+  }
+
+  return {
+    backend: 'automated',
+    title: payload.title,
+    url: payload.url,
+    text,
+    elementCount: formattedElements.length,
+    filePath: args?.filePath
+  }
+}
+
+export async function captureAutomatedBrowserScreenshot(args?: {
+  uid?: string
+  filePath?: string
+}): Promise<{
+  backend: 'automated'
+  mimeType: string
+  data: string
+  filePath?: string
+}> {
+  const viewId = getRequiredActiveViewId()
+  let dataUrl: string | null
+
+  if (args?.uid) {
+    const element = getSnapshotElement(viewId, args.uid)
+    const selector = JSON.stringify(element.selector)
+    const rect = await executeInView<{ x: number; y: number; width: number; height: number } | null>(
+      viewId,
+      `(() => {
+        const el = document.querySelector(${selector})
+        if (!el) return null
+        const rect = el.getBoundingClientRect()
+        return {
+          x: Math.max(0, Math.floor(rect.x)),
+          y: Math.max(0, Math.floor(rect.y)),
+          width: Math.max(1, Math.ceil(rect.width)),
+          height: Math.max(1, Math.ceil(rect.height))
+        }
+      })()`
+    )
+
+    if (!rect) {
+      throw new Error(`Element ${args.uid} not found for screenshot.`)
+    }
+
+    dataUrl = await browserViewManager.capture(viewId, rect)
+  } else {
+    dataUrl = await browserViewManager.capture(viewId)
+  }
+
+  if (!dataUrl) {
+    throw new Error('Failed to capture screenshot.')
+  }
+
+  const imagePayload = dataUrlToImagePayload(dataUrl)
+  if (args?.filePath) {
+    writeFileSync(args.filePath, Buffer.from(imagePayload.data, 'base64'))
+  }
+
+  return {
+    backend: 'automated',
+    mimeType: imagePayload.mimeType,
+    data: imagePayload.data,
+    filePath: args?.filePath
   }
 }
 
@@ -371,110 +553,19 @@ const browser_snapshot = tool(
   },
   async (args) => {
     try {
-      const viewId = getRequiredActiveViewId()
-      const verbose = Boolean(args.verbose)
-      const payload = await executeInView<{
-        title: string
-        url: string
-        bodyText: string
-        elements: Array<{
-          selector: string
-          tag: string
-          role: string
-          text: string
-          placeholder: string
-          type: string
-        }>
-      }>(
-        viewId,
-        `(() => {
-          const selector = [
-            'a[href]',
-            'button',
-            'input',
-            'textarea',
-            'select',
-            '[role="button"]',
-            '[role="link"]',
-            '[role="textbox"]',
-            '[contenteditable="true"]',
-            '[tabindex]:not([tabindex="-1"])'
-          ].join(',')
-          const limit = ${verbose ? 300 : 120}
-          const textLimit = ${verbose ? 6000 : 2500}
-          const isVisible = (el) => {
-            const style = window.getComputedStyle(el)
-            const rect = el.getBoundingClientRect()
-            return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0
-          }
-          const cssPath = (element) => {
-            const parts = []
-            let current = element
-            while (current && current.nodeType === Node.ELEMENT_NODE && current.tagName.toLowerCase() !== 'html') {
-              let part = current.tagName.toLowerCase()
-              if (current.id) {
-                part += '#' + CSS.escape(current.id)
-                parts.unshift(part)
-                break
-              }
-              let sibling = current
-              let index = 1
-              while ((sibling = sibling.previousElementSibling)) {
-                if (sibling.tagName === current.tagName) index += 1
-              }
-              part += ':nth-of-type(' + index + ')'
-              parts.unshift(part)
-              current = current.parentElement
-            }
-            return parts.join(' > ')
-          }
-          const normalize = (value) => (value || '').replace(/\\s+/g, ' ').trim()
-          const elements = Array.from(document.querySelectorAll(selector))
-            .filter(isVisible)
-            .slice(0, limit)
-            .map((el) => ({
-              selector: cssPath(el),
-              tag: el.tagName.toLowerCase(),
-              role: el.getAttribute('role') || '',
-              text: normalize(el.innerText || el.textContent || '').slice(0, 160),
-              placeholder: 'placeholder' in el ? normalize(el.placeholder || '').slice(0, 120) : '',
-              type: 'type' in el ? normalize(el.type || '').slice(0, 40) : ''
-            }))
-          return {
-            title: document.title,
-            url: location.href,
-            bodyText: normalize(document.body ? document.body.innerText : '').slice(0, textLimit),
-            elements
-          }
-        })()`
-      )
-
-      const elementMap = new Map<string, SnapshotElement>()
-      const formattedElements = payload.elements.map((element, index) => {
-        const uid = `e${index + 1}`
-        const snapshotElement: SnapshotElement = { uid, ...element }
-        elementMap.set(uid, snapshotElement)
-        return snapshotElement
+      const result = await captureAutomatedBrowserSnapshot({
+        verbose: args.verbose,
+        filePath: args.filePath
       })
 
-      snapshotCache.set(viewId, elementMap)
-
-      const formatted = formatSnapshot({
-        title: payload.title,
-        url: payload.url,
-        bodyText: payload.bodyText,
-        elements: formattedElements
-      })
-
-      if (args.filePath) {
-        writeFileSync(args.filePath, formatted, 'utf-8')
+      if (result.filePath) {
         return {
-          content: [{ type: 'text' as const, text: `Snapshot saved to: ${args.filePath}` }]
+          content: [{ type: 'text' as const, text: `Snapshot saved to: ${result.filePath}` }]
         }
       }
 
       return {
-        content: [{ type: 'text' as const, text: formatted }]
+        content: [{ type: 'text' as const, text: result.text }]
       }
     } catch (error) {
       return {
@@ -597,59 +688,24 @@ const browser_screenshot = tool(
   },
   async (args) => {
     try {
-      const viewId = getRequiredActiveViewId()
-      let dataUrl: string | null
+      const result = await captureAutomatedBrowserScreenshot({
+        uid: args.uid,
+        filePath: args.filePath
+      })
 
-      if (args.uid) {
-        const element = getSnapshotElement(viewId, args.uid)
-        const selector = JSON.stringify(element.selector)
-        const rect = await executeInView<{ x: number; y: number; width: number; height: number } | null>(
-          viewId,
-          `(() => {
-            const el = document.querySelector(${selector})
-            if (!el) return null
-            const rect = el.getBoundingClientRect()
-            return {
-              x: Math.max(0, Math.floor(rect.x)),
-              y: Math.max(0, Math.floor(rect.y)),
-              width: Math.max(1, Math.ceil(rect.width)),
-              height: Math.max(1, Math.ceil(rect.height))
-            }
-          })()`
-        )
-
-        if (!rect) {
-          return {
-            content: [{ type: 'text' as const, text: `Element ${args.uid} not found for screenshot.` }],
-            isError: true
-          }
-        }
-
-        dataUrl = await browserViewManager.capture(viewId, rect)
-      } else {
-        dataUrl = await browserViewManager.capture(viewId)
-      }
-
-      if (!dataUrl) {
+      if (result.filePath) {
         return {
-          content: [{ type: 'text' as const, text: 'Failed to capture screenshot.' }],
-          isError: true
-        }
-      }
-
-      const imagePayload = dataUrlToImagePayload(dataUrl)
-
-      if (args.filePath) {
-        writeFileSync(args.filePath, Buffer.from(imagePayload.data, 'base64'))
-        return {
-          content: [{ type: 'text' as const, text: `Screenshot saved to: ${args.filePath}` }]
+          content: [
+            { type: 'text' as const, text: `Screenshot saved to: ${result.filePath}` },
+            { type: 'image' as const, data: result.data, mimeType: result.mimeType }
+          ]
         }
       }
 
       return {
         content: [
           { type: 'text' as const, text: `Screenshot captured${args.uid ? ` for ${args.uid}` : ''}` },
-          { type: 'image' as const, data: imagePayload.data, mimeType: imagePayload.mimeType }
+          { type: 'image' as const, data: result.data!, mimeType: result.mimeType }
         ]
       }
     } catch (error) {
@@ -674,10 +730,55 @@ const automatedBrowserTools = [
   browser_screenshot
 ]
 
-export function createAutomatedBrowserMcpServer() {
+const instrumentedAutomatedBrowserTools = automatedBrowserTools.map((toolDefinition) => ({
+  ...toolDefinition
+}))
+
+export function createAutomatedBrowserMcpServer(options: BrowserMcpServerOptions = {}) {
+  const tools = instrumentedAutomatedBrowserTools.map((toolDefinition) => ({
+    ...toolDefinition,
+    handler: async (args: unknown, extra?: unknown) => {
+      try {
+        const result = await toolDefinition.handler(args, extra)
+        recordToolExecutionStep({
+          defaultTaskId: options.conversationId || 'browser:automated',
+          defaultSpaceId: options.spaceId,
+          defaultConversationId: options.conversationId,
+          extra,
+          category: 'browser',
+          action: toolDefinition.name,
+          toolArgs: args,
+          result,
+          metadata: { backend: 'automated' }
+        })
+        return result
+      } catch (error) {
+        recordToolExecutionStep({
+          defaultTaskId: options.conversationId || 'browser:automated',
+          defaultSpaceId: options.spaceId,
+          defaultConversationId: options.conversationId,
+          extra,
+          category: 'browser',
+          action: toolDefinition.name,
+          toolArgs: args,
+          result: {
+            content: [{ type: 'text' as const, text: (error as Error).message }],
+            isError: true
+          },
+          metadata: { backend: 'automated', thrown: true }
+        })
+        throw error
+      }
+    }
+  }))
+
   return createSdkMcpServer({
     name: 'ai-browser',
     version: '1.0.0',
-    tools: automatedBrowserTools
+    tools
   })
+}
+
+export function getAutomatedBrowserToolNames(): string[] {
+  return instrumentedAutomatedBrowserTools.map((tool) => tool.name)
 }

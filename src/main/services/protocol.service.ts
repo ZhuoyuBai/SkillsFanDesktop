@@ -2,11 +2,11 @@
  * Protocol Service - Custom protocol registration
  *
  * Provides:
- * 1. skillsfan-file:// - Proxy to file:// for secure local resource access
+ * 1. halo-file:// - Proxy to file:// for secure local resource access
  * 2. skillsfan:// - Deep link protocol for OAuth callbacks
  *
  * Usage:
- * - Files: <img src="skillsfan-file:///path/to/image.png">
+ * - Files: <img src="halo-file:///path/to/image.png">
  * - OAuth: skillsfan://auth/callback?code=xxx&state=yyy
  *
  * Security: Only file:// URLs are allowed for halo-file, no remote URLs pass through.
@@ -60,14 +60,17 @@ function ensureDevProtocolOnMac(): void {
  * Must be called after app.whenReady()
  */
 export function registerProtocols(): void {
-  // skillsfan-file:// - Proxy to file:// for local resources
+  // halo-file:// - Proxy to file:// for local resources
   // Chromium blocks file:// from localhost/app origins, this bypasses that
   protocol.handle('halo-file', (request) => {
-    const filePath = decodeURIComponent(request.url.replace('skillsfan-file://', ''))
-    return net.fetch(`file://${filePath}`)
+    const proxiedUrl = new URL(request.url)
+    proxiedUrl.protocol = 'file:'
+    proxiedUrl.search = ''
+    proxiedUrl.hash = ''
+    return net.fetch(proxiedUrl.toString())
   })
 
-  console.log('[Protocol] Registered skillsfan-file:// protocol')
+  console.log('[Protocol] Registered halo-file:// protocol')
 
   // In dev mode on macOS, patch Info.plist so setAsDefaultProtocolClient works
   ensureDevProtocolOnMac()

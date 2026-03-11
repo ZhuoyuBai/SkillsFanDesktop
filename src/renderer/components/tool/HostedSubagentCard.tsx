@@ -84,7 +84,7 @@ export const HostedSubagentCard = memo(function HostedSubagentCard({
         {/* Expand chevron */}
         {hasResult && (
           <ChevronRight
-            size={10}
+            size={12}
             className={`flex-shrink-0 text-muted-foreground transition-transform ${isExpanded ? 'rotate-90' : ''}`}
           />
         )}

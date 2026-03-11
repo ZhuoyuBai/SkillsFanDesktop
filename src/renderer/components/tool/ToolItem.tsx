@@ -259,7 +259,7 @@ export const ToolItem = memo(function ToolItem({
         {/* Expand chevron (only when expandable) */}
         {expandable ? (
           <ChevronRight
-            size={10}
+            size={12}
             className={`flex-shrink-0 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
           />
         ) : (

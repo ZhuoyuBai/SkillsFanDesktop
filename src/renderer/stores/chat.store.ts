@@ -21,7 +21,7 @@
 
 import { create } from 'zustand'
 import { api } from '../api'
-import type { Conversation, ConversationMeta, Message, ToolCall, Artifact, Thought, AgentEventBase, ImageAttachment, Attachment, CompactInfo, CanvasContext, TextSegment } from '../types'
+import type { Conversation, ConversationMeta, Message, ToolCall, Artifact, Thought, AgentEventBase, ImageAttachment, Attachment, CompactInfo, CanvasContext, TextSegment, HostStep } from '../types'
 import { hasAnyAISource } from '../types'
 import { canvasLifecycle } from '../services/canvas-lifecycle'
 import { useAppStore } from './app.store'
@@ -36,6 +36,7 @@ import {
 
 // LRU cache size limit
 const CONVERSATION_CACHE_SIZE = 10
+const MAX_SESSION_HOST_STEPS = 24
 
 // Selection type for switching between conversations and loop tasks
 export type SelectionType = 'conversation' | 'loopTask'
@@ -87,6 +88,8 @@ interface SessionState {
   taskProgressMap: Map<string, TaskProgress>
   // Hosted subagent runtime runs (from agent:subagent-update events)
   subagentRunMap: Map<string, SubagentRunEntry>
+  // Host/browser/desktop activity for the current or latest run
+  hostSteps: HostStep[]
 }
 
 // Sub-agent step history entry
@@ -178,7 +181,8 @@ function createEmptySessionState(): SessionState {
     draftContent: '',
     sdkStatus: null,
     taskProgressMap: new Map(),
-    subagentRunMap: new Map()
+    subagentRunMap: new Map(),
+    hostSteps: []
   }
 }
 
@@ -194,6 +198,24 @@ function createEmptySpaceState(): SpaceState {
 function shouldHideSdkStatus(message?: string | null): boolean {
   if (!message) return false
   return shouldSuppressSetModelStatus(message)
+}
+
+function normalizeHostSteps(steps: HostStep[]): HostStep[] {
+  const seen = new Set<string>()
+  const normalized = [...steps]
+    .sort((left, right) => left.timestamp - right.timestamp)
+    .filter((step) => {
+      const key = step.stepId || `${step.timestamp}:${step.action}`
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+
+  return normalized.slice(-MAX_SESSION_HOST_STEPS)
+}
+
+function appendHostStep(existing: HostStep[], nextStep: HostStep): HostStep[] {
+  return normalizeHostSteps([...existing, nextStep])
 }
 
 interface ChatState {
@@ -292,6 +314,7 @@ interface ChatState {
     usage?: { total_tokens: number; tool_uses: number; duration_ms: number }
   }) => void
   handleAgentSubagentUpdate: (data: AgentEventBase & SubagentRunEntry) => void
+  handleAgentHostStep: (data: AgentEventBase & HostStep) => void
   killSubagentRun: (runId: string) => Promise<void>
   answerUserQuestion: (conversationId: string, answers: Record<string, string>) => Promise<void>
 
@@ -564,6 +587,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           thoughts: Thought[]
           taskProgress?: TaskProgress[]
           subagentRuns?: SubagentRunEntry[]
+          hostSteps?: HostStep[]
           spaceId?: string
         }
         const recoveredTaskProgress = new Map(
@@ -572,17 +596,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
         const recoveredSubagentRuns = new Map(
           (sessionState.subagentRuns || []).map(run => [run.runId, run])
         )
+        const recoveredHostSteps = normalizeHostSteps(sessionState.hostSteps || [])
 
         if (
           sessionState.isActive
           || sessionState.thoughts.length > 0
           || recoveredTaskProgress.size > 0
           || recoveredSubagentRuns.size > 0
+          || recoveredHostSteps.length > 0
         ) {
           logger.debug(
             `[ChatStore] Recovering session for conversation ${conversationId}: ` +
             `${sessionState.thoughts.length} thoughts, ${recoveredTaskProgress.size} tasks, ` +
-            `${recoveredSubagentRuns.size} hosted subagents`
+            `${recoveredSubagentRuns.size} hosted subagents, ${recoveredHostSteps.length} host steps`
           )
 
           set((state) => {
@@ -595,7 +621,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
               isThinking: sessionState.isActive,
               thoughts: sessionState.thoughts,
               taskProgressMap: recoveredTaskProgress,
-              subagentRunMap: recoveredSubagentRuns
+              subagentRunMap: recoveredSubagentRuns,
+              hostSteps: recoveredHostSteps
             })
 
             return { sessions: newSessions }
@@ -1225,7 +1252,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
         compactInfo: null,
         sdkStatus: null,
         textSegments: [],
-        lastSegmentIndex: 0
+        lastSegmentIndex: 0,
+        hostSteps: []
       })
       return { sessions: newSessions }
     })
@@ -1659,6 +1687,22 @@ export const useChatStore = create<ChatState>((set, get) => ({
         ...session,
         subagentRunMap: nextRuns
       })
+      return { sessions: newSessions }
+    })
+  },
+
+  handleAgentHostStep: (data) => {
+    const { conversationId, ...step } = data
+
+    set((state) => {
+      const newSessions = new Map(state.sessions)
+      const session = newSessions.get(conversationId) || createEmptySessionState()
+
+      newSessions.set(conversationId, {
+        ...session,
+        hostSteps: appendHostStep(session.hostSteps, step as HostStep)
+      })
+
       return { sessions: newSessions }
     })
   },

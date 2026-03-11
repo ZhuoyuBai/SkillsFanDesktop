@@ -11,6 +11,7 @@
 
 import fs from 'node:fs/promises'
 import { BrowserWindow } from 'electron'
+import { hostRuntime } from '../../../gateway/host-runtime'
 import { getConfig } from '../config.service'
 import { getConversation, saveSessionId, addMessage, updateLastMessage } from '../conversation.service'
 import {
@@ -269,6 +270,8 @@ async function sendMessageInternal(
   const shouldPersistConversation = !ralphMode?.enabled
   const shouldPersistUserMessage = shouldPersistConversation && internalMessage?.persistUserMessage !== false
   const shouldCreateAssistantPlaceholder = shouldPersistConversation && assistantPersistMode === 'update_last'
+
+  hostRuntime.stepReporter.clearTask(conversationId)
 
   // Notify frontend that this queued message is now actually executing
   sendToRenderer('agent:start', spaceId, conversationId, {})

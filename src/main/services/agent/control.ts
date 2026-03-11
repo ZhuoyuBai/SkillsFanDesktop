@@ -10,11 +10,13 @@
  */
 
 import { BrowserWindow } from 'electron'
+import { stepReporterRuntime } from '../../../gateway/host-runtime/step-reporter/runtime'
 import { activeSessions, v2Sessions } from './session-manager'
 import { getConversation, updateLastMessage } from '../conversation.service'
 import { sendMessage } from './send-message'
 import { agentQueue } from './lane-queue'
 import type { Thought, Attachment, ImageAttachment } from './types'
+import type { HostStep } from '../../../shared/types/host-runtime'
 import {
   killSubagentRun,
   listSubagentRunsForConversation,
@@ -323,12 +325,14 @@ export function getSessionState(conversationId: string): {
     toolUseId?: string
     durationMs?: number
   }>
+  hostSteps: HostStep[]
   spaceId?: string
 } {
   const session = activeSessions.get(conversationId)
   const subagentRuns = listSubagentRunsForConversation(conversationId)
+  const hostSteps = stepReporterRuntime.listSteps(conversationId)
   if (!session) {
-    return { isActive: false, thoughts: [], taskProgress: [], subagentRuns }
+    return { isActive: false, thoughts: [], taskProgress: [], subagentRuns, hostSteps }
   }
   return {
     isActive: true,
@@ -338,6 +342,7 @@ export function getSessionState(conversationId: string): {
       stepHistory: [...task.stepHistory]
     })),
     subagentRuns,
+    hostSteps,
     spaceId: session.spaceId
   }
 }

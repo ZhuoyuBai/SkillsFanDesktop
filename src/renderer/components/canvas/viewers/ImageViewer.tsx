@@ -29,18 +29,50 @@ export function ImageViewer({ tab }: ImageViewerProps) {
   const [imageLoaded, setImageLoaded] = useState(false)
   const [imageError, setImageError] = useState(false)
   const [naturalSize, setNaturalSize] = useState({ width: 0, height: 0 })
+  const [localObjectUrl, setLocalObjectUrl] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!tab.content) {
+      setLocalObjectUrl(null)
+      return
+    }
+
+    try {
+      const binary = atob(tab.content)
+      const bytes = new Uint8Array(binary.length)
+      for (let index = 0; index < binary.length; index += 1) {
+        bytes[index] = binary.charCodeAt(index)
+      }
+
+      const objectUrl = URL.createObjectURL(new Blob([bytes], {
+        type: tab.mimeType || 'image/png'
+      }))
+      setLocalObjectUrl(objectUrl)
+
+      return () => {
+        URL.revokeObjectURL(objectUrl)
+      }
+    } catch (error) {
+      console.error('Failed to build local image preview URL:', error)
+      setLocalObjectUrl(null)
+      return
+    }
+  }, [tab.id, tab.content, tab.mimeType, tab.lastModified])
 
   // Get image URL
-  // Priority: halo-file:// (custom protocol, fast) > remote download > base64 fallback
+  // Priority:
+  // 1. Remote download URL in remote mode
+  // 2. Local blob URL built from base64 content
+  // 3. halo-file:// fallback for legacy tabs that only have a path
   // Append lastModified timestamp to bust browser cache when file changes
   const cacheBuster = tab.lastModified ? `?t=${tab.lastModified}` : ''
-  const imageUrl = tab.path
-    ? (api.isRemoteMode()
-        ? api.getArtifactDownloadUrl(tab.path)
-        : `halo-file://${tab.path}${cacheBuster}`)
+  const imageUrl = api.isRemoteMode() && tab.path
+    ? api.getArtifactDownloadUrl(tab.path)
     : tab.content
-      ? `data:${tab.mimeType || 'image/png'};base64,${tab.content}`
-      : ''
+      ? (localObjectUrl || '')
+      : tab.path
+        ? `halo-file://${encodeURI(tab.path)}${cacheBuster}`
+        : ''
 
   // Reset view when tab changes
   useEffect(() => {
@@ -57,6 +89,12 @@ export function ImageViewer({ tab }: ImageViewerProps) {
       setImageError(false)
     }
   }, [tab.lastModified])
+
+  useEffect(() => {
+    if (localObjectUrl) {
+      setImageError(false)
+    }
+  }, [localObjectUrl])
 
   // Zoom functions
   const zoomIn = () => setScale(s => Math.min(s * 1.25, 5))
@@ -218,7 +256,7 @@ export function ImageViewer({ tab }: ImageViewerProps) {
             <p className="text-lg mb-2">{t('Unable to load image')}</p>
             <p className="text-sm">{t('File may have been moved or deleted')}</p>
           </div>
-        ) : (
+        ) : imageUrl ? (
           <img
             src={imageUrl}
             alt={tab.title}
@@ -231,7 +269,7 @@ export function ImageViewer({ tab }: ImageViewerProps) {
             onError={handleImageError}
             draggable={false}
           />
-        )}
+        ) : null}
 
         {/* Loading indicator */}
         {!imageLoaded && !imageError && (

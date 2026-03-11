@@ -47,7 +47,7 @@ export type {
 // ============================================
 
 // Send message to agent
-export { sendMessage } from './send-message'
+export { sendMessage } from '../../../gateway/runtime/orchestrator'
 
 // Generation control
 export {
@@ -63,11 +63,9 @@ export {
 // ============================================
 
 export {
-  ensureSessionWarm,
-  closeV2Session,
-  closeAllV2Sessions,
-  invalidateAllSessions
-} from './session-manager'
+  ensureSessionWarm
+} from '../../../gateway/runtime/orchestrator'
+export { closeV2Session, closeAllV2Sessions, invalidateAllSessions } from './session-manager'
 
 // ============================================
 // Permission Handling

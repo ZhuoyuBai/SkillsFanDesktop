@@ -88,7 +88,7 @@ const ThinkingItem = memo(function ThinkingItem({
           text-muted-foreground cursor-pointer hover:text-foreground/70 transition-colors"
       >
         <ChevronRight
-          size={10}
+          size={12}
           className={`flex-shrink-0 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
         />
         <span className="truncate">{t('Thinking')}</span>
@@ -477,7 +477,7 @@ export function LinearStream({
   }
 
   return (
-    <div className="px-0 py-1 w-full overflow-y-hidden overflow-x-auto text-left text-[13px]">
+    <div className="px-3 py-1 w-full overflow-y-hidden overflow-x-auto text-left text-[13px]">
       {/* Pre-step items (tools before first TodoWrite), skip skill badges */}
       {todoGrouping.hasTodos && todoGrouping.preStepItems.length > 0 && (() => {
         const counter = { value: 0 }
@@ -516,7 +516,7 @@ export function LinearStream({
       {/* Waiting indicator - CLI style */}
       {isThinking && !isStreaming && !currentText.trim() && (
         <div className="py-1 flex flex-col gap-0.5">
-          <div className="flex items-center gap-2 text-[13px] text-muted-foreground">
+          <div className="flex items-center gap-2.5 text-[13px] text-muted-foreground">
             <Loader2 size={12} className="animate-spin text-orange-400" />
             <span>{t('chat.thinking').replace(/\.{3}$/, '')}<span className="thinking-dots"><span className="dot">.</span><span className="dot">.</span><span className="dot">.</span></span></span>
           </div>

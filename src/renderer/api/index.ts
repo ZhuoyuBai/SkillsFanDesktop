@@ -502,6 +502,24 @@ export const api = {
     return httpRequest('GET', `/api/agent/session/${conversationId}`)
   },
 
+  getHostStatus: async (): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.skillsfan.getHostStatus()
+    }
+    return {
+      success: true,
+      data: {
+        platform: 'unknown',
+        browser: { state: 'unsupported', backend: 'automated', toolCount: 0 },
+        desktop: { state: 'unsupported' },
+        permissions: {
+          accessibility: { state: 'unsupported' },
+          screenRecording: { state: 'unsupported' }
+        }
+      }
+    }
+  },
+
   // Warm up V2 session - call when switching conversations to prepare for faster message sending
   ensureSessionWarm: async (spaceId: string, conversationId: string): Promise<ApiResponse> => {
     if (isElectron()) {
@@ -938,6 +956,8 @@ export const api = {
     onEvent('agent:task-update', callback),
   onAgentSubagentUpdate: (callback: (data: unknown) => void) =>
     onEvent('agent:subagent-update', callback),
+  onAgentHostStep: (callback: (data: unknown) => void) =>
+    onEvent('agent:host-step', callback),
   onRemoteStatusChange: (callback: (data: unknown) => void) =>
     onEvent('remote:status-change', callback),
 

@@ -94,7 +94,7 @@ export const AgentTaskCard = memo(function AgentTaskCard({
         {/* Expand chevron */}
         {hasContent && (
           <ChevronRight
-            size={10}
+            size={12}
             className={`flex-shrink-0 text-muted-foreground transition-transform ${isExpanded ? 'rotate-90' : ''}`}
           />
         )}

@@ -9,6 +9,7 @@
 import { existsSync, readdirSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { ensureOpenAICompatRouter, encodeBackendConfig } from '../../openai-compat-router'
+import { hostRuntime } from '../../../gateway/host-runtime'
 import { AI_BROWSER_SYSTEM_PROMPT } from '../ai-browser/prompt'
 import { createSkillMcpServer } from '../skill'
 import { createCanUseTool } from './permission-handler'
@@ -197,8 +198,10 @@ export async function buildSdkOptions(params: BuildSdkOptionsParams): Promise<{
   addedMcpServers.push('web-tools')
 
   if (effectiveAiBrowserEnabled) {
-    const { createAutomatedBrowserMcpServer } = await import('../automated-browser/sdk-mcp-server')
-    mcpServers['ai-browser'] = createAutomatedBrowserMcpServer()
+    mcpServers['ai-browser'] = hostRuntime.browser.createMcpServer('automated', {
+      spaceId,
+      conversationId
+    })
     addedMcpServers.push('ai-browser')
   }
 

@@ -28,7 +28,7 @@ import { MarkdownRenderer } from './MarkdownRenderer'
 import { FileChangesFooter } from '../diff'
 import { MessageAttachments } from './AttachmentPreview'
 import { HaloLogo } from '../brand/HaloLogo'
-import type { Message, Thought } from '../../types'
+import type { ImageAttachment, Message, Thought } from '../../types'
 import { useTranslation } from '../../i18n'
 import {
   getLatestVisibleActiveToolUseIds,
@@ -41,6 +41,66 @@ interface MessageItemProps {
   isInContainer?: boolean
   isWorking?: boolean  // True when AI is still generating (not yet complete)
   isWaitingMore?: boolean  // True when content paused (e.g., during tool call), show "..." animation
+}
+
+function getBaseName(path: string): string {
+  const normalized = path.replace(/\\/g, '/')
+  const parts = normalized.split('/')
+  return parts[parts.length - 1] || path
+}
+
+function extractImageAttachmentsFromThoughts(thoughts: Thought[] | undefined): ImageAttachment[] {
+  if (!thoughts || thoughts.length === 0) {
+    return []
+  }
+
+  const attachments: ImageAttachment[] = []
+  const seen = new Set<string>()
+
+  for (const thought of thoughts) {
+    if (thought.type !== 'tool_result' || !thought.toolOutput) continue
+
+    try {
+      const parsed = JSON.parse(thought.toolOutput) as Array<{
+        type?: string
+        source?: {
+          type?: string
+          data?: string
+          media_type?: string
+        }
+        file_path?: string
+      }>
+
+      if (!Array.isArray(parsed)) continue
+
+      for (const block of parsed) {
+        if (
+          block?.type !== 'image'
+          || block.source?.type !== 'base64'
+          || !block.source.data
+          || !block.source.media_type?.startsWith('image/')
+        ) {
+          continue
+        }
+
+        const key = `${block.source.media_type}:${block.source.data.slice(0, 64)}`
+        if (seen.has(key)) continue
+        seen.add(key)
+
+        attachments.push({
+          id: `thought-image:${thought.id}:${attachments.length}`,
+          type: 'image',
+          mediaType: block.source.media_type as ImageAttachment['mediaType'],
+          data: block.source.data,
+          name: block.file_path ? getBaseName(block.file_path) : undefined
+        })
+      }
+    } catch {
+      // Ignore non-JSON tool output.
+    }
+  }
+
+  return attachments
 }
 
 // Collapsible thought history component
@@ -192,11 +252,29 @@ export function MessageItem({ message, hideThoughts = false, isInContainer = fal
   const isStreaming = (message as any).isStreaming
   const [copied, setCopied] = useState(false)
   const { t } = useTranslation()
-  const userAttachments = useMemo(() => {
-    if (!isUser) return []
-    if (message.attachments && message.attachments.length > 0) return message.attachments
-    return message.images || []
-  }, [isUser, message.attachments, message.images])
+  const messageAttachments = useMemo(() => {
+    const explicitAttachments = message.attachments && message.attachments.length > 0
+      ? message.attachments
+      : message.images || []
+
+    const inferredThoughtImages = extractImageAttachmentsFromThoughts(message.thoughts)
+    if (inferredThoughtImages.length === 0) {
+      return explicitAttachments
+    }
+
+    const merged = [...explicitAttachments]
+    for (const attachment of inferredThoughtImages) {
+      const exists = merged.some((current) => (
+        current.type === 'image'
+        && current.data === attachment.data
+      ))
+      if (!exists) {
+        merged.unshift(attachment)
+      }
+    }
+
+    return merged
+  }, [message.attachments, message.images, message.thoughts])
 
   // Handle copying message content to clipboard
   const handleCopyMessage = useCallback(async () => {
@@ -277,7 +355,7 @@ export function MessageItem({ message, hideThoughts = false, isInContainer = fal
     || hasMessageContent
     || Boolean(isStreaming)
     || Boolean(isWaitingMore)
-    || userAttachments.length > 0
+    || messageAttachments.length > 0
 
   // Extract file paths from thoughts for clickable file links in markdown
   const filePathMap = useMemo(() => {
@@ -333,8 +411,8 @@ export function MessageItem({ message, hideThoughts = false, isInContainer = fal
       {/* Content */}
       <div className="flex-1 min-w-0">
         {/* User message attachments (displayed before text) */}
-        {isUser && userAttachments.length > 0 && (
-          <MessageAttachments attachments={userAttachments} />
+        {messageAttachments.length > 0 && (
+          <MessageAttachments attachments={messageAttachments} />
         )}
 
         {/* Message content */}

@@ -24,9 +24,12 @@ import type {
   AISourceType,
   AISourcesConfig,
   BackendRequestConfig,
+  CustomSourceConfig,
   OAuthSourceConfig,
   OAuthStartResult,
-  OAuthCompleteResult
+  OAuthCompleteResult,
+  RuntimeAuthMode,
+  RuntimeEndpoint
 } from '../../../shared/types'
 import { getConfig, saveConfig } from '../config.service'
 import { getCustomProvider } from './providers/custom.provider'
@@ -144,91 +147,173 @@ class AISourceManager {
   }
 
   /**
-   * Get backend request configuration for the current source
-   * This is the main method used by agent.service.ts
+   * Resolve a runtime-ready endpoint for the requested source.
+   * This keeps provider/model/auth/baseUrl details explicit for future runtimes
+   * without changing the current compat-router execution path.
    */
-  getBackendConfig(): BackendRequestConfig | null {
-    // Use decrypted config for providers to read tokens
+  resolveRuntimeEndpoint(sourceType?: AISourceType): RuntimeEndpoint | null {
     const aiSources = this.getDecryptedAiSources()
+    const requestedSource = sourceType || aiSources.current
 
-    // Debug logging
-    console.log('[AISourceManager] getBackendConfig called')
-    console.log('[AISourceManager] current source:', aiSources.current)
-    console.log('[AISourceManager] aiSources keys:', Object.keys(aiSources))
+    console.log('[AISourceManager] resolveRuntimeEndpoint called')
+    console.log('[AISourceManager] requested source:', requestedSource)
 
-    const provider = this.providers.get(aiSources.current)
+    const provider = this.providers.get(requestedSource)
 
     if (!provider) {
-      console.log(`[AISourceManager] No registered provider for source: ${aiSources.current}`)
+      console.log(`[AISourceManager] No registered provider for source: ${requestedSource}`)
       console.log('[AISourceManager] Available providers:', Array.from(this.providers.keys()))
 
-      // Check if current source is a dynamic custom API provider (e.g., 'zhipu', 'kimi', 'deepseek')
-      // These have 'apiKey' field but are not registered as providers
-      const currentConfig = (aiSources as Record<string, any>)[aiSources.current]
-      if (currentConfig && typeof currentConfig === 'object' && 'apiKey' in currentConfig && currentConfig.apiKey) {
-        console.log('[AISourceManager] Found dynamic custom API config for:', aiSources.current)
-        return this.getDynamicCustomBackendConfig(currentConfig)
+      const dynamicConfig = this.getDynamicCustomSourceConfig(aiSources, requestedSource)
+      if (dynamicConfig) {
+        console.log('[AISourceManager] Found dynamic custom API config for:', requestedSource)
+        return this.buildRuntimeEndpointFromCustomSourceConfig({
+          requestedSource,
+          source: requestedSource,
+          authMode: 'api-key',
+          config: dynamicConfig
+        })
       }
 
-      console.warn(`[AISourceManager] No config found for source: ${aiSources.current}`)
+      console.warn(`[AISourceManager] No runtime endpoint found for source: ${requestedSource}`)
       return null
     }
 
     console.log('[AISourceManager] Found provider:', provider.type)
 
     if (!provider.isConfigured(aiSources)) {
-      console.warn(`[AISourceManager] Provider ${aiSources.current} is not configured`)
-      // Fallback: if OAuth provider is not configured (not logged in),
-      // check for a matching custom API provider with an API key
-      return this.tryCustomApiFallback(aiSources)
+      console.warn(`[AISourceManager] Provider ${requestedSource} is not configured`)
+      return this.tryRuntimeEndpointFallback(aiSources, requestedSource)
     }
 
     console.log('[AISourceManager] Provider is configured, calling getBackendConfig')
-    const result = provider.getBackendConfig(aiSources)
-    console.log('[AISourceManager] getBackendConfig result:', result ? { url: result.url, model: result.model, hasKey: !!result.key } : null)
+    const backendConfig = provider.getBackendConfig(aiSources)
+    console.log('[AISourceManager] resolveRuntimeEndpoint backend result:', backendConfig ? { url: backendConfig.url, model: backendConfig.model, hasKey: !!backendConfig.key } : null)
 
-    if (!result) {
-      // Provider is configured but returned null (e.g., expired token)
-      // Try custom API fallback
-      return this.tryCustomApiFallback(aiSources)
+    if (!backendConfig) {
+      return this.tryRuntimeEndpointFallback(aiSources, requestedSource)
     }
 
+    return {
+      requestedSource,
+      source: requestedSource,
+      authMode: this.isOAuthProvider(provider) ? 'oauth' : 'api-key',
+      provider: this.isOAuthProvider(provider)
+        ? 'oauth'
+        : this.getProviderTransportKind(aiSources, requestedSource),
+      baseUrl: backendConfig.url,
+      apiKey: backendConfig.key,
+      model: backendConfig.model,
+      headers: backendConfig.headers,
+      apiType: backendConfig.apiType,
+      forceStream: backendConfig.forceStream
+    }
+  }
+
+  /**
+   * Get backend request configuration for the current source
+   * This is the main method used by agent.service.ts
+   */
+  getBackendConfig(): BackendRequestConfig | null {
+    console.log('[AISourceManager] getBackendConfig called')
+    const endpoint = this.resolveRuntimeEndpoint()
+
+    if (!endpoint) {
+      console.log('[AISourceManager] getBackendConfig result: null')
+      return null
+    }
+
+    const result: BackendRequestConfig = {
+      url: endpoint.baseUrl,
+      key: endpoint.apiKey,
+      model: endpoint.model,
+      headers: endpoint.headers,
+      apiType: endpoint.apiType,
+      forceStream: endpoint.forceStream
+    }
+    console.log('[AISourceManager] getBackendConfig result:', {
+      url: result.url,
+      model: result.model,
+      hasKey: !!result.key
+    })
     return result
   }
 
-  /**
-   * Get backend config for dynamic custom API providers (zhipu, kimi, deepseek, etc.)
-   * These are stored by provider ID but use the same format as CustomSourceConfig
-   */
-  private getDynamicCustomBackendConfig(config: Record<string, any>): BackendRequestConfig | null {
-    if (!config.apiKey) return null
+  private getDynamicCustomSourceConfig(
+    aiSources: AISourcesConfig,
+    sourceType: AISourceType
+  ): (CustomSourceConfig & {
+    customHeaders?: Record<string, string>
+    apiType?: 'chat_completions' | 'responses'
+  }) | null {
+    const config = (aiSources as Record<string, any>)[sourceType]
+    if (config && typeof config === 'object' && 'apiKey' in config && config.apiKey) {
+      return config as CustomSourceConfig & {
+        customHeaders?: Record<string, string>
+        apiType?: 'chat_completions' | 'responses'
+      }
+    }
+    return null
+  }
 
-    const isAnthropic = config.provider === 'anthropic'
-    const baseUrl = (config.apiUrl || 'https://api.anthropic.com').replace(/\/$/, '')
+  private buildRuntimeEndpointFromCustomSourceConfig(params: {
+    requestedSource: AISourceType
+    source: AISourceType
+    authMode: RuntimeAuthMode
+    config: CustomSourceConfig & {
+      customHeaders?: Record<string, string>
+      apiType?: 'chat_completions' | 'responses'
+    }
+  }): RuntimeEndpoint | null {
+    if (!params.config.apiKey) {
+      return null
+    }
+
+    const isAnthropic = params.config.provider === 'anthropic'
+    const baseUrl = (params.config.apiUrl || 'https://api.anthropic.com').replace(/\/$/, '')
 
     return {
-      url: baseUrl,
-      key: config.apiKey,
-      model: config.model,
-      apiType: isAnthropic ? undefined : (baseUrl.includes('/responses') ? 'responses' : 'chat_completions')
+      requestedSource: params.requestedSource,
+      source: params.source,
+      authMode: params.authMode,
+      provider: isAnthropic ? 'anthropic' : 'openai',
+      baseUrl,
+      apiKey: params.config.apiKey,
+      model: params.config.model,
+      headers: params.config.customHeaders,
+      apiType: isAnthropic
+        ? undefined
+        : (params.config.apiType || (baseUrl.includes('/responses') ? 'responses' : 'chat_completions'))
     }
   }
 
-  /**
-   * Try falling back to a custom API provider when an OAuth provider fails.
-   * e.g., when 'glm' OAuth is not configured, try 'zhipu' custom API key.
-   */
-  private tryCustomApiFallback(aiSources: AISourcesConfig): BackendRequestConfig | null {
-    const fallbackKey = OAUTH_TO_CUSTOM_FALLBACK[aiSources.current]
+  private tryRuntimeEndpointFallback(
+    aiSources: AISourcesConfig,
+    requestedSource: AISourceType
+  ): RuntimeEndpoint | null {
+    const fallbackKey = OAUTH_TO_CUSTOM_FALLBACK[requestedSource]
     if (!fallbackKey) return null
 
-    const fallbackConfig = (aiSources as Record<string, any>)[fallbackKey]
-    if (fallbackConfig && typeof fallbackConfig === 'object' && 'apiKey' in fallbackConfig && fallbackConfig.apiKey) {
-      console.log(`[AISourceManager] OAuth provider ${aiSources.current} unavailable, falling back to custom API: ${fallbackKey}`)
-      return this.getDynamicCustomBackendConfig(fallbackConfig)
+    const fallbackConfig = this.getDynamicCustomSourceConfig(aiSources, fallbackKey)
+    if (fallbackConfig) {
+      console.log(`[AISourceManager] Source ${requestedSource} unavailable, resolving runtime endpoint via custom API fallback: ${fallbackKey}`)
+      return this.buildRuntimeEndpointFromCustomSourceConfig({
+        requestedSource,
+        source: fallbackKey,
+        authMode: 'fallback',
+        config: fallbackConfig
+      })
     }
 
     return null
+  }
+
+  private getProviderTransportKind(
+    aiSources: AISourcesConfig,
+    sourceType: AISourceType
+  ): 'anthropic' | 'openai' {
+    const sourceConfig = (aiSources as Record<string, any>)[sourceType]
+    return sourceConfig?.provider === 'openai' ? 'openai' : 'anthropic'
   }
 
   /**

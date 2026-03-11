@@ -124,6 +124,9 @@ interface HaloConfig {
   browserAutomation?: {
     mode: 'ai-browser' | 'system-browser'
   }
+  runtime?: {
+    mode: 'claude-sdk' | 'hybrid' | 'native'
+  }
   // Vision model for image preprocessing (used when primary model doesn't support vision)
   imageModel?: {
     source: string  // AI source key, e.g. 'custom', 'skillsfan-credits'
@@ -249,6 +252,9 @@ const DEFAULT_CONFIG: HaloConfig = {
   },
   browserAutomation: {
     mode: 'ai-browser'
+  },
+  runtime: {
+    mode: 'claude-sdk'
   },
   onboarding: {
     completed: false
@@ -452,6 +458,7 @@ function mergeConfigWithDefaults(parsed: Record<string, any>): HaloConfig {
     // memory: merge with defaults
     memory: { ...DEFAULT_CONFIG.memory, ...parsed.memory },
     browserAutomation: { ...DEFAULT_CONFIG.browserAutomation, ...parsed.browserAutomation },
+    runtime: { ...DEFAULT_CONFIG.runtime, ...parsed.runtime },
     tools: normalizeWebToolsConfig(parsed.tools)
   }
 }
@@ -497,6 +504,9 @@ function applyConfigUpdates(currentConfig: HaloConfig, config: Partial<HaloConfi
   }
   if (config.browserAutomation) {
     newConfig.browserAutomation = { ...currentConfig.browserAutomation, ...config.browserAutomation }
+  }
+  if (config.runtime) {
+    newConfig.runtime = { ...currentConfig.runtime, ...config.runtime }
   }
   if (config.tools) {
     newConfig.tools = normalizeWebToolsConfig({
