@@ -12,7 +12,7 @@ import { syncAIBrowserStoreWithConfig } from './ai-browser.store'
 import { createLogger } from '../lib/logger'
 
 // Settings section type (must match SettingsPage)
-export type SettingsSection = 'ai-model' | 'display' | 'mcp' | 'skills' | 'system' | 'remote' | 'account' | 'spaces' | 'advanced'
+export type SettingsSection = 'ai-model' | 'display' | 'mcp' | 'skills' | 'system' | 'computer-automation' | 'remote' | 'account' | 'spaces' | 'advanced'
 
 // Git Bash installation progress
 interface GitBashInstallProgress {

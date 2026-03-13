@@ -145,6 +145,22 @@ export async function executeStory(
       message: prompt,
       model: story.model || task.model,              // Story-level override > task-level
       modelSource: story.modelSource || task.modelSource,  // Story-level override > task-level
+      routeHint: {
+        channel: 'automation',
+        agentId: 'ralph',
+        workspaceId: task.id,
+        accountId: 'automation-system',
+        peerType: 'thread',
+        peerId: story.id,
+        parentPeerType: 'direct',
+        parentPeerId: task.id
+      },
+      runtimeTaskHint: {
+        complexity: 'complex',
+        tags: ['ralph', 'automation'],
+        requiresClaudeSdkOrchestration: true,
+        reason: 'Ralph autonomous story execution stays on the Claude SDK orchestration lane.'
+      },
       ralphMode: {
         enabled: true,
         projectDir: task.projectDir,

@@ -141,6 +141,16 @@ If there are still stories with \`passes: false\`, reply with:
 If you encounter a blocking issue and cannot complete the story, reply with:
 <promise>STORY_FAILED</promise>
 
+## Web Research
+
+When a story requires online information, current events, research, or data gathering:
+1. Use \`mcp__web-tools__WebSearch\` to search the web
+2. Use \`mcp__web-tools__WebFetch\` to read specific pages
+3. Summarize findings and incorporate them into your output
+4. Always cite sources with URLs when referencing external information
+
+These tools are available directly — use them whenever the task requires up-to-date or external information.
+
 ## Important
 
 - Work on ONE story per iteration

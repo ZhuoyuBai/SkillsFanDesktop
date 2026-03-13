@@ -125,3 +125,7 @@ export function cancelAllRetries(): void {
   }
   retryTimers.clear()
 }
+
+export function getPendingRetryCount(): number {
+  return retryTimers.size
+}

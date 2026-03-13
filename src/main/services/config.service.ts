@@ -124,6 +124,23 @@ interface HaloConfig {
   browserAutomation?: {
     mode: 'ai-browser' | 'system-browser'
   }
+  gateway?: {
+    enabled: boolean
+    mode: 'embedded' | 'external'
+  }
+  providers?: {
+    mode: 'compat' | 'mixed' | 'native'
+  }
+  plugins?: {
+    v2: {
+      enabled: boolean
+    }
+  }
+  channels?: {
+    v2: {
+      enabled: boolean
+    }
+  }
   runtime?: {
     mode: 'claude-sdk' | 'hybrid' | 'native'
   }
@@ -252,6 +269,23 @@ const DEFAULT_CONFIG: HaloConfig = {
   },
   browserAutomation: {
     mode: 'ai-browser'
+  },
+  gateway: {
+    enabled: false,
+    mode: 'embedded'
+  },
+  providers: {
+    mode: 'compat'
+  },
+  plugins: {
+    v2: {
+      enabled: false
+    }
+  },
+  channels: {
+    v2: {
+      enabled: false
+    }
   },
   runtime: {
     mode: 'claude-sdk'
@@ -458,6 +492,24 @@ function mergeConfigWithDefaults(parsed: Record<string, any>): HaloConfig {
     // memory: merge with defaults
     memory: { ...DEFAULT_CONFIG.memory, ...parsed.memory },
     browserAutomation: { ...DEFAULT_CONFIG.browserAutomation, ...parsed.browserAutomation },
+    gateway: { ...DEFAULT_CONFIG.gateway, ...parsed.gateway },
+    providers: { ...DEFAULT_CONFIG.providers, ...parsed.providers },
+    plugins: {
+      ...DEFAULT_CONFIG.plugins,
+      ...parsed.plugins,
+      v2: {
+        ...DEFAULT_CONFIG.plugins?.v2,
+        ...parsed.plugins?.v2
+      }
+    },
+    channels: {
+      ...DEFAULT_CONFIG.channels,
+      ...parsed.channels,
+      v2: {
+        ...DEFAULT_CONFIG.channels?.v2,
+        ...parsed.channels?.v2
+      }
+    },
     runtime: { ...DEFAULT_CONFIG.runtime, ...parsed.runtime },
     tools: normalizeWebToolsConfig(parsed.tools)
   }
@@ -504,6 +556,32 @@ function applyConfigUpdates(currentConfig: HaloConfig, config: Partial<HaloConfi
   }
   if (config.browserAutomation) {
     newConfig.browserAutomation = { ...currentConfig.browserAutomation, ...config.browserAutomation }
+  }
+  if (config.gateway) {
+    newConfig.gateway = { ...currentConfig.gateway, ...config.gateway }
+  }
+  if (config.providers) {
+    newConfig.providers = { ...currentConfig.providers, ...config.providers }
+  }
+  if (config.plugins) {
+    newConfig.plugins = {
+      ...currentConfig.plugins,
+      ...config.plugins,
+      v2: {
+        ...currentConfig.plugins?.v2,
+        ...config.plugins.v2
+      }
+    }
+  }
+  if (config.channels) {
+    newConfig.channels = {
+      ...currentConfig.channels,
+      ...config.channels,
+      v2: {
+        ...currentConfig.channels?.v2,
+        ...config.channels.v2
+      }
+    }
   }
   if (config.runtime) {
     newConfig.runtime = { ...currentConfig.runtime, ...config.runtime }

@@ -12,6 +12,10 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, rmSync
 import { atomicWriteJsonSync } from '../utils/atomic-write'
 import { getSpace, getSpaceMetaDir, listSpaces } from './space.service'
 import { v4 as uuidv4 } from 'uuid'
+import {
+  deleteLoopTaskGatewaySession,
+  syncLoopTaskGatewaySession
+} from '../../gateway/sessions'
 import type {
   LoopTask,
   LoopTaskMeta,
@@ -24,6 +28,22 @@ import { scheduleTask, unscheduleTask } from './scheduler.service'
 import { getCurrentTask, stopTask as stopRalphTask } from './ralph'
 
 const INDEX_VERSION = 1
+
+function syncLoopTaskGatewaySessionSafely(task: LoopTask, reason: 'loop_task_create' | 'loop_task_update' | 'loop_task_restore'): void {
+  try {
+    syncLoopTaskGatewaySession(task, reason)
+  } catch (error) {
+    console.error(`[LoopTask] Failed to sync gateway session for task ${task.id}:`, error)
+  }
+}
+
+function deleteLoopTaskGatewaySessionSafely(spaceId: string, taskId: string): void {
+  try {
+    deleteLoopTaskGatewaySession(spaceId, taskId)
+  } catch (error) {
+    console.error(`[LoopTask] Failed to delete gateway session for task ${taskId}:`, error)
+  }
+}
 
 // ============================================================================
 // Index Management Functions
@@ -270,6 +290,8 @@ export function createTask(spaceId: string, config: CreateLoopTaskConfig): LoopT
     scheduleTask(spaceId, task.id, task.schedule)
   }
 
+  syncLoopTaskGatewaySessionSafely(task, 'loop_task_create')
+
   return task
 }
 
@@ -347,6 +369,8 @@ export function updateTask(
     }
   }
 
+  syncLoopTaskGatewaySessionSafely(updated, 'loop_task_update')
+
   return updated
 }
 
@@ -381,6 +405,7 @@ export async function deleteTask(spaceId: string, taskId: string): Promise<boole
 
   // Update index (remove entry)
   updateIndexEntry(tasksDir, spaceId, taskId, null)
+  deleteLoopTaskGatewaySessionSafely(spaceId, taskId)
 
   console.log(`[LoopTask] Task deleted: ${taskId}`)
   return true
@@ -644,6 +669,36 @@ export function recoverInterruptedTasks(): { recoveredCount: number; recoveredTa
   return {
     recoveredCount: recoveredTaskIds.length,
     recoveredTaskIds
+  }
+}
+
+export function syncAllTasksToGatewaySessions(): { syncedCount: number; syncedTaskIds: string[] } {
+  const spaces = listSpaces()
+  const syncedTaskIds: string[] = []
+
+  for (const space of spaces) {
+    let taskMetas: LoopTaskMeta[] = []
+    try {
+      taskMetas = listTasks(space.id)
+    } catch (error) {
+      console.error(`[LoopTask] Failed to list tasks for gateway sync, space=${space.id}:`, error)
+      continue
+    }
+
+    for (const meta of taskMetas) {
+      const task = getTask(space.id, meta.id)
+      if (!task) {
+        continue
+      }
+
+      syncLoopTaskGatewaySessionSafely(task, 'loop_task_restore')
+      syncedTaskIds.push(task.id)
+    }
+  }
+
+  return {
+    syncedCount: syncedTaskIds.length,
+    syncedTaskIds
   }
 }
 

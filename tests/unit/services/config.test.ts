@@ -77,6 +77,10 @@ describe('Config Service', () => {
       expect(config.api.apiUrl).toBe('https://api.anthropic.com')
       expect(config.permissions.commandExecution).toBe('ask')
       expect(config.appearance.theme).toBe('light')
+      expect(config.gateway).toEqual({ enabled: false, mode: 'embedded' })
+      expect(config.providers).toEqual({ mode: 'compat' })
+      expect(config.plugins?.v2.enabled).toBe(false)
+      expect(config.channels?.v2.enabled).toBe(false)
       expect(config.runtime?.mode).toBe('claude-sdk')
       expect(config.tools?.web.search.provider).toBe('duckduckgo')
       expect(config.tools?.web.fetch.enabled).toBe(true)
@@ -103,6 +107,7 @@ describe('Config Service', () => {
       expect(config.api.provider).toBe('anthropic')
       expect(config.api.apiUrl).toBe('https://api.anthropic.com')
       expect(config.permissions.fileAccess).toBe('allow')
+      expect(config.gateway).toEqual({ enabled: false, mode: 'embedded' })
     })
   })
 
@@ -154,6 +159,25 @@ describe('Config Service', () => {
       const config = getConfig()
       expect(config.runtime?.mode).toBe('native')
       expect(config.browserAutomation?.mode).toBe('ai-browser')
+    })
+
+    it('should deep merge migration feature flags with defaults', () => {
+      saveConfig({
+        gateway: { enabled: true },
+        plugins: { v2: { enabled: true } }
+      } as any)
+
+      saveConfig({
+        gateway: { mode: 'external' },
+        providers: { mode: 'native' },
+        channels: { v2: { enabled: true } }
+      } as any)
+
+      const config = getConfig()
+      expect(config.gateway).toEqual({ enabled: true, mode: 'external' })
+      expect(config.providers).toEqual({ mode: 'native' })
+      expect(config.plugins?.v2.enabled).toBe(true)
+      expect(config.channels?.v2.enabled).toBe(true)
     })
 
     it('should replace mcpServers entirely', () => {

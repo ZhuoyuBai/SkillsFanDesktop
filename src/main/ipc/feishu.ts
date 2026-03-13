@@ -5,16 +5,13 @@
  */
 
 import { getConfig, saveConfig } from '../services/config.service'
-import { getChannelManager } from '../services/channel'
 import { FeishuBotService } from '../services/feishu'
 import { FeishuAccessControl } from '../services/feishu/access-control'
 import { ipcHandle } from './utils'
 import type { FeishuConfig, FeishuStatus } from '@shared/types/feishu'
-import type { FeishuChannel } from '../services/channel/adapters/feishu.channel'
+import { getGatewayFeishuChannel } from '../../gateway/channels'
 
-function getFeishuChannel(): FeishuChannel | undefined {
-  return getChannelManager().getChannel<FeishuChannel>('feishu')
-}
+const getFeishuChannel = getGatewayFeishuChannel
 
 function getFeishuConfig(): FeishuConfig | undefined {
   const config = getConfig()
@@ -59,7 +56,7 @@ export function registerFeishuHandlers(): void {
   ipcHandle('feishu:enable', async () => {
     const config = getFeishuConfig()
     if (!config?.appId || !config?.appSecret) {
-      throw new Error('App ID and App Secret are required')
+      throw new Error('Please enter both App ID and App Secret before enabling')
     }
 
     const updatedConfig = { ...config, enabled: true }
@@ -87,7 +84,7 @@ export function registerFeishuHandlers(): void {
   // Regenerate pairing code
   ipcHandle('feishu:regenerate-pairing-code', () => {
     const config = getFeishuConfig()
-    if (!config) throw new Error('Feishu not configured')
+    if (!config) throw new Error('Please set up Feishu integration first in Settings')
 
     const newCode = FeishuAccessControl.generatePairingCode()
     saveConfig({ feishu: { ...config, pairingCode: newCode } } as Record<string, unknown>)
@@ -97,7 +94,7 @@ export function registerFeishuHandlers(): void {
   // Revoke a chat authorization
   ipcHandle('feishu:revoke-chat', (_e, chatId: string) => {
     const config = getFeishuConfig()
-    if (!config) throw new Error('Feishu not configured')
+    if (!config) throw new Error('Please set up Feishu integration first in Settings')
 
     const newAllowed = config.allowedChatIds.filter(id => id !== chatId)
     saveConfig({ feishu: { ...config, allowedChatIds: newAllowed } } as Record<string, unknown>)
@@ -118,14 +115,14 @@ export function registerFeishuHandlers(): void {
   // Update group policy
   ipcHandle('feishu:set-group-policy', (_e, policy: 'mention' | 'all' | 'disabled') => {
     const config = getFeishuConfig()
-    if (!config) throw new Error('Feishu not configured')
+    if (!config) throw new Error('Please set up Feishu integration first in Settings')
     saveConfig({ feishu: { ...config, groupPolicy: policy } } as Record<string, unknown>)
   })
 
   // Set default space
   ipcHandle('feishu:set-default-space', (_e, spaceId: string | null) => {
     const config = getFeishuConfig()
-    if (!config) throw new Error('Feishu not configured')
+    if (!config) throw new Error('Please set up Feishu integration first in Settings')
     saveConfig({ feishu: { ...config, defaultSpaceId: spaceId ?? undefined } } as Record<string, unknown>)
   })
 }

@@ -16,6 +16,11 @@ import {
   thinkingEffortToBudgetTokens
 } from '../../../../shared/utils/openai-models'
 import { stripLeadingSetModelStatus } from '../../../../shared/utils/sdk-status'
+import {
+  syncSubagentGatewaySession,
+  findPreferredGatewaySessionByConversationId
+} from '../../../../gateway/sessions'
+import { resolveSubagentGatewayRoute } from '../../../../gateway/sessions/automation'
 import type {
   SerializedSubagentRun,
   SubagentRun,
@@ -109,6 +114,13 @@ interface PersistedSubagentRegistry {
   runs: SerializedSubagentRun[]
 }
 
+export interface HostedSubagentRuntimeStatus {
+  registryLoaded: boolean
+  totalRuns: number
+  activeRuns: number
+  waitingAnnouncementRuns: number
+}
+
 function isTerminalStatus(status: SubagentRunStatus): boolean {
   return status === 'completed'
     || status === 'failed'
@@ -195,6 +207,17 @@ function loadRunsForSpace(spaceId: string): SerializedSubagentRun[] {
   return payload.runs
 }
 
+function syncSubagentGatewaySessionSafely(
+  run: SubagentRun,
+  reason: 'subagent_spawn' | 'subagent_update' | 'subagent_restore'
+): void {
+  try {
+    syncSubagentGatewaySession(run, reason)
+  } catch (error) {
+    console.error(`[Subagent][${run.runId}] Failed to sync gateway session:`, error)
+  }
+}
+
 function ensureRegistryLoaded(): void {
   if (registryLoaded) {
     return
@@ -239,6 +262,7 @@ function ensureRegistryLoaded(): void {
 
       runs.set(restored.runId, restored)
       appendRunToConversation(restored.parentConversationId, restored.runId)
+      syncSubagentGatewaySessionSafely(restored, 'subagent_restore')
     }
   }
 
@@ -353,13 +377,19 @@ async function maybeAutoAnnounce(parentConversationId: string): Promise<void> {
   const pendingRunIds = pendingRuns.map((run) => run.runId)
 
   try {
-    const { sendMessage } = await import('../send-message')
+    const { sendMessage } = await import('../../../../gateway/runtime/orchestrator')
 
     await sendMessage(getMainWindow(), {
       spaceId: pendingRuns[0].parentSpaceId,
       conversationId: parentConversationId,
       message: buildAutoAnnouncePayload(parentConversationId, pendingRuns),
       messagePrefix: SUBAGENT_AUTO_ANNOUNCE_PREFIX,
+      runtimeTaskHint: {
+        complexity: 'complex',
+        tags: ['subagent'],
+        requiresClaudeSdkOrchestration: true,
+        reason: 'Hosted subagent completion announcements stay on the Claude SDK orchestration lane.'
+      },
       internalMessage: {
         kind: 'subagent_completion',
         persistUserMessage: false,
@@ -446,6 +476,7 @@ function updateRun(runId: string, updates: Partial<SubagentRun>): SubagentRun {
 
   const next = { ...existing, ...updates }
   runs.set(runId, next)
+  syncSubagentGatewaySessionSafely(next, 'subagent_update')
   schedulePersistForSpace(next.parentSpaceId)
   dispatchRunUpdate(next)
   return next
@@ -499,7 +530,7 @@ function createSubagentCanUseTool(workDir: string) {
       if (!isWithinWorkDir) {
         return {
           behavior: 'deny' as const,
-          message: `Can only access files within the current space: ${workDir}`
+          message: `File access is limited to the current workspace folder: ${workDir}`
         }
       }
     }
@@ -513,13 +544,13 @@ function createSubagentCanUseTool(workDir: string) {
     if (permission === 'deny') {
       return {
         behavior: 'deny' as const,
-        message: 'Command execution is disabled'
+        message: 'Running commands is currently disabled in settings'
       }
     }
     if (permission === 'ask' && !currentConfig.permissions.trustMode) {
       return {
         behavior: 'deny' as const,
-        message: 'Interactive approval is unavailable inside hosted subagents. Run this step in the primary agent instead.'
+        message: 'This action requires manual approval and cannot run automatically in a background task. Try running it directly in the main conversation instead.'
       }
     }
     return {
@@ -539,14 +570,14 @@ function createSubagentCanUseTool(workDir: string) {
     ) {
       return {
         behavior: 'deny' as const,
-        message: 'Nested hosted subagents and team orchestration are disabled inside a hosted subagent.'
+        message: 'Creating additional background tasks from within a background task is not supported.'
       }
     }
 
     if (BLOCKED_SERVER_SIDE_TOOLS.has(toolName)) {
       return {
         behavior: 'deny' as const,
-        message: `Built-in server-side tool "${toolName}" is disabled. Use local MCP tools instead.`
+        message: `The "${toolName}" tool is not available in background tasks. Use alternative local tools instead.`
       }
     }
 
@@ -583,7 +614,7 @@ function createSubagentCanUseTool(workDir: string) {
       if (currentConfig.browserAutomation?.mode !== 'system-browser') {
         return {
           behavior: 'deny' as const,
-          message: 'System browser opening is disabled while automated browser mode is active. Use automated browser tools instead.'
+          message: 'Opening the system browser is disabled while the automated browser is in use.'
         }
       }
       return { behavior: 'allow' as const, updatedInput: input }
@@ -594,7 +625,7 @@ function createSubagentCanUseTool(workDir: string) {
       if (currentConfig.browserAutomation?.mode === 'system-browser') {
         return {
           behavior: 'deny' as const,
-          message: 'Automated browser is disabled while "Use System Default Browser" mode is enabled.'
+          message: 'The automated browser is disabled because system browser mode is turned on in settings.'
         }
       }
       return { behavior: 'allow' as const, updatedInput: input }
@@ -922,6 +953,7 @@ export async function spawnSubagent(params: SubagentSpawnParams): Promise<Serial
   runs.set(runId, run)
   executions.set(runId, execution)
   appendRunToConversation(params.parentConversationId, runId)
+  syncSubagentGatewaySessionSafely(run, 'subagent_spawn')
   persistSpaceRuns(params.parentSpaceId)
   dispatchRunUpdate(run)
 
@@ -971,6 +1003,36 @@ export function listSubagentRunsForConversation(
       if (!run) return false
       return includeCompleted || !isTerminalStatus(run.status)
     })
+    .sort((a, b) => Date.parse(b.spawnedAt) - Date.parse(a.spawnedAt))
+    .slice(0, Math.max(1, limit))
+    .map(serializeRun)
+}
+
+export function listSubagentRunsBySessionKey(
+  sessionKey: string,
+  options?: { includeCompleted?: boolean; limit?: number }
+): SerializedSubagentRun[] {
+  ensureRegistryLoaded()
+  const includeCompleted = options?.includeCompleted ?? true
+  const limit = options?.limit ?? Infinity
+
+  const matched: SubagentRun[] = []
+  for (const run of runs.values()) {
+    if (!includeCompleted && isTerminalStatus(run.status)) continue
+
+    const parentSession = findPreferredGatewaySessionByConversationId(run.parentConversationId)
+    if (parentSession?.sessionKey === sessionKey || parentSession?.mainSessionKey === sessionKey) {
+      matched.push(run)
+      continue
+    }
+
+    const subagentRoute = resolveSubagentGatewayRoute(run)
+    if (subagentRoute.sessionKey === sessionKey || subagentRoute.mainSessionKey === sessionKey) {
+      matched.push(run)
+    }
+  }
+
+  return matched
     .sort((a, b) => Date.parse(b.spawnedAt) - Date.parse(a.spawnedAt))
     .slice(0, Math.max(1, limit))
     .map(serializeRun)
@@ -1062,6 +1124,15 @@ export function killSubagentRun(runId: string): SerializedSubagentRun {
 
 export function initializeSubagentRuntime(): void {
   ensureRegistryLoaded()
+}
+
+export function getSubagentRuntimeStatus(): HostedSubagentRuntimeStatus {
+  return {
+    registryLoaded,
+    totalRuns: runs.size,
+    activeRuns: Array.from(runs.values()).filter((run) => !isTerminalStatus(run.status)).length,
+    waitingAnnouncementRuns: Array.from(runs.values()).filter((run) => run.status === 'waiting_announce').length
+  }
 }
 
 export function shutdownSubagentRuntime(): void {

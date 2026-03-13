@@ -10,10 +10,13 @@
  */
 
 import { BrowserWindow } from 'electron'
-import { stepReporterRuntime } from '../../../gateway/host-runtime/step-reporter/runtime'
+import { canDelegateGatewayCommands, executeGatewayCommand } from '../../../gateway/commands'
+import { sendMessage } from '../../../gateway/runtime/orchestrator'
+import { getGatewaySessionStepJournal, stepReporterRuntime } from '../../../gateway/host-runtime'
+import { listGatewaySubagentRunsForConversation } from '../../../gateway/automation/subagents'
+import { findPreferredGatewaySessionByConversationId } from '../../../gateway/sessions/store'
 import { activeSessions, v2Sessions } from './session-manager'
 import { getConversation, updateLastMessage } from '../conversation.service'
-import { sendMessage } from './send-message'
 import { agentQueue } from './lane-queue'
 import type { Thought, Attachment, ImageAttachment } from './types'
 import type { HostStep } from '../../../shared/types/host-runtime'
@@ -157,6 +160,16 @@ export async function stopGeneration(conversationId?: string): Promise<void> {
     activeSessions.clear()
     console.log('[Agent] All generations stopped')
   }
+
+  if (canDelegateGatewayCommands()) {
+    try {
+      await executeGatewayCommand('agent.stop', {
+        conversationId
+      })
+    } catch (error) {
+      console.error('[Agent] Failed to stop generation through external gateway command path:', error)
+    }
+  }
 }
 
 // ============================================
@@ -187,6 +200,13 @@ export async function interruptAndInject(
   const { spaceId, conversationId, message, images, attachments } = request
 
   console.log(`[Agent] interruptAndInject: conv=${conversationId}`)
+
+  if (canDelegateGatewayCommands()) {
+    await executeGatewayCommand('agent.interrupt-inject', {
+      request
+    })
+    return
+  }
 
   // 0. Clear queued messages (user interrupt = don't need queued messages)
   const cleared = agentQueue.clearQueue(conversationId)
@@ -270,6 +290,29 @@ export function getActiveSessions(): string[] {
   return Array.from(activeSessions.keys())
 }
 
+/**
+ * Active session entry enriched with gateway session keys.
+ */
+export interface ActiveSessionWithKeys {
+  conversationId: string
+  sessionKey?: string
+  mainSessionKey?: string
+}
+
+/**
+ * Get all active sessions enriched with gateway session keys.
+ */
+export function getActiveSessionsWithKeys(): ActiveSessionWithKeys[] {
+  return Array.from(activeSessions.keys()).map((conversationId) => {
+    const gwSession = findPreferredGatewaySessionByConversationId(conversationId)
+    return {
+      conversationId,
+      sessionKey: gwSession?.sessionKey,
+      mainSessionKey: gwSession?.mainSessionKey
+    }
+  })
+}
+
 // ============================================
 // Session State Recovery
 // ============================================
@@ -327,12 +370,25 @@ export function getSessionState(conversationId: string): {
   }>
   hostSteps: HostStep[]
   spaceId?: string
+  sessionKey?: string
+  mainSessionKey?: string
 } {
   const session = activeSessions.get(conversationId)
-  const subagentRuns = listSubagentRunsForConversation(conversationId)
-  const hostSteps = stepReporterRuntime.listSteps(conversationId)
+  const subagentRuns = listGatewaySubagentRunsForConversation(conversationId)
+  const gwSession = findPreferredGatewaySessionByConversationId(conversationId)
+  const hostSteps = gwSession
+    ? getGatewaySessionStepJournal(gwSession.sessionKey).steps
+    : stepReporterRuntime.listSteps(conversationId)
   if (!session) {
-    return { isActive: false, thoughts: [], taskProgress: [], subagentRuns, hostSteps }
+    return {
+      isActive: false,
+      thoughts: [],
+      taskProgress: [],
+      subagentRuns,
+      hostSteps: hostSteps.length > 0 ? hostSteps : [],
+      sessionKey: gwSession?.sessionKey,
+      mainSessionKey: gwSession?.mainSessionKey
+    }
   }
   return {
     isActive: true,
@@ -342,7 +398,9 @@ export function getSessionState(conversationId: string): {
       stepHistory: [...task.stepHistory]
     })),
     subagentRuns,
-    hostSteps,
-    spaceId: session.spaceId
+    hostSteps: hostSteps.length > 0 ? hostSteps : [],
+    spaceId: session.spaceId,
+    sessionKey: gwSession?.sessionKey,
+    mainSessionKey: gwSession?.mainSessionKey
   }
 }

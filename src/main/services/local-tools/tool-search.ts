@@ -1,4 +1,4 @@
-import type { ToolCatalogEntry } from './tool-catalog'
+import type { ToolCatalogEntry } from '../../../gateway/tools/types'
 
 export interface ToolSearchResult extends ToolCatalogEntry {
   score: number

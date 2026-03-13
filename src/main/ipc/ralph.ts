@@ -5,24 +5,22 @@
 
 import { ipcMain, BrowserWindow, dialog } from 'electron'
 import {
-  createTask,
-  startTask,
-  stopTask,
-  getTask,
-  getCurrentTask,
-  setCurrentTask,
-  setMainWindow,
-  generateStories,
-  importFromPrd,
-  importFromPrdFile,
-  prdExists
-} from '../services/ralph'
-import { getTask as getLoopTask } from '../services/loop-task.service'
-import type { CreateTaskConfig, RalphTask, UserStory } from '../services/ralph/types'
+  createGatewayRalphTask,
+  startGatewayRalphTask,
+  stopGatewayRalphTask,
+  getGatewayRalphTask,
+  getGatewayRalphCurrentTask,
+  setGatewayRalphMainWindow,
+  generateGatewayRalphStories,
+  importGatewayRalphFromPrdFile,
+  gatewayRalphPrdExists,
+  loadGatewayRalphTaskFromLoopTask,
+  type CreateTaskConfig
+} from '../../gateway/automation/ralph'
 
 export function registerRalphHandlers(window: BrowserWindow | null): void {
   // Set main window for event broadcasting
-  setMainWindow(window)
+  setGatewayRalphMainWindow(window)
 
   // Create a new task
   ipcMain.handle(
@@ -32,9 +30,7 @@ export function registerRalphHandlers(window: BrowserWindow | null): void {
       config: CreateTaskConfig
     ) => {
       try {
-        const task = await createTask(config)
-        // Store as current task
-        setCurrentTask(task)
+        const task = await createGatewayRalphTask(config)
         return { success: true, data: task }
       } catch (error: unknown) {
         const err = error as Error
@@ -49,38 +45,14 @@ export function registerRalphHandlers(window: BrowserWindow | null): void {
     try {
       // If spaceId is provided, load from Loop Task persistence
       if (spaceId) {
-        const loopTask = getLoopTask(spaceId, taskId)
+        const loopTask = loadGatewayRalphTaskFromLoopTask(spaceId, taskId)
         if (!loopTask) {
-          return { success: false, error: `Task ${taskId} not found in space ${spaceId}` }
+          return { success: false, error: 'The requested task could not be found in the current workspace' }
         }
-
-        // Convert LoopTask to RalphTask format
-        const ralphTask: RalphTask = {
-          id: loopTask.id,
-          projectDir: loopTask.projectDir,
-          branchName: loopTask.branchName,
-          description: loopTask.description,
-          stories: loopTask.stories,
-          status: loopTask.status,
-          currentStoryIndex: loopTask.currentStoryIndex,
-          iteration: loopTask.iteration,
-          maxIterations: loopTask.maxIterations,
-          model: loopTask.model,
-          modelSource: loopTask.modelSource,
-          createdAt: loopTask.createdAt,
-          startedAt: loopTask.startedAt,
-          completedAt: loopTask.completedAt,
-          stepRetryConfig: loopTask.stepRetryConfig,
-          loopConfig: loopTask.loopConfig,
-          currentLoop: loopTask.currentLoop
-        }
-
-        // Set as current task before starting
-        setCurrentTask(ralphTask)
       }
       // If no spaceId, assume task was created via ralph:create-task and is already in memory
 
-      await startTask(taskId)
+      await startGatewayRalphTask(taskId, { spaceId })
       return { success: true }
     } catch (error: unknown) {
       const err = error as Error
@@ -92,7 +64,7 @@ export function registerRalphHandlers(window: BrowserWindow | null): void {
   // Stop a task
   ipcMain.handle('ralph:stop', async (_event, taskId: string) => {
     try {
-      await stopTask(taskId)
+      await stopGatewayRalphTask(taskId)
       return { success: true }
     } catch (error: unknown) {
       const err = error as Error
@@ -104,7 +76,7 @@ export function registerRalphHandlers(window: BrowserWindow | null): void {
   // Get a specific task
   ipcMain.handle('ralph:get-task', async (_event, taskId: string) => {
     try {
-      const task = await getTask(taskId)
+      const task = await getGatewayRalphTask(taskId)
       return { success: true, data: task }
     } catch (error: unknown) {
       const err = error as Error
@@ -116,7 +88,7 @@ export function registerRalphHandlers(window: BrowserWindow | null): void {
   // Get current task
   ipcMain.handle('ralph:get-current', async () => {
     try {
-      const task = getCurrentTask()
+      const task = await getGatewayRalphCurrentTask()
       return { success: true, data: task }
     } catch (error: unknown) {
       const err = error as Error
@@ -133,7 +105,7 @@ export function registerRalphHandlers(window: BrowserWindow | null): void {
       config: { projectDir: string; description: string }
     ) => {
       try {
-        const stories = await generateStories(config)
+        const stories = await generateGatewayRalphStories(config)
         return { success: true, data: stories }
       } catch (error: unknown) {
         const err = error as Error
@@ -149,7 +121,7 @@ export function registerRalphHandlers(window: BrowserWindow | null): void {
     async () => {
       try {
         const dialogResult = await dialog.showOpenDialog({
-          title: 'Select prd.json',
+          title: 'Select Project Requirements File',
           properties: ['openFile'],
           filters: [
             { name: 'JSON Files', extensions: ['json'] }
@@ -160,7 +132,7 @@ export function registerRalphHandlers(window: BrowserWindow | null): void {
           return { success: true, data: null }
         }
 
-        const result = await importFromPrdFile(dialogResult.filePaths[0])
+        const result = await importGatewayRalphFromPrdFile(dialogResult.filePaths[0])
         return { success: true, data: result }
       } catch (error: unknown) {
         const err = error as Error
@@ -175,7 +147,7 @@ export function registerRalphHandlers(window: BrowserWindow | null): void {
     'ralph:prd-exists',
     async (_event, projectDir: string) => {
       try {
-        const exists = await prdExists(projectDir)
+        const exists = await gatewayRalphPrdExists(projectDir)
         return { success: true, data: exists }
       } catch (error: unknown) {
         const err = error as Error

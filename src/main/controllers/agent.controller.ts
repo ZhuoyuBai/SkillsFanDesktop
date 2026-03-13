@@ -4,7 +4,7 @@
  */
 
 import { BrowserWindow } from 'electron'
-import type { Attachment } from '../services/agent/types'
+import type { AgentRouteHint, Attachment } from '../services/agent/types'
 import {
   sendMessage as agentSendMessage,
   stopGeneration as agentStopGeneration,
@@ -34,6 +34,7 @@ export interface SendMessageRequest {
   attachments?: Attachment[]  // General file attachments for multi-modal messages
   thinkingEnabled?: boolean   // Enable extended thinking mode
   aiBrowserEnabled?: boolean  // Enable AI Browser tools
+  routeHint?: AgentRouteHint
 }
 
 export interface ControllerResponse<T = unknown> {

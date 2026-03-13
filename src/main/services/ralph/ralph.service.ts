@@ -478,6 +478,14 @@ export async function generateStories(config: GenerateStoriesConfig): Promise<Us
     spaceId: '__ralph__',
     conversationId: sessionId,
     message: prompt,
+    routeHint: {
+      channel: 'automation',
+      agentId: 'ralph',
+      workspaceId: projectDir,
+      accountId: 'automation-system',
+      peerType: 'direct',
+      peerId: sessionId
+    },
     ralphMode: {
       enabled: true,
       projectDir: projectDir,

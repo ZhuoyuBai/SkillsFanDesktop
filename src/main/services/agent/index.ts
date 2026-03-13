@@ -42,6 +42,8 @@ export type {
   MainWindowRef
 } from './types'
 
+export type { HostedSubagentRuntimeStatus } from './subagent/runtime'
+
 // ============================================
 // Core Functions
 // ============================================
@@ -97,9 +99,11 @@ export { broadcastMcpStatus } from './mcp-manager'
 export { agentQueue } from './lane-queue'
 export {
   initializeSubagentRuntime,
+  getSubagentRuntimeStatus,
   shutdownSubagentRuntime,
   spawnSubagent,
   getSubagentRun,
+  listSubagentRunsBySessionKey,
   listSubagentRunsForConversation,
   waitForConversationSubagents,
   waitForSubagentRun,

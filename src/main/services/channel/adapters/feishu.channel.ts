@@ -613,7 +613,13 @@ export class FeishuChannel implements Channel {
       await sendMessage(mainWindow, {
         spaceId: session.spaceId,
         conversationId: session.conversationId,
-        message: text
+        message: text,
+        routeHint: {
+          channel: 'feishu',
+          accountId: session.openId || 'feishu-user',
+          peerType: session.chatType === 'p2p' ? 'direct' : 'group',
+          peerId: session.chatId
+        }
       })
       console.log(`[FeishuChannel] Agent completed for ${chatId}`)
     } catch (err) {

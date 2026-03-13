@@ -3,8 +3,10 @@
  */
 
 import { ipcMain, BrowserWindow } from 'electron'
-import { sendMessage, stopGeneration, interruptAndInject, handleToolApproval, handleUserQuestionAnswer, getSessionState, ensureSessionWarm, testMcpConnections, getV2Session, killSubagentRun, getSubagentRun } from '../services/agent'
-import type { Attachment, ImageAttachment } from '../services/agent/types'
+import { sendMessage, stopGeneration, interruptAndInject, handleToolApproval, handleUserQuestionAnswer, getSessionState, ensureSessionWarm, testMcpConnections } from '../services/agent'
+import { getGatewaySubagentRun, killGatewaySubagentRun } from '../../gateway/automation/subagents'
+import { rewindGatewayFiles } from '../../gateway/runtime/rewind'
+import type { AgentRouteHint, Attachment, ImageAttachment } from '../services/agent/types'
 import type { ThinkingEffort } from '../../shared/utils/openai-models'
 import { ipcHandle } from './utils'
 
@@ -23,7 +25,12 @@ export function registerAgentHandlers(window: BrowserWindow | null): void {
       attachments?: Attachment[]
       thinkingEffort?: ThinkingEffort
     }) => {
-      await sendMessage(mainWindow, request)
+      await sendMessage(mainWindow, {
+        ...request,
+        routeHint: {
+          channel: 'electron'
+        } satisfies AgentRouteHint
+      })
     }
   )
 
@@ -66,43 +73,34 @@ export function registerAgentHandlers(window: BrowserWindow | null): void {
 
   // Warm up V2 session - non-blocking, fire-and-forget
   ipcHandle('agent:ensure-session-warm', (_e, spaceId: string, conversationId: string) => {
-    ensureSessionWarm(spaceId, conversationId).catch((error: unknown) => {
+    ensureSessionWarm(spaceId, conversationId, {
+      channel: 'electron'
+    }).catch((error: unknown) => {
       console.error('[IPC] ensureSessionWarm error:', error)
     })
   })
 
   // Kill a hosted subagent run
   ipcHandle('agent:kill-subagent', (_e, runId: string) => {
-    return killSubagentRun(runId)
+    return killGatewaySubagentRun(runId)
   })
 
   // Get detailed info for a hosted subagent run
   ipcHandle('agent:get-subagent-detail', (_e, runId: string) => {
-    return getSubagentRun(runId)
+    return getGatewaySubagentRun(runId)
   })
 
   // Rewind files - has custom error handling with logging, keep ipcMain.handle
   ipcMain.handle('agent:rewind-files', async (_event, conversationId: string, userMessageUuid: string) => {
     console.log(`[IPC] agent:rewind-files called: conversationId=${conversationId}, uuid=${userMessageUuid}`)
-    try {
-      const sessionInfo = getV2Session(conversationId)
-      if (!sessionInfo) {
-        console.log('[IPC] agent:rewind-files: No active session found')
-        return { success: false, error: 'No active session for this conversation' }
-      }
-      if (!sessionInfo.session.rewindFiles) {
-        console.log('[IPC] agent:rewind-files: rewindFiles method not available on session')
-        return { success: false, error: 'Rewind not supported by current SDK session' }
-      }
-      console.log(`[IPC] agent:rewind-files: Calling session.rewindFiles(${userMessageUuid})...`)
-      await sessionInfo.session.rewindFiles(userMessageUuid)
+    const result = await rewindGatewayFiles(conversationId, userMessageUuid)
+    if (result.success) {
       console.log('[IPC] agent:rewind-files: Success')
-      return { success: true }
-    } catch (error: unknown) {
-      const err = error as Error
-      console.error('[IPC] agent:rewind-files: Error:', err.message, err.stack)
-      return { success: false, error: err.message }
+      return result
     }
+
+    console.warn(`[IPC] agent:rewind-files: Failed: ${result.error || 'unknown error'}`)
+    return result
   })
 
   // Test MCP - returns custom shape with servers array

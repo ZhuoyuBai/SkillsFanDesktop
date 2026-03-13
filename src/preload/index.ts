@@ -150,6 +150,22 @@ export interface SkillsFanAPI {
   answerUserQuestion: (conversationId: string, answers: Record<string, string>) => Promise<IpcResponse>
   rewindFiles: (conversationId: string, userMessageUuid: string) => Promise<IpcResponse>
   getHostStatus: () => Promise<IpcResponse>
+  getGatewayHealth: () => Promise<IpcResponse>
+  getGatewayServices: () => Promise<IpcResponse>
+  getGatewayDoctor: () => Promise<IpcResponse>
+  getGatewayProcessStatus: () => Promise<IpcResponse>
+  getGatewayLauncherStatus: () => Promise<IpcResponse>
+  recoverGatewayLauncher: () => Promise<IpcResponse>
+  getGatewayDaemonStatus: () => Promise<IpcResponse>
+  getGatewayDaemonInstallPlan: () => Promise<IpcResponse>
+  prepareGatewayDaemonInstall: () => Promise<IpcResponse>
+  runGatewayDaemonInstall: (bundleDir?: string) => Promise<IpcResponse>
+  runGatewayDaemonUninstall: (bundleDir?: string) => Promise<IpcResponse>
+  clearGatewayDaemonLock: () => Promise<IpcResponse>
+  registerGatewayDaemon: () => Promise<IpcResponse>
+  unregisterGatewayDaemon: () => Promise<IpcResponse>
+  getGatewayStepJournal: (sessionKey: string) => Promise<IpcResponse>
+  runGatewayDesktopSmokeFlow: (flowId: string) => Promise<IpcResponse>
 
   // Event listeners
   onAgentStart: (callback: (data: unknown) => void) => () => void
@@ -550,6 +566,22 @@ const api: SkillsFanAPI = {
   answerUserQuestion: (conversationId, answers) => ipcRenderer.invoke('agent:answer-question', conversationId, answers),
   rewindFiles: (conversationId, userMessageUuid) => ipcRenderer.invoke('agent:rewind-files', conversationId, userMessageUuid),
   getHostStatus: () => ipcRenderer.invoke('agent:get-host-status'),
+  getGatewayHealth: () => ipcRenderer.invoke('gateway:health'),
+  getGatewayServices: () => ipcRenderer.invoke('gateway:services'),
+  getGatewayDoctor: () => ipcRenderer.invoke('gateway:doctor'),
+  getGatewayProcessStatus: () => ipcRenderer.invoke('gateway:process-status'),
+  getGatewayLauncherStatus: () => ipcRenderer.invoke('gateway:launcher-status'),
+  recoverGatewayLauncher: () => ipcRenderer.invoke('gateway:launcher-recover'),
+  getGatewayDaemonStatus: () => ipcRenderer.invoke('gateway:daemon-status'),
+  getGatewayDaemonInstallPlan: () => ipcRenderer.invoke('gateway:daemon-install-plan'),
+  prepareGatewayDaemonInstall: () => ipcRenderer.invoke('gateway:daemon-prepare-install'),
+  runGatewayDaemonInstall: (bundleDir) => ipcRenderer.invoke('gateway:daemon-run-install', bundleDir),
+  runGatewayDaemonUninstall: (bundleDir) => ipcRenderer.invoke('gateway:daemon-run-uninstall', bundleDir),
+  clearGatewayDaemonLock: () => ipcRenderer.invoke('gateway:daemon-clear-lock'),
+  registerGatewayDaemon: () => ipcRenderer.invoke('gateway:daemon-register'),
+  unregisterGatewayDaemon: () => ipcRenderer.invoke('gateway:daemon-unregister'),
+  getGatewayStepJournal: (sessionKey) => ipcRenderer.invoke('gateway:step-journal', sessionKey),
+  runGatewayDesktopSmokeFlow: (flowId) => ipcRenderer.invoke('gateway:desktop-smoke-flow-run', flowId),
 
   // Event listeners
   onAgentStart: (callback) => createEventListener('agent:start', callback),

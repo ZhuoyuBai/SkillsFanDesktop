@@ -22,6 +22,7 @@
 
 import { BrowserWindow } from 'electron'
 import { registerOnboardingHandlers } from '../ipc/onboarding'
+import { registerGatewayHandlers } from '../ipc/gateway'
 import { registerRemoteHandlers } from '../ipc/remote'
 import { registerBrowserHandlers } from '../ipc/browser'
 import { registerAIBrowserHandlers, cleanupAIBrowserHandlers } from '../ipc/ai-browser'
@@ -38,12 +39,7 @@ import { shutdownMemory } from '../services/memory'
 import { registerFeishuHandlers } from '../ipc/feishu'
 import { registerExtensionHandlers } from '../ipc/extension'
 import { initializeExtensions as initExtensions, shutdownExtensions } from '../services/extension'
-import { FeishuChannel } from '../services/channel/adapters/feishu.channel'
-import { getChannelManager } from '../services/channel'
-import { initializeSubagentRuntime, shutdownSubagentRuntime } from '../services/agent'
-import { shutdownScheduler } from '../services/scheduler.service'
-import { recoverInterruptedTasks } from '../services/loop-task.service'
-import { cancelAllRetries } from '../services/retry-handler'
+import { initializeGatewayDeferred, shutdownGatewayDeferred } from '../../gateway/bootstrap'
 
 /**
  * Initialize extended services after window is visible
@@ -64,6 +60,9 @@ export function initializeExtendedServices(mainWindow: BrowserWindow): void {
 
   // Onboarding: First-time user guide, only needed once
   registerOnboardingHandlers()
+
+  // Gateway: embedded gateway health and service registry surface
+  registerGatewayHandlers()
 
   // Remote: Remote access feature, optional functionality
   registerRemoteHandlers(mainWindow)
@@ -95,23 +94,8 @@ export function initializeExtendedServices(mainWindow: BrowserWindow): void {
   // Loop Task: Persistent loop task storage
   registerLoopTaskHandlers(mainWindow)
 
-  // Hosted subagent runtime: recover persisted run registry
-  initializeSubagentRuntime()
-
   // Skill: Settings and slash-command APIs
   registerSkillHandlers()
-
-  // Recover stale running loop tasks after crash/restart
-  try {
-    const recovery = recoverInterruptedTasks()
-    if (recovery.recoveredCount > 0) {
-      console.log(
-        `[Bootstrap] Recovered ${recovery.recoveredCount} interrupted loop task(s): ${recovery.recoveredTaskIds.join(', ')}`
-      )
-    }
-  } catch (err) {
-    console.error('[Bootstrap] Failed to recover interrupted loop tasks:', err)
-  }
 
   // Memory: Memory management (clear memory)
   registerMemoryHandlers()
@@ -120,12 +104,10 @@ export function initializeExtendedServices(mainWindow: BrowserWindow): void {
   registerExtensionHandlers()
   initExtensions()
 
-  // Feishu: Chat bot remote control (optional)
+  // Gateway deferred services: optional channels + automation recovery/runtime shutdown
   registerFeishuHandlers()
-  const feishuChannel = new FeishuChannel()
-  getChannelManager().registerChannel(feishuChannel)
-  feishuChannel.initialize().catch((err) => {
-    console.error('[Bootstrap] Feishu initialization failed:', err)
+  initializeGatewayDeferred().catch((err) => {
+    console.error('[Bootstrap] Gateway deferred initialization failed:', err)
   })
 
   // Skill: Initialize skill registry and start file watcher
@@ -170,8 +152,6 @@ export function initializeExtendedServices(mainWindow: BrowserWindow): void {
  * Called during window-all-closed to properly release resources.
  */
 export function cleanupExtendedServices(): void {
-  shutdownSubagentRuntime()
-
   // AI Browser: Cleanup MCP server and browser context
   cleanupAIBrowserHandlers()
 
@@ -187,19 +167,10 @@ export function cleanupExtendedServices(): void {
   // Extensions: Stop watcher and unload extensions
   shutdownExtensions()
 
-  // Scheduler: Stop all cron jobs and interval timers
-  shutdownScheduler()
-
-  // Retry handler: Cancel all pending retry timers
-  cancelAllRetries()
-
-  // Feishu: Disconnect bot
-  const feishuChannel = getChannelManager().getChannel<FeishuChannel>('feishu')
-  if (feishuChannel) {
-    feishuChannel.shutdown().catch((err) => {
-      console.error('[Bootstrap] Feishu shutdown error:', err)
-    })
-  }
+  // Gateway deferred services: stop optional channels and automation lifecycle
+  shutdownGatewayDeferred().catch((err) => {
+    console.error('[Bootstrap] Gateway deferred shutdown error:', err)
+  })
 
   console.log('[Bootstrap] Extended services cleaned up')
 }

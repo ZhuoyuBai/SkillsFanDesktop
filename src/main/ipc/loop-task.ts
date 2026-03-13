@@ -21,63 +21,63 @@ import {
   retryFailed,
   resetAndRerun,
   listAllScheduledTasks
-} from '../services/loop-task.service'
+} from '../../gateway/automation/loop-task'
 import type { CreateLoopTaskConfig, LoopTask, UserStory } from '../../shared/types/loop-task'
 import { ipcHandle } from './utils'
 
 export function registerLoopTaskHandlers(window: BrowserWindow | null): void {
   ipcHandle('loop-task:list', (_e, spaceId: string) => listTasks(spaceId))
 
-  ipcHandle('loop-task:create', (_e, spaceId: string, config: CreateLoopTaskConfig) =>
-    createTask(spaceId, config)
+  ipcHandle('loop-task:create', async (_e, spaceId: string, config: CreateLoopTaskConfig) =>
+    await createTask(spaceId, config)
   )
 
   ipcHandle('loop-task:get', (_e, spaceId: string, taskId: string) => getTask(spaceId, taskId))
 
-  ipcHandle('loop-task:update', (_e, spaceId: string, taskId: string, updates: Partial<LoopTask>) =>
-    updateTask(spaceId, taskId, updates)
+  ipcHandle('loop-task:update', async (_e, spaceId: string, taskId: string, updates: Partial<LoopTask>) =>
+    await updateTask(spaceId, taskId, updates)
   )
 
-  ipcHandle('loop-task:rename', (_e, spaceId: string, taskId: string, name: string) =>
-    renameTask(spaceId, taskId, name)
+  ipcHandle('loop-task:rename', async (_e, spaceId: string, taskId: string, name: string) =>
+    await renameTask(spaceId, taskId, name)
   )
 
   ipcHandle('loop-task:delete', (_e, spaceId: string, taskId: string) => deleteTask(spaceId, taskId))
 
   ipcHandle('loop-task:add-story',
-    (_e, spaceId: string, taskId: string, story: Omit<UserStory, 'id' | 'status'>) =>
-      addStory(spaceId, taskId, story)
+    async (_e, spaceId: string, taskId: string, story: Omit<UserStory, 'id' | 'status'>) =>
+      await addStory(spaceId, taskId, story)
   )
 
   ipcHandle('loop-task:update-story',
-    (_e, spaceId: string, taskId: string, storyId: string, updates: Partial<UserStory>) =>
-      updateStory(spaceId, taskId, storyId, updates)
+    async (_e, spaceId: string, taskId: string, storyId: string, updates: Partial<UserStory>) =>
+      await updateStory(spaceId, taskId, storyId, updates)
   )
 
-  ipcHandle('loop-task:remove-story', (_e, spaceId: string, taskId: string, storyId: string) =>
-    removeStory(spaceId, taskId, storyId)
+  ipcHandle('loop-task:remove-story', async (_e, spaceId: string, taskId: string, storyId: string) =>
+    await removeStory(spaceId, taskId, storyId)
   )
 
   ipcHandle('loop-task:reorder-stories',
-    (_e, spaceId: string, taskId: string, fromIndex: number, toIndex: number) =>
-      reorderStories(spaceId, taskId, fromIndex, toIndex)
+    async (_e, spaceId: string, taskId: string, fromIndex: number, toIndex: number) =>
+      await reorderStories(spaceId, taskId, fromIndex, toIndex)
   )
 
-  ipcHandle('loop-task:retry-story', (_e, spaceId: string, taskId: string, storyId: string) => {
-    const task = retryStory(spaceId, taskId, storyId)
-    if (!task) throw new Error('Story not found or not in failed state')
+  ipcHandle('loop-task:retry-story', async (_e, spaceId: string, taskId: string, storyId: string) => {
+    const task = await retryStory(spaceId, taskId, storyId)
+    if (!task) throw new Error('This story cannot be retried because it was not found or has not failed')
     return task
   })
 
-  ipcHandle('loop-task:retry-failed', (_e, spaceId: string, taskId: string) => {
-    const task = retryFailed(spaceId, taskId)
-    if (!task) throw new Error('Task not found')
+  ipcHandle('loop-task:retry-failed', async (_e, spaceId: string, taskId: string) => {
+    const task = await retryFailed(spaceId, taskId)
+    if (!task) throw new Error('The requested task could not be found')
     return task
   })
 
-  ipcHandle('loop-task:reset-all', (_e, spaceId: string, taskId: string) => {
-    const task = resetAndRerun(spaceId, taskId)
-    if (!task) throw new Error('Task not found or currently running')
+  ipcHandle('loop-task:reset-all', async (_e, spaceId: string, taskId: string) => {
+    const task = await resetAndRerun(spaceId, taskId)
+    if (!task) throw new Error('This task cannot be reset because it was not found or is still running')
     return task
   })
 
@@ -117,7 +117,7 @@ export function registerLoopTaskHandlers(window: BrowserWindow | null): void {
 
   ipcHandle('file:read', async (_e, filePath: string) => {
     if (!(await fs.pathExists(filePath))) {
-      throw new Error('File not found')
+      throw new Error('The requested file could not be found')
     }
     return fs.readFile(filePath, 'utf-8')
   })

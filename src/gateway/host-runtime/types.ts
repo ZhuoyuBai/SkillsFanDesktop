@@ -1,5 +1,8 @@
 import type { BrowserWindow } from 'electron'
-import type { MacOSAutomationResult } from '../../main/services/local-tools/macos-ui'
+import type {
+  MacOSAutomationErrorCode,
+  MacOSAutomationResult
+} from '../../main/services/local-tools/macos-ui'
 import type {
   HostEnvironmentStatus,
   HostStep,
@@ -44,16 +47,194 @@ export interface RunAppleScriptInput {
   timeoutMs?: number
 }
 
+export interface ActivateDesktopApplicationInput {
+  workDir: string
+  application: string
+  timeoutMs?: number
+}
+
+export type DesktopKeyModifier = 'command' | 'control' | 'option' | 'shift'
+
+export interface PressDesktopKeyInput {
+  workDir: string
+  key: string
+  modifiers?: DesktopKeyModifier[]
+  timeoutMs?: number
+}
+
+export interface TypeDesktopTextInput {
+  workDir: string
+  text: string
+  timeoutMs?: number
+}
+
+export type DesktopMouseButton = 'left' | 'right'
+
+export interface ClickDesktopAtCoordinateInput {
+  workDir: string
+  x: number
+  y: number
+  button?: DesktopMouseButton
+  clickCount?: number
+  timeoutMs?: number
+}
+
+export interface MoveDesktopMouseInput {
+  workDir: string
+  x: number
+  y: number
+  timeoutMs?: number
+}
+
+export interface ScrollDesktopInput {
+  workDir: string
+  x: number
+  y: number
+  deltaX?: number
+  deltaY?: number
+  timeoutMs?: number
+}
+
+export interface ListDesktopWindowsInput {
+  workDir: string
+  application?: string
+  timeoutMs?: number
+}
+
+export interface FocusDesktopWindowInput {
+  workDir: string
+  application: string
+  windowName?: string
+  windowIndex?: number
+  timeoutMs?: number
+}
+
+export interface DesktopWindowInfo {
+  application: string
+  name: string
+  index: number
+  position: { x: number; y: number } | null
+  size: { width: number; height: number } | null
+  minimized: boolean
+}
+
+export interface DesktopWindowListResult {
+  windows: DesktopWindowInfo[]
+}
+
+export type DesktopHostAction =
+  | 'open_application'
+  | 'run_applescript'
+  | 'activate_application'
+  | 'press_key'
+  | 'type_text'
+  | 'click'
+  | 'move_mouse'
+  | 'scroll'
+  | 'list_windows'
+  | 'focus_window'
+
+export interface DesktopActionCapability {
+  id: DesktopHostAction
+  supported: boolean
+  requiresAccessibilityPermission?: boolean
+  notes?: string
+}
+
+export interface DesktopAdapterMethodCapability {
+  id: string
+  displayName?: string
+  action: DesktopHostAction
+  supported: boolean
+  stage?: 'active' | 'scaffolded' | 'planned'
+  notes?: string
+}
+
+export interface DesktopAdapterWorkflowCapability {
+  id: string
+  displayName?: string
+  supported: boolean
+  stage?: 'active' | 'planned'
+  methodIds: string[]
+  notes?: string
+}
+
+export interface DesktopAdapterSmokeFlowCapability {
+  id: string
+  displayName?: string
+  supported: boolean
+  stage?: 'active' | 'planned'
+  methodIds: string[]
+  verification?: string
+  notes?: string
+}
+
+export type DesktopSmokeFlowRunState = 'running' | 'passed' | 'failed'
+
+export interface DesktopSmokeFlowExecutionStep {
+  methodId: string
+  success: boolean
+  summary: string
+  errorCode?: MacOSAutomationErrorCode
+  errorMessage?: string
+  data?: unknown
+}
+
+export interface DesktopSmokeFlowExecutionResult {
+  id: string
+  adapterId: string
+  displayName?: string
+  verification?: string
+  state: DesktopSmokeFlowRunState
+  startedAt: string
+  finishedAt?: string
+  durationMs?: number
+  summary: string
+  error?: string | null
+  steps: DesktopSmokeFlowExecutionStep[]
+}
+
+export interface DesktopAdapterCapability {
+  id: string
+  displayName?: string
+  supported: boolean
+  stage?: 'active' | 'planned'
+  applicationNames?: string[]
+  actions?: DesktopHostAction[]
+  methods?: DesktopAdapterMethodCapability[]
+  workflows?: DesktopAdapterWorkflowCapability[]
+  smokeFlows?: DesktopAdapterSmokeFlowCapability[]
+  notes?: string
+}
+
 export interface DesktopHostCapabilities {
   platform: NodeJS.Platform
+  backend: 'generic-macos' | 'unsupported'
   supportsOpenApplication: boolean
   supportsAppleScript: boolean
+  supportsActivateApplication: boolean
+  supportsPressKey: boolean
+  supportsTypeText: boolean
+  supportsClick: boolean
+  supportsScroll: boolean
+  supportsWindowManagement: boolean
+  actions: DesktopActionCapability[]
+  adapters: DesktopAdapterCapability[]
+  errorCodes: MacOSAutomationErrorCode[]
 }
 
 export interface DesktopHostRuntime {
   getCapabilities(): DesktopHostCapabilities
   openApplication(args: OpenDesktopApplicationInput): Promise<MacOSAutomationResult>
   runAppleScript(args: RunAppleScriptInput): Promise<MacOSAutomationResult>
+  activateApplication(args: ActivateDesktopApplicationInput): Promise<MacOSAutomationResult>
+  pressKey(args: PressDesktopKeyInput): Promise<MacOSAutomationResult>
+  typeText(args: TypeDesktopTextInput): Promise<MacOSAutomationResult>
+  clickAtCoordinate(args: ClickDesktopAtCoordinateInput): Promise<MacOSAutomationResult>
+  moveMouse(args: MoveDesktopMouseInput): Promise<MacOSAutomationResult>
+  scroll(args: ScrollDesktopInput): Promise<MacOSAutomationResult>
+  listWindows(args: ListDesktopWindowsInput): Promise<DesktopWindowListResult>
+  focusWindow(args: FocusDesktopWindowInput): Promise<MacOSAutomationResult>
 }
 
 export interface PerceptionSourceDescriptor {

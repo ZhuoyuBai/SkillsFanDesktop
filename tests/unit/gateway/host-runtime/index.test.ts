@@ -58,6 +58,74 @@ const mocks = vi.hoisted(() => ({
     timedOut: false,
     timeoutMs: 1000
   })),
+  activateMacOSApplication: vi.fn(async () => ({
+    runner: 'osascript',
+    cwd: '/tmp',
+    returnCode: 0,
+    stdout: '',
+    stderr: '',
+    timedOut: false,
+    timeoutMs: 1000
+  })),
+  pressMacOSKey: vi.fn(async () => ({
+    runner: 'osascript',
+    cwd: '/tmp',
+    returnCode: 0,
+    stdout: '',
+    stderr: '',
+    timedOut: false,
+    timeoutMs: 1000
+  })),
+  typeMacOSText: vi.fn(async () => ({
+    runner: 'osascript',
+    cwd: '/tmp',
+    returnCode: 0,
+    stdout: '',
+    stderr: '',
+    timedOut: false,
+    timeoutMs: 1000
+  })),
+  clickMacOSAtCoordinate: vi.fn(async () => ({
+    runner: 'osascript',
+    cwd: '/tmp',
+    returnCode: 0,
+    stdout: '',
+    stderr: '',
+    timedOut: false,
+    timeoutMs: 1000
+  })),
+  moveMacOSMouse: vi.fn(async () => ({
+    runner: 'osascript',
+    cwd: '/tmp',
+    returnCode: 0,
+    stdout: '',
+    stderr: '',
+    timedOut: false,
+    timeoutMs: 1000
+  })),
+  scrollMacOS: vi.fn(async () => ({
+    runner: 'osascript',
+    cwd: '/tmp',
+    returnCode: 0,
+    stdout: '',
+    stderr: '',
+    timedOut: false,
+    timeoutMs: 1000
+  })),
+  listMacOSWindows: vi.fn(async () => ({
+    windows: [
+      { application: 'Safari', name: 'Example', index: 1, position: { x: 0, y: 0 }, size: { width: 800, height: 600 }, minimized: false }
+    ]
+  })),
+  focusMacOSWindow: vi.fn(async () => ({
+    runner: 'osascript',
+    cwd: '/tmp',
+    returnCode: 0,
+    stdout: '',
+    stderr: '',
+    timedOut: false,
+    timeoutMs: 1000
+  })),
   captureMacOSDesktopScreenshot: vi.fn(async () => ({
     filePath: '/tmp/desktop.png',
     mimeType: 'image/png',
@@ -71,7 +139,23 @@ const mocks = vi.hoisted(() => ({
   })),
   getMacOSScreenRecordingPermissionStatus: vi.fn(async () => ({
     state: 'granted'
-  }))
+  })),
+  getDesktopSmokeFlowRunSnapshot: vi.fn((flowId: string) => (
+    flowId === 'chrome.tab-roundtrip'
+      ? {
+        id: flowId,
+        adapterId: 'chrome',
+        displayName: 'Tab Roundtrip',
+        state: 'passed',
+        startedAt: '2026-03-13T03:00:00.000Z',
+        finishedAt: '2026-03-13T03:00:02.000Z',
+        durationMs: 2000,
+        summary: 'Chrome tab roundtrip passed.',
+        error: null,
+        steps: []
+      }
+      : null
+  ))
 }))
 
 vi.mock('../../../../src/main/services/ai-browser', () => ({
@@ -95,10 +179,22 @@ vi.mock('../../../../src/main/services/automated-browser/sdk-mcp-server', () => 
 vi.mock('../../../../src/main/services/local-tools/macos-ui', () => ({
   openMacOSApplication: mocks.openMacOSApplication,
   executeAppleScript: mocks.executeAppleScript,
+  activateMacOSApplication: mocks.activateMacOSApplication,
+  pressMacOSKey: mocks.pressMacOSKey,
+  typeMacOSText: mocks.typeMacOSText,
+  clickMacOSAtCoordinate: mocks.clickMacOSAtCoordinate,
+  moveMacOSMouse: mocks.moveMacOSMouse,
+  scrollMacOS: mocks.scrollMacOS,
+  listMacOSWindows: mocks.listMacOSWindows,
+  focusMacOSWindow: mocks.focusMacOSWindow,
   captureMacOSDesktopScreenshot: mocks.captureMacOSDesktopScreenshot,
   readMacOSDesktopUiTree: mocks.readMacOSDesktopUiTree,
   getMacOSAccessibilityPermissionStatus: mocks.getMacOSAccessibilityPermissionStatus,
   getMacOSScreenRecordingPermissionStatus: mocks.getMacOSScreenRecordingPermissionStatus
+}))
+
+vi.mock('../../../../src/gateway/host-runtime/desktop/smoke-flows', () => ({
+  getDesktopSmokeFlowRunSnapshot: mocks.getDesktopSmokeFlowRunSnapshot
 }))
 
 import {
@@ -108,6 +204,7 @@ import {
   perceptionHostRuntime,
   stepReporterRuntime
 } from '../../../../src/gateway/host-runtime'
+import { listDesktopAppAdapters } from '../../../../src/gateway/host-runtime/desktop/adapters/registry'
 
 describe('host runtime adapters', () => {
   beforeEach(() => {
@@ -206,6 +303,111 @@ describe('host runtime adapters', () => {
   })
 
   it('delegates desktop operations to the existing macOS helpers', async () => {
+    const isMacOS = process.platform === 'darwin'
+    const capabilities = desktopHostRuntime.getCapabilities()
+
+    expect(capabilities).toMatchObject({
+      platform: process.platform,
+      backend: isMacOS ? 'generic-macos' : 'unsupported',
+      supportsOpenApplication: isMacOS,
+      supportsAppleScript: isMacOS,
+      supportsActivateApplication: isMacOS,
+      supportsPressKey: isMacOS,
+      supportsTypeText: isMacOS,
+      supportsClick: isMacOS,
+      supportsScroll: isMacOS,
+      supportsWindowManagement: isMacOS
+    })
+    expect(capabilities.actions).toEqual([
+      {
+        id: 'open_application',
+        supported: isMacOS,
+        notes: isMacOS
+          ? 'Launches a real macOS application or target URL/file.'
+          : 'Desktop automation is only available on macOS.'
+      },
+      {
+        id: 'run_applescript',
+        supported: isMacOS,
+        notes: isMacOS
+          ? 'Advanced escape hatch for actions not yet covered by structured desktop tools.'
+          : 'Desktop automation is only available on macOS.'
+      },
+      {
+        id: 'activate_application',
+        supported: isMacOS,
+        notes: isMacOS
+          ? 'Brings an existing application to the foreground.'
+          : 'Desktop automation is only available on macOS.'
+      },
+      {
+        id: 'press_key',
+        supported: isMacOS,
+        requiresAccessibilityPermission: isMacOS,
+        notes: isMacOS
+          ? 'Requires macOS Accessibility permission.'
+          : 'Desktop automation is only available on macOS.'
+      },
+      {
+        id: 'type_text',
+        supported: isMacOS,
+        requiresAccessibilityPermission: isMacOS,
+        notes: isMacOS
+          ? 'Requires macOS Accessibility permission.'
+          : 'Desktop automation is only available on macOS.'
+      },
+      {
+        id: 'click',
+        supported: isMacOS,
+        requiresAccessibilityPermission: isMacOS,
+        notes: isMacOS
+          ? 'Requires macOS Accessibility permission.'
+          : 'Desktop automation is only available on macOS.'
+      },
+      {
+        id: 'move_mouse',
+        supported: isMacOS,
+        requiresAccessibilityPermission: isMacOS,
+        notes: isMacOS
+          ? 'Requires macOS Accessibility permission.'
+          : 'Desktop automation is only available on macOS.'
+      },
+      {
+        id: 'scroll',
+        supported: isMacOS,
+        requiresAccessibilityPermission: isMacOS,
+        notes: isMacOS
+          ? 'Requires macOS Accessibility permission.'
+          : 'Desktop automation is only available on macOS.'
+      },
+      {
+        id: 'list_windows',
+        supported: isMacOS,
+        requiresAccessibilityPermission: isMacOS,
+        notes: isMacOS
+          ? 'Requires macOS Accessibility permission.'
+          : 'Desktop automation is only available on macOS.'
+      },
+      {
+        id: 'focus_window',
+        supported: isMacOS,
+        requiresAccessibilityPermission: isMacOS,
+        notes: isMacOS
+          ? 'Requires macOS Accessibility permission.'
+          : 'Desktop automation is only available on macOS.'
+      }
+    ])
+    expect(capabilities.adapters).toEqual(listDesktopAppAdapters(process.platform))
+    expect(capabilities.errorCodes).toEqual([
+      'unsupported_platform',
+      'invalid_input',
+      'timeout',
+      'permission_denied',
+      'app_not_found',
+      'window_not_found',
+      'execution_failed'
+    ])
+
     const openResult = await desktopHostRuntime.openApplication({
       workDir: '/tmp',
       application: 'Safari'
@@ -213,6 +415,19 @@ describe('host runtime adapters', () => {
     const scriptResult = await desktopHostRuntime.runAppleScript({
       workDir: '/tmp',
       script: 'return "ok"'
+    })
+    const activateResult = await desktopHostRuntime.activateApplication({
+      workDir: '/tmp',
+      application: 'Safari'
+    })
+    const keyResult = await desktopHostRuntime.pressKey({
+      workDir: '/tmp',
+      key: 'Enter',
+      modifiers: ['command']
+    })
+    const typeResult = await desktopHostRuntime.typeText({
+      workDir: '/tmp',
+      text: 'hello'
     })
 
     expect(mocks.openMacOSApplication).toHaveBeenCalledWith({
@@ -223,8 +438,91 @@ describe('host runtime adapters', () => {
       workDir: '/tmp',
       script: 'return "ok"'
     })
+    expect(mocks.activateMacOSApplication).toHaveBeenCalledWith({
+      workDir: '/tmp',
+      application: 'Safari'
+    })
+    expect(mocks.pressMacOSKey).toHaveBeenCalledWith({
+      workDir: '/tmp',
+      key: 'Enter',
+      modifiers: ['command']
+    })
+    expect(mocks.typeMacOSText).toHaveBeenCalledWith({
+      workDir: '/tmp',
+      text: 'hello'
+    })
     expect(openResult.returnCode).toBe(0)
     expect(scriptResult.stdout).toBe('ok')
+    expect(activateResult.returnCode).toBe(0)
+    expect(keyResult.returnCode).toBe(0)
+    expect(typeResult.returnCode).toBe(0)
+  })
+
+  it('delegates click, move, scroll, and window operations to macOS helpers', async () => {
+    const clickResult = await desktopHostRuntime.clickAtCoordinate({
+      workDir: '/tmp',
+      x: 100,
+      y: 200,
+      button: 'left',
+      clickCount: 2
+    })
+    expect(mocks.clickMacOSAtCoordinate).toHaveBeenCalledWith({
+      workDir: '/tmp',
+      x: 100,
+      y: 200,
+      button: 'left',
+      clickCount: 2
+    })
+    expect(clickResult.returnCode).toBe(0)
+
+    const moveResult = await desktopHostRuntime.moveMouse({
+      workDir: '/tmp',
+      x: 300,
+      y: 400
+    })
+    expect(mocks.moveMacOSMouse).toHaveBeenCalledWith({
+      workDir: '/tmp',
+      x: 300,
+      y: 400
+    })
+    expect(moveResult.returnCode).toBe(0)
+
+    const scrollResult = await desktopHostRuntime.scroll({
+      workDir: '/tmp',
+      x: 500,
+      y: 600,
+      deltaY: -3
+    })
+    expect(mocks.scrollMacOS).toHaveBeenCalledWith({
+      workDir: '/tmp',
+      x: 500,
+      y: 600,
+      deltaY: -3
+    })
+    expect(scrollResult.returnCode).toBe(0)
+
+    const windowsResult = await desktopHostRuntime.listWindows({
+      workDir: '/tmp',
+      application: 'Safari'
+    })
+    expect(mocks.listMacOSWindows).toHaveBeenCalledWith({
+      workDir: '/tmp',
+      application: 'Safari'
+    })
+    expect(windowsResult.windows).toHaveLength(1)
+    expect(windowsResult.windows[0].application).toBe('Safari')
+
+    const focusResult = await desktopHostRuntime.focusWindow({
+      workDir: '/tmp',
+      application: 'Safari',
+      windowName: 'Example'
+    })
+    expect(mocks.focusMacOSWindow).toHaveBeenCalledWith({
+      workDir: '/tmp',
+      application: 'Safari',
+      windowName: 'Example'
+    })
+    expect(focusResult.returnCode).toBe(0)
   })
 
   it('reports host environment status for the current platform', async () => {
@@ -238,13 +536,118 @@ describe('host runtime adapters', () => {
         toolCount: 3
       },
       desktop: {
-        state: process.platform === 'darwin' ? 'ready' : 'unsupported'
+        state: process.platform === 'darwin' ? 'ready' : 'unsupported',
+        backend: process.platform === 'darwin' ? 'generic-macos' : 'unsupported',
+        actions: expect.any(Array),
+        adapters: expect.any(Array),
+        errorCodes: [
+          'unsupported_platform',
+          'invalid_input',
+          'timeout',
+          'permission_denied',
+          'app_not_found',
+          'window_not_found',
+          'execution_failed'
+        ]
       },
       permissions: {
         accessibility: { state: 'needs_permission' },
         screenRecording: { state: 'granted' }
       }
     })
+    expect(status.desktop.actions.some((action) => action.id === 'press_key' && action.blockedByPermission)).toBe(
+      process.platform === 'darwin'
+    )
+    expect(status.desktop.adapters[0]?.id).toBe('generic-macos')
+    expect(status.desktop.adapters.find((adapter) => adapter.id === 'finder')?.methods).toEqual([
+      expect.objectContaining({
+        id: 'finder.reveal_path',
+        action: 'run_applescript',
+        stage: 'active',
+        supported: true
+      }),
+      expect.objectContaining({
+        id: 'finder.open_folder',
+        action: 'open_application',
+        stage: 'active',
+        supported: true
+      }),
+      expect.objectContaining({
+        id: 'finder.open_home_folder',
+        action: 'open_application',
+        stage: 'active',
+        supported: true
+      }),
+      expect.objectContaining({
+        id: 'finder.new_window',
+        action: 'press_key',
+        stage: 'active',
+        supported: true
+      }),
+      expect.objectContaining({
+        id: 'finder.search',
+        action: 'run_applescript',
+        stage: 'active',
+        supported: true
+      })
+    ])
+    expect(status.desktop.adapters.find((adapter) => adapter.id === 'terminal')).toEqual(expect.objectContaining({
+      stage: 'active',
+      supported: process.platform === 'darwin',
+      workflows: expect.arrayContaining([
+        expect.objectContaining({
+          id: 'terminal.session-control',
+          blockedByPermission: false
+        }),
+        expect.objectContaining({
+          id: 'terminal.run-and-verify',
+          blockedByPermission: process.platform === 'darwin',
+          recoveryHint: process.platform === 'darwin'
+            ? 'Grant macOS Accessibility permission to unlock shortcut, keyboard, mouse, and window-control steps in this workflow.'
+            : undefined
+        }),
+        expect.objectContaining({
+          id: 'iterm.pane-ops',
+          blockedByPermission: false
+        })
+      ])
+    }))
+    expect(status.desktop.adapters.find((adapter) => adapter.id === 'chrome')).toEqual(expect.objectContaining({
+      stage: 'active',
+      supported: process.platform === 'darwin',
+      workflows: expect.arrayContaining([
+        expect.objectContaining({
+          id: 'chrome.tab-navigation',
+          blockedByPermission: process.platform === 'darwin'
+        }),
+        expect.objectContaining({
+          id: 'chrome.tab-observe',
+          blockedByPermission: false
+        }),
+        expect.objectContaining({
+          id: 'chrome.tab-cleanup',
+          blockedByPermission: process.platform === 'darwin'
+        })
+      ]),
+      smokeFlows: expect.arrayContaining([
+        expect.objectContaining({
+          id: 'chrome.tab-roundtrip',
+          blockedByPermission: process.platform === 'darwin',
+          lastRun: {
+            state: 'passed',
+            startedAt: '2026-03-13T03:00:00.000Z',
+            finishedAt: '2026-03-13T03:00:02.000Z',
+            durationMs: 2000,
+            summary: 'Chrome tab roundtrip passed.',
+            error: undefined
+          }
+        }),
+        expect.objectContaining({
+          id: 'chrome.discovery-roundtrip',
+          blockedByPermission: process.platform === 'darwin'
+        })
+      ])
+    }))
     expect(mocks.getMacOSAccessibilityPermissionStatus).toHaveBeenCalledTimes(1)
     expect(mocks.getMacOSScreenRecordingPermissionStatus).toHaveBeenCalledTimes(1)
   })

@@ -41,7 +41,12 @@ app.commandLine.appendSwitch('disable-blink-features', 'AutomationControlled')
 // Always request the lock, even in dev mode, to prevent protocol URLs
 // (skillsfan://auth/callback) from spawning a second Electron instance.
 // electron-vite dev sends SIGTERM on restart, releasing the OS-level lock.
-const gotTheLock = app.requestSingleInstanceLock()
+const isGatewayExternalProcess =
+  process.env.SKILLSFAN_GATEWAY_ONLY === '1'
+  || process.env.SKILLSFAN_GATEWAY_ROLE === 'external'
+  || process.argv.includes('--gateway-external')
+
+const gotTheLock = isGatewayExternalProcess ? true : app.requestSingleInstanceLock()
 
 if (!gotTheLock) {
   // Another instance is already running, exit immediately
@@ -54,6 +59,10 @@ if (!gotTheLock) {
 // Note: This event only fires on the primary instance
 // On Windows/Linux, deep link URLs are passed as command line arguments
 app.on('second-instance', (_event, commandLine) => {
+  if (isGatewayExternalProcess) {
+    return
+  }
+
   // Check for skillsfan:// URL in command line (Windows/Linux deep links)
   const url = commandLine.find((arg) => arg.startsWith('skillsfan://'))
   if (url) {
@@ -89,7 +98,7 @@ import {
   cleanupExtendedServices
 } from './bootstrap'
 import { initializeApp, getConfig, getMinimizeToTray } from './services/config.service'
-import { disableRemoteAccess } from './services/remote.service'
+import { initializeGatewayCore, shutdownGateway } from '../gateway/bootstrap'
 import { stopOpenAICompatRouter } from './openai-compat-router'
 import {
   createTray,
@@ -326,6 +335,20 @@ function createWindow(): void {
 
 // Initialize application
 app.whenReady().then(async () => {
+  if (isGatewayExternalProcess) {
+    await initializeApp()
+    await loadAuthState()
+    await initializeGatewayCore(null, {
+      processRole: 'external-gateway'
+    })
+    await initializeGatewayDeferred({
+      processRole: 'external-gateway'
+    })
+    app.dock?.hide()
+    console.log('[Gateway] External gateway process ready.')
+    return
+  }
+
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.halo.app')
 
@@ -368,6 +391,7 @@ app.whenReady().then(async () => {
   // Phase 1: Essential Services (synchronous, required for first screen)
   // These services are needed for the initial UI render
   if (mainWindow) {
+    await initializeGatewayCore(mainWindow)
     initializeEssentialServices(mainWindow)
   }
 
@@ -394,6 +418,10 @@ app.whenReady().then(async () => {
   }
 
   app.on('activate', function () {
+    if (isGatewayExternalProcess) {
+      return
+    }
+
     // On macOS, re-show the window when clicking dock icon
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.show()
@@ -410,13 +438,17 @@ app.on('before-quit', () => {
 })
 
 app.on('window-all-closed', () => {
+  if (isGatewayExternalProcess) {
+    return
+  }
+
   // If minimize to tray is enabled, don't quit
   if (getMinimizeToTray() && !getIsQuitting()) {
     return
   }
 
-  // Clean up remote access before quitting
-  disableRemoteAccess().catch(console.error)
+  // Clean up the gateway before quitting
+  shutdownGateway().catch(console.error)
   // Clean up local OpenAI compat router (if started)
   stopOpenAICompatRouter().catch(console.error)
 

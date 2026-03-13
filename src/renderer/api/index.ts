@@ -17,6 +17,7 @@ import {
 } from './transport'
 import type { ImageAttachment, Attachment } from '../types'
 import type { ThinkingEffort } from '../../shared/utils/openai-models'
+import i18n from '../i18n'
 
 // Response type
 interface ApiResponse<T = unknown> {
@@ -143,7 +144,7 @@ export const api = {
       return window.skillsfan.resetToDefault()
     }
     // Remote mode does not support reset
-    return { success: false, error: 'Reset to default is only available in desktop mode' }
+    return { success: false, error: i18n.t('Reset to default is only available in the desktop app') }
   },
 
   // ===== Memory =====
@@ -244,7 +245,7 @@ export const api = {
       return window.skillsfan.selectFolder()
     }
     // Cannot select folder in remote mode
-    return { success: false, error: 'Cannot select folder in remote mode' }
+    return { success: false, error: i18n.t('This feature is not available in remote mode') }
   },
 
   pathExists: async (targetPath: string): Promise<ApiResponse<boolean>> => {
@@ -520,6 +521,118 @@ export const api = {
     }
   },
 
+  getGatewayHealth: async (): Promise<ApiResponse> => {
+    if (!isElectron()) {
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
+    }
+    return window.skillsfan.getGatewayHealth()
+  },
+
+  getGatewayServices: async (): Promise<ApiResponse> => {
+    if (!isElectron()) {
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
+    }
+    return window.skillsfan.getGatewayServices()
+  },
+
+  getGatewayDoctor: async (): Promise<ApiResponse> => {
+    if (!isElectron()) {
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
+    }
+    return window.skillsfan.getGatewayDoctor()
+  },
+
+  getGatewayProcessStatus: async (): Promise<ApiResponse> => {
+    if (!isElectron()) {
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
+    }
+    return window.skillsfan.getGatewayProcessStatus()
+  },
+
+  getGatewayLauncherStatus: async (): Promise<ApiResponse> => {
+    if (!isElectron()) {
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
+    }
+    return window.skillsfan.getGatewayLauncherStatus()
+  },
+
+  recoverGatewayLauncher: async (): Promise<ApiResponse> => {
+    if (!isElectron()) {
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
+    }
+    return window.skillsfan.recoverGatewayLauncher()
+  },
+
+  getGatewayDaemonStatus: async (): Promise<ApiResponse> => {
+    if (!isElectron()) {
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
+    }
+    return window.skillsfan.getGatewayDaemonStatus()
+  },
+
+  getGatewayDaemonInstallPlan: async (): Promise<ApiResponse> => {
+    if (!isElectron()) {
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
+    }
+    return window.skillsfan.getGatewayDaemonInstallPlan()
+  },
+
+  prepareGatewayDaemonInstall: async (): Promise<ApiResponse> => {
+    if (!isElectron()) {
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
+    }
+    return window.skillsfan.prepareGatewayDaemonInstall()
+  },
+
+  runGatewayDaemonInstall: async (bundleDir?: string): Promise<ApiResponse> => {
+    if (!isElectron()) {
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
+    }
+    return window.skillsfan.runGatewayDaemonInstall(bundleDir)
+  },
+
+  runGatewayDaemonUninstall: async (bundleDir?: string): Promise<ApiResponse> => {
+    if (!isElectron()) {
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
+    }
+    return window.skillsfan.runGatewayDaemonUninstall(bundleDir)
+  },
+
+  clearGatewayDaemonLock: async (): Promise<ApiResponse> => {
+    if (!isElectron()) {
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
+    }
+    return window.skillsfan.clearGatewayDaemonLock()
+  },
+
+  registerGatewayDaemon: async (): Promise<ApiResponse> => {
+    if (!isElectron()) {
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
+    }
+    return window.skillsfan.registerGatewayDaemon()
+  },
+
+  unregisterGatewayDaemon: async (): Promise<ApiResponse> => {
+    if (!isElectron()) {
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
+    }
+    return window.skillsfan.unregisterGatewayDaemon()
+  },
+
+  runGatewayDesktopSmokeFlow: async (flowId: string): Promise<ApiResponse> => {
+    if (!isElectron()) {
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
+    }
+    return window.skillsfan.runGatewayDesktopSmokeFlow(flowId)
+  },
+
+  getGatewayStepJournal: async (sessionKey: string): Promise<ApiResponse> => {
+    if (!isElectron()) {
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
+    }
+    return window.skillsfan.getGatewayStepJournal(sessionKey)
+  },
+
   // Warm up V2 session - call when switching conversations to prepare for faster message sending
   ensureSessionWarm: async (spaceId: string, conversationId: string): Promise<ApiResponse> => {
     if (isElectron()) {
@@ -580,7 +693,7 @@ export const api = {
       return window.skillsfan.openArtifact(filePath)
     }
     // Can't open files remotely
-    return { success: false, error: 'Cannot open files in remote mode' }
+    return { success: false, error: i18n.t('This feature is not available in remote mode') }
   },
 
   showArtifactInFolder: async (filePath: string): Promise<ApiResponse> => {
@@ -588,7 +701,7 @@ export const api = {
       return window.skillsfan.showArtifactInFolder(filePath)
     }
     // Can't open folder remotely
-    return { success: false, error: 'Cannot open folder in remote mode' }
+    return { success: false, error: i18n.t('This feature is not available in remote mode') }
   },
 
   // Download artifact (remote mode only - triggers browser download)
@@ -630,14 +743,14 @@ export const api = {
       return window.skillsfan.watchArtifactFile(filePath)
     }
     // Remote mode: no file watching support
-    return { success: false, error: 'File watching not supported in remote mode' }
+    return { success: false, error: i18n.t('This feature is not available in remote mode') }
   },
 
   unwatchArtifactFile: async (filePath: string): Promise<ApiResponse> => {
     if (isElectron()) {
       return window.skillsfan.unwatchArtifactFile(filePath)
     }
-    return { success: false, error: 'File watching not supported in remote mode' }
+    return { success: false, error: i18n.t('This feature is not available in remote mode') }
   },
 
   onArtifactFileChanged: (callback: (data: unknown) => void): (() => void) => {
@@ -670,7 +783,7 @@ export const api = {
     if (isElectron()) {
       return window.skillsfan.selectSkillArchive()
     }
-    return { success: false, error: 'Only available in desktop app' }
+    return { success: false, error: i18n.t('This feature is only available in the desktop app') }
   },
 
   installSkill: async (
@@ -694,7 +807,7 @@ export const api = {
     if (isElectron()) {
       return window.skillsfan.openSkillFolder(skillName)
     }
-    return { success: false, error: 'Only available in desktop app' }
+    return { success: false, error: i18n.t('This feature is only available in the desktop app') }
   },
 
   // List slash commands (built-in + skills)
@@ -747,127 +860,127 @@ export const api = {
   // ===== Remote Access (Electron only) =====
   enableRemoteAccess: async (port?: number): Promise<ApiResponse> => {
     if (!isElectron()) {
-      return { success: false, error: 'Only available in desktop app' }
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
     }
     return window.skillsfan.enableRemoteAccess(port)
   },
 
   disableRemoteAccess: async (): Promise<ApiResponse> => {
     if (!isElectron()) {
-      return { success: false, error: 'Only available in desktop app' }
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
     }
     return window.skillsfan.disableRemoteAccess()
   },
 
   enableTunnel: async (): Promise<ApiResponse> => {
     if (!isElectron()) {
-      return { success: false, error: 'Only available in desktop app' }
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
     }
     return window.skillsfan.enableTunnel()
   },
 
   disableTunnel: async (): Promise<ApiResponse> => {
     if (!isElectron()) {
-      return { success: false, error: 'Only available in desktop app' }
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
     }
     return window.skillsfan.disableTunnel()
   },
 
   getRemoteStatus: async (): Promise<ApiResponse> => {
     if (!isElectron()) {
-      return { success: false, error: 'Only available in desktop app' }
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
     }
     return window.skillsfan.getRemoteStatus()
   },
 
   getRemoteQRCode: async (includeToken?: boolean): Promise<ApiResponse> => {
     if (!isElectron()) {
-      return { success: false, error: 'Only available in desktop app' }
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
     }
     return window.skillsfan.getRemoteQRCode(includeToken)
   },
 
   setRemotePassword: async (password: string): Promise<ApiResponse> => {
     if (!isElectron()) {
-      return { success: false, error: 'Only available in desktop app' }
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
     }
     return window.skillsfan.setRemotePassword(password)
   },
 
   regenerateRemotePassword: async (): Promise<ApiResponse> => {
     if (!isElectron()) {
-      return { success: false, error: 'Only available in desktop app' }
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
     }
     return window.skillsfan.regenerateRemotePassword()
   },
 
   // ===== Feishu Bot (Electron only) =====
   feishuStatus: async (): Promise<ApiResponse> => {
-    if (!isElectron()) return { success: false, error: 'Only available in desktop app' }
+    if (!isElectron()) return { success: false, error: i18n.t('This feature is only available in the desktop app') }
     return window.skillsfan.feishuStatus()
   },
   feishuTestConnection: async (appId: string, appSecret: string): Promise<ApiResponse> => {
-    if (!isElectron()) return { success: false, error: 'Only available in desktop app' }
+    if (!isElectron()) return { success: false, error: i18n.t('This feature is only available in the desktop app') }
     return window.skillsfan.feishuTestConnection(appId, appSecret)
   },
   feishuSetCredentials: async (appId: string, appSecret: string): Promise<ApiResponse> => {
-    if (!isElectron()) return { success: false, error: 'Only available in desktop app' }
+    if (!isElectron()) return { success: false, error: i18n.t('This feature is only available in the desktop app') }
     return window.skillsfan.feishuSetCredentials(appId, appSecret)
   },
   feishuEnable: async (): Promise<ApiResponse> => {
-    if (!isElectron()) return { success: false, error: 'Only available in desktop app' }
+    if (!isElectron()) return { success: false, error: i18n.t('This feature is only available in the desktop app') }
     return window.skillsfan.feishuEnable()
   },
   feishuDisable: async (): Promise<ApiResponse> => {
-    if (!isElectron()) return { success: false, error: 'Only available in desktop app' }
+    if (!isElectron()) return { success: false, error: i18n.t('This feature is only available in the desktop app') }
     return window.skillsfan.feishuDisable()
   },
   feishuRegeneratePairingCode: async (): Promise<ApiResponse> => {
-    if (!isElectron()) return { success: false, error: 'Only available in desktop app' }
+    if (!isElectron()) return { success: false, error: i18n.t('This feature is only available in the desktop app') }
     return window.skillsfan.feishuRegeneratePairingCode()
   },
   feishuRevokeChat: async (chatId: string): Promise<ApiResponse> => {
-    if (!isElectron()) return { success: false, error: 'Only available in desktop app' }
+    if (!isElectron()) return { success: false, error: i18n.t('This feature is only available in the desktop app') }
     return window.skillsfan.feishuRevokeChat(chatId)
   },
   feishuGetSessions: async (): Promise<ApiResponse> => {
-    if (!isElectron()) return { success: false, error: 'Only available in desktop app' }
+    if (!isElectron()) return { success: false, error: i18n.t('This feature is only available in the desktop app') }
     return window.skillsfan.feishuGetSessions()
   },
   feishuSetGroupPolicy: async (policy: string): Promise<ApiResponse> => {
-    if (!isElectron()) return { success: false, error: 'Only available in desktop app' }
+    if (!isElectron()) return { success: false, error: i18n.t('This feature is only available in the desktop app') }
     return window.skillsfan.feishuSetGroupPolicy(policy)
   },
   feishuSetDefaultSpace: async (spaceId: string | null): Promise<ApiResponse> => {
-    if (!isElectron()) return { success: false, error: 'Only available in desktop app' }
+    if (!isElectron()) return { success: false, error: i18n.t('This feature is only available in the desktop app') }
     return window.skillsfan.feishuSetDefaultSpace(spaceId)
   },
 
   // ===== System Settings (Electron only) =====
   getAutoLaunch: async (): Promise<ApiResponse> => {
     if (!isElectron()) {
-      return { success: false, error: 'Only available in desktop app' }
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
     }
     return window.skillsfan.getAutoLaunch()
   },
 
   setAutoLaunch: async (enabled: boolean): Promise<ApiResponse> => {
     if (!isElectron()) {
-      return { success: false, error: 'Only available in desktop app' }
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
     }
     return window.skillsfan.setAutoLaunch(enabled)
   },
 
   getMinimizeToTray: async (): Promise<ApiResponse> => {
     if (!isElectron()) {
-      return { success: false, error: 'Only available in desktop app' }
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
     }
     return window.skillsfan.getMinimizeToTray()
   },
 
   setMinimizeToTray: async (enabled: boolean): Promise<ApiResponse> => {
     if (!isElectron()) {
-      return { success: false, error: 'Only available in desktop app' }
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
     }
     return window.skillsfan.setMinimizeToTray(enabled)
   },
@@ -892,28 +1005,28 @@ export const api = {
 
   maximizeWindow: async (): Promise<ApiResponse> => {
     if (!isElectron()) {
-      return { success: false, error: 'Only available in desktop app' }
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
     }
     return window.skillsfan.maximizeWindow()
   },
 
   unmaximizeWindow: async (): Promise<ApiResponse> => {
     if (!isElectron()) {
-      return { success: false, error: 'Only available in desktop app' }
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
     }
     return window.skillsfan.unmaximizeWindow()
   },
 
   isWindowMaximized: async (): Promise<ApiResponse<boolean>> => {
     if (!isElectron()) {
-      return { success: false, error: 'Only available in desktop app' }
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
     }
     return window.skillsfan.isWindowMaximized()
   },
 
   toggleMaximizeWindow: async (): Promise<ApiResponse<boolean>> => {
     if (!isElectron()) {
-      return { success: false, error: 'Only available in desktop app' }
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
     }
     return window.skillsfan.toggleMaximizeWindow()
   },
@@ -974,21 +1087,21 @@ export const api = {
     if (isElectron()) {
       return window.skillsfan.createBrowserView(viewId, url)
     }
-    return { success: false, error: 'Browser views only available in desktop app' }
+    return { success: false, error: i18n.t('This feature is only available in the desktop app') }
   },
 
   destroyBrowserView: async (viewId: string): Promise<ApiResponse> => {
     if (isElectron()) {
       return window.skillsfan.destroyBrowserView(viewId)
     }
-    return { success: false, error: 'Browser views only available in desktop app' }
+    return { success: false, error: i18n.t('This feature is only available in the desktop app') }
   },
 
   destroyAllBrowserViews: async (): Promise<ApiResponse> => {
     if (isElectron()) {
       return window.skillsfan.destroyAllBrowserViews()
     }
-    return { success: false, error: 'Browser views only available in desktop app' }
+    return { success: false, error: i18n.t('This feature is only available in the desktop app') }
   },
 
   showBrowserView: async (
@@ -998,14 +1111,14 @@ export const api = {
     if (isElectron()) {
       return window.skillsfan.showBrowserView(viewId, bounds)
     }
-    return { success: false, error: 'Browser views only available in desktop app' }
+    return { success: false, error: i18n.t('This feature is only available in the desktop app') }
   },
 
   hideBrowserView: async (viewId: string): Promise<ApiResponse> => {
     if (isElectron()) {
       return window.skillsfan.hideBrowserView(viewId)
     }
-    return { success: false, error: 'Browser views only available in desktop app' }
+    return { success: false, error: i18n.t('This feature is only available in the desktop app') }
   },
 
   resizeBrowserView: async (
@@ -1015,84 +1128,84 @@ export const api = {
     if (isElectron()) {
       return window.skillsfan.resizeBrowserView(viewId, bounds)
     }
-    return { success: false, error: 'Browser views only available in desktop app' }
+    return { success: false, error: i18n.t('This feature is only available in the desktop app') }
   },
 
   navigateBrowserView: async (viewId: string, url: string): Promise<ApiResponse> => {
     if (isElectron()) {
       return window.skillsfan.navigateBrowserView(viewId, url)
     }
-    return { success: false, error: 'Browser views only available in desktop app' }
+    return { success: false, error: i18n.t('This feature is only available in the desktop app') }
   },
 
   browserGoBack: async (viewId: string): Promise<ApiResponse> => {
     if (isElectron()) {
       return window.skillsfan.browserGoBack(viewId)
     }
-    return { success: false, error: 'Browser views only available in desktop app' }
+    return { success: false, error: i18n.t('This feature is only available in the desktop app') }
   },
 
   browserGoForward: async (viewId: string): Promise<ApiResponse> => {
     if (isElectron()) {
       return window.skillsfan.browserGoForward(viewId)
     }
-    return { success: false, error: 'Browser views only available in desktop app' }
+    return { success: false, error: i18n.t('This feature is only available in the desktop app') }
   },
 
   browserReload: async (viewId: string): Promise<ApiResponse> => {
     if (isElectron()) {
       return window.skillsfan.browserReload(viewId)
     }
-    return { success: false, error: 'Browser views only available in desktop app' }
+    return { success: false, error: i18n.t('This feature is only available in the desktop app') }
   },
 
   browserStop: async (viewId: string): Promise<ApiResponse> => {
     if (isElectron()) {
       return window.skillsfan.browserStop(viewId)
     }
-    return { success: false, error: 'Browser views only available in desktop app' }
+    return { success: false, error: i18n.t('This feature is only available in the desktop app') }
   },
 
   getBrowserState: async (viewId: string): Promise<ApiResponse> => {
     if (isElectron()) {
       return window.skillsfan.getBrowserState(viewId)
     }
-    return { success: false, error: 'Browser views only available in desktop app' }
+    return { success: false, error: i18n.t('This feature is only available in the desktop app') }
   },
 
   captureBrowserView: async (viewId: string): Promise<ApiResponse> => {
     if (isElectron()) {
       return window.skillsfan.captureBrowserView(viewId)
     }
-    return { success: false, error: 'Browser views only available in desktop app' }
+    return { success: false, error: i18n.t('This feature is only available in the desktop app') }
   },
 
   executeBrowserJS: async (viewId: string, code: string): Promise<ApiResponse> => {
     if (isElectron()) {
       return window.skillsfan.executeBrowserJS(viewId, code)
     }
-    return { success: false, error: 'Browser views only available in desktop app' }
+    return { success: false, error: i18n.t('This feature is only available in the desktop app') }
   },
 
   setBrowserZoom: async (viewId: string, level: number): Promise<ApiResponse> => {
     if (isElectron()) {
       return window.skillsfan.setBrowserZoom(viewId, level)
     }
-    return { success: false, error: 'Browser views only available in desktop app' }
+    return { success: false, error: i18n.t('This feature is only available in the desktop app') }
   },
 
   toggleBrowserDevTools: async (viewId: string): Promise<ApiResponse> => {
     if (isElectron()) {
       return window.skillsfan.toggleBrowserDevTools(viewId)
     }
-    return { success: false, error: 'Browser views only available in desktop app' }
+    return { success: false, error: i18n.t('This feature is only available in the desktop app') }
   },
 
   showBrowserContextMenu: async (options: { viewId: string; url?: string; zoomLevel: number }): Promise<ApiResponse> => {
     if (isElectron()) {
       return window.skillsfan.showBrowserContextMenu(options)
     }
-    return { success: false, error: 'Browser views only available in desktop app' }
+    return { success: false, error: i18n.t('This feature is only available in the desktop app') }
   },
 
   onBrowserStateChange: (callback: (data: unknown) => void) =>
@@ -1113,7 +1226,7 @@ export const api = {
     if (isElectron()) {
       return window.skillsfan.showCanvasTabContextMenu(options)
     }
-    return { success: false, error: 'Native menu only available in desktop app' }
+    return { success: false, error: i18n.t('This feature is only available in the desktop app') }
   },
 
   onCanvasTabAction: (callback: (data: {
@@ -1163,42 +1276,42 @@ export const api = {
   // ===== Updater (Electron only) =====
   checkForUpdates: async (): Promise<ApiResponse> => {
     if (!isElectron()) {
-      return { success: false, error: 'Only available in desktop app' }
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
     }
     return window.skillsfan.checkForUpdates()
   },
 
   installUpdate: async (): Promise<ApiResponse> => {
     if (!isElectron()) {
-      return { success: false, error: 'Only available in desktop app' }
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
     }
     return window.skillsfan.installUpdate()
   },
 
   downloadUpdate: async (): Promise<ApiResponse> => {
     if (!isElectron()) {
-      return { success: false, error: 'Only available in desktop app' }
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
     }
     return window.skillsfan.downloadUpdate()
   },
 
   getVersion: async (): Promise<ApiResponse<string>> => {
     if (!isElectron()) {
-      return { success: false, error: 'Only available in desktop app' }
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
     }
     return window.skillsfan.getVersion()
   },
 
   getUpdateInfo: async (): Promise<ApiResponse> => {
     if (!isElectron()) {
-      return { success: false, error: 'Only available in desktop app' }
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
     }
     return window.skillsfan.getUpdateInfo()
   },
 
   openDownloadPage: async (): Promise<ApiResponse> => {
     if (!isElectron()) {
-      return { success: false, error: 'Only available in desktop app' }
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
     }
     return window.skillsfan.openDownloadPage()
   },
@@ -1240,14 +1353,14 @@ export const api = {
   // Used for floating UI elements that need to render above BrowserViews
   showChatCapsuleOverlay: async (): Promise<ApiResponse> => {
     if (!isElectron()) {
-      return { success: false, error: 'Only available in desktop app' }
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
     }
     return window.skillsfan.showChatCapsuleOverlay()
   },
 
   hideChatCapsuleOverlay: async (): Promise<ApiResponse> => {
     if (!isElectron()) {
-      return { success: false, error: 'Only available in desktop app' }
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
     }
     return window.skillsfan.hideChatCapsuleOverlay()
   },
@@ -1262,49 +1375,49 @@ export const api = {
   // ===== Performance Monitoring (Electron only, Developer Tools) =====
   perfStart: async (config?: { sampleInterval?: number; maxSamples?: number }): Promise<ApiResponse> => {
     if (!isElectron()) {
-      return { success: false, error: 'Only available in desktop app' }
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
     }
     return window.skillsfan.perfStart(config)
   },
 
   perfStop: async (): Promise<ApiResponse> => {
     if (!isElectron()) {
-      return { success: false, error: 'Only available in desktop app' }
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
     }
     return window.skillsfan.perfStop()
   },
 
   perfGetState: async (): Promise<ApiResponse> => {
     if (!isElectron()) {
-      return { success: false, error: 'Only available in desktop app' }
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
     }
     return window.skillsfan.perfGetState()
   },
 
   perfGetHistory: async (): Promise<ApiResponse> => {
     if (!isElectron()) {
-      return { success: false, error: 'Only available in desktop app' }
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
     }
     return window.skillsfan.perfGetHistory()
   },
 
   perfClearHistory: async (): Promise<ApiResponse> => {
     if (!isElectron()) {
-      return { success: false, error: 'Only available in desktop app' }
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
     }
     return window.skillsfan.perfClearHistory()
   },
 
   perfSetConfig: async (config: { enabled?: boolean; sampleInterval?: number; warnOnThreshold?: boolean }): Promise<ApiResponse> => {
     if (!isElectron()) {
-      return { success: false, error: 'Only available in desktop app' }
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
     }
     return window.skillsfan.perfSetConfig(config)
   },
 
   perfExport: async (): Promise<ApiResponse<string>> => {
     if (!isElectron()) {
-      return { success: false, error: 'Only available in desktop app' }
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
     }
     return window.skillsfan.perfExport()
   },
@@ -1351,7 +1464,7 @@ export const api = {
     error?: string
   }) => void): Promise<{ success: boolean; path?: string; error?: string }> => {
     if (!isElectron()) {
-      return { success: false, error: 'Only available in desktop app' }
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
     }
     return window.skillsfan.installGitBash(onProgress)
   },
@@ -1394,35 +1507,35 @@ export const api = {
     branchName?: string
   }): Promise<ApiResponse> => {
     if (!isElectron()) {
-      return { success: false, error: 'Only available in desktop app' }
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
     }
     return window.skillsfan.ralphCreateTask(config)
   },
 
   ralphStart: async (spaceId: string | null, taskId: string): Promise<ApiResponse> => {
     if (!isElectron()) {
-      return { success: false, error: 'Only available in desktop app' }
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
     }
     return window.skillsfan.ralphStart(spaceId, taskId)
   },
 
   ralphStop: async (taskId: string): Promise<ApiResponse> => {
     if (!isElectron()) {
-      return { success: false, error: 'Only available in desktop app' }
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
     }
     return window.skillsfan.ralphStop(taskId)
   },
 
   ralphGetTask: async (taskId: string): Promise<ApiResponse> => {
     if (!isElectron()) {
-      return { success: false, error: 'Only available in desktop app' }
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
     }
     return window.skillsfan.ralphGetTask(taskId)
   },
 
   ralphGetCurrent: async (): Promise<ApiResponse> => {
     if (!isElectron()) {
-      return { success: false, error: 'Only available in desktop app' }
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
     }
     return window.skillsfan.ralphGetCurrent()
   },
@@ -1432,21 +1545,21 @@ export const api = {
     description: string
   }): Promise<ApiResponse> => {
     if (!isElectron()) {
-      return { success: false, error: 'Only available in desktop app' }
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
     }
     return window.skillsfan.ralphGenerateStories(config)
   },
 
   ralphImportPrd: async (config: { projectDir: string }): Promise<ApiResponse> => {
     if (!isElectron()) {
-      return { success: false, error: 'Only available in desktop app' }
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
     }
     return window.skillsfan.ralphImportPrd(config)
   },
 
   ralphPrdExists: async (projectDir: string): Promise<ApiResponse> => {
     if (!isElectron()) {
-      return { success: false, error: 'Only available in desktop app' }
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
     }
     return window.skillsfan.ralphPrdExists(projectDir)
   },
@@ -1643,56 +1756,56 @@ export const api = {
   // ===== SkillsFan Account Auth (Electron only) =====
   skillsfanStartLogin: async (): Promise<ApiResponse> => {
     if (!isElectron()) {
-      return { success: false, error: 'Only available in desktop app' }
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
     }
     return window.skillsfan.skillsfanStartLogin()
   },
 
   skillsfanLogout: async (): Promise<ApiResponse> => {
     if (!isElectron()) {
-      return { success: false, error: 'Only available in desktop app' }
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
     }
     return window.skillsfan.skillsfanLogout()
   },
 
   skillsfanGetUser: async (): Promise<ApiResponse> => {
     if (!isElectron()) {
-      return { success: false, error: 'Only available in desktop app' }
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
     }
     return window.skillsfan.skillsfanGetUser()
   },
 
   skillsfanGetAuthState: async (): Promise<ApiResponse> => {
     if (!isElectron()) {
-      return { success: false, error: 'Only available in desktop app' }
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
     }
     return window.skillsfan.skillsfanGetAuthState()
   },
 
   skillsfanIsLoggedIn: async (): Promise<ApiResponse> => {
     if (!isElectron()) {
-      return { success: false, error: 'Only available in desktop app' }
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
     }
     return window.skillsfan.skillsfanIsLoggedIn()
   },
 
   skillsfanRefreshToken: async (): Promise<ApiResponse> => {
     if (!isElectron()) {
-      return { success: false, error: 'Only available in desktop app' }
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
     }
     return window.skillsfan.skillsfanRefreshToken()
   },
 
   skillsfanGetCredits: async (): Promise<ApiResponse> => {
     if (!isElectron()) {
-      return { success: false, error: 'Only available in desktop app' }
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
     }
     return window.skillsfan.skillsfanGetCredits()
   },
 
   skillsfanRefreshCredits: async (): Promise<ApiResponse> => {
     if (!isElectron()) {
-      return { success: false, error: 'Only available in desktop app' }
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
     }
     return window.skillsfan.skillsfanRefreshCredits()
   },

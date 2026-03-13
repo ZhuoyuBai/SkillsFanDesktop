@@ -13,6 +13,11 @@ import { getConfig, getTempSpacePath } from '../config.service'
 import { getSpace } from '../space.service'
 import { getAISourceManager } from '../ai-sources'
 import { getChannelManager, createOutboundEvent } from '../channel'
+import {
+  relayGatewayConversationEvent,
+  relayGatewayGlobalEvent,
+  shouldRelayGatewayChannelEvents
+} from '../../../gateway/channels/relay'
 import type { ElectronChannel } from '../channel'
 import type { ApiCredentials, MainWindowRef } from './types'
 
@@ -472,9 +477,12 @@ export function sendToRenderer(
   conversationId: string,
   data: Record<string, unknown>
 ): void {
-  getChannelManager().dispatchEvent(
-    createOutboundEvent(channel, spaceId, conversationId, data)
-  )
+  const event = createOutboundEvent(channel, spaceId, conversationId, data)
+  getChannelManager().dispatchEvent(event)
+
+  if (shouldRelayGatewayChannelEvents()) {
+    relayGatewayConversationEvent(event)
+  }
 }
 
 /**
@@ -483,4 +491,8 @@ export function sendToRenderer(
  */
 export function broadcastToAllClients(channel: string, data: Record<string, unknown>): void {
   getChannelManager().dispatchGlobal(channel, data)
+
+  if (shouldRelayGatewayChannelEvents()) {
+    relayGatewayGlobalEvent(channel, data)
+  }
 }

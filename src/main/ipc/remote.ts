@@ -14,7 +14,7 @@ import {
   onRemoteAccessStatusChange,
   setCustomPassword,
   regeneratePassword
-} from '../services/remote.service'
+} from '../../gateway/server/remote'
 import { ipcHandle } from './utils'
 
 let mainWindow: BrowserWindow | null = null

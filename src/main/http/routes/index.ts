@@ -17,7 +17,7 @@ import * as configController from '../../controllers/config.controller'
 import { listArtifacts, listArtifactsTree } from '../../services/artifact.service'
 import { getTempSpacePath, getSpacesDir } from '../../services/config.service'
 import { getSpace, getAllSpacePaths, isExistingDirectory } from '../../services/space.service'
-import * as loopTaskService from '../../services/loop-task.service'
+import * as loopTaskService from '../../../gateway/automation/loop-task'
 
 // Helper: get working directory for a space
 function getWorkingDir(spaceId: string): string {
@@ -198,7 +198,10 @@ export function registerApiRoutes(app: Express, mainWindow: BrowserWindow | null
       images,  // Pass images for multi-modal messages (remote access)
       attachments,  // Pass general attachments for multi-modal messages (remote access)
       thinkingEnabled,  // Pass thinking mode for extended thinking (remote access)
-      aiBrowserEnabled  // Pass AI Browser toggle for remote access
+      aiBrowserEnabled,  // Pass AI Browser toggle for remote access
+      routeHint: {
+        channel: 'remote-web'
+      }
     })
     res.json(result)
   })
@@ -407,7 +410,7 @@ export function registerApiRoutes(app: Express, mainWindow: BrowserWindow | null
   // Create a new task
   app.post('/api/spaces/:spaceId/loop-tasks', async (req: Request, res: Response) => {
     try {
-      const task = loopTaskService.createTask(req.params.spaceId, req.body)
+      const task = await loopTaskService.createTask(req.params.spaceId, req.body)
       res.json({ success: true, data: task })
     } catch (error) {
       res.json({ success: false, error: (error as Error).message })
@@ -427,7 +430,7 @@ export function registerApiRoutes(app: Express, mainWindow: BrowserWindow | null
   // Update a task
   app.put('/api/spaces/:spaceId/loop-tasks/:taskId', async (req: Request, res: Response) => {
     try {
-      const task = loopTaskService.updateTask(req.params.spaceId, req.params.taskId, req.body)
+      const task = await loopTaskService.updateTask(req.params.spaceId, req.params.taskId, req.body)
       res.json({ success: true, data: task })
     } catch (error) {
       res.json({ success: false, error: (error as Error).message })
@@ -438,7 +441,7 @@ export function registerApiRoutes(app: Express, mainWindow: BrowserWindow | null
   app.post('/api/spaces/:spaceId/loop-tasks/:taskId/rename', async (req: Request, res: Response) => {
     try {
       const { name } = req.body
-      const task = loopTaskService.renameTask(req.params.spaceId, req.params.taskId, name)
+      const task = await loopTaskService.renameTask(req.params.spaceId, req.params.taskId, name)
       res.json({ success: true, data: task })
     } catch (error) {
       res.json({ success: false, error: (error as Error).message })
@@ -458,7 +461,7 @@ export function registerApiRoutes(app: Express, mainWindow: BrowserWindow | null
   // Add a story to a task
   app.post('/api/spaces/:spaceId/loop-tasks/:taskId/stories', async (req: Request, res: Response) => {
     try {
-      const story = loopTaskService.addStory(req.params.spaceId, req.params.taskId, req.body)
+      const story = await loopTaskService.addStory(req.params.spaceId, req.params.taskId, req.body)
       res.json({ success: true, data: story })
     } catch (error) {
       res.json({ success: false, error: (error as Error).message })
@@ -468,7 +471,7 @@ export function registerApiRoutes(app: Express, mainWindow: BrowserWindow | null
   // Update a story
   app.put('/api/spaces/:spaceId/loop-tasks/:taskId/stories/:storyId', async (req: Request, res: Response) => {
     try {
-      const success = loopTaskService.updateStory(
+      const success = await loopTaskService.updateStory(
         req.params.spaceId,
         req.params.taskId,
         req.params.storyId,
@@ -483,7 +486,7 @@ export function registerApiRoutes(app: Express, mainWindow: BrowserWindow | null
   // Remove a story
   app.delete('/api/spaces/:spaceId/loop-tasks/:taskId/stories/:storyId', async (req: Request, res: Response) => {
     try {
-      const success = loopTaskService.removeStory(
+      const success = await loopTaskService.removeStory(
         req.params.spaceId,
         req.params.taskId,
         req.params.storyId
@@ -498,7 +501,7 @@ export function registerApiRoutes(app: Express, mainWindow: BrowserWindow | null
   app.post('/api/spaces/:spaceId/loop-tasks/:taskId/stories/reorder', async (req: Request, res: Response) => {
     try {
       const { fromIndex, toIndex } = req.body
-      const success = loopTaskService.reorderStories(
+      const success = await loopTaskService.reorderStories(
         req.params.spaceId,
         req.params.taskId,
         fromIndex,

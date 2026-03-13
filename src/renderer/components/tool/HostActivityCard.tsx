@@ -4,6 +4,7 @@ import { useTranslation } from '../../i18n'
 import { api } from '../../api'
 import { useCanvasStore } from '../../stores/canvas.store'
 import { ImageViewer } from '../chat/ImageViewer'
+import { StepCompareView } from './StepCompareView'
 import type { HostStep, ImageAttachment } from '../../types'
 import { CollapsibleSection } from '../ui/CollapsibleSection'
 
@@ -42,8 +43,51 @@ const ACTION_LABEL_KEYS: Record<string, string> = {
   browser_perf_insight: 'Read performance insight',
   open_application: 'Open app',
   run_applescript: 'Run desktop script',
+  finder_reveal_path: 'Reveal in Finder',
+  finder_open_home_folder: 'Open Finder home folder',
+  finder_new_window: 'Open new Finder window',
+  finder_search: 'Search in Finder',
+  terminal_new_tab_run_command: 'Run terminal command in new tab',
+  terminal_new_window_run_command: 'Run terminal command in new window',
+  terminal_run_command_in_directory: 'Run terminal command in directory',
+  terminal_list_sessions: 'List terminal sessions',
+  terminal_list_panes: 'List terminal panes',
+  terminal_get_pane_layout: 'Read terminal pane layout',
+  terminal_focus_session: 'Focus terminal session',
+  terminal_interrupt_process: 'Interrupt terminal process',
+  terminal_get_session_state: 'Read terminal session state',
+  terminal_get_last_command_result: 'Read terminal last command result',
+  terminal_read_output: 'Read terminal output',
+  terminal_wait_for_output: 'Wait for terminal output',
+  terminal_wait_until_not_busy: 'Wait for terminal session idle',
+  terminal_wait_until_idle: 'Wait for terminal idle',
+  terminal_split_pane_run_command: 'Split terminal pane and run command',
+  terminal_run_command_and_wait: 'Run terminal command and wait',
+  terminal_run_command_in_directory_and_wait: 'Run terminal command in directory and wait',
+  chrome_open_url: 'Open URL in Chrome',
+  chrome_open_url_in_new_tab: 'Open URL in new Chrome tab',
+  chrome_new_tab: 'Open new Chrome tab',
+  chrome_reload_active_tab: 'Reload active Chrome tab',
+  terminal_run_command: 'Run terminal command',
+  chrome_focus_tab: 'Focus Chrome tab',
+  chrome_focus_tab_by_url: 'Focus Chrome tab by URL',
+  chrome_list_tabs: 'List Chrome tabs',
+  chrome_find_tabs: 'Find Chrome tabs',
+  chrome_close_tabs: 'Close Chrome tabs',
+  chrome_get_active_tab: 'Read active Chrome tab',
+  chrome_wait_for_tab: 'Wait for Chrome tab',
+  chrome_wait_for_active_tab: 'Wait for active Chrome tab',
+  chrome_close_active_tab: 'Close active Chrome tab',
+  finder_open_folder: 'Open Finder folder',
+  skillsfan_open_settings: 'Open SkillsFan settings',
+  skillsfan_focus_main_window: 'Focus SkillsFan main window',
   desktop_screenshot: 'Take desktop screenshot',
-  desktop_ui_tree: 'Read desktop elements'
+  desktop_ui_tree: 'Read desktop elements',
+  click: 'Click at position',
+  move_mouse: 'Move mouse',
+  scroll: 'Scroll',
+  list_windows: 'List windows',
+  focus_window: 'Focus window'
 }
 
 function getRecord(value: unknown): Record<string, unknown> | null {
@@ -234,9 +278,14 @@ export function HostActivityCard({ steps, isCollapsed, onToggle }: HostActivityC
               const isError = step.metadata?.isError === true
               const Icon = getStepIcon(step)
               const detail = getStepDetail(step)
-              const previewArtifact = step.artifacts?.find((artifact) => isInlineImageArtifact(artifact))
-                || step.artifacts?.find((artifact) => Boolean(artifact.previewText))
-                || step.artifacts?.find((artifact) => Boolean(artifact.path))
+              const beforeArtifact = step.artifacts?.find((a) => a.role === 'before' && isInlineImageArtifact(a))
+              const afterArtifact = step.artifacts?.find((a) => a.role === 'after' && isInlineImageArtifact(a))
+              const hasCompareView = Boolean(beforeArtifact && afterArtifact)
+              const previewArtifact = hasCompareView
+                ? undefined
+                : step.artifacts?.find((artifact) => artifact.role !== 'before' && artifact.role !== 'after' && isInlineImageArtifact(artifact))
+                  || step.artifacts?.find((artifact) => artifact.role !== 'before' && artifact.role !== 'after' && Boolean(artifact.previewText))
+                  || step.artifacts?.find((artifact) => artifact.role !== 'before' && artifact.role !== 'after' && Boolean(artifact.path))
 
               return (
                 <div
@@ -277,6 +326,17 @@ export function HostActivityCard({ steps, isCollapsed, onToggle }: HostActivityC
                           {formatRelativeTime(step.timestamp, t)}
                         </span>
                       </div>
+
+                      {hasCompareView && beforeArtifact && afterArtifact && (
+                        <div className="mt-3 rounded-lg border border-border/40 bg-card/70 p-2.5">
+                          <StepCompareView
+                            before={beforeArtifact}
+                            after={afterArtifact}
+                            metadata={step.metadata}
+                            onClickImage={(artifact) => { void handlePreviewArtifact(step, artifact) }}
+                          />
+                        </div>
+                      )}
 
                       {previewArtifact && (
                         <div className="mt-3 rounded-lg border border-border/40 bg-card/70 p-2.5">
@@ -337,7 +397,7 @@ export function HostActivityCard({ steps, isCollapsed, onToggle }: HostActivityC
 
                       {step.artifacts && step.artifacts.length > 0 && (
                         <div className="mt-2 flex flex-wrap gap-2">
-                          {step.artifacts.map((artifact, index) => {
+                          {step.artifacts.filter((a) => !hasCompareView || (a.role !== 'before' && a.role !== 'after')).map((artifact, index) => {
                             const label = getArtifactDisplayLabel(artifact)
 
                             if (artifact.path) {

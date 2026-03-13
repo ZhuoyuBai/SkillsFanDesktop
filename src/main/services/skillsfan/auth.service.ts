@@ -11,7 +11,7 @@
  * 4. Tokens stored securely, user info fetched
  */
 
-import { shell, app } from 'electron'
+import { shell, app, type BrowserWindow } from 'electron'
 import crypto from 'crypto'
 import { join } from 'path'
 import { existsSync, readFileSync, writeFileSync, unlinkSync } from 'fs'
@@ -35,7 +35,6 @@ import type {
   LoginResult,
   StartLoginResult
 } from '../../../shared/types/skillsfan'
-import { getMainWindow } from '../../index'
 
 // ============================================================================
 // State Management
@@ -55,6 +54,15 @@ let authState: SkillsFanAuthState = {
 
 type LoginSuccessCallback = (user: SkillsFanUser) => void
 const loginSuccessCallbacks: LoginSuccessCallback[] = []
+
+function getMainWindowSafely(): BrowserWindow | null {
+  try {
+    const entry = require('../../index') as { getMainWindow?: () => BrowserWindow | null }
+    return entry.getMainWindow?.() ?? null
+  } catch {
+    return null
+  }
+}
 
 /**
  * Register a callback to be notified when login succeeds.
@@ -608,7 +616,7 @@ async function clearAuthState(): Promise<void> {
  * Notify renderer process of successful login
  */
 function notifyLoginSuccess(state: SkillsFanAuthState): void {
-  const mainWindow = getMainWindow()
+  const mainWindow = getMainWindowSafely()
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('skillsfan:login-success', {
       user: state.user
@@ -628,7 +636,7 @@ function notifyLoginSuccess(state: SkillsFanAuthState): void {
  * Notify renderer process of login error
  */
 function notifyLoginError(error: string): void {
-  const mainWindow = getMainWindow()
+  const mainWindow = getMainWindowSafely()
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('skillsfan:login-error', { error })
     // Focus window
@@ -641,7 +649,7 @@ function notifyLoginError(error: string): void {
  * Notify renderer process of logout
  */
 function notifyLogout(): void {
-  const mainWindow = getMainWindow()
+  const mainWindow = getMainWindowSafely()
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('skillsfan:logout')
   }

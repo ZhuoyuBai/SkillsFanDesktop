@@ -9,12 +9,11 @@
 import { existsSync, readdirSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { ensureOpenAICompatRouter, encodeBackendConfig } from '../../openai-compat-router'
-import { hostRuntime } from '../../../gateway/host-runtime'
+import { buildToolRegistry } from '../../../gateway/tools'
 import { AI_BROWSER_SYSTEM_PROMPT } from '../ai-browser/prompt'
-import { createSkillMcpServer } from '../skill'
 import { createCanUseTool } from './permission-handler'
-import { buildSystemPromptAppend, getEnabledMcpServers, inferOpenAIWireApi } from './helpers'
-import { getEnabledExtensions, runSystemPromptHooks, runGetMcpServersHooks } from '../extension'
+import { buildSystemPromptAppend, inferOpenAIWireApi } from './helpers'
+import { getEnabledExtensions, runSystemPromptHooks } from '../extension'
 import type { ApiCredentials } from './types'
 
 const DEFAULT_MODEL = 'claude-opus-4-5-20251101'
@@ -163,62 +162,29 @@ export async function buildSdkOptions(params: BuildSdkOptionsParams): Promise<{
     routed = false
   } = params
 
-  const browserAutomationMode = config.browserAutomation?.mode === 'system-browser'
-    ? 'system-browser'
-    : 'ai-browser'
-  const effectiveAiBrowserEnabled = aiBrowserEnabled && browserAutomationMode !== 'system-browser'
-
   // Load custom agent definitions from .claude/agents/*.md
   const agents = loadAgentDefinitions(workDir)
 
   // Collect additional directories from config
   const additionalDirectories: string[] = config.additionalDirectories || []
 
-  const enabledMcp = getEnabledMcpServers(config.mcpServers || {})
-  const mcpServers: Record<string, any> = enabledMcp ? { ...enabledMcp } : {}
-  const addedMcpServers: string[] = []
-
-  if (browserAutomationMode === 'system-browser' && mcpServers['ai-browser']) {
-    delete mcpServers['ai-browser']
-  }
-
-  const { createLocalToolsMcpServer } = await import('../local-tools/sdk-mcp-server')
-  mcpServers['local-tools'] = createLocalToolsMcpServer({
+  const {
+    mcpServers,
+    addedMcpServers,
+    browserAutomationMode,
+    effectiveAiBrowserEnabled
+  } = await buildToolRegistry({
+    config,
     workDir,
     spaceId,
     conversationId,
-    aiBrowserEnabled: effectiveAiBrowserEnabled,
+    aiBrowserEnabled,
     includeSkillMcp,
     includeSubagentTools
   })
-  addedMcpServers.push('local-tools')
-
-  const { createWebToolsMcpServer } = await import('../web-tools/sdk-mcp-server')
-  mcpServers['web-tools'] = createWebToolsMcpServer()
-  addedMcpServers.push('web-tools')
-
-  if (effectiveAiBrowserEnabled) {
-    mcpServers['ai-browser'] = hostRuntime.browser.createMcpServer('automated', {
-      spaceId,
-      conversationId
-    })
-    addedMcpServers.push('ai-browser')
-  }
-
-  if (includeSkillMcp) {
-    mcpServers['skill'] = await createSkillMcpServer()
-    addedMcpServers.push('skill')
-  }
 
   // Extension MCP servers
   const enabledExtensions = getEnabledExtensions()
-  if (enabledExtensions.length > 0) {
-    const extensionMcpServers = await runGetMcpServersHooks(enabledExtensions)
-    for (const [name, config] of Object.entries(extensionMcpServers)) {
-      mcpServers[name] = config
-      addedMcpServers.push(name)
-    }
-  }
 
   const builtInTools = [
     // Core file tools

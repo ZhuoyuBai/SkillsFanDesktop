@@ -2,6 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import fs from 'fs'
 import path from 'path'
 import type { CreateLoopTaskConfig, UserStory } from '../../../src/shared/types/loop-task'
+import {
+  clearGatewaySessionStoreForTests,
+  getGatewaySession,
+  resolveLoopTaskGatewayRoute
+} from '../../../src/gateway/sessions'
 
 vi.mock('@main/services/space.service', () => ({
   getSpace: vi.fn((spaceId: string) => ({
@@ -89,6 +94,7 @@ describe('loop-task.service', () => {
   beforeEach(() => {
     const spaceDir = path.join(globalThis.__HALO_TEST_DIR__, 'spaces', TEST_SPACE_ID)
     fs.mkdirSync(path.join(spaceDir, '.skillsfan'), { recursive: true })
+    clearGatewaySessionStoreForTests()
   })
 
   describe('createTask/getTask/listTasks', () => {
@@ -100,6 +106,25 @@ describe('loop-task.service', () => {
       expect(task.currentLoop).toBe(0)
       expect(task.stories).toHaveLength(2)
       expect(task.stories[0].status).toBe('pending')
+    })
+
+    it('creates a matching gateway session for the task', () => {
+      const task = createTask(TEST_SPACE_ID, makeConfig())
+      const session = getGatewaySession(resolveLoopTaskGatewayRoute(TEST_SPACE_ID, task.id).sessionKey)
+
+      expect(session).toMatchObject({
+        status: 'idle',
+        route: {
+          agentId: 'loop-task',
+          workspaceId: TEST_SPACE_ID,
+          peerId: task.id
+        },
+        metadata: {
+          automationKind: 'loop-task',
+          taskId: task.id,
+          taskName: task.name
+        }
+      })
     })
 
     it('generates task name from description', () => {
@@ -152,6 +177,7 @@ describe('loop-task.service', () => {
       expect(deleted).toBe(true)
       expect(getTask(TEST_SPACE_ID, task.id)).toBeNull()
       expect(listTasks(TEST_SPACE_ID)).toHaveLength(0)
+      expect(getGatewaySession(resolveLoopTaskGatewayRoute(TEST_SPACE_ID, task.id).sessionKey)).toBeNull()
     })
   })
 

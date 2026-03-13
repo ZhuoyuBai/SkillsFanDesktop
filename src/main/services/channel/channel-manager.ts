@@ -9,6 +9,10 @@
 
 import type { Channel } from './channel.interface'
 import type { NormalizedOutboundEvent, OutboundEventType } from '@shared/types/channel'
+import {
+  findGatewaySessionsByConversationId,
+  findPreferredGatewaySessionByConversationId
+} from '../../../gateway/sessions'
 
 // These channels should always receive conversation events so local/remote UI state
 // stays in sync even when a conversation is owned by another channel (e.g. Feishu).
@@ -18,10 +22,51 @@ export class ChannelManager {
   private channels = new Map<string, Channel>()
   /**
    * Tracks which channels have active clients for each conversation.
-   * When a channel dispatches an event, only channels in this map receive it.
-   * If no mapping exists, all channels receive the event (broadcast fallback).
+   * During Phase 3 migration this remains the backward-compatible routing index.
    */
   private conversationChannelMap = new Map<string, Set<string>>()
+  /**
+   * Tracks which channels are interested in a gateway platform session.
+   * This lets channel routing start following sessionKey without breaking
+   * legacy conversationId-based consumers.
+   */
+  private sessionChannelMap = new Map<string, Set<string>>()
+
+  private trackKey(map: Map<string, Set<string>>, key: string, channelId: string): void {
+    if (!map.has(key)) {
+      map.set(key, new Set())
+    }
+    map.get(key)!.add(channelId)
+  }
+
+  private collectMappedChannels(map: Map<string, Set<string>>, key?: string): Set<string> {
+    if (!key) {
+      return new Set()
+    }
+
+    return new Set(map.get(key) || [])
+  }
+
+  private resolveInterestedChannels(event: NormalizedOutboundEvent): Set<string> {
+    const interested = this.collectMappedChannels(this.conversationChannelMap, event.conversationId)
+    const sessionKeys = new Set<string>()
+
+    if (event.sessionKey) {
+      sessionKeys.add(event.sessionKey)
+    }
+
+    for (const session of findGatewaySessionsByConversationId(event.conversationId)) {
+      sessionKeys.add(session.sessionKey)
+    }
+
+    for (const sessionKey of sessionKeys) {
+      for (const channelId of this.collectMappedChannels(this.sessionChannelMap, sessionKey)) {
+        interested.add(channelId)
+      }
+    }
+
+    return interested
+  }
 
   /**
    * Register a channel adapter.
@@ -36,18 +81,28 @@ export class ChannelManager {
    * Called when a message comes in from a channel, or when a client subscribes.
    */
   trackConversation(conversationId: string, channelId: string): void {
-    if (!this.conversationChannelMap.has(conversationId)) {
-      this.conversationChannelMap.set(conversationId, new Set())
+    this.trackKey(this.conversationChannelMap, conversationId, channelId)
+
+    for (const session of findGatewaySessionsByConversationId(conversationId)) {
+      this.trackSession(session.sessionKey, channelId)
     }
-    this.conversationChannelMap.get(conversationId)!.add(channelId)
+  }
+
+  /**
+   * Track that a channel is interested in a gateway platform session.
+   * This is the bridge path while we migrate off conversation-scoped routing.
+   */
+  trackSession(sessionKey: string, channelId: string): void {
+    this.trackKey(this.sessionChannelMap, sessionKey, channelId)
   }
 
   /**
    * Dispatch an outbound event to all interested channels.
    * This is the drop-in replacement for sendToRenderer().
+   * During migration it resolves interest from both conversationId and sessionKey.
    */
   dispatchEvent(event: NormalizedOutboundEvent): void {
-    const interestedChannels = this.conversationChannelMap.get(event.conversationId)
+    const interestedChannels = this.resolveInterestedChannels(event)
 
     if (interestedChannels && interestedChannels.size > 0) {
       // Keep routed delivery for channel-specific outputs (e.g. Feishu), but always
@@ -106,6 +161,7 @@ export class ChannelManager {
     }
     this.channels.clear()
     this.conversationChannelMap.clear()
+    this.sessionChannelMap.clear()
     console.log('[ChannelManager] All channels shut down')
   }
 }
@@ -133,11 +189,29 @@ export function createOutboundEvent(
   conversationId: string,
   data: Record<string, unknown>
 ): NormalizedOutboundEvent {
+  const preferredSession = findPreferredGatewaySessionByConversationId(conversationId, {
+    workspaceId: spaceId
+  })
+  const sessionKey = typeof data.sessionKey === 'string'
+    ? data.sessionKey
+    : preferredSession?.sessionKey
+  const mainSessionKey = typeof data.mainSessionKey === 'string'
+    ? data.mainSessionKey
+    : preferredSession?.mainSessionKey
+
   return {
     type: channel as OutboundEventType,
     spaceId,
     conversationId,
-    payload: { ...data, spaceId, conversationId },
+    sessionKey,
+    mainSessionKey,
+    payload: {
+      ...data,
+      spaceId,
+      conversationId,
+      ...(sessionKey ? { sessionKey } : {}),
+      ...(mainSessionKey ? { mainSessionKey } : {})
+    },
     timestamp: Date.now()
   }
 }

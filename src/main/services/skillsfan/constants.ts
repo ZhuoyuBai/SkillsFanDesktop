@@ -17,7 +17,7 @@ declare const __SKILLSFAN_API_URL__: string
  * Priority: build-time > env var > locale detection
  */
 function getRegion(): 'cn' | 'overseas' {
-  if (__SKILLSFAN_REGION__) {
+  if (typeof __SKILLSFAN_REGION__ !== 'undefined' && __SKILLSFAN_REGION__) {
     return __SKILLSFAN_REGION__ as 'cn' | 'overseas'
   }
   if (process.env.SKILLSFAN_REGION) {
@@ -40,7 +40,7 @@ function getRegion(): 'cn' | 'overseas' {
  * Priority: build-time API URL > env SKILLSFAN_API_URL > region detection
  */
 export const SKILLSFAN_BASE_URL =
-  __SKILLSFAN_API_URL__ ||
+  (typeof __SKILLSFAN_API_URL__ !== 'undefined' ? __SKILLSFAN_API_URL__ : '') ||
   process.env.SKILLSFAN_API_URL ||
   (getRegion() === 'cn' ? 'https://www.skills.fan' : 'https://skillsfan.com')
 

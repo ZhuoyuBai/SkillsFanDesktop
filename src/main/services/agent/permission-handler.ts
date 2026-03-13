@@ -6,6 +6,12 @@
  */
 
 import path from 'path'
+import { canDelegateGatewayCommands, executeGatewayCommand } from '../../../gateway/commands'
+import {
+  resolveNativeToolApproval,
+  resolveNativeUserQuestion
+} from '../../../gateway/runtime/native/interaction'
+import { getSharedToolPermissionPolicy } from '../../../gateway/tools/policies'
 import { getConfig } from '../config.service'
 import { isAIBrowserTool } from '../ai-browser/tool-utils'
 import { activeSessions } from './session-manager'
@@ -204,89 +210,53 @@ export function createCanUseTool(
       }
     }
 
-    if (toolName === 'mcp__web-tools__WebSearch') {
-      const updatedInput = sanitizeWebSearchInput(input)
-      return { behavior: 'allow' as const, updatedInput }
-    }
-
-    if (toolName === 'mcp__web-tools__WebFetch') {
-      return {
-        behavior: 'allow' as const,
-        updatedInput: input
-      }
-    }
-
-    if (toolName === 'mcp__local-tools__memory') {
-      return {
-        behavior: 'allow' as const,
-        updatedInput: input
-      }
-    }
-
-    if (
-      toolName === 'mcp__local-tools__tool_search_tool_regex'
-      || toolName === 'mcp__local-tools__tool_search_tool_bm25'
-      || toolName === 'mcp__local-tools__subagents'
-    ) {
-      return {
-        behavior: 'allow' as const,
-        updatedInput: input
-      }
-    }
-
-    if (toolName === 'mcp__local-tools__text_editor_code_execution') {
-      const violation = ensurePathsWithinWorkspace()
-      if (violation) return violation
-
-      return {
-        behavior: 'allow' as const,
-        updatedInput: input
-      }
-    }
-
-    if (toolName === 'mcp__local-tools__open_url') {
-      const currentConfig = getConfig()
-      if (currentConfig.browserAutomation?.mode !== 'system-browser') {
+    const sharedPolicy = getSharedToolPermissionPolicy(toolName)
+    if (sharedPolicy) {
+      if (sharedPolicy.kind === 'sanitize-web-search') {
         return {
-          behavior: 'deny' as const,
-          message: 'System browser opening is disabled while automated browser mode is active. Use automated browser tools instead.'
+          behavior: 'allow' as const,
+          updatedInput: sanitizeWebSearchInput(input)
         }
       }
 
-      return {
-        behavior: 'allow' as const,
-        updatedInput: input
+      if (sharedPolicy.kind === 'allow') {
+        return {
+          behavior: 'allow' as const,
+          updatedInput: input
+        }
       }
-    }
 
-    if (toolName === 'mcp__local-tools__bash_code_execution') {
-      return await requestCommandApproval(
-        toolName,
-        `Execute command: ${input.command || 'shell command'}`
-      )
-    }
+      if (sharedPolicy.kind === 'workspace-paths') {
+        const violation = ensurePathsWithinWorkspace()
+        if (violation) return violation
 
-    if (toolName === 'mcp__local-tools__code_execution') {
-      const language = typeof input.language === 'string' ? input.language : 'code'
-      return await requestCommandApproval(
-        toolName,
-        `Execute ${language} snippet`
-      )
-    }
+        return {
+          behavior: 'allow' as const,
+          updatedInput: input
+        }
+      }
 
-    if (toolName === 'mcp__local-tools__open_application') {
-      const application = typeof input.application === 'string' ? input.application : 'application'
-      return await requestCommandApproval(
-        toolName,
-        `Open macOS application: ${application}`
-      )
-    }
+      if (sharedPolicy.kind === 'system-browser-only') {
+        const currentConfig = getConfig()
+        if (currentConfig.browserAutomation?.mode !== 'system-browser') {
+          return {
+            behavior: 'deny' as const,
+            message: 'System browser opening is disabled while automated browser mode is active. Use automated browser tools instead.'
+          }
+        }
 
-    if (toolName === 'mcp__local-tools__run_applescript') {
-      return await requestCommandApproval(
-        toolName,
-        'Execute AppleScript for macOS UI automation'
-      )
+        return {
+          behavior: 'allow' as const,
+          updatedInput: input
+        }
+      }
+
+      if (sharedPolicy.kind === 'command-approval' && sharedPolicy.getApprovalDescription) {
+        return await requestCommandApproval(
+          toolName,
+          sharedPolicy.getApprovalDescription(input)
+        )
+      }
     }
 
     if (toolName === 'mcp__local-tools__subagent_spawn') {
@@ -488,6 +458,16 @@ export function createCanUseTool(
  * Handle tool approval from renderer for a specific conversation
  */
 export function handleToolApproval(conversationId: string, approved: boolean): void {
+  if (canDelegateGatewayCommands()) {
+    void executeGatewayCommand('agent.tool-approval', {
+      conversationId,
+      approved
+    }).catch((error) => {
+      console.error('[Agent] Failed to forward tool approval to external gateway:', error)
+    })
+    return
+  }
+
   const session = activeSessions.get(conversationId)
   if (session?.pendingPermissionResolve) {
     console.log(`[Agent][${conversationId}] Tool approval received: approved=${approved}`)
@@ -500,6 +480,8 @@ export function handleToolApproval(conversationId: string, approved: boolean): v
     session.pendingPermissionResolve(approved)
     session.pendingPermissionResolve = null
     session.pendingPermissionToolCall = null
+  } else if (resolveNativeToolApproval(conversationId, approved)) {
+    console.log(`[Agent][${conversationId}] Native runtime tool approval resolved: approved=${approved}`)
   } else {
     console.warn(`[Agent][${conversationId}] Tool approval received but no pending permission resolver was found`)
   }
@@ -516,6 +498,16 @@ export function handleUserQuestionAnswer(
   conversationId: string,
   answers: Record<string, string>
 ): void {
+  if (canDelegateGatewayCommands()) {
+    void executeGatewayCommand('agent.question-answer', {
+      conversationId,
+      answers
+    }).catch((error) => {
+      console.error('[Agent] Failed to forward user question answer to external gateway:', error)
+    })
+    return
+  }
+
   const session = activeSessions.get(conversationId)
   if (session?.pendingUserQuestion?.inputResolve) {
     const spaceId = session.spaceId
@@ -523,6 +515,8 @@ export function handleUserQuestionAnswer(
     // Notify frontend to clear the question UI
     sendToRenderer('agent:user-question-answered', spaceId, conversationId, {})
     // Note: inputResolve will clear pendingUserQuestion after resolving
+  } else if (resolveNativeUserQuestion(conversationId, answers)) {
+    console.log(`[Agent][${conversationId}] Native runtime user question answered`)
   } else {
     console.warn(`[Agent][${conversationId}] No pending question to answer`)
   }

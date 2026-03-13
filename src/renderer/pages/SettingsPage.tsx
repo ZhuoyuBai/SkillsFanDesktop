@@ -34,10 +34,11 @@ import { SkillsFanAccountSection } from '../components/settings/SkillsFanAccount
 import { SpaceManagementSection } from '../components/settings/SpaceManagementSection'
 import { ResetSection } from '../components/settings/ResetSection'
 import { ScheduledTasksSection } from '../components/settings/ScheduledTasksSection'
+import { ConfirmDialog } from '../components/ui/ConfirmDialog'
 import { FeishuSettings } from '../components/settings/FeishuSettings'
 import { useTranslation, setLanguage, getCurrentLanguage, SUPPORTED_LOCALES, type LocaleCode } from '../i18n'
 import { isNoVisionModel } from '../../shared/utils/vision-models'
-import { Loader2, LogOut, Plus, Check, Globe, Key, MessageSquare, Bot, Palette, Server, Settings as SettingsIcon, Wifi, ExternalLink, X, Package, User, Layers, Lock, SlidersHorizontal, Clock, ArrowLeft, Database, type LucideIcon } from 'lucide-react'
+import { Loader2, LogOut, Plus, Check, Globe, Key, MessageSquare, Bot, Palette, Server, Settings as SettingsIcon, Wifi, ExternalLink, X, Package, User, Layers, Lock, SlidersHorizontal, Clock, ArrowLeft, Database, RefreshCw, Copy, Monitor, Terminal, FolderOpen, Sparkles, type LucideIcon } from 'lucide-react'
 import { usePlatform } from '../components/layout/Header'
 import { isElectron } from '../api/transport'
 import { useToastStore } from '../stores/toast.store'
@@ -133,7 +134,7 @@ const PROVIDER_PRESETS: ProviderPreset[] = [
   },
   {
     id: 'custom',
-    name: '自定义',
+    name: 'Custom',
     nameKey: 'Custom',
     apiType: 'custom',
     isCustom: true
@@ -276,8 +277,449 @@ interface RemoteAccessStatus {
   clients: number
 }
 
+type GatewayDoctorCheckState = 'ok' | 'warn' | 'fail'
+
+interface GatewayDoctorCheck {
+  key: string
+  state: GatewayDoctorCheckState
+  summary: string
+}
+
+interface GatewayDoctorReport {
+  generatedAt: string
+  overallState: GatewayDoctorCheckState
+  checks: GatewayDoctorCheck[]
+}
+
+interface GatewayDaemonStatusView {
+  supported: boolean
+  manager: string
+  state: string
+  desiredMode: 'manual' | 'daemon'
+  installable: boolean
+  registered: boolean
+  autoStartEnabled: boolean
+  registeredAt: string | null
+  updatedAt: string | null
+  lockState: string
+  lockOwner: string | null
+  lockPid: number | null
+  lockHeartbeatAgeMs: number | null
+  note: string
+  lastError: string | null
+}
+
+interface GatewayDaemonCommandSpec {
+  command: string
+  args: string[]
+}
+
+interface GatewayDaemonInstallFile {
+  kind: string
+  path: string
+  content: string
+}
+
+interface GatewayDaemonInstallPlan {
+  supported: boolean
+  manager: string
+  label: string
+  taskName: string
+  executablePath: string
+  args: string[]
+  workingDirectory: string | null
+  files: GatewayDaemonInstallFile[]
+  installCommands: GatewayDaemonCommandSpec[]
+  uninstallCommands: GatewayDaemonCommandSpec[]
+  notes: string[]
+}
+
+interface GatewayDaemonPreparedInstallFile {
+  kind: string
+  targetPath: string
+  stagedPath: string
+}
+
+interface GatewayDaemonPreparedInstallBundle {
+  supported: boolean
+  manager: string
+  generatedAt: string
+  stagingRootDir: string
+  bundleDir: string
+  manifestPath: string
+  readmePath: string
+  installCommandsFilePath: string | null
+  uninstallCommandsFilePath: string | null
+  fileCount: number
+  stagedFiles: GatewayDaemonPreparedInstallFile[]
+}
+
+interface GatewayDaemonExecutedCommand {
+  command: string
+  args: string[]
+  startedAt: string
+  finishedAt: string
+  success: boolean
+  exitCode: number | null
+  stdout: string
+  stderr: string
+}
+
+interface GatewayDaemonExecutionResult {
+  action: 'install' | 'uninstall'
+  success: boolean
+  manager: string
+  bundleDir: string
+  manifestPath: string
+  preparedAt: string
+  executedAt: string
+  copiedFileCount: number
+  copiedTargets: string[]
+  commands: GatewayDaemonExecutedCommand[]
+  rollbackHints: string[]
+  cleanupHints: string[]
+  error: string | null
+  note: string | null
+}
+
+type GatewayDaemonConfirmAction = null | {
+  type: 'install' | 'uninstall' | 'clear-lock'
+  title: string
+  message: string
+  confirmLabel: string
+  variant: 'warning' | 'danger' | 'info'
+}
+
+interface GatewayHealthStatusView {
+  checkedAt: string
+  gateway: {
+    mode: string
+    state?: string
+  }
+  runtime: {
+    configuredMode: string
+    activeKind: string
+    fallbackActive: boolean
+    registeredKinds?: string[]
+    nativeRegistered?: boolean
+    hybridTaskRouting?: boolean
+    native?: {
+      scaffolded: boolean
+      ready: boolean
+      providerNativeExecution: boolean
+      sharedToolRegistryReady: boolean
+      taskRoutingReady: boolean
+      supportedProviders: string[]
+      supportedApiTypes: string[]
+      interaction: {
+        pendingToolApprovalCount: number
+        pendingUserQuestionCount: number
+        pendingUserQuestionPreview?: string | null
+        pendingUserQuestionHeader?: string | null
+        lastToolApprovalRequestedAt: string | null
+        lastUserQuestionRequestedAt: string | null
+      }
+      note: string
+    }
+  }
+  process: {
+    state: string
+    pid: number | null
+    heartbeatAgeMs: number | null
+  }
+  launcher: {
+    state: string
+  }
+  commands: {
+    initialized: boolean
+    processRole: string | null
+    pendingCount: number
+    processingCount: number
+    processedCount: number
+    failedCount: number
+    lastCommandName: string | null
+    lastCommandAt: string | null
+    lastSuccessAt: string | null
+    lastFailureAt: string | null
+    lastError: string | null
+  }
+  sessionStore: {
+    enabled: boolean
+    hydrated: boolean
+    sessionCount: number
+    snapshotSavedAt: string | null
+    lastLoadError: string | null
+    lastSaveError: string | null
+  }
+  stepJournal: {
+    enabled: boolean
+    persistedTaskCount: number
+    persistedStepCount: number
+    lastPersistedAt: string | null
+    lastLoadError: string | null
+    lastPersistError: string | null
+  }
+  host: {
+    platform: string
+    desktop: {
+      state: string
+      backend?: string
+      actions: Array<{
+        id: string
+        supported: boolean
+        requiresAccessibilityPermission?: boolean
+        blockedByPermission?: boolean
+        notes?: string
+      }>
+      adapters: Array<{
+        id: string
+        displayName?: string
+        supported: boolean
+        stage?: 'active' | 'planned'
+        applicationNames?: string[]
+        actions?: string[]
+        methods?: Array<{
+          id: string
+          displayName?: string
+          action: string
+          supported: boolean
+          stage?: 'active' | 'scaffolded' | 'planned'
+          notes?: string
+        }>
+        workflows?: Array<{
+          id: string
+          displayName?: string
+          supported: boolean
+          stage?: 'active' | 'planned'
+          methodIds: string[]
+          blockedByPermission?: boolean
+          blockedMethodIds?: string[]
+          recoveryHint?: string
+          notes?: string
+        }>
+        smokeFlows?: Array<{
+          id: string
+          displayName?: string
+          supported: boolean
+          stage?: 'active' | 'planned'
+          methodIds: string[]
+          blockedByPermission?: boolean
+          blockedMethodIds?: string[]
+          verification?: string
+          recoveryHint?: string
+          lastRun?: {
+            state: 'running' | 'passed' | 'failed'
+            startedAt: string
+            finishedAt?: string
+            durationMs?: number
+            summary: string
+            error?: string | null
+          }
+          notes?: string
+        }>
+        notes?: string
+      }>
+      errorCodes: string[]
+    }
+    permissions: {
+      accessibility: { state: string }
+      screenRecording: { state: string }
+    }
+  }
+}
+
+function formatOptionalTimestamp(value: string | null | undefined): string {
+  if (!value) {
+    return '—'
+  }
+
+  const timestamp = Date.parse(value)
+  if (!Number.isFinite(timestamp)) {
+    return value
+  }
+
+  return new Date(timestamp).toLocaleString()
+}
+
+function formatDurationMs(value: number | null | undefined): string {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return '—'
+  }
+
+  if (value < 1000) {
+    return `${Math.round(value)} ms`
+  }
+
+  return `${(value / 1000).toFixed(value >= 10000 ? 0 : 1)} s`
+}
+
+function formatGatewayManagerLabel(value: string | null | undefined): string {
+  if (!value) {
+    return 'manual'
+  }
+
+  return value
+    .split('-')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ')
+}
+
+function formatGatewayCommand(spec: GatewayDaemonCommandSpec): string {
+  return [spec.command, ...spec.args].join(' ')
+}
+
+const MACOS_ACCESSIBILITY_SETTINGS_URL = 'x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility'
+const MACOS_SCREEN_RECORDING_SETTINGS_URL = 'x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture'
+
+function getStatusBadgeClasses(state: string | null | undefined): string {
+  switch (state) {
+    case 'ok':
+    case 'ready':
+    case 'registered':
+    case 'owned':
+    case 'connected':
+      return 'bg-green-500/10 text-green-600 border border-green-500/30'
+    case 'warn':
+    case 'degraded':
+    case 'stale':
+    case 'available':
+      return 'bg-amber-500/10 text-amber-600 border border-amber-500/30'
+    case 'fail':
+    case 'error':
+      return 'bg-red-500/10 text-red-600 border border-red-500/30'
+    case 'external':
+    case 'observed':
+      return 'bg-blue-500/10 text-blue-600 border border-blue-500/30'
+    default:
+      return 'bg-secondary text-muted-foreground border border-border'
+  }
+}
+
+function buildDesktopWorkflowRecoveryGuide(health: GatewayHealthStatusView): string {
+  const blockedWorkflows = health.host.desktop.adapters
+    .flatMap((adapter) => (adapter.workflows || []).map((workflow) => ({
+      adapterName: adapter.displayName || adapter.id,
+      workflow
+    })))
+    .filter(({ workflow }) => workflow.blockedByPermission)
+
+  if (blockedWorkflows.length === 0) {
+    return 'No blocked desktop workflows.'
+  }
+
+  return blockedWorkflows.map(({ adapterName, workflow }) => {
+    const lines = [
+      `${adapterName} / ${workflow.displayName || workflow.id}`,
+      `- Blocked methods: ${(workflow.blockedMethodIds || []).join(', ') || '—'}`
+    ]
+
+    if (workflow.recoveryHint) {
+      lines.push(`- Recovery: ${workflow.recoveryHint}`)
+    }
+
+    return lines.join('\n')
+  }).join('\n\n')
+}
+
+function buildDesktopSmokeFlowRecoveryGuide(health: GatewayHealthStatusView): string {
+  const blockedSmokeFlows = health.host.desktop.adapters
+    .flatMap((adapter) => (adapter.smokeFlows || []).map((smokeFlow) => ({
+      adapterName: adapter.displayName || adapter.id,
+      smokeFlow
+    })))
+    .filter(({ smokeFlow }) => smokeFlow.blockedByPermission)
+
+  if (blockedSmokeFlows.length === 0) {
+    return 'No blocked desktop smoke flows.'
+  }
+
+  return blockedSmokeFlows.map(({ adapterName, smokeFlow }) => {
+    const lines = [
+      `${adapterName} / ${smokeFlow.displayName || smokeFlow.id}`,
+      `- Blocked methods: ${(smokeFlow.blockedMethodIds || []).join(', ') || '—'}`
+    ]
+
+    if (smokeFlow.verification) {
+      lines.push(`- Verification: ${smokeFlow.verification}`)
+    }
+
+    if (smokeFlow.recoveryHint) {
+      lines.push(`- Recovery: ${smokeFlow.recoveryHint}`)
+    }
+
+    return lines.join('\n')
+  }).join('\n\n')
+}
+
+function buildDesktopAutomationRunbook(health: GatewayHealthStatusView): string {
+  const activeAdapters = health.host.desktop.adapters.filter((adapter) => adapter.stage === 'active' && adapter.supported)
+
+  if (activeAdapters.length === 0) {
+    return 'No active computer automation adapters.'
+  }
+
+  const sections = activeAdapters.map((adapter) => {
+    const lines = [
+      `${adapter.displayName || adapter.id}`,
+      `Applications: ${(adapter.applicationNames || []).join(', ') || '—'}`
+    ]
+
+    const workflows = (adapter.workflows || []).filter((workflow) => workflow.stage === 'active' && workflow.supported)
+    if (workflows.length > 0) {
+      lines.push('', 'Productized Workflows:')
+      for (const workflow of workflows) {
+        lines.push(`- ${workflow.displayName || workflow.id} [${workflow.blockedByPermission ? 'Blocked' : 'Ready'}]`)
+        lines.push(`  Methods: ${workflow.methodIds.join(', ')}`)
+        if (workflow.notes) {
+          lines.push(`  Notes: ${workflow.notes}`)
+        }
+        if (workflow.blockedByPermission && workflow.recoveryHint) {
+          lines.push(`  Recovery: ${workflow.recoveryHint}`)
+        }
+      }
+    }
+
+    const smokeFlows = (adapter.smokeFlows || []).filter((smokeFlow) => smokeFlow.stage === 'active' && smokeFlow.supported)
+    if (smokeFlows.length > 0) {
+      lines.push('', 'Smoke Flows:')
+      for (const smokeFlow of smokeFlows) {
+        lines.push(`- ${smokeFlow.displayName || smokeFlow.id} [${smokeFlow.blockedByPermission ? 'Blocked' : 'Ready'}]`)
+        lines.push(`  Methods: ${smokeFlow.methodIds.join(', ')}`)
+        if (smokeFlow.verification) {
+          lines.push(`  Verification: ${smokeFlow.verification}`)
+        }
+        if (smokeFlow.notes) {
+          lines.push(`  Notes: ${smokeFlow.notes}`)
+        }
+        if (smokeFlow.blockedByPermission && smokeFlow.recoveryHint) {
+          lines.push(`  Recovery: ${smokeFlow.recoveryHint}`)
+        }
+      }
+    }
+
+    return lines.join('\n')
+  })
+
+  const blockedActions = health.host.desktop.actions
+    .filter((action) => action.blockedByPermission)
+    .map((action) => action.id)
+
+  const footer = blockedActions.length > 0
+    ? ['', `Blocked computer actions: ${blockedActions.join(', ')}`]
+    : []
+
+  return [
+    'Computer Automation Runbook',
+    `Platform: ${health.host.platform}`,
+    `Backend: ${health.host.desktop.backend || '—'}`,
+    '',
+    ...sections,
+    ...footer
+  ].join('\n')
+}
+
 // Settings section type
-type SettingsSection = 'ai-model' | 'display' | 'mcp' | 'skills' | 'system' | 'remote' | 'feishu' | 'account' | 'spaces' | 'advanced' | 'scheduled'
+type SettingsSection = 'ai-model' | 'display' | 'mcp' | 'skills' | 'system' | 'computer-automation' | 'remote' | 'feishu' | 'account' | 'spaces' | 'advanced' | 'scheduled'
 
 export function SettingsPage() {
   const { t } = useTranslation()
@@ -371,6 +813,20 @@ export function SettingsPage() {
   const [webSearchPerplexityApiKey, setWebSearchPerplexityApiKey] = useState(initialWebToolsValues.perplexityApiKey)
   const [showWebSearchKeys, setShowWebSearchKeys] = useState(false)
   const [isSavingWebTools, setIsSavingWebTools] = useState(false)
+  const [gatewayHealth, setGatewayHealth] = useState<GatewayHealthStatusView | null>(null)
+  const [gatewayDoctor, setGatewayDoctor] = useState<GatewayDoctorReport | null>(null)
+  const [gatewayDaemonStatus, setGatewayDaemonStatus] = useState<GatewayDaemonStatusView | null>(null)
+  const [gatewayDaemonInstallPlan, setGatewayDaemonInstallPlan] = useState<GatewayDaemonInstallPlan | null>(null)
+  const [gatewayDaemonPreparedInstall, setGatewayDaemonPreparedInstall] = useState<GatewayDaemonPreparedInstallBundle | null>(null)
+  const [gatewayDaemonExecutionResult, setGatewayDaemonExecutionResult] = useState<GatewayDaemonExecutionResult | null>(null)
+  const [gatewayDaemonConfirmAction, setGatewayDaemonConfirmAction] = useState<GatewayDaemonConfirmAction>(null)
+  const [activeDesktopSmokeFlowId, setActiveDesktopSmokeFlowId] = useState<string | null>(null)
+  const [isLoadingGatewayDiagnostics, setIsLoadingGatewayDiagnostics] = useState(false)
+  const [activeGatewayDaemonAction, setActiveGatewayDaemonAction] = useState<'register' | 'unregister' | null>(null)
+  const [isPreparingGatewayDaemonInstall, setIsPreparingGatewayDaemonInstall] = useState(false)
+  const [activeGatewayDaemonCommand, setActiveGatewayDaemonCommand] = useState<'install' | 'uninstall' | null>(null)
+  const [isClearingGatewayDaemonLock, setIsClearingGatewayDaemonLock] = useState(false)
+  const [isRecoveringGatewayLauncher, setIsRecoveringGatewayLauncher] = useState(false)
 
   // API Key visibility state
   const [showApiKey, setShowApiKey] = useState(false)
@@ -530,6 +986,60 @@ export function SettingsPage() {
     }
   }
 
+  const loadGatewayDiagnostics = useCallback(async (options?: { silent?: boolean }) => {
+    if (api.isRemoteMode()) {
+      return
+    }
+
+    setIsLoadingGatewayDiagnostics(true)
+
+    try {
+      const [healthResult, doctorResult, daemonResult, installPlanResult] = await Promise.all([
+        api.getGatewayHealth(),
+        api.getGatewayDoctor(),
+        api.getGatewayDaemonStatus(),
+        api.getGatewayDaemonInstallPlan()
+      ])
+
+      if (healthResult.success) {
+        setGatewayHealth(healthResult.data as GatewayHealthStatusView)
+      }
+      if (doctorResult.success) {
+        setGatewayDoctor(doctorResult.data as GatewayDoctorReport)
+      }
+      if (daemonResult.success) {
+        setGatewayDaemonStatus(daemonResult.data as GatewayDaemonStatusView)
+      }
+      if (installPlanResult.success) {
+        setGatewayDaemonInstallPlan(installPlanResult.data as GatewayDaemonInstallPlan)
+      }
+
+      const firstError = [
+        healthResult.error,
+        doctorResult.error,
+        daemonResult.error,
+        installPlanResult.error
+      ].find((value) => typeof value === 'string' && value.length > 0)
+
+      if (firstError && !options?.silent) {
+        addToast(firstError, 'error')
+      }
+    } catch (error) {
+      console.error('[Settings] Failed to load gateway diagnostics:', error)
+      if (!options?.silent) {
+        addToast(t('Failed to load gateway diagnostics'), 'error')
+      }
+    } finally {
+      setIsLoadingGatewayDiagnostics(false)
+    }
+  }, [addToast, t])
+
+  useEffect(() => {
+    if ((activeSection === 'advanced' || activeSection === 'computer-automation') && !api.isRemoteMode()) {
+      void loadGatewayDiagnostics({ silent: true })
+    }
+  }, [activeSection, loadGatewayDiagnostics])
+
   const handleToggleRemote = async () => {
     // Permission check: not logged in
     if (!authState?.isLoggedIn) {
@@ -581,8 +1091,86 @@ export function SettingsPage() {
     loadRemoteStatus()
   }
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text)
+  const copyToClipboard = async (text: string) => {
+    if (!text) {
+      return
+    }
+
+    try {
+      await navigator.clipboard.writeText(text)
+      addToast(t('Copied'), 'success')
+    } catch (error) {
+      console.error('[Settings] Failed to copy to clipboard:', error)
+      addToast(t('Copy failed'), 'error')
+    }
+  }
+
+  const handleOpenDesktopPermissionSettings = async (permission: 'accessibility' | 'screen-recording') => {
+    const url = permission === 'accessibility'
+      ? MACOS_ACCESSIBILITY_SETTINGS_URL
+      : MACOS_SCREEN_RECORDING_SETTINGS_URL
+
+    try {
+      await api.openExternal(url)
+    } catch (error) {
+      console.error('[Settings] Failed to open macOS permission settings:', error)
+      addToast('Failed to open System Settings', 'error')
+    }
+  }
+
+  const handleCopyDesktopWorkflowRecoveryGuide = async () => {
+    if (!gatewayHealth) {
+      return
+    }
+
+    await copyToClipboard(buildDesktopWorkflowRecoveryGuide(gatewayHealth))
+  }
+
+  const handleCopyDesktopSmokeFlowGuide = async () => {
+    if (!gatewayHealth) {
+      return
+    }
+
+    await copyToClipboard(buildDesktopSmokeFlowRecoveryGuide(gatewayHealth))
+  }
+
+  const handleCopyDesktopAutomationRunbook = async () => {
+    if (!gatewayHealth) {
+      return
+    }
+
+    await copyToClipboard(buildDesktopAutomationRunbook(gatewayHealth))
+  }
+
+  const handleRunDesktopSmokeFlow = async (flowId: string) => {
+    setActiveDesktopSmokeFlowId(flowId)
+    try {
+      const result = await api.runGatewayDesktopSmokeFlow(flowId)
+      if (!result.success) {
+        addToast(result.error || t('Failed'), 'error')
+        return
+      }
+
+      const execution = result.data as {
+        state?: 'running' | 'passed' | 'failed'
+        summary?: string
+        error?: string | null
+      }
+      addToast(
+        execution.summary || (
+          execution.state === 'passed'
+            ? t('Passed')
+            : execution.error || t('Failed')
+        ),
+        execution.state === 'passed' ? 'success' : 'error'
+      )
+      await loadGatewayDiagnostics({ silent: true })
+    } catch (error) {
+      console.error('[Settings] Failed to run desktop smoke flow:', error)
+      addToast(t('Failed'), 'error')
+    } finally {
+      setActiveDesktopSmokeFlowId(null)
+    }
   }
 
   // Auto-save helper for appearance settings
@@ -746,6 +1334,193 @@ export function SettingsPage() {
       setIsSavingWebTools(false)
     }
   }
+
+  const handleRegisterGatewayDaemon = async () => {
+    setActiveGatewayDaemonAction('register')
+    try {
+      const result = await api.registerGatewayDaemon()
+      if (!result.success) {
+        addToast(result.error || t('Save failed'), 'error')
+        return
+      }
+
+      addToast(t('Saved'), 'success')
+      await loadGatewayDiagnostics({ silent: true })
+    } catch (error) {
+      console.error('[Settings] Failed to register gateway daemon:', error)
+      addToast(t('Save failed'), 'error')
+    } finally {
+      setActiveGatewayDaemonAction(null)
+    }
+  }
+
+  const handleUnregisterGatewayDaemon = async () => {
+    setActiveGatewayDaemonAction('unregister')
+    try {
+      const result = await api.unregisterGatewayDaemon()
+      if (!result.success) {
+        addToast(result.error || t('Save failed'), 'error')
+        return
+      }
+
+      addToast(t('Saved'), 'success')
+      await loadGatewayDiagnostics({ silent: true })
+    } catch (error) {
+      console.error('[Settings] Failed to unregister gateway daemon:', error)
+      addToast(t('Save failed'), 'error')
+    } finally {
+      setActiveGatewayDaemonAction(null)
+    }
+  }
+
+  const handlePrepareGatewayDaemonInstall = async () => {
+    setIsPreparingGatewayDaemonInstall(true)
+    try {
+      const result = await api.prepareGatewayDaemonInstall()
+      if (!result.success) {
+        addToast(result.error || t('Save failed'), 'error')
+        return
+      }
+
+      setGatewayDaemonPreparedInstall(result.data as GatewayDaemonPreparedInstallBundle)
+      setGatewayDaemonExecutionResult(null)
+      addToast(t('Saved'), 'success')
+    } catch (error) {
+      console.error('[Settings] Failed to prepare gateway daemon install bundle:', error)
+      addToast(t('Save failed'), 'error')
+    } finally {
+      setIsPreparingGatewayDaemonInstall(false)
+    }
+  }
+
+  const handleRunGatewayDaemonCommand = async (action: 'install' | 'uninstall') => {
+    const bundleDir = gatewayDaemonPreparedInstall?.bundleDir
+    if (!bundleDir) {
+      addToast(t('Prepare install files first'), 'info')
+      return
+    }
+
+    setActiveGatewayDaemonCommand(action)
+    try {
+      const result = action === 'install'
+        ? await api.runGatewayDaemonInstall(bundleDir)
+        : await api.runGatewayDaemonUninstall(bundleDir)
+
+      if (!result.success) {
+        addToast(result.error || t('Save failed'), 'error')
+        return
+      }
+
+      setGatewayDaemonExecutionResult(result.data as GatewayDaemonExecutionResult)
+      addToast(t('Saved'), 'success')
+      await loadGatewayDiagnostics({ silent: true })
+    } catch (error) {
+      console.error(`[Settings] Failed to run gateway daemon ${action}:`, error)
+      addToast(t('Save failed'), 'error')
+    } finally {
+      setActiveGatewayDaemonCommand(null)
+    }
+  }
+
+  const handleClearGatewayDaemonLock = async () => {
+    setIsClearingGatewayDaemonLock(true)
+    try {
+      const result = await api.clearGatewayDaemonLock()
+      if (!result.success) {
+        addToast(result.error || t('Save failed'), 'error')
+        return
+      }
+
+      addToast(t('Saved'), 'success')
+      await loadGatewayDiagnostics({ silent: true })
+    } catch (error) {
+      console.error('[Settings] Failed to clear gateway daemon lock:', error)
+      addToast(t('Save failed'), 'error')
+    } finally {
+      setIsClearingGatewayDaemonLock(false)
+    }
+  }
+
+  const handleRecoverGatewayLauncher = async () => {
+    setIsRecoveringGatewayLauncher(true)
+    try {
+      const result = await api.recoverGatewayLauncher()
+      if (!result.success) {
+        addToast(result.error || t('Save failed'), 'error')
+        return
+      }
+
+      const status = result.data as { state?: string } | undefined
+      addToast(
+        status?.state === 'connected'
+          ? t('External gateway is connected')
+          : t('Recovery started'),
+        'success'
+      )
+      await loadGatewayDiagnostics({ silent: true })
+    } catch (error) {
+      console.error('[Settings] Failed to recover gateway launcher:', error)
+      addToast(t('Save failed'), 'error')
+    } finally {
+      setIsRecoveringGatewayLauncher(false)
+    }
+  }
+
+  const requestGatewayDaemonActionConfirmation = (type: 'install' | 'uninstall' | 'clear-lock') => {
+    if (type === 'install') {
+      setGatewayDaemonConfirmAction({
+        type,
+        title: t('Run Install Commands'),
+        message: t('This will copy the prepared daemon files into their target system locations and run the generated install commands. Continue?'),
+        confirmLabel: t('Run Install'),
+        variant: 'warning'
+      })
+      return
+    }
+
+    if (type === 'uninstall') {
+      setGatewayDaemonConfirmAction({
+        type,
+        title: t('Run Uninstall Commands'),
+        message: t('This will run the generated uninstall commands for the prepared daemon bundle. Generated target files may still require manual cleanup. Continue?'),
+        confirmLabel: t('Run Uninstall'),
+        variant: 'danger'
+      })
+      return
+    }
+
+    setGatewayDaemonConfirmAction({
+      type,
+      title: t('Clear Stale Lock'),
+      message: t('This will remove the observed daemon lock file so the launcher can recover from a stale or unhealthy background state. Continue?'),
+      confirmLabel: t('Clear Lock'),
+      variant: 'warning'
+    })
+  }
+
+  const handleConfirmGatewayDaemonAction = async () => {
+    if (!gatewayDaemonConfirmAction) {
+      return
+    }
+
+    const action = gatewayDaemonConfirmAction
+    setGatewayDaemonConfirmAction(null)
+
+    if (action.type === 'install' || action.type === 'uninstall') {
+      await handleRunGatewayDaemonCommand(action.type)
+      return
+    }
+
+    await handleClearGatewayDaemonLock()
+  }
+
+  const shouldShowGatewayLauncherRecovery = gatewayHealth?.gateway.mode === 'external' && (
+    gatewayHealth.launcher.state !== 'connected'
+    || gatewayHealth.process.state === 'awaiting-external'
+    || gatewayHealth.process.state === 'inactive'
+    || gatewayDaemonStatus?.lockState === 'stale'
+    || gatewayDaemonStatus?.lockState === 'error'
+  )
 
   // Handle clear memory
   const handleClearMemory = async () => {
@@ -1045,6 +1820,160 @@ export function SettingsPage() {
     goBack()
   }
 
+  const adapterIconMap: Record<string, LucideIcon> = {
+    'terminal': Terminal,
+    'chrome': Globe,
+    'finder': FolderOpen,
+    'skillsfan': Sparkles,
+  }
+
+  const adapterDisplayNames: Record<string, string> = {
+    'terminal': t('Terminal'),
+    'chrome': t('Chrome Browser'),
+    'finder': t('Finder'),
+    'skillsfan': 'SkillsFan',
+  }
+
+  const adapterDescriptions: Record<string, string> = {
+    'terminal': t('terminal_description'),
+    'chrome': t('chrome_description'),
+    'finder': t('finder_description'),
+    'skillsfan': t('skillsfan_description'),
+  }
+
+  const adapterBlockedDescriptions: Record<string, string> = {
+    'terminal': t('terminal_blocked_description'),
+    'chrome': t('chrome_blocked_description'),
+  }
+
+  const getBlockedCapabilityLabels = (): string[] => {
+    if (!gatewayHealth) return []
+    const blocked = gatewayHealth.host.desktop.actions.filter(a => a.blockedByPermission)
+    const labels: string[] = []
+    if (blocked.some(a => ['press_key', 'type_text'].includes(a.id))) labels.push(t('keyboard input'))
+    if (blocked.some(a => ['click', 'move_mouse', 'scroll'].includes(a.id))) labels.push(t('mouse control'))
+    if (blocked.some(a => ['list_windows', 'focus_window'].includes(a.id))) labels.push(t('window management'))
+    return labels
+  }
+
+  const renderComputerAutomationContent = () => {
+    if (!gatewayHealth) {
+      return null
+    }
+
+    const needsAccessibility = gatewayHealth.host.permissions.accessibility.state === 'needs_permission'
+    const needsScreenRecording = gatewayHealth.host.permissions.screenRecording.state === 'needs_permission'
+    const hasPermissionIssue = needsAccessibility || needsScreenRecording
+    const allReady = gatewayHealth.host.desktop.state === 'ready' && !hasPermissionIssue
+    const blockedLabels = getBlockedCapabilityLabels()
+    const activeAdapters = gatewayHealth.host.desktop.adapters.filter(a => a.stage === 'active' && a.id !== 'generic-macos')
+    const plannedAdapters = gatewayHealth.host.desktop.adapters.filter(a => a.stage === 'planned')
+    const allAdapters = [...activeAdapters, ...plannedAdapters]
+
+    return (
+      <div className="space-y-4">
+        {/* Permission banner */}
+        {hasPermissionIssue && (
+          <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 rounded-full bg-amber-500/10 p-1.5">
+                <Lock className="h-4 w-4 text-amber-600" />
+              </div>
+              <div className="flex-1 space-y-2">
+                <p className="text-sm font-medium text-amber-700 dark:text-amber-400">
+                  {t('System permission required')}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {needsAccessibility && t('AI needs Accessibility permission to help you with {{capabilities}}.', {
+                    capabilities: blockedLabels.join(t(', '))
+                  })}
+                  {needsAccessibility && needsScreenRecording && ' '}
+                  {needsScreenRecording && t('Screen Recording permission is also needed.')}
+                </p>
+                <div className="text-sm text-muted-foreground space-y-1 mt-1">
+                  <p>{t('permission_step_1')}</p>
+                  <p>{t('permission_step_2')}</p>
+                  <p>{t('permission_step_3')}</p>
+                </div>
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {needsAccessibility && (
+                    <button
+                      onClick={() => handleOpenDesktopPermissionSettings('accessibility')}
+                      className="px-3 py-1.5 bg-amber-500/10 text-amber-700 dark:text-amber-400 text-sm rounded-lg hover:bg-amber-500/20 transition-colors border border-amber-500/30 font-medium"
+                    >
+                      {t('Enable Accessibility')}
+                    </button>
+                  )}
+                  {needsScreenRecording && (
+                    <button
+                      onClick={() => handleOpenDesktopPermissionSettings('screen-recording')}
+                      className="px-3 py-1.5 bg-amber-500/10 text-amber-700 dark:text-amber-400 text-sm rounded-lg hover:bg-amber-500/20 transition-colors border border-amber-500/30 font-medium"
+                    >
+                      {t('Enable Screen Recording')}
+                    </button>
+                  )}
+                </div>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {t('AI will only perform these actions when you explicitly ask.')}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {allReady && (
+          <div className="flex items-center gap-2">
+            <Check className="h-4 w-4 text-green-600" />
+            <span className="text-sm text-green-600 font-medium">{t('All system permissions granted')}</span>
+          </div>
+        )}
+
+        {/* App list — same style as other settings items */}
+        {allAdapters.map((adapter, index) => {
+          const AdapterIcon = adapterIconMap[adapter.id] || Monitor
+          const isPlanned = adapter.stage === 'planned'
+          const hasBlockedWorkflows = !isPlanned && (adapter.workflows || []).some(w => w.blockedByPermission)
+          const description = adapterDescriptions[adapter.id] || ''
+
+          return (
+            <div
+              key={adapter.id}
+              className={index > 0 || (hasPermissionIssue || allReady) ? 'pt-4 border-t border-border' : ''}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <AdapterIcon className="h-4 w-4 text-muted-foreground" />
+                  <p className="font-medium">
+                    {adapterDisplayNames[adapter.id] || adapter.displayName || adapter.id}
+                  </p>
+                </div>
+                {isPlanned && (
+                  <span className="text-sm text-muted-foreground">{t('Coming soon')}</span>
+                )}
+              </div>
+              <p className="text-sm text-muted-foreground mt-1">
+                {description}
+              </p>
+              {hasBlockedWorkflows && (
+                <div className="flex items-center gap-2 mt-2">
+                  <p className="text-sm text-amber-600 dark:text-amber-400">
+                    {adapterBlockedDescriptions[adapter.id] || ''}
+                  </p>
+                  <button
+                    onClick={() => handleOpenDesktopPermissionSettings('accessibility')}
+                    className="text-sm text-amber-700 dark:text-amber-400 underline hover:no-underline whitespace-nowrap"
+                  >
+                    {t('Enable now')}
+                  </button>
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
+
   // Navigation items configuration
   const navItems: { id: SettingsSection; icon: LucideIcon; label: string; desktopOnly?: boolean; hidden?: boolean }[] = [
     { id: 'account', icon: User, label: t('Account'), desktopOnly: true },
@@ -1052,6 +1981,7 @@ export function SettingsPage() {
     { id: 'skills', icon: Package, label: t('Skills') },
     { id: 'spaces', icon: Layers, label: t('Spaces'), desktopOnly: true },
     { id: 'system', icon: SettingsIcon, label: t('System'), desktopOnly: true },
+    { id: 'computer-automation', icon: Monitor, label: t('Computer Automation'), desktopOnly: true },
     { id: 'advanced', icon: SlidersHorizontal, label: t('Advanced'), desktopOnly: true },
     { id: 'mcp', icon: Server, label: t('MCP Servers'), hidden: true },
     { id: 'display', icon: Palette, label: t('Display & Language') },
@@ -1582,6 +2512,21 @@ export function SettingsPage() {
             </section>
           )}
 
+          {activeSection === 'computer-automation' && !api.isRemoteMode() && (
+            <section className="bg-card rounded-xl border border-border p-6">
+              <h2 className="text-lg font-medium mb-4">{t('Computer Automation')}</h2>
+
+              {!gatewayHealth && isLoadingGatewayDiagnostics && (
+                <div className="rounded-lg border border-border bg-secondary/20 px-4 py-5 text-sm text-muted-foreground flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  {t('Loading...')}
+                </div>
+              )}
+
+              {gatewayHealth && renderComputerAutomationContent()}
+            </section>
+          )}
+
           {/* Advanced Section */}
           {activeSection === 'advanced' && !api.isRemoteMode() && (
             <section className="bg-card rounded-xl border border-border p-6">
@@ -1798,6 +2743,613 @@ export function SettingsPage() {
                   </div>
                 </div>
 
+                <div className="pt-4 border-t border-border space-y-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <p className="font-medium">{t('Gateway Diagnostics')}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {t('Observe gateway runtime health, recovery storage, and background daemon status.')}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => loadGatewayDiagnostics()}
+                      disabled={isLoadingGatewayDiagnostics}
+                      className="inline-flex items-center gap-2 px-3 py-2 text-sm bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/80 transition-colors disabled:opacity-50"
+                    >
+                      <RefreshCw className={`w-4 h-4 ${isLoadingGatewayDiagnostics ? 'animate-spin' : ''}`} />
+                      {isLoadingGatewayDiagnostics ? t('Loading...') : t('Refresh')}
+                    </button>
+                  </div>
+
+                  {!gatewayHealth && isLoadingGatewayDiagnostics && (
+                    <div className="rounded-lg border border-border bg-secondary/20 px-4 py-5 text-sm text-muted-foreground flex items-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      {t('Loading gateway diagnostics...')}
+                    </div>
+                  )}
+
+                  {gatewayHealth && (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div className="rounded-lg border border-border bg-secondary/20 p-4 space-y-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-sm font-medium">{t('Gateway Runtime')}</p>
+                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${getStatusBadgeClasses(gatewayHealth.process.state)}`}>
+                            {gatewayHealth.gateway.mode === 'external' ? t('External') : t('Embedded')}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                          <div>
+                            <p className="text-xs text-muted-foreground">{t('Runtime')}</p>
+                            <p className="mt-1 font-medium">{gatewayHealth.runtime.activeKind}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">{t('Configured Mode')}</p>
+                            <p className="mt-1 font-medium">{gatewayHealth.runtime.configuredMode}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">{t('Registered Runtimes')}</p>
+                            <p className="mt-1 font-medium">{(gatewayHealth.runtime.registeredKinds || []).join(', ') || '—'}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">{t('Hybrid Routing')}</p>
+                            <p className="mt-1 font-medium">{gatewayHealth.runtime.hybridTaskRouting ? t('Task-based') : t('Mode-only')}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">{t('Process')}</p>
+                            <p className="mt-1 font-medium">{gatewayHealth.process.state}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">{t('Launcher')}</p>
+                            <p className="mt-1 font-medium">{gatewayHealth.launcher.state}</p>
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+                          <span>{t('PID')}: {gatewayHealth.process.pid ?? '—'}</span>
+                          <span>{t('Heartbeat Age')}: {formatDurationMs(gatewayHealth.process.heartbeatAgeMs)}</span>
+                          <span>{t('Checked At')}: {formatOptionalTimestamp(gatewayHealth.checkedAt)}</span>
+                        </div>
+                        {gatewayHealth.runtime.native && (
+                          <div className="rounded-lg border border-border/60 bg-background/60 px-3 py-2 text-xs text-muted-foreground space-y-1">
+                            <div className="flex flex-wrap gap-3">
+                              <span>{t('Native Lane')}: {gatewayHealth.runtime.nativeRegistered ? t('Registered') : t('Scaffolded')}</span>
+                              <span>{t('Ready')}: {gatewayHealth.runtime.native.ready ? t('Yes') : t('No')}</span>
+                              <span>{t('Provider-native')}: {gatewayHealth.runtime.native.providerNativeExecution ? t('Enabled') : t('Planned')}</span>
+                            </div>
+                            <div className="flex flex-wrap gap-3">
+                              <span>{t('Providers')}: {gatewayHealth.runtime.native.supportedProviders.join(', ') || '—'}</span>
+                              <span>{t('API Types')}: {gatewayHealth.runtime.native.supportedApiTypes.join(', ') || '—'}</span>
+                            </div>
+                            <div className="flex flex-wrap gap-3">
+                              <span>{t('Pending Approvals')}: {gatewayHealth.runtime.native.interaction.pendingToolApprovalCount}</span>
+                              <span>{t('Pending Questions')}: {gatewayHealth.runtime.native.interaction.pendingUserQuestionCount}</span>
+                            </div>
+                            {gatewayHealth.runtime.native.interaction.pendingUserQuestionPreview && (
+                              <div>
+                                <span>{t('Waiting for this reply')}: {gatewayHealth.runtime.native.interaction.pendingUserQuestionPreview}</span>
+                              </div>
+                            )}
+                            <div className="flex flex-wrap gap-3">
+                              <span>{t('Last Approval Request')}: {formatOptionalTimestamp(gatewayHealth.runtime.native.interaction.lastToolApprovalRequestedAt)}</span>
+                              <span>{t('Last Question Request')}: {formatOptionalTimestamp(gatewayHealth.runtime.native.interaction.lastUserQuestionRequestedAt)}</span>
+                            </div>
+                            <p>{gatewayHealth.runtime.native.note}</p>
+                          </div>
+                        )}
+                        {gatewayHealth.runtime.fallbackActive && (
+                          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
+                            {t('Configured runtime is falling back to a different active runtime.')}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="rounded-lg border border-border bg-secondary/20 p-4 space-y-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-sm font-medium">{t('Command Runtime')}</p>
+                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${getStatusBadgeClasses(
+                            gatewayHealth.gateway.mode !== 'external'
+                              ? 'disabled'
+                              : gatewayHealth.commands.lastError
+                                ? 'error'
+                                : gatewayHealth.commands.initialized
+                                  ? 'ok'
+                                  : 'warn'
+                          )}`}>
+                            {gatewayHealth.gateway.mode !== 'external'
+                              ? t('Disabled')
+                              : gatewayHealth.commands.initialized
+                                ? t('Active')
+                                : t('Pending')}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                          <div>
+                            <p className="text-xs text-muted-foreground">{t('Role')}</p>
+                            <p className="mt-1 font-medium">{gatewayHealth.commands.processRole || '—'}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">{t('Pending')}</p>
+                            <p className="mt-1 font-medium">{gatewayHealth.commands.pendingCount}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">{t('Processed')}</p>
+                            <p className="mt-1 font-medium">{gatewayHealth.commands.processedCount}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">{t('Failed')}</p>
+                            <p className="mt-1 font-medium">{gatewayHealth.commands.failedCount}</p>
+                          </div>
+                        </div>
+                        <div className="space-y-1 text-xs text-muted-foreground">
+                          <p>{t('Last Command')}: {gatewayHealth.commands.lastCommandName || '—'}</p>
+                          <p>{t('Last Activity')}: {formatOptionalTimestamp(gatewayHealth.commands.lastCommandAt)}</p>
+                          <p>{t('Last Success')}: {formatOptionalTimestamp(gatewayHealth.commands.lastSuccessAt)}</p>
+                        </div>
+                        {gatewayHealth.commands.lastError && (
+                          <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-500 break-all">
+                            {gatewayHealth.commands.lastError}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="rounded-lg border border-border bg-secondary/20 p-4 space-y-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-sm font-medium">{t('Recovery Storage')}</p>
+                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${getStatusBadgeClasses(
+                            gatewayHealth.sessionStore.lastLoadError
+                              || gatewayHealth.sessionStore.lastSaveError
+                              || gatewayHealth.stepJournal.lastLoadError
+                              || gatewayHealth.stepJournal.lastPersistError
+                              ? 'warn'
+                              : 'ok'
+                          )}`}>
+                            {gatewayHealth.sessionStore.enabled || gatewayHealth.stepJournal.enabled ? t('Active') : t('Disabled')}
+                          </span>
+                        </div>
+                        <div className="space-y-3 text-sm">
+                          <div className="rounded-lg border border-border/60 bg-background/50 p-3">
+                            <div className="flex items-center justify-between gap-3">
+                              <p className="font-medium">{t('Session Store')}</p>
+                              <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${getStatusBadgeClasses(
+                                !gatewayHealth.sessionStore.enabled
+                                  ? 'disabled'
+                                  : gatewayHealth.sessionStore.lastLoadError || gatewayHealth.sessionStore.lastSaveError
+                                    ? 'warn'
+                                    : gatewayHealth.sessionStore.hydrated
+                                      ? 'ok'
+                                      : 'degraded'
+                              )}`}>
+                                {gatewayHealth.sessionStore.enabled
+                                  ? gatewayHealth.sessionStore.hydrated ? t('Hydrated') : t('Pending')
+                                  : t('Disabled')}
+                              </span>
+                            </div>
+                            <p className="mt-2 text-xs text-muted-foreground">
+                              {t('{{count}} sessions, last snapshot {{time}}', {
+                                count: gatewayHealth.sessionStore.sessionCount,
+                                time: formatOptionalTimestamp(gatewayHealth.sessionStore.snapshotSavedAt)
+                              })}
+                            </p>
+                            {(gatewayHealth.sessionStore.lastLoadError || gatewayHealth.sessionStore.lastSaveError) && (
+                              <p className="mt-2 text-xs text-red-500 break-all">
+                                {gatewayHealth.sessionStore.lastLoadError || gatewayHealth.sessionStore.lastSaveError}
+                              </p>
+                            )}
+                          </div>
+
+                          <div className="rounded-lg border border-border/60 bg-background/50 p-3">
+                            <div className="flex items-center justify-between gap-3">
+                              <p className="font-medium">{t('Step Journal')}</p>
+                              <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${getStatusBadgeClasses(
+                                !gatewayHealth.stepJournal.enabled
+                                  ? 'disabled'
+                                  : gatewayHealth.stepJournal.lastLoadError || gatewayHealth.stepJournal.lastPersistError
+                                    ? 'warn'
+                                    : 'ok'
+                              )}`}>
+                                {gatewayHealth.stepJournal.enabled ? t('Persisting') : t('Disabled')}
+                              </span>
+                            </div>
+                            <p className="mt-2 text-xs text-muted-foreground">
+                              {t('{{taskCount}} tasks / {{stepCount}} steps, last persisted {{time}}', {
+                                taskCount: gatewayHealth.stepJournal.persistedTaskCount,
+                                stepCount: gatewayHealth.stepJournal.persistedStepCount,
+                                time: formatOptionalTimestamp(gatewayHealth.stepJournal.lastPersistedAt)
+                              })}
+                            </p>
+                            {(gatewayHealth.stepJournal.lastLoadError || gatewayHealth.stepJournal.lastPersistError) && (
+                              <p className="mt-2 text-xs text-red-500 break-all">
+                                {gatewayHealth.stepJournal.lastLoadError || gatewayHealth.stepJournal.lastPersistError}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {gatewayDoctor && (
+                    <div className="rounded-lg border border-border bg-secondary/20 p-4 space-y-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-medium">{t('Doctor Report')}</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {t('Generated at {{time}}', { time: formatOptionalTimestamp(gatewayDoctor.generatedAt) })}
+                          </p>
+                        </div>
+                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${getStatusBadgeClasses(gatewayDoctor.overallState)}`}>
+                          {gatewayDoctor.overallState.toUpperCase()}
+                        </span>
+                      </div>
+                      <div className="space-y-2">
+                        {gatewayDoctor.checks.map((check) => (
+                          <div
+                            key={check.key}
+                            className="flex items-start justify-between gap-3 rounded-lg border border-border/60 bg-background/50 px-3 py-2"
+                          >
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium">{check.key}</p>
+                              <p className="text-xs text-muted-foreground mt-1 break-words">{check.summary}</p>
+                            </div>
+                            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${getStatusBadgeClasses(check.state)}`}>
+                              {check.state}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {gatewayDaemonStatus && (
+                    <div className="rounded-lg border border-border bg-secondary/20 p-4 space-y-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-medium">{t('Background Gateway')}</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {t('Manage daemon intent and inspect auto-start integration for the external gateway process.')}
+                          </p>
+                        </div>
+                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${getStatusBadgeClasses(
+                          gatewayDaemonStatus.lastError
+                            ? 'error'
+                            : gatewayDaemonStatus.registered
+                              ? 'registered'
+                              : gatewayDaemonStatus.state
+                        )}`}>
+                          {gatewayDaemonStatus.registered ? t('Registered') : t('Manual')}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                        <div className="rounded-lg border border-border/60 bg-background/50 p-3">
+                          <p className="text-xs text-muted-foreground">{t('Manager')}</p>
+                          <p className="mt-1 font-medium">{formatGatewayManagerLabel(gatewayDaemonStatus.manager)}</p>
+                          <p className="mt-2 text-xs text-muted-foreground">{t('Desired mode')}: {gatewayDaemonStatus.desiredMode}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">{t('Auto Start')}: {gatewayDaemonStatus.autoStartEnabled ? t('Enabled') : t('Disabled')}</p>
+                        </div>
+                        <div className="rounded-lg border border-border/60 bg-background/50 p-3">
+                          <p className="text-xs text-muted-foreground">{t('Lock')}</p>
+                          <p className="mt-1 font-medium">{gatewayDaemonStatus.lockState}</p>
+                          <p className="mt-2 text-xs text-muted-foreground">{t('Owner')}: {gatewayDaemonStatus.lockOwner || '—'}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">{t('Heartbeat Age')}: {formatDurationMs(gatewayDaemonStatus.lockHeartbeatAgeMs)}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          onClick={handleRegisterGatewayDaemon}
+                          disabled={activeGatewayDaemonAction !== null || !gatewayDaemonStatus.installable}
+                          className="px-4 py-2 bg-primary text-primary-foreground text-sm rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50"
+                        >
+                          {activeGatewayDaemonAction === 'register' ? t('Saving...') : t('Enable Daemon Mode')}
+                        </button>
+                        <button
+                          onClick={handleUnregisterGatewayDaemon}
+                          disabled={activeGatewayDaemonAction !== null}
+                          className="px-4 py-2 bg-secondary text-secondary-foreground text-sm rounded-lg hover:bg-secondary/80 transition-colors disabled:opacity-50"
+                        >
+                          {activeGatewayDaemonAction === 'unregister' ? t('Saving...') : t('Use Manual Mode')}
+                        </button>
+                        {shouldShowGatewayLauncherRecovery && (
+                          <button
+                            onClick={handleRecoverGatewayLauncher}
+                            disabled={isRecoveringGatewayLauncher}
+                            className="px-4 py-2 bg-amber-500/10 text-amber-700 text-sm rounded-lg hover:bg-amber-500/20 transition-colors border border-amber-500/30 disabled:opacity-50 dark:text-amber-400"
+                          >
+                            {isRecoveringGatewayLauncher ? t('Recovering...') : t('Recover External Gateway')}
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-muted-foreground">
+                        <p>{t('Registered at')}: {formatOptionalTimestamp(gatewayDaemonStatus.registeredAt)}</p>
+                        <p>{t('Updated at')}: {formatOptionalTimestamp(gatewayDaemonStatus.updatedAt)}</p>
+                      </div>
+
+                      {gatewayDaemonStatus.note && (
+                        <div className="rounded-lg border border-border/60 bg-background/50 px-3 py-2 text-xs text-muted-foreground">
+                          {gatewayDaemonStatus.note}
+                        </div>
+                      )}
+
+                      {gatewayDaemonStatus.lastError && (
+                        <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-500 break-all">
+                          {gatewayDaemonStatus.lastError}
+                        </div>
+                      )}
+
+                      {gatewayDaemonInstallPlan && (
+                        <div className="rounded-lg border border-border/60 bg-background/50 p-3 space-y-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="text-sm font-medium">{t('Install Plan')}</p>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {gatewayDaemonInstallPlan.supported
+                                  ? t('Manual installer skeleton for {{manager}}.', {
+                                      manager: formatGatewayManagerLabel(gatewayDaemonInstallPlan.manager)
+                                    })
+                                  : t('Daemon installation is not supported on this platform yet.')}
+                              </p>
+                            </div>
+                            {gatewayDaemonInstallPlan.installCommands.length > 0 && (
+                              <button
+                                onClick={() => copyToClipboard(gatewayDaemonInstallPlan.installCommands.map(formatGatewayCommand).join('\n'))}
+                                className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                              >
+                                <Copy className="w-3.5 h-3.5" />
+                                {t('Copy install commands')}
+                              </button>
+                            )}
+                          </div>
+
+                          {gatewayDaemonInstallPlan.files.map((file) => (
+                            <div key={file.path} className="rounded-lg border border-border/60 px-3 py-2">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <p className="text-xs text-muted-foreground">{file.kind}</p>
+                                  <p className="mt-1 font-mono text-xs break-all">{file.path}</p>
+                                </div>
+                                <button
+                                  onClick={() => copyToClipboard(file.content)}
+                                  className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                                >
+                                  <Copy className="w-3.5 h-3.5" />
+                                  {t('Copy file')}
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+
+                          {gatewayDaemonInstallPlan.installCommands.length > 0 && (
+                            <div className="space-y-2">
+                              <p className="text-xs font-medium text-foreground">{t('Install Commands')}</p>
+                              <div className="rounded-lg border border-border/60 bg-background px-3 py-2 space-y-2">
+                                {gatewayDaemonInstallPlan.installCommands.map((command) => (
+                                  <code key={formatGatewayCommand(command)} className="block text-xs break-all">
+                                    {formatGatewayCommand(command)}
+                                  </code>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {gatewayDaemonInstallPlan.uninstallCommands.length > 0 && (
+                            <div className="space-y-2">
+                              <p className="text-xs font-medium text-foreground">{t('Uninstall Commands')}</p>
+                              <div className="rounded-lg border border-border/60 bg-background px-3 py-2 space-y-2">
+                                {gatewayDaemonInstallPlan.uninstallCommands.map((command) => (
+                                  <code key={formatGatewayCommand(command)} className="block text-xs break-all">
+                                    {formatGatewayCommand(command)}
+                                  </code>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {gatewayDaemonInstallPlan.notes.length > 0 && (
+                            <div className="space-y-2">
+                              <p className="text-xs font-medium text-foreground">{t('Notes')}</p>
+                              <div className="space-y-1">
+                                {gatewayDaemonInstallPlan.notes.map((note) => (
+                                  <p key={note} className="text-xs text-muted-foreground">
+                                    {note}
+                                  </p>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="flex flex-wrap gap-2 pt-1">
+                            <button
+                              onClick={handlePrepareGatewayDaemonInstall}
+                              disabled={isPreparingGatewayDaemonInstall || !gatewayDaemonInstallPlan.supported}
+                              className="px-4 py-2 bg-primary/10 text-primary text-sm rounded-lg hover:bg-primary/20 transition-colors border border-primary/30 disabled:opacity-50"
+                            >
+                              {isPreparingGatewayDaemonInstall ? t('Preparing...') : t('Prepare Install Files')}
+                            </button>
+                            <button
+                              onClick={() => requestGatewayDaemonActionConfirmation('install')}
+                              disabled={activeGatewayDaemonCommand !== null || !gatewayDaemonPreparedInstall}
+                              className="px-4 py-2 bg-primary text-primary-foreground text-sm rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50"
+                            >
+                              {activeGatewayDaemonCommand === 'install' ? t('Running...') : t('Run Install Commands')}
+                            </button>
+                            <button
+                              onClick={() => requestGatewayDaemonActionConfirmation('uninstall')}
+                              disabled={activeGatewayDaemonCommand !== null || !gatewayDaemonPreparedInstall}
+                              className="px-4 py-2 bg-secondary text-secondary-foreground text-sm rounded-lg hover:bg-secondary/80 transition-colors disabled:opacity-50"
+                            >
+                              {activeGatewayDaemonCommand === 'uninstall' ? t('Running...') : t('Run Uninstall Commands')}
+                            </button>
+                            {(gatewayDaemonStatus.lockState === 'stale' || gatewayDaemonStatus.lockState === 'error') && (
+                              <button
+                                onClick={() => requestGatewayDaemonActionConfirmation('clear-lock')}
+                                disabled={isClearingGatewayDaemonLock}
+                                className="px-4 py-2 bg-amber-500/10 text-amber-700 text-sm rounded-lg hover:bg-amber-500/20 transition-colors border border-amber-500/30 disabled:opacity-50 dark:text-amber-400"
+                              >
+                                {isClearingGatewayDaemonLock ? t('Clearing...') : t('Clear Stale Lock')}
+                              </button>
+                            )}
+                          </div>
+
+                          {gatewayDaemonPreparedInstall && (
+                            <div className="rounded-lg border border-border/60 bg-secondary/20 p-3 space-y-3">
+                              <div className="flex items-start justify-between gap-3">
+                                <div>
+                                  <p className="text-sm font-medium">{t('Prepared Install Bundle')}</p>
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    {t('Generated at {{time}}', { time: formatOptionalTimestamp(gatewayDaemonPreparedInstall.generatedAt) })}
+                                  </p>
+                                </div>
+                                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${getStatusBadgeClasses('ready')}`}>
+                                  {t('{{count}} files', { count: gatewayDaemonPreparedInstall.fileCount })}
+                                </span>
+                              </div>
+
+                              <div className="space-y-2">
+                                <div className="rounded-lg border border-border/60 px-3 py-2">
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div className="min-w-0">
+                                      <p className="text-xs text-muted-foreground">{t('Bundle Directory')}</p>
+                                      <p className="mt-1 font-mono text-xs break-all">{gatewayDaemonPreparedInstall.bundleDir}</p>
+                                    </div>
+                                    <button
+                                      onClick={() => copyToClipboard(gatewayDaemonPreparedInstall.bundleDir)}
+                                      className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                                    >
+                                      <Copy className="w-3.5 h-3.5" />
+                                      {t('Copy')}
+                                    </button>
+                                  </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                  <div className="rounded-lg border border-border/60 px-3 py-2">
+                                    <p className="text-xs text-muted-foreground">{t('Manifest')}</p>
+                                    <p className="mt-1 font-mono text-xs break-all">{gatewayDaemonPreparedInstall.manifestPath}</p>
+                                  </div>
+                                  <div className="rounded-lg border border-border/60 px-3 py-2">
+                                    <p className="text-xs text-muted-foreground">{t('README')}</p>
+                                    <p className="mt-1 font-mono text-xs break-all">{gatewayDaemonPreparedInstall.readmePath}</p>
+                                  </div>
+                                </div>
+
+                                {gatewayDaemonPreparedInstall.stagedFiles.length > 0 && (
+                                  <div className="space-y-2">
+                                    <p className="text-xs font-medium text-foreground">{t('Prepared Files')}</p>
+                                    <div className="space-y-2">
+                                      {gatewayDaemonPreparedInstall.stagedFiles.map((file) => (
+                                        <div key={file.stagedPath} className="rounded-lg border border-border/60 px-3 py-2">
+                                          <p className="text-xs text-muted-foreground">{file.kind}</p>
+                                          <p className="mt-1 font-mono text-xs break-all">{file.stagedPath}</p>
+                                          <p className="mt-1 text-xs text-muted-foreground break-all">
+                                            {t('Target')}: {file.targetPath}
+                                          </p>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {gatewayDaemonExecutionResult && (
+                            <div className="rounded-lg border border-border/60 bg-secondary/20 p-3 space-y-3">
+                              <div className="flex items-start justify-between gap-3">
+                                <div>
+                                  <p className="text-sm font-medium">{t('Execution Result')}</p>
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    {t('{{action}} finished at {{time}}', {
+                                      action: gatewayDaemonExecutionResult.action,
+                                      time: formatOptionalTimestamp(gatewayDaemonExecutionResult.executedAt)
+                                    })}
+                                  </p>
+                                </div>
+                                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${getStatusBadgeClasses(
+                                  gatewayDaemonExecutionResult.success ? 'ok' : 'error'
+                                )}`}>
+                                  {gatewayDaemonExecutionResult.success ? t('Success') : t('Failed')}
+                                </span>
+                              </div>
+
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-muted-foreground">
+                                <p>{t('Bundle Directory')}: {gatewayDaemonExecutionResult.bundleDir}</p>
+                                <p>{t('Copied Files')}: {gatewayDaemonExecutionResult.copiedFileCount}</p>
+                              </div>
+
+                              {gatewayDaemonExecutionResult.note && (
+                                <div className="rounded-lg border border-border/60 bg-background/50 px-3 py-2 text-xs text-muted-foreground">
+                                  {gatewayDaemonExecutionResult.note}
+                                </div>
+                              )}
+
+                              {gatewayDaemonExecutionResult.error && (
+                                <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-500 break-all">
+                                  {gatewayDaemonExecutionResult.error}
+                                </div>
+                              )}
+
+                              {gatewayDaemonExecutionResult.rollbackHints.length > 0 && (
+                                <div className="space-y-2">
+                                  <p className="text-xs font-medium text-foreground">{t('Rollback Hints')}</p>
+                                  <div className="space-y-2">
+                                    {gatewayDaemonExecutionResult.rollbackHints.map((hint) => (
+                                      <div key={hint} className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+                                        {hint}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {gatewayDaemonExecutionResult.cleanupHints.length > 0 && (
+                                <div className="space-y-2">
+                                  <p className="text-xs font-medium text-foreground">{t('Cleanup Hints')}</p>
+                                  <div className="space-y-2">
+                                    {gatewayDaemonExecutionResult.cleanupHints.map((hint) => (
+                                      <div key={hint} className="rounded-lg border border-border/60 bg-background/50 px-3 py-2 text-xs text-muted-foreground">
+                                        {hint}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              <div className="space-y-2">
+                                {gatewayDaemonExecutionResult.commands.map((commandResult) => (
+                                  <div key={`${commandResult.command}-${commandResult.startedAt}`} className="rounded-lg border border-border/60 bg-background/50 px-3 py-2 space-y-2">
+                                    <div className="flex items-start justify-between gap-3">
+                                      <code className="text-xs break-all">
+                                        {formatGatewayCommand({
+                                          command: commandResult.command,
+                                          args: commandResult.args
+                                        })}
+                                      </code>
+                                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${getStatusBadgeClasses(
+                                        commandResult.success ? 'ok' : 'error'
+                                      )}`}>
+                                        {commandResult.success ? t('OK') : t('Error')}
+                                      </span>
+                                    </div>
+                                    {commandResult.stdout && (
+                                      <pre className="text-xs text-muted-foreground whitespace-pre-wrap break-words">{commandResult.stdout}</pre>
+                                    )}
+                                    {commandResult.stderr && (
+                                      <pre className="text-xs text-red-500 whitespace-pre-wrap break-words">{commandResult.stderr}</pre>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
                 {/* Memory Management */}
                 <div className={`pt-4 border-t border-border transition-opacity ${(config?.memory?.enabled ?? true) ? '' : 'opacity-50 pointer-events-none'}`}>
                   <div className="flex items-center justify-between">
@@ -1993,6 +3545,18 @@ export function SettingsPage() {
               </div>
             </div>
           )}
+
+          <ConfirmDialog
+            isOpen={Boolean(gatewayDaemonConfirmAction)}
+            title={gatewayDaemonConfirmAction?.title || t('Confirm')}
+            message={gatewayDaemonConfirmAction?.message || ''}
+            confirmLabel={gatewayDaemonConfirmAction?.confirmLabel}
+            variant={gatewayDaemonConfirmAction?.variant || 'warning'}
+            onConfirm={() => {
+              void handleConfirmGatewayDaemonAction()
+            }}
+            onCancel={() => setGatewayDaemonConfirmAction(null)}
+          />
 
           {/* MCP Servers Section */}
           {activeSection === 'mcp' && (

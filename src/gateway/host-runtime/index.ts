@@ -21,4 +21,5 @@ export {
   stepReporterRuntime
 }
 
+export * from './step-reporter/query'
 export type * from './types'

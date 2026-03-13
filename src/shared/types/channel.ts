@@ -92,6 +92,9 @@ export interface NormalizedOutboundEvent {
   /** Target identifiers */
   spaceId: string
   conversationId: string
+  /** Gateway platform session identifiers (optional during migration) */
+  sessionKey?: string
+  mainSessionKey?: string
   /** Event payload (type-specific, flat object for backward compatibility) */
   payload: Record<string, unknown>
   /** Timestamp (ms since epoch) */

@@ -136,6 +136,36 @@ export interface InternalMessageConfig {
   onError?: (errorMessage: string) => void
 }
 
+export interface AgentRouteHint {
+  agentId?: string
+  channel?: string
+  workspaceId?: string
+  accountId?: string
+  peerType?: 'direct' | 'group' | 'thread'
+  peerId?: string
+  parentPeerType?: 'direct' | 'group'
+  parentPeerId?: string
+}
+
+export type RuntimeTaskHintTag =
+  | 'skill'
+  | 'subagent'
+  | 'agent-team'
+  | 'ralph'
+  | 'loop-task'
+  | 'automation'
+  | 'web-research'
+  | 'browser-automation'
+  | 'desktop-automation'
+
+export interface RuntimeTaskHint {
+  preferredRuntime?: 'auto' | 'claude-sdk' | 'native'
+  complexity?: 'lightweight' | 'complex'
+  tags?: RuntimeTaskHintTag[]
+  requiresClaudeSdkOrchestration?: boolean
+  reason?: string
+}
+
 export interface AgentRequest {
   spaceId: string
   conversationId: string
@@ -151,6 +181,8 @@ export interface AgentRequest {
   model?: string              // Model to use (for future model switching)
   modelSource?: string        // AI source/provider override (e.g. 'skillsfan-credits', 'deepseek')
   canvasContext?: CanvasContext  // Current canvas state for AI awareness
+  routeHint?: AgentRouteHint
+  runtimeTaskHint?: RuntimeTaskHint
   ralphMode?: RalphModeConfig    // Ralph autonomous loop mode
   internalMessage?: InternalMessageConfig
 }

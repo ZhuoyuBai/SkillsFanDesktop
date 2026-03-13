@@ -8,6 +8,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ChannelManager, createOutboundEvent } from '@main/services/channel/channel-manager'
 import type { Channel } from '@main/services/channel/channel.interface'
 import type { NormalizedOutboundEvent } from '@shared/types/channel'
+import { resolveRoute } from '../../../../src/gateway/routing'
+import {
+  clearGatewaySessionStoreForTests,
+  createGatewaySession
+} from '../../../../src/gateway/sessions'
 
 function createMockChannel(id: string): Channel {
   return {
@@ -36,6 +41,7 @@ describe('ChannelManager', () => {
 
   beforeEach(() => {
     manager = new ChannelManager()
+    clearGatewaySessionStoreForTests()
   })
 
   describe('registerChannel', () => {
@@ -111,6 +117,51 @@ describe('ChannelManager', () => {
 
       expect(ch1.dispatch).toHaveBeenCalledWith(event)
     })
+
+    it('should route via tracked gateway session when event carries a session key', () => {
+      const ch1 = createMockChannel('ch1')
+      const ch2 = createMockChannel('ch2')
+      manager.registerChannel(ch1)
+      manager.registerChannel(ch2)
+
+      const route = resolveRoute({
+        workspaceId: 'space-1',
+        conversationId: 'conv-1'
+      })
+      createGatewaySession(route, { status: 'active' })
+      manager.trackSession(route.sessionKey, 'ch2')
+
+      const event = createTestEvent('conv-1')
+      event.sessionKey = route.sessionKey
+      event.mainSessionKey = route.mainSessionKey
+
+      manager.dispatchEvent(event)
+
+      expect(ch1.dispatch).not.toHaveBeenCalled()
+      expect(ch2.dispatch).toHaveBeenCalledWith(event)
+    })
+
+    it('should inherit session interest when a tracked conversation already has gateway sessions', () => {
+      const ch1 = createMockChannel('ch1')
+      const ch2 = createMockChannel('ch2')
+      manager.registerChannel(ch1)
+      manager.registerChannel(ch2)
+
+      const route = resolveRoute({
+        workspaceId: 'space-1',
+        conversationId: 'conv-1'
+      })
+      createGatewaySession(route, { status: 'active' })
+      manager.trackConversation('conv-1', 'ch1')
+
+      const event = createTestEvent('conv-1')
+      event.sessionKey = route.sessionKey
+
+      manager.dispatchEvent(event)
+
+      expect(ch1.dispatch).toHaveBeenCalledWith(event)
+      expect(ch2.dispatch).not.toHaveBeenCalled()
+    })
   })
 
   describe('dispatchGlobal', () => {
@@ -163,5 +214,33 @@ describe('createOutboundEvent', () => {
       conversationId: 'conv-1'
     })
     expect(event.timestamp).toBeGreaterThan(0)
+  })
+
+  it('should enrich events with gateway session identifiers when available', () => {
+    const route = resolveRoute({
+      workspaceId: 'space-1',
+      conversationId: 'conv-1'
+    })
+    createGatewaySession(route, {
+      status: 'active'
+    })
+
+    const event = createOutboundEvent(
+      'agent:message',
+      'space-1',
+      'conv-1',
+      { type: 'message', content: 'hello' }
+    )
+
+    expect(event.sessionKey).toBe(route.sessionKey)
+    expect(event.mainSessionKey).toBe(route.mainSessionKey)
+    expect(event.payload).toEqual({
+      type: 'message',
+      content: 'hello',
+      spaceId: 'space-1',
+      conversationId: 'conv-1',
+      sessionKey: route.sessionKey,
+      mainSessionKey: route.mainSessionKey
+    })
   })
 })

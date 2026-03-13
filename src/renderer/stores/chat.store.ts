@@ -1419,6 +1419,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
       return { sessions: newSessions, conversationCache: newCache }
     })
 
+    // Skip conversation reload for Ralph mode (no persistent conversation)
+    if (spaceId === '__ralph__') {
+      set((state) => {
+        const newSessions = new Map(state.sessions)
+        const session = newSessions.get(conversationId)
+        if (session) {
+          newSessions.set(conversationId, { ...session, isGenerating: false, streamingContent: '', sdkStatus: null })
+        }
+        return { sessions: newSessions }
+      })
+      return
+    }
+
     // Reload conversation from backend (Single Source of Truth)
     // Backend has already saved the complete message with thoughts
     try {
