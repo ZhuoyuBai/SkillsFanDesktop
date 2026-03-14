@@ -862,7 +862,7 @@ export function SettingsPage() {
   const [activeGatewayDaemonCommand, setActiveGatewayDaemonCommand] = useState<'install' | 'uninstall' | null>(null)
   const [isClearingGatewayDaemonLock, setIsClearingGatewayDaemonLock] = useState(false)
   const [isRecoveringGatewayLauncher, setIsRecoveringGatewayLauncher] = useState(false)
-  const [isSavingSimpleTaskTrial, setIsSavingSimpleTaskTrial] = useState(false)
+  const [isSavingAutomaticHandling, setIsSavingAutomaticHandling] = useState(false)
 
   // API Key visibility state
   const [showApiKey, setShowApiKey] = useState(false)
@@ -1213,7 +1213,7 @@ export function SettingsPage() {
     const currentConfig = config ?? DEFAULT_CONFIG
     const nextMode: NonNullable<HaloConfig['runtime']>['mode'] = enabled ? 'hybrid' : 'claude-sdk'
 
-    setIsSavingSimpleTaskTrial(true)
+    setIsSavingAutomaticHandling(true)
     try {
       await api.setConfig({ runtime: { mode: nextMode } })
       const nextConfig: HaloConfig = {
@@ -1230,7 +1230,7 @@ export function SettingsPage() {
       console.error('[Settings] Failed to update automatic handling mode:', error)
       addToast(t('Save failed'), 'error')
     } finally {
-      setIsSavingSimpleTaskTrial(false)
+      setIsSavingAutomaticHandling(false)
     }
   }
 
@@ -1957,7 +1957,7 @@ export function SettingsPage() {
             <Switch
               checked={automaticHandlingEnabled}
               onChange={handleAutomaticHandlingChange}
-              disabled={isSavingSimpleTaskTrial}
+              disabled={isSavingAutomaticHandling}
             />
           </div>
         </div>

@@ -54,6 +54,28 @@ When the user asks for fresh online information, source links, citations, or pag
 3. Use \`mcp__web-tools__WebSearch\` and \`mcp__web-tools__WebFetch\` directly so SkillsFan can manage permissions and results correctly.
 `
 
+const TERMINAL_AUTOMATION_POLICY_PROMPT = `
+
+## Terminal Automation Policy
+
+When the user wants to run a command in Terminal or iTerm:
+1. Do not call \`mcp__local-tools__open_application\` first just to launch Terminal or iTerm.
+2. Prefer a single terminal tool such as \`mcp__local-tools__terminal_run_command\`, \`mcp__local-tools__terminal_run_command_and_wait\`, or \`mcp__local-tools__terminal_run_command_in_directory\`.
+3. Use \`mcp__local-tools__terminal_new_window_run_command\` only when the user explicitly asks for a separate new window.
+4. Use \`mcp__local-tools__terminal_new_tab_run_command\` only when the user explicitly asks for a separate new tab.
+`
+
+const STRUCTURED_APP_AUTOMATION_POLICY_PROMPT = `
+
+## Structured App Automation Policy
+
+When the user wants to work with Finder, Chrome, Terminal, or iTerm:
+1. Do not call \`mcp__local-tools__open_application\` first just to prepare the app for another structured tool.
+2. Prefer the structured app tool itself, because it already knows how to open or reuse the app when needed.
+3. Use \`mcp__local-tools__open_application\` only when the user explicitly wants to simply open the app and stop there.
+4. Avoid opening an extra blank window before using Finder, Chrome, Terminal, or iTerm tools.
+`
+
 export interface ResolvedSdkTransport {
   anthropicBaseUrl: string
   anthropicApiKey: string
@@ -207,6 +229,8 @@ export async function buildSdkOptions(params: BuildSdkOptionsParams): Promise<{
       preset: 'claude_code' as const,
       append: buildSystemPromptAppend(workDir, credentialsModel, config.memory?.enabled)
         + WEB_RESEARCH_POLICY_PROMPT
+        + TERMINAL_AUTOMATION_POLICY_PROMPT
+        + STRUCTURED_APP_AUTOMATION_POLICY_PROMPT
         + (effectiveAiBrowserEnabled ? AI_BROWSER_SYSTEM_PROMPT + AI_BROWSER_PREFERENCE_PROMPT : '')
         + (browserAutomationMode === 'system-browser' ? SYSTEM_BROWSER_AUTOMATION_PROMPT : '')
         + ralphSystemPromptAppend

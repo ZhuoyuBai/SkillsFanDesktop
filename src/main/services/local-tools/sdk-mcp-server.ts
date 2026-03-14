@@ -342,7 +342,7 @@ export function createLocalToolsMcpServer(options: CreateLocalToolsMcpServerOpti
 
   const openApplicationTool = tool(
     'open_application',
-    'Open a real macOS application, optionally with a URL or file target. Use this to launch the user\'s actual Google Chrome instead of the sandboxed AI browser.',
+    'Open a real macOS application, optionally with a URL or file target. Use this to launch the user\'s actual Google Chrome instead of the sandboxed AI browser. Do not use this just to prepare Terminal, iTerm, Finder, or Chrome before another structured app tool; those tools already open or reuse the app when needed.',
     {
       application: z.string().min(1).describe('macOS application name, such as "Google Chrome" or "Safari"'),
       target: z.string().optional().describe('Optional URL or file path to open with the application'),
@@ -1403,7 +1403,7 @@ export function createLocalToolsMcpServer(options: CreateLocalToolsMcpServerOpti
 
   const terminalRunCommandTool = tool(
     'terminal_run_command',
-    'Run a shell command in Terminal or iTerm through a structured desktop adapter instead of free-form AppleScript.',
+    'Run a shell command in Terminal or iTerm through a structured desktop adapter instead of free-form AppleScript. This already opens Terminal or iTerm when needed, so do not call open_application first.',
     {
       command: z.string().min(1).describe('Shell command to run in the selected terminal app'),
       application: terminalApplicationSchema.optional().describe('Terminal app to target (default: Terminal)'),
@@ -4100,7 +4100,7 @@ export function createLocalToolsMcpServer(options: CreateLocalToolsMcpServerOpti
 
   const terminalNewWindowRunCommandTool = tool(
     'terminal_new_window_run_command',
-    'Open a new Terminal or iTerm window, then run a shell command through a structured desktop adapter.',
+    'Open a new Terminal or iTerm window, then run a shell command through a structured desktop adapter. Use this only when the user explicitly wants a separate new window.',
     {
       command: z.string().min(1).describe('Shell command to run in the new terminal window'),
       application: terminalApplicationSchema.optional().describe('Terminal app to target (default: Terminal)'),

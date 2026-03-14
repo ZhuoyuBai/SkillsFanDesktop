@@ -53,7 +53,7 @@ const BASE_MCP_TOOLS: ToolCatalogEntry[] = [
   },
   {
     name: 'mcp__local-tools__open_application',
-    description: 'Open a real macOS application, optionally with a URL or file target, such as Google Chrome.',
+    description: 'Open a real macOS application, optionally with a URL or file target, such as Google Chrome. Do not use this just to prepare Terminal, iTerm, Finder, or Chrome before another structured app tool; those tools already open or reuse the app when needed.',
     source: 'mcp',
     server: 'local-tools',
     category: 'desktop'
@@ -158,14 +158,14 @@ const BASE_MCP_TOOLS: ToolCatalogEntry[] = [
   },
   {
     name: 'mcp__local-tools__terminal_new_tab_run_command',
-    description: 'Open a new Terminal or iTerm tab, then run a shell command through a structured macOS desktop adapter.',
+    description: 'Open a new Terminal or iTerm tab, then run a shell command through a structured macOS desktop adapter. Use this only when the user explicitly wants a separate new tab.',
     source: 'mcp',
     server: 'local-tools',
     category: 'desktop'
   },
   {
     name: 'mcp__local-tools__terminal_new_window_run_command',
-    description: 'Open a new Terminal or iTerm window, then run a shell command through a structured macOS desktop adapter.',
+    description: 'Open a new Terminal or iTerm window, then run a shell command through a structured macOS desktop adapter. Use this only when the user explicitly wants a separate new window.',
     source: 'mcp',
     server: 'local-tools',
     category: 'desktop'
@@ -277,7 +277,7 @@ const BASE_MCP_TOOLS: ToolCatalogEntry[] = [
   },
   {
     name: 'mcp__local-tools__terminal_run_command',
-    description: 'Run a shell command in Terminal or iTerm through a structured macOS desktop adapter.',
+    description: 'Run a shell command in Terminal or iTerm through a structured macOS desktop adapter. This already opens Terminal or iTerm when needed, so do not open the app first.',
     source: 'mcp',
     server: 'local-tools',
     category: 'desktop'

@@ -6695,3 +6695,102 @@ npm run build
   - 再根据真实 upstream 结果决定是否需要修 `endpoint / schema / error mapping`
 - 继续 `M8`
   - 在现有 rollout scope 基础上再扩第二批 provider / model 级灰度
+
+## Step 102 - 用户侧收口为单开关，隐藏技术路线提示
+
+### 做了什么
+
+- `src/renderer/pages/SettingsPage.tsx`
+  - 把“自定义处理方式”这块最后一处遗留状态名清理掉，设置页现在只保留一个用户可理解的切换：
+    - `全部使用 Claude Code SDK`
+    - `自定义处理方式`
+  - 普通用户不再需要理解“试用 / rollout / 当前任务范围 / 当前 route 状态”。
+
+- `src/renderer/components/chat/MessageList.tsx`
+  - 删除聊天流顶部的 runtime route banner 渲染。
+  - 运行时仍会在内部记录 route info，用于系统判断与后续排查，但不再打断普通用户聊天体验。
+
+- `src/renderer/components/chat/ChatView.tsx`
+  - 不再把 runtime route 继续往消息列表透传。
+
+- 删除：
+  - `src/renderer/components/chat/RuntimeRouteBanner.tsx`
+  - 避免用户继续看到“这次走了哪条技术路线”的提示。
+
+### 验证
+
+- 单测：
+  - `npm run test:unit -- tests/unit/gateway/runtime/native-runtime.test.ts tests/unit/gateway/runtime/native-send-message.test.ts tests/unit/renderer/stores/chat.store.test.ts tests/unit/services/agent/control.test.ts`
+- 构建：
+  - `npm run build`
+
+### 结果
+
+- 通过
+- 设置页保留了更简单的产品入口
+- 聊天流不再暴露技术路线提示
+- 内部 route info、自动回退和 NativeRuntime 边界保护逻辑不受影响
+
+### 产品意义
+
+- 这一步不是新增功能，而是把前面“为了灰度而暴露给用户的技术概念”重新收回系统内部
+- 对普通用户来说，现在只需要理解：
+  - 要不要启用自定义处理方式
+- 不再需要理解：
+  - 这次走了哪条 route
+  - 当前是不是首批范围
+  - runtime 是否 ready
+- 这让当前阶段更接近正式产品，而不是测试工具
+
+### 下一步
+
+- 继续 `M7`
+  - 在有真实 `openai-codex` 凭据的环境补做 end-to-end smoke
+  - 根据真实使用再修少量稳定性问题
+- 当前阶段不再继续深挖共享工具抽象或用户侧状态面
+
+## Step 103 - 终端普通命令去掉内部标记，成功后不再显示误导性“检查中”
+
+### 做了什么
+
+- `src/gateway/host-runtime/desktop/adapters/terminal.ts`
+  - 普通终端命令不再默认注入内部状态标记。
+  - 只有 `...and_wait` 这类真正需要结构化完成态的命令，才继续携带内部 marker。
+
+- `src/gateway/host-runtime/desktop/adapters/executor.ts`
+  - `terminal.run_command`
+  - `terminal.new_tab_run_command`
+  - `terminal.new_window_run_command`
+  - `terminal.run_command_in_directory`
+  - `terminal.split_pane_run_command`
+  - 这些普通执行路径不再生成内部 `commandId` marker，也不再把 marker 直接打到用户终端里。
+
+- `src/renderer/components/tool/HostStatusBanner.tsx`
+  - 当电脑动作已经实际执行过、但系统权限状态仍处于 `unknown` 时，不再继续显示中性的“检查中”横幅。
+  - 避免用户刚看到动作已经完成，页面却还显示“AI 正在检查电脑操作权限”。
+
+- 测试：
+  - 更新 terminal adapter / executor / sdk-mcp-server 断言，确保普通命令路径不再泄露 marker。
+
+### 验证
+
+- 单测：
+  - `npm run test:unit -- tests/unit/gateway/host-runtime/desktop-adapters.test.ts tests/unit/gateway/host-runtime/desktop-adapter-executor.test.ts tests/unit/services/local-tools/sdk-mcp-server.test.ts tests/unit/services/agent/permission-handler.test.ts`
+- 构建：
+  - `npm run build`
+
+### 结果
+
+- 通过
+- `4` 个测试文件，`156` 个测试通过
+- 构建通过
+
+### 产品意义
+
+- 这一步不是“提升能力”
+- 而是修正一个很影响感受的体验问题：
+  - 命令虽然执行成功了，但普通用户看到的是一堆内部标记，会自然觉得“这不算真的成功”
+- 现在普通终端动作更像人手动在终端里执行：
+  - 用户看到的是正常命令与正常输出
+  - 不是系统内部的调试痕迹
+- 同时，已经成功执行后，界面也不再继续摆一张误导性的“检查中”卡片

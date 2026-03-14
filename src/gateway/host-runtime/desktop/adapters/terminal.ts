@@ -208,37 +208,45 @@ function buildTerminalTargetLines(args: {
   const resolvedSessionLabel = paneIndex ? 'Pane' : 'Session'
 
   if (application === 'iTerm' || application === 'iTerm2') {
+    const appleScriptApplication = application
     return [
-      'tell application "iTerm2"',
+      `tell application "${appleScriptApplication}"`,
       '  activate',
+      '  delay 0.1',
       '  if (count of windows) = 0 then',
       createWindowIfMissing
-        ? '    create window with default profile'
+        ? '    set targetWindow to (create window with default profile)'
         : '    error "iTerm2 has no open windows."',
-      '  end if',
+      createWindowIfMissing ? '    delay 0.1' : '',
+      '  else',
       windowIndex
-        ? `  set targetWindow to first window whose index is ${windowIndex}`
-        : '  set targetWindow to current window',
+        ? `    set targetWindow to first window whose index is ${windowIndex}`
+        : '    set targetWindow to current window',
+      '  end if',
+      '  tell targetWindow',
       tabIndex
-        ? `  if (count of tabs of targetWindow) < ${tabIndex} then`
+        ? `    if (count of tabs) < ${tabIndex} then`
         : '',
       tabIndex
-        ? `    error "Tab not found: ${tabIndex}"`
+        ? `      error "Tab not found: ${tabIndex}"`
         : '',
-      tabIndex ? '  end if' : '',
+      tabIndex ? '    end if' : '',
       tabIndex
-        ? `  set targetTab to tab ${tabIndex} of targetWindow`
-        : '  set targetTab to current tab of targetWindow',
+        ? `    set targetTab to tab ${tabIndex}`
+        : '    set targetTab to current tab',
+      '  end tell',
+      '  tell targetTab',
       resolvedSessionIndex
-        ? `  if (count of sessions of targetTab) < ${resolvedSessionIndex} then`
+        ? `    if (count of sessions) < ${resolvedSessionIndex} then`
         : '',
       resolvedSessionIndex
-        ? `    error "${resolvedSessionLabel} not found: ${resolvedSessionIndex}"`
+        ? `      error "${resolvedSessionLabel} not found: ${resolvedSessionIndex}"`
         : '',
-      resolvedSessionIndex ? '  end if' : '',
+      resolvedSessionIndex ? '    end if' : '',
       resolvedSessionIndex
-        ? `  set targetSession to session ${resolvedSessionIndex} of targetTab`
-        : '  set targetSession to current session of targetTab'
+        ? `    set targetSession to session ${resolvedSessionIndex}`
+        : '    set targetSession to current session',
+      '  end tell'
     ].filter(Boolean)
   }
 
@@ -284,7 +292,29 @@ export function buildTerminalCommandWithExitStatusMarker(
     ].join('; ')
   }
 
-  return `{ ${normalizedCommand}; }; __skillsfan_exit_code=$?; printf '\\n${TERMINAL_EXIT_STATUS_MARKER_PREFIX}%s\\n' "$__skillsfan_exit_code"`
+  return normalizedCommand
+}
+
+export function buildITermProbeScript(
+  application: Extract<TerminalApplication, 'iTerm' | 'iTerm2'>
+): string {
+  const appleScriptApplication = application
+
+  return [
+    `tell application "${appleScriptApplication}"`,
+    '  if (count of windows) = 0 then',
+    '    return "no_windows"',
+    '  end if',
+    '  set targetWindow to current window',
+    '  tell targetWindow',
+    '    set targetTab to current tab',
+    '  end tell',
+    '  tell targetTab',
+    '    set targetSession to current session',
+    '  end tell',
+    '  return "ok"',
+    'end tell'
+  ].join('\n')
 }
 
 export function buildTerminalRunCommandScript(
@@ -323,8 +353,9 @@ export function buildTerminalNewTabRunCommandScript(
   const escapedCommand = escapeAppleScriptString(buildTerminalCommandWithExitStatusMarker(command, commandId))
 
   if (application === 'iTerm' || application === 'iTerm2') {
+    const appleScriptApplication = application
     return [
-      'tell application "iTerm2"',
+      `tell application "${appleScriptApplication}"`,
       '  activate',
       '  if (count of windows) = 0 then',
       '    create window with default profile',
@@ -342,14 +373,14 @@ export function buildTerminalNewTabRunCommandScript(
     'tell application "Terminal"',
     '  activate',
     '  if (count of windows) = 0 then',
-    '    do script ""',
+    `    do script "${escapedCommand}"`,
     '  else',
     '    tell application "System Events"',
     '      keystroke "t" using command down',
     '    end tell',
     '    delay 0.2',
+    `    do script "${escapedCommand}" in front window`,
     '  end if',
-    `  do script "${escapedCommand}" in front window`,
     'end tell'
   ].join('\n')
 }
@@ -362,8 +393,9 @@ export function buildTerminalNewWindowRunCommandScript(
   const escapedCommand = escapeAppleScriptString(buildTerminalCommandWithExitStatusMarker(command, commandId))
 
   if (application === 'iTerm' || application === 'iTerm2') {
+    const appleScriptApplication = application
     return [
-      'tell application "iTerm2"',
+      `tell application "${appleScriptApplication}"`,
       '  activate',
       '  create window with default profile',
       `  tell current session of current window to write text "${escapedCommand}"`,
@@ -375,14 +407,14 @@ export function buildTerminalNewWindowRunCommandScript(
     'tell application "Terminal"',
     '  activate',
     '  if (count of windows) = 0 then',
-    '    do script ""',
+    `    do script "${escapedCommand}"`,
     '  else',
     '    tell application "System Events"',
     '      keystroke "n" using command down',
     '    end tell',
     '    delay 0.2',
+    `    do script "${escapedCommand}" in front window`,
     '  end if',
-    `  do script "${escapedCommand}" in front window`,
     'end tell'
   ].join('\n')
 }
@@ -412,8 +444,9 @@ export function buildTerminalListSessionsScript(
   application: TerminalApplication = 'Terminal'
 ): string {
   if (application === 'iTerm' || application === 'iTerm2') {
+    const appleScriptApplication = application
     return [
-      'tell application "iTerm2"',
+      `tell application "${appleScriptApplication}"`,
       '  activate',
       '  if (count of windows) = 0 then',
       '    error "iTerm2 has no open windows."',

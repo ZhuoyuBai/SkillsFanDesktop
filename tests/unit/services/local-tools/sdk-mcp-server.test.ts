@@ -225,6 +225,25 @@ describe('createLocalToolsMcpServer desktop tools', () => {
     expect(result.content[0]?.text).toBe('Opened Safari with https://example.com.')
   })
 
+  it('prefers app activation over opening a blank extra window for structured desktop apps', async () => {
+    const openApplication = getToolHandler('open_application')
+    const result = await openApplication({
+      application: 'Google Chrome'
+    }) as {
+      content: Array<{ text: string }>
+      isError?: boolean
+    }
+
+    expect(mocks.activateApplication).toHaveBeenCalledWith({
+      workDir: '/workspace',
+      application: 'Google Chrome',
+      timeoutMs: undefined
+    })
+    expect(mocks.openApplication).not.toHaveBeenCalled()
+    expect(result.isError).toBeUndefined()
+    expect(result.content[0]?.text).toBe('Opened Google Chrome.')
+  })
+
   it('uses the finder adapter method when revealing a non-folder path in Finder', async () => {
     const openApplication = getToolHandler('open_application')
     const result = await openApplication({
@@ -448,7 +467,7 @@ describe('createLocalToolsMcpServer desktop tools', () => {
 
     expect(mocks.runAppleScript).toHaveBeenCalledWith({
       workDir: '/workspace',
-      script: expect.stringContaining('set targetSession to session 1 of targetTab'),
+      script: expect.stringContaining('set targetSession to session 1'),
       timeoutMs: 5000
     })
     expect(result.isError).toBeUndefined()
@@ -670,7 +689,7 @@ describe('createLocalToolsMcpServer desktop tools', () => {
 
     expect(mocks.runAppleScript).toHaveBeenCalledWith({
       workDir: '/workspace',
-      script: expect.stringContaining('set targetSession to session 2 of targetTab'),
+      script: expect.stringContaining('set targetSession to session 2'),
       timeoutMs: 5000
     })
     expect(result.isError).toBeUndefined()
@@ -700,8 +719,8 @@ describe('createLocalToolsMcpServer desktop tools', () => {
   it('routes terminal_new_window_run_command through the terminal adapter', async () => {
     const handler = getToolHandler('terminal_new_window_run_command')
     const result = await handler({
-      command: 'pnpm typecheck',
-      application: 'iTerm2',
+      command: 'pwd',
+      application: 'Terminal',
       timeoutMs: 5000
     }) as {
       content: Array<{ text: string }>
@@ -710,11 +729,13 @@ describe('createLocalToolsMcpServer desktop tools', () => {
 
     expect(mocks.runAppleScript).toHaveBeenCalledWith({
       workDir: '/workspace',
-      script: expect.stringContaining('create window with default profile'),
+      script: expect.stringContaining('keystroke "n" using command down'),
       timeoutMs: 5000
     })
+    expect(mocks.runAppleScript.mock.calls[0]?.[0]?.script).toContain('do script "pwd"')
+    expect(mocks.runAppleScript.mock.calls[0]?.[0]?.script).not.toContain('do script ""')
     expect(result.isError).toBeUndefined()
-    expect(result.content[0]?.text).toBe('Opened a new window and ran command in iTerm2.')
+    expect(result.content[0]?.text).toBe('Opened a new window and ran command in Terminal.')
   })
 
   it('routes terminal_split_pane_run_command through the terminal adapter', async () => {
@@ -750,7 +771,7 @@ describe('createLocalToolsMcpServer desktop tools', () => {
     })
     expect(result.isError).toBeUndefined()
     expect(JSON.parse(result.content[0]?.text || '{}')).toEqual({
-      commandId: expect.any(String),
+      commandId: null,
       application: 'iTerm2',
       windowIndex: 2,
       tabIndex: 3,

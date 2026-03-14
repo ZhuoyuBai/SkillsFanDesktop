@@ -29,6 +29,7 @@ import { buildSkillsFanOpenSettingsShortcut } from './skillsfan'
 import {
   TERMINAL_COMMAND_RESULT_MARKER_PREFIX,
   TERMINAL_COMMAND_START_MARKER_PREFIX,
+  buildITermProbeScript,
   buildTerminalInterruptShortcut,
   buildTerminalGetPaneLayoutScript,
   buildTerminalGetSessionStateScript,
@@ -350,6 +351,54 @@ function isExistingDirectory(targetPath: string, workDir: string): boolean {
 
 function normalizeTerminalApplication(application?: string): TerminalApplication {
   return application === 'iTerm' || application === 'iTerm2' ? application : 'Terminal'
+}
+
+function getTerminalApplicationAttempts(application: TerminalApplication): TerminalApplication[] {
+  if (application === 'iTerm') {
+    return ['iTerm', 'iTerm2']
+  }
+
+  return [application]
+}
+
+async function runTerminalAppleScriptWithFallback(args: {
+  runtime: DesktopHostRuntime
+  workDir: string
+  application: TerminalApplication
+  timeoutMs?: number
+  buildScript: (application: TerminalApplication) => string
+}): Promise<MacOSAutomationResult> {
+  if (args.application === 'Terminal' || args.application === 'iTerm2') {
+    return await args.runtime.runAppleScript({
+      workDir: args.workDir,
+      script: args.buildScript(args.application),
+      timeoutMs: args.timeoutMs
+    })
+  }
+
+  const attempts = getTerminalApplicationAttempts(args.application)
+  let lastProbeResult: MacOSAutomationResult | null = null
+
+  for (const candidateApplication of attempts) {
+    const probeResult = await args.runtime.runAppleScript({
+      workDir: args.workDir,
+      script: buildITermProbeScript(candidateApplication),
+      timeoutMs: args.timeoutMs
+    })
+    lastProbeResult = probeResult
+
+    if (probeResult.returnCode !== 0 || probeResult.timedOut) {
+      continue
+    }
+
+    return await args.runtime.runAppleScript({
+      workDir: args.workDir,
+      script: args.buildScript(candidateApplication),
+      timeoutMs: args.timeoutMs
+    })
+  }
+
+  return lastProbeResult as MacOSAutomationResult
 }
 
 function normalizeTerminalTargetIndex(
@@ -1332,10 +1381,12 @@ async function waitForTerminalExitStatus(args: {
 
   while (Date.now() - startedAt <= overallTimeoutMs) {
     attempts += 1
-    const result = await args.runtime.runAppleScript({
+    const result = await runTerminalAppleScriptWithFallback({
+      runtime: args.runtime,
       workDir: args.workDir,
-      script: buildTerminalReadOutputScript(args.application, args.target),
-      timeoutMs: perAttemptTimeoutMs
+      application: args.application,
+      timeoutMs: perAttemptTimeoutMs,
+      buildScript: (application) => buildTerminalReadOutputScript(application, args.target)
     })
     if (result.returnCode !== 0 || result.timedOut) {
       const observation = lastObservation ?? applyTerminalTarget({
@@ -1448,10 +1499,12 @@ async function waitForTerminalSessionNotBusy(args: {
 
   while (Date.now() - startedAt <= overallTimeoutMs) {
     attempts += 1
-    const result = await args.runtime.runAppleScript({
+    const result = await runTerminalAppleScriptWithFallback({
+      runtime: args.runtime,
       workDir: args.workDir,
-      script: buildTerminalGetSessionStateScript(args.application, args.target),
-      timeoutMs: perAttemptTimeoutMs
+      application: args.application,
+      timeoutMs: perAttemptTimeoutMs,
+      buildScript: (application) => buildTerminalGetSessionStateScript(application, args.target)
     })
     if (result.returnCode !== 0 || result.timedOut) {
       const observation = lastObservation ?? parseTerminalSessionStateObservation({
@@ -1489,10 +1542,12 @@ async function waitForTerminalSessionNotBusy(args: {
     lastObservation = observation
 
     if (!observation.busy) {
-      const outputResult = await args.runtime.runAppleScript({
+      const outputResult = await runTerminalAppleScriptWithFallback({
+        runtime: args.runtime,
         workDir: args.workDir,
-        script: buildTerminalReadOutputScript(args.application, args.target),
-        timeoutMs: perAttemptTimeoutMs
+        application: args.application,
+        timeoutMs: perAttemptTimeoutMs,
+        buildScript: (application) => buildTerminalReadOutputScript(application, args.target)
       })
       const outputObservation = outputResult.returnCode === 0 && !outputResult.timedOut
         ? applyTerminalTarget({
@@ -1692,10 +1747,12 @@ export async function executeDesktopAdapterMethod(args: {
     }
     case 'terminal.list_sessions': {
       const application = normalizeTerminalApplication(args.input.application)
-      const result = await args.runtime.runAppleScript({
+      const result = await runTerminalAppleScriptWithFallback({
+        runtime: args.runtime,
         workDir: args.input.workDir,
-        script: buildTerminalListSessionsScript(application),
-        timeoutMs: args.input.timeoutMs
+        application,
+        timeoutMs: args.input.timeoutMs,
+        buildScript: (currentApplication) => buildTerminalListSessionsScript(currentApplication)
       })
       const data = parseTerminalSessionListObservation({
         result,
@@ -1719,10 +1776,12 @@ export async function executeDesktopAdapterMethod(args: {
         application,
         input: args.input
       })
-      const result = await args.runtime.runAppleScript({
+      const result = await runTerminalAppleScriptWithFallback({
+        runtime: args.runtime,
         workDir: args.input.workDir,
-        script: buildTerminalListPanesScript(application, target),
-        timeoutMs: args.input.timeoutMs
+        application,
+        timeoutMs: args.input.timeoutMs,
+        buildScript: (currentApplication) => buildTerminalListPanesScript(currentApplication, target)
       })
       const data = parseTerminalPaneListObservation({
         result,
@@ -1747,10 +1806,12 @@ export async function executeDesktopAdapterMethod(args: {
         application,
         input: args.input
       })
-      const result = await args.runtime.runAppleScript({
+      const result = await runTerminalAppleScriptWithFallback({
+        runtime: args.runtime,
         workDir: args.input.workDir,
-        script: buildTerminalGetPaneLayoutScript(application, target),
-        timeoutMs: args.input.timeoutMs
+        application,
+        timeoutMs: args.input.timeoutMs,
+        buildScript: (currentApplication) => buildTerminalGetPaneLayoutScript(currentApplication, target)
       })
       const data = parseTerminalPaneLayoutObservation({
         result,
@@ -1780,10 +1841,12 @@ export async function executeDesktopAdapterMethod(args: {
         )
       }
 
-      const result = await args.runtime.runAppleScript({
+      const result = await runTerminalAppleScriptWithFallback({
+        runtime: args.runtime,
         workDir: args.input.workDir,
-        script: buildTerminalFocusSessionScript(application, target),
-        timeoutMs: args.input.timeoutMs
+        application,
+        timeoutMs: args.input.timeoutMs,
+        buildScript: (currentApplication) => buildTerminalFocusSessionScript(currentApplication, target)
       })
 
       return {
@@ -1797,15 +1860,16 @@ export async function executeDesktopAdapterMethod(args: {
     case 'terminal.run_command': {
       const command = requireNonEmptyValue(args.input.command, 'Command')
       const application = normalizeTerminalApplication(args.input.application)
-      const commandId = createTerminalCommandId()
       const target = resolveTerminalSessionTarget({
         application,
         input: args.input
       })
-      const result = await args.runtime.runAppleScript({
+      const result = await runTerminalAppleScriptWithFallback({
+        runtime: args.runtime,
         workDir: args.input.workDir,
-        script: buildTerminalRunCommandScript(command, application, target, commandId),
-        timeoutMs: args.input.timeoutMs
+        application,
+        timeoutMs: args.input.timeoutMs,
+        buildScript: (currentApplication) => buildTerminalRunCommandScript(command, currentApplication, target)
       })
 
       return {
@@ -1813,7 +1877,6 @@ export async function executeDesktopAdapterMethod(args: {
         methodId: args.input.methodId,
         stage,
         result,
-        data: { commandId },
         successText: `Ran command in ${application}.`
       }
     }
@@ -1825,10 +1888,12 @@ export async function executeDesktopAdapterMethod(args: {
         application,
         input: args.input
       })
-      const baselineResult = await args.runtime.runAppleScript({
+      const baselineResult = await runTerminalAppleScriptWithFallback({
+        runtime: args.runtime,
         workDir: args.input.workDir,
-        script: buildTerminalReadOutputScript(application, target),
-        timeoutMs: args.input.timeoutMs
+        application,
+        timeoutMs: args.input.timeoutMs,
+        buildScript: (currentApplication) => buildTerminalReadOutputScript(currentApplication, target)
       })
       const baselineObservation = baselineResult.returnCode === 0 && !baselineResult.timedOut
         ? applyTerminalTarget({
@@ -1840,10 +1905,12 @@ export async function executeDesktopAdapterMethod(args: {
           target
         })
         : null
-      const dispatchResult = await args.runtime.runAppleScript({
+      const dispatchResult = await runTerminalAppleScriptWithFallback({
+        runtime: args.runtime,
         workDir: args.input.workDir,
-        script: buildTerminalRunCommandScript(command, application, target, commandId),
-        timeoutMs: args.input.timeoutMs
+        application,
+        timeoutMs: args.input.timeoutMs,
+        buildScript: (currentApplication) => buildTerminalRunCommandScript(command, currentApplication, target, commandId)
       })
 
       if (dispatchResult.returnCode !== 0 || dispatchResult.timedOut) {
@@ -1883,11 +1950,12 @@ export async function executeDesktopAdapterMethod(args: {
     case 'terminal.new_tab_run_command': {
       const command = requireNonEmptyValue(args.input.command, 'Command')
       const application = normalizeTerminalApplication(args.input.application)
-      const commandId = createTerminalCommandId()
-      const result = await args.runtime.runAppleScript({
+      const result = await runTerminalAppleScriptWithFallback({
+        runtime: args.runtime,
         workDir: args.input.workDir,
-        script: buildTerminalNewTabRunCommandScript(command, application, commandId),
-        timeoutMs: args.input.timeoutMs
+        application,
+        timeoutMs: args.input.timeoutMs,
+        buildScript: (currentApplication) => buildTerminalNewTabRunCommandScript(command, currentApplication)
       })
 
       return {
@@ -1895,18 +1963,18 @@ export async function executeDesktopAdapterMethod(args: {
         methodId: args.input.methodId,
         stage,
         result,
-        data: { commandId },
         successText: `Opened a new tab and ran command in ${application}.`
       }
     }
     case 'terminal.new_window_run_command': {
       const command = requireNonEmptyValue(args.input.command, 'Command')
       const application = normalizeTerminalApplication(args.input.application)
-      const commandId = createTerminalCommandId()
-      const result = await args.runtime.runAppleScript({
+      const result = await runTerminalAppleScriptWithFallback({
+        runtime: args.runtime,
         workDir: args.input.workDir,
-        script: buildTerminalNewWindowRunCommandScript(command, application, commandId),
-        timeoutMs: args.input.timeoutMs
+        application,
+        timeoutMs: args.input.timeoutMs,
+        buildScript: (currentApplication) => buildTerminalNewWindowRunCommandScript(command, currentApplication)
       })
 
       return {
@@ -1914,24 +1982,24 @@ export async function executeDesktopAdapterMethod(args: {
         methodId: args.input.methodId,
         stage,
         result,
-        data: { commandId },
         successText: `Opened a new window and ran command in ${application}.`
       }
     }
     case 'terminal.split_pane_run_command': {
       const command = requireNonEmptyValue(args.input.command, 'Command')
       const application = normalizeTerminalApplication(args.input.application)
-      const commandId = createTerminalCommandId()
       requireITermApplication(application, 'terminal.split_pane_run_command')
       const target = resolveTerminalSessionTarget({
         application,
         input: args.input
       })
       const direction: TerminalSplitDirection = args.input.direction === 'horizontal' ? 'horizontal' : 'vertical'
-      const result = await args.runtime.runAppleScript({
+      const result = await runTerminalAppleScriptWithFallback({
+        runtime: args.runtime,
         workDir: args.input.workDir,
-        script: buildTerminalSplitPaneRunCommandScript(command, direction, application, target, commandId),
-        timeoutMs: args.input.timeoutMs
+        application,
+        timeoutMs: args.input.timeoutMs,
+        buildScript: (currentApplication) => buildTerminalSplitPaneRunCommandScript(command, direction, currentApplication, target)
       })
       const data = result.returnCode === 0 && !result.timedOut
         ? {
@@ -1939,11 +2007,11 @@ export async function executeDesktopAdapterMethod(args: {
             result,
             application
           }),
-          commandId,
+          commandId: null,
           direction,
           created: true
         } satisfies TerminalSplitPaneObservation
-        : { commandId }
+        : { commandId: null }
 
       return {
         adapterId: args.input.adapterId,
@@ -1958,15 +2026,16 @@ export async function executeDesktopAdapterMethod(args: {
       const command = requireNonEmptyValue(args.input.command, 'Command')
       const directory = requireNonEmptyValue(args.input.target, 'Directory')
       const application = normalizeTerminalApplication(args.input.application)
-      const commandId = createTerminalCommandId()
       const target = resolveTerminalSessionTarget({
         application,
         input: args.input
       })
-      const result = await args.runtime.runAppleScript({
+      const result = await runTerminalAppleScriptWithFallback({
+        runtime: args.runtime,
         workDir: args.input.workDir,
-        script: buildTerminalRunCommandInDirectoryScript(command, directory, application, target, commandId),
-        timeoutMs: args.input.timeoutMs
+        application,
+        timeoutMs: args.input.timeoutMs,
+        buildScript: (currentApplication) => buildTerminalRunCommandInDirectoryScript(command, directory, currentApplication, target)
       })
 
       return {
@@ -1974,7 +2043,6 @@ export async function executeDesktopAdapterMethod(args: {
         methodId: args.input.methodId,
         stage,
         result,
-        data: { commandId },
         successText: `Ran command in ${application} at ${directory}.`
       }
     }
@@ -1987,10 +2055,12 @@ export async function executeDesktopAdapterMethod(args: {
         application,
         input: args.input
       })
-      const baselineResult = await args.runtime.runAppleScript({
+      const baselineResult = await runTerminalAppleScriptWithFallback({
+        runtime: args.runtime,
         workDir: args.input.workDir,
-        script: buildTerminalReadOutputScript(application, target),
-        timeoutMs: args.input.timeoutMs
+        application,
+        timeoutMs: args.input.timeoutMs,
+        buildScript: (currentApplication) => buildTerminalReadOutputScript(currentApplication, target)
       })
       const baselineObservation = baselineResult.returnCode === 0 && !baselineResult.timedOut
         ? applyTerminalTarget({
@@ -2002,10 +2072,12 @@ export async function executeDesktopAdapterMethod(args: {
           target
         })
         : null
-      const dispatchResult = await args.runtime.runAppleScript({
+      const dispatchResult = await runTerminalAppleScriptWithFallback({
+        runtime: args.runtime,
         workDir: args.input.workDir,
-        script: buildTerminalRunCommandInDirectoryScript(command, directory, application, target, commandId),
-        timeoutMs: args.input.timeoutMs
+        application,
+        timeoutMs: args.input.timeoutMs,
+        buildScript: (currentApplication) => buildTerminalRunCommandInDirectoryScript(command, directory, currentApplication, target, commandId)
       })
 
       if (dispatchResult.returnCode !== 0 || dispatchResult.timedOut) {
@@ -2050,10 +2122,12 @@ export async function executeDesktopAdapterMethod(args: {
       })
       const shortcut = buildTerminalInterruptShortcut()
       const activationResult = target
-        ? await args.runtime.runAppleScript({
+        ? await runTerminalAppleScriptWithFallback({
+          runtime: args.runtime,
           workDir: args.input.workDir,
-          script: buildTerminalFocusSessionScript(application, target),
-          timeoutMs: args.input.timeoutMs
+          application,
+          timeoutMs: args.input.timeoutMs,
+          buildScript: (currentApplication) => buildTerminalFocusSessionScript(currentApplication, target)
         })
         : await args.runtime.activateApplication({
           workDir: args.input.workDir,
@@ -2090,10 +2164,12 @@ export async function executeDesktopAdapterMethod(args: {
         application,
         input: args.input
       })
-      const result = await args.runtime.runAppleScript({
+      const result = await runTerminalAppleScriptWithFallback({
+        runtime: args.runtime,
         workDir: args.input.workDir,
-        script: buildTerminalGetSessionStateScript(application, target),
-        timeoutMs: args.input.timeoutMs
+        application,
+        timeoutMs: args.input.timeoutMs,
+        buildScript: (currentApplication) => buildTerminalGetSessionStateScript(currentApplication, target)
       })
       const data = parseTerminalSessionStateObservation({
         result,
@@ -2116,10 +2192,12 @@ export async function executeDesktopAdapterMethod(args: {
         application,
         input: args.input
       })
-      const result = await args.runtime.runAppleScript({
+      const result = await runTerminalAppleScriptWithFallback({
+        runtime: args.runtime,
         workDir: args.input.workDir,
-        script: buildTerminalReadOutputScript(application, target),
-        timeoutMs: args.input.timeoutMs
+        application,
+        timeoutMs: args.input.timeoutMs,
+        buildScript: (currentApplication) => buildTerminalReadOutputScript(currentApplication, target)
       })
       const data = parseTerminalLastCommandResultObservation({
         result,
@@ -2142,10 +2220,12 @@ export async function executeDesktopAdapterMethod(args: {
         application,
         input: args.input
       })
-      const result = await args.runtime.runAppleScript({
+      const result = await runTerminalAppleScriptWithFallback({
+        runtime: args.runtime,
         workDir: args.input.workDir,
-        script: buildTerminalReadOutputScript(application, target),
-        timeoutMs: args.input.timeoutMs
+        application,
+        timeoutMs: args.input.timeoutMs,
+        buildScript: (currentApplication) => buildTerminalReadOutputScript(currentApplication, target)
       })
       const data = applyTerminalTarget({
         observation: parseTerminalOutputObservation({
@@ -2184,10 +2264,12 @@ export async function executeDesktopAdapterMethod(args: {
 
       while (Date.now() - startedAt <= overallTimeoutMs) {
         attempts += 1
-        const result = await args.runtime.runAppleScript({
+        const result = await runTerminalAppleScriptWithFallback({
+          runtime: args.runtime,
           workDir: args.input.workDir,
-          script: buildTerminalReadOutputScript(application, target),
-          timeoutMs: perAttemptTimeoutMs
+          application,
+          timeoutMs: perAttemptTimeoutMs,
+          buildScript: (currentApplication) => buildTerminalReadOutputScript(currentApplication, target)
         })
         if (result.returnCode !== 0 || result.timedOut) {
           return {
@@ -2330,10 +2412,12 @@ export async function executeDesktopAdapterMethod(args: {
 
       while (Date.now() - startedAt <= overallTimeoutMs) {
         checks += 1
-        const result = await args.runtime.runAppleScript({
+        const result = await runTerminalAppleScriptWithFallback({
+          runtime: args.runtime,
           workDir: args.input.workDir,
-          script: buildTerminalReadOutputScript(application, target),
-          timeoutMs: perAttemptTimeoutMs
+          application,
+          timeoutMs: perAttemptTimeoutMs,
+          buildScript: (currentApplication) => buildTerminalReadOutputScript(currentApplication, target)
         })
         if (result.returnCode !== 0 || result.timedOut) {
           return {
@@ -2924,6 +3008,23 @@ function isProbablyHttpUrl(value: string | undefined): boolean {
   }
 }
 
+function shouldPreferActivationOverOpenApplication(application: string, target?: string): boolean {
+  if (target?.trim()) {
+    return false
+  }
+
+  const normalizedApplication = application.trim().toLowerCase()
+  return [
+    'finder',
+    'google chrome',
+    'chrome',
+    'chromium',
+    'terminal',
+    'iterm',
+    'iterm2'
+  ].includes(normalizedApplication)
+}
+
 export async function maybeExecuteOpenApplicationAdapterMethod(args: {
   runtime: DesktopHostRuntime
   platform: NodeJS.Platform
@@ -2968,6 +3069,26 @@ export async function maybeExecuteOpenApplicationAdapterMethod(args: {
         timeoutMs: args.timeoutMs
       }
     })
+  }
+
+  if (shouldPreferActivationOverOpenApplication(args.application, args.target)) {
+    const result = await args.runtime.activateApplication({
+      workDir: args.workDir,
+      application: args.application,
+      timeoutMs: args.timeoutMs
+    })
+
+    return {
+      adapterId: normalizedApplication === 'finder'
+        ? 'finder'
+        : ['google chrome', 'chrome', 'chromium'].includes(normalizedApplication)
+          ? 'chrome'
+          : 'terminal',
+      methodId: 'desktop.activate_application',
+      stage: 'active',
+      result,
+      successText: `Opened ${args.application}.`
+    }
   }
 
   return null

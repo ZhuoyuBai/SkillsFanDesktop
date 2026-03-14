@@ -210,11 +210,65 @@ describe('desktop adapter executor', () => {
 
     expect(runtime.runAppleScript).toHaveBeenCalledWith({
       workDir: '/workspace',
-      script: expect.stringContaining('set targetSession to session 1 of targetTab'),
+      script: expect.stringContaining('set targetSession to session 1'),
       timeoutMs: 5000
     })
+    expect(runtime.runAppleScript.mock.calls.at(-1)?.[0]?.script).toContain('tell targetWindow')
+    expect(runtime.runAppleScript.mock.calls.at(-1)?.[0]?.script).toContain('tell targetTab')
+    expect(runtime.runAppleScript.mock.calls.at(-1)?.[0]?.script).not.toContain('__SKILLSFAN_EXIT_STATUS__=')
     expect(execution.stage).toBe('active')
     expect(execution.successText).toBe('Ran command in iTerm2.')
+  })
+
+  it('accepts the iTerm alias and targets the matching AppleScript application first', async () => {
+    const execution = await executeDesktopAdapterMethod({
+      runtime: runtime as any,
+      platform: 'darwin',
+      input: {
+        workDir: '/workspace',
+        adapterId: 'terminal',
+        methodId: 'terminal.run_command',
+        application: 'iTerm',
+        command: 'pwd',
+        timeoutMs: 5000
+      }
+    })
+
+    expect(runtime.runAppleScript.mock.calls.at(-1)?.[0]?.script).toContain('tell application "iTerm"')
+    expect(runtime.runAppleScript.mock.calls.at(-1)?.[0]?.script).toContain('tell targetWindow')
+    expect(execution.successText).toBe('Ran command in iTerm.')
+  })
+
+  it('retries with iTerm2 before failing when the iTerm alias errors', async () => {
+    runtime.runAppleScript
+      .mockResolvedValueOnce({
+        ...successResult,
+        returnCode: 1,
+        ok: false,
+        stderr: 'execution error: Application isn’t running. (-600)'
+      })
+      .mockResolvedValueOnce({ ...successResult })
+      .mockResolvedValueOnce({ ...successResult })
+
+    const execution = await executeDesktopAdapterMethod({
+      runtime: runtime as any,
+      platform: 'darwin',
+      input: {
+        workDir: '/workspace',
+        adapterId: 'terminal',
+        methodId: 'terminal.run_command',
+        application: 'iTerm',
+        command: 'pwd',
+        timeoutMs: 5000
+      }
+    })
+
+    expect(runtime.runAppleScript).toHaveBeenCalledTimes(3)
+    expect(runtime.runAppleScript.mock.calls[0]?.[0]?.script).toContain('tell application "iTerm"')
+    expect(runtime.runAppleScript.mock.calls[1]?.[0]?.script).toContain('tell application "iTerm2"')
+    expect(runtime.runAppleScript.mock.calls[2]?.[0]?.script).toContain('tell application "iTerm2"')
+    expect(execution.result.returnCode).toBe(0)
+    expect(execution.successText).toBe('Ran command in iTerm.')
   })
 
   it('executes terminal list_sessions through the adapter helper', async () => {
@@ -432,7 +486,7 @@ describe('desktop adapter executor', () => {
 
     expect(runtime.runAppleScript).toHaveBeenCalledWith({
       workDir: '/workspace',
-      script: expect.stringContaining('set targetSession to session 2 of targetTab'),
+      script: expect.stringContaining('set targetSession to session 2'),
       timeoutMs: 5000
     })
     expect(execution.stage).toBe('active')
@@ -458,8 +512,35 @@ describe('desktop adapter executor', () => {
       script: expect.stringContaining('keystroke "t" using command down'),
       timeoutMs: 5000
     })
+    expect(runtime.runAppleScript.mock.calls[0]?.[0]?.script).not.toContain('do script ""')
+    expect(runtime.runAppleScript.mock.calls[0]?.[0]?.script).not.toContain('__SKILLSFAN_EXIT_STATUS__=')
     expect(execution.stage).toBe('active')
     expect(execution.successText).toBe('Opened a new tab and ran command in Terminal.')
+  })
+
+  it('executes terminal new_window_run_command in Terminal without creating a blank shell first', async () => {
+    const execution = await executeDesktopAdapterMethod({
+      runtime: runtime as any,
+      platform: 'darwin',
+      input: {
+        workDir: '/workspace',
+        adapterId: 'terminal',
+        methodId: 'terminal.new_window_run_command',
+        application: 'Terminal',
+        command: 'pwd',
+        timeoutMs: 5000
+      }
+    })
+
+    expect(runtime.runAppleScript).toHaveBeenCalledWith({
+      workDir: '/workspace',
+      script: expect.stringContaining('keystroke "n" using command down'),
+      timeoutMs: 5000
+    })
+    expect(runtime.runAppleScript.mock.calls[0]?.[0]?.script).toContain('do script "pwd"')
+    expect(runtime.runAppleScript.mock.calls[0]?.[0]?.script).not.toContain('do script ""')
+    expect(execution.stage).toBe('active')
+    expect(execution.successText).toBe('Opened a new window and ran command in Terminal.')
   })
 
   it('executes terminal new_window_run_command through the adapter helper', async () => {
@@ -481,6 +562,7 @@ describe('desktop adapter executor', () => {
       script: expect.stringContaining('create window with default profile'),
       timeoutMs: 5000
     })
+    expect(runtime.runAppleScript.mock.calls[0]?.[0]?.script).not.toContain('__SKILLSFAN_EXIT_STATUS__=')
     expect(execution.stage).toBe('active')
     expect(execution.successText).toBe('Opened a new window and ran command in iTerm2.')
   })
@@ -516,7 +598,7 @@ describe('desktop adapter executor', () => {
     expect(execution.stage).toBe('active')
     expect(execution.successText).toBe('Split iTerm2 pane (horizontal) and ran command.')
     expect(execution.data).toEqual({
-      commandId: expect.any(String),
+      commandId: null,
       application: 'iTerm2',
       windowIndex: 2,
       tabIndex: 3,
@@ -561,6 +643,7 @@ describe('desktop adapter executor', () => {
       script: expect.stringContaining(`cd '/Users/demo/project' && pnpm test`),
       timeoutMs: 5000
     })
+    expect(runtime.runAppleScript.mock.calls[0]?.[0]?.script).not.toContain('__SKILLSFAN_EXIT_STATUS__=')
     expect(execution.stage).toBe('active')
     expect(execution.successText).toBe('Ran command in Terminal at /Users/demo/project.')
   })
@@ -611,7 +694,7 @@ describe('desktop adapter executor', () => {
 
     expect(runtime.runAppleScript).toHaveBeenCalledWith({
       workDir: '/workspace',
-      script: expect.stringContaining('set targetSession to session 2 of targetTab'),
+      script: expect.stringContaining('set targetSession to session 2'),
       timeoutMs: 5000
     })
     expect(runtime.pressKey).toHaveBeenCalledWith({
@@ -1543,9 +1626,17 @@ describe('desktop adapter executor', () => {
       target: 'https://example.com/docs'
     })
 
+    const chromeActivateExecution = await maybeExecuteOpenApplicationAdapterMethod({
+      runtime: runtime as any,
+      platform: 'darwin',
+      workDir: '/workspace',
+      application: 'Google Chrome'
+    })
+
     expect(finderRevealExecution?.methodId).toBe('finder.reveal_path')
     expect(finderFolderExecution?.methodId).toBe('finder.open_folder')
     expect(chromeExecution?.methodId).toBe('chrome.open_url')
+    expect(chromeActivateExecution?.methodId).toBe('desktop.activate_application')
     expect(runtime.openApplication).toHaveBeenCalledWith({
       workDir: '/workspace',
       application: 'Finder',
@@ -1558,6 +1649,11 @@ describe('desktop adapter executor', () => {
       application: 'Google Chrome',
       target: 'https://example.com/docs',
       activate: undefined,
+      timeoutMs: undefined
+    })
+    expect(runtime.activateApplication).toHaveBeenCalledWith({
+      workDir: '/workspace',
+      application: 'Google Chrome',
       timeoutMs: undefined
     })
     expect(safariExecution).toBeNull()

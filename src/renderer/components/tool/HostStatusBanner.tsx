@@ -206,6 +206,10 @@ export function HostStatusBanner({ status, steps = [] }: HostStatusBannerProps) 
   const webState: ActionState = status.browser.state === 'ready' ? 'ready' : status.browser.state
   const computerState = getComputerActionState(status)
   const scope = getUsageScope(steps)
+  if (scope === 'computer' && computerState === 'unknown' && steps.length > 0) {
+    return null
+  }
+
   const copy = getBannerCopy({ webState, computerState, scope, t })
   const permissionItems = [
     status.permissions.screenRecording.state === 'needs_permission' ? t('Read screen') : null,
