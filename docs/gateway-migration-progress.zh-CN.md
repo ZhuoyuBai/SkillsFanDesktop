@@ -6749,6 +6749,152 @@ npm run build
   - 根据真实使用再修少量稳定性问题
 - 当前阶段不再继续深挖共享工具抽象或用户侧状态面
 
+## Step 104 - NativeRuntime 接入 provider/model 级灰度策略
+
+### 做了什么
+
+- `src/shared/types/runtime.ts`
+  - 新增 `NativeRuntimeRolloutPolicy`，作为内部 provider/model 灰度规则的共享类型。
+
+- `src/main/services/config.service.ts`
+  - `runtime.nativeRollout` 开始支持：
+    - `sourceAllowlist`
+    - `sourceBlocklist`
+    - `modelAllowlistBySource`
+    - `modelBlocklistBySource`
+  - 默认先只允许：
+    - `custom`
+    - `openai`
+    - `openai-codex`
+  - 同时补齐了 `runtime.nativeRollout` 的默认值、merge 和更新逻辑，避免后续只更新 `mode` 时把内部灰度配置冲掉。
+
+- `src/gateway/runtime/routing.ts`
+  - 新增 `resolveRuntimeRequestSourceContext()`，把当前请求实际命中的 `source / model` 独立解析出来。
+  - 路由现在不再只看“是不是简单任务”，还会额外判断当前 `source / model` 是否在 native 灰度名单里。
+  - 如果当前 source/model 还没放开，simple task 也会继续留在 `Claude Code SDK`，并带上明确的 `policy_held` blocker，而不是笼统地落到 “native_not_ready” 或 “outside scope”。
+  - 第一批 rollout exclusion 里新增：
+    - `provider-model-policy`
+
+- `src/main/services/agent/send-message.ts`
+- `src/gateway/runtime/orchestrator.ts`
+- `src/gateway/runtime/native/runtime.ts`
+- `src/gateway/server/health.ts`
+  - 这些入口现在都会把当前请求/当前配置解析成 `source / model`，并把 `runtime.nativeRollout` 一起传进 runtime 路由或 health 视图。
+
+- `src/gateway/runtime/native/user-facing.ts`
+  - 新增 `policyHeld` 文案。
+  - 当 source/model 还没进入当前自动处理灰度时，系统会明确说“当前只有部分模型先走这种处理方式”，而不是继续报“不在范围内”这种模糊描述。
+
+### 验证
+
+- 单测：
+  - `npm run test:unit -- tests/unit/gateway/runtime/routing.test.ts tests/unit/gateway/server/health.test.ts tests/unit/gateway/server/services.test.ts tests/unit/gateway/runtime/native-runtime.test.ts tests/unit/gateway/runtime/orchestrator.test.ts tests/unit/gateway/runtime/native-send-message.test.ts`
+- 构建：
+  - `npm run build`
+
+### 结果
+
+- 通过
+- `6` 个测试文件，`47` 个测试通过
+- 构建通过
+
+### 产品意义
+
+- 这一步不是给普通用户再加一个新开关
+- 而是把“自定义处理方式什么时候能继续扩大到第二批 provider”这件事先做成可控系统
+- 后面即使继续接：
+  - `GLM`
+  - `Kimi`
+  - `DeepSeek`
+  - `Qwen`
+- 也不会因为 transport 一接上，就自动把它们都放进首批范围
+- 这样可以继续保持现在这条产品原则：
+  - 用户侧仍然只看到一个简单选择
+  - 系统内部则开始具备 source/model 级灰度和回退控制
+
+### 下一步
+
+- 继续 `M8`
+  - 收 compat fallback 的 provider/model 级策略
+  - 再决定第二批 provider-native adapters 的接入顺序
+- 当前阶段仍然不扩用户侧设置复杂度，不新增面向普通用户的 runtime 细粒度开关
+
+## Step 105 - NativeRuntime 接入 compat fallback 分类，区分协议不兼容与 adapter 未接入
+
+### 做了什么
+
+- `src/gateway/runtime/native/types.ts`
+  - 新增 `NativeProviderCapabilityReasonId` 与 `NativeRuntimeReadinessReasonId`。
+  - 把 native lane “为什么现在还不能接手”正式做成结构化状态，而不再只留一段 note 文本。
+
+- `src/gateway/runtime/native/capabilities.ts`
+  - provider capability 现在除了 `supported / adapterId / supportsToolCalls` 这些能力位，还会显式返回：
+    - `no-endpoint`
+    - `requires-responses`
+    - `adapter-unavailable`
+    - `supported`
+
+- `src/gateway/runtime/native/runtime.ts`
+  - native status 新增 `readinessReasonId`：
+    - `ready`
+    - `no-endpoint`
+    - `requires-responses`
+    - `adapter-unavailable`
+    - `shared-tools-missing`
+  - 这样 health / services / registration 不再只能靠 `ready=true/false` 和一段 note 猜原因。
+
+- `src/gateway/runtime/routing.ts`
+  - runtime selection 现在会把 native 的 readiness reason 和 note 一起带入 fallback 决策。
+  - 当 simple task 本来倾向 native、但当前 source/model 还不能走 native 时，内部 reason 不再只写 “no native runtime is registered”，而是会带上更具体的 compat note。
+  - rollout validation 现在会把阻塞拆成：
+    - `compat_no_endpoint`
+    - `compat_requires_responses`
+    - `compat_adapter_unavailable`
+    - `shared_tools_missing`
+    - 只有兜底时才继续回到 `native_not_ready`
+
+- `src/gateway/server/health.ts`
+  - gateway health 现在会把 `native.readinessReasonId` 一起传进 rollout status。
+  - 也就是说，health/doctor/service registry 现在已经能区分“模型协议不兼容”和“provider 还没接这条 native lane”。
+
+- `src/main/services/agent/send-message.ts`
+- `src/gateway/runtime/orchestrator.ts`
+  - 发送链与 runtime 选择链都会带上 native readiness reason / note，避免内部 fallback 继续丢失语义。
+
+- `src/renderer/pages/SettingsPage.tsx`
+  - 同步放宽本地类型定义，让 rollout blocker code 和 native readiness 字段与后端状态保持一致。
+
+### 验证
+
+- 单测：
+  - `npm run test:unit -- tests/unit/gateway/runtime/routing.test.ts tests/unit/gateway/runtime/native-runtime.test.ts tests/unit/gateway/runtime/orchestrator.test.ts tests/unit/gateway/server/health.test.ts tests/unit/gateway/server/services.test.ts tests/unit/gateway/doctor/report.test.ts`
+- 构建：
+  - `npm run build`
+
+### 结果
+
+- 通过
+- `6` 个测试文件，`48` 个测试通过
+- 构建通过
+
+### 产品意义
+
+- 这一步不是给用户增加新功能
+- 而是把后面继续扩第二批 provider 时最容易混乱的一层边界先理顺：
+  - 当前模型根本没有可用连接
+  - 当前模型协议还不对
+  - 当前 provider 还没接进自定义处理方式
+  - 共享工具层还没准备好
+- 以前这些情况很容易都被归到一个笼统的 “还没准备好”
+- 现在系统已经能更清楚地区分它们，后面继续接 `GLM / Kimi / DeepSeek / Qwen` 时，就不会把所有 fallback 都混成同一种阻塞态
+
+### 下一步
+
+- 继续 `M8`
+  - 先补第二批 provider 的接入顺序与显式 adapter plan
+  - 再逐个接第二批 provider-native adapter
+- 当前仍然不增加面向普通用户的复杂设置，继续保持“一个简单开关 + 系统内部保护边界”
+
 ## Step 103 - 终端普通命令去掉内部标记，成功后不再显示误导性“检查中”
 
 ### 做了什么
@@ -6794,3 +6940,298 @@ npm run build
   - 用户看到的是正常命令与正常输出
   - 不是系统内部的调试痕迹
 - 同时，已经成功执行后，界面也不再继续摆一张误导性的“检查中”卡片
+
+## Step 106 - 按当前产品预设接入 zhipu / minimax / kimi / deepseek 的 Anthropic Messages Native adapter
+
+### 做了什么
+
+- 先结合当前产品实际可配置的 API key 入口确认第二批 provider 的顺序。
+  - 当前设置页里明确提供了这些 anthropic-compatible custom source：
+    - `zhipu`
+    - `minimax`
+    - `kimi`
+    - `deepseek`
+  - 当前这一轮不包含：
+    - `qwen`
+  - 因此这一轮没有泛泛地去接一批“OpenAI-like” provider，而是先按产品已暴露的预设渠道补齐这四条最有价值的路径。
+
+- 新增：
+  - `src/gateway/runtime/native/anthropic-request.ts`
+  - `src/gateway/runtime/native/anthropic-normalize.ts`
+  - `src/gateway/runtime/native/adapters/anthropic-messages.ts`
+
+- `src/gateway/runtime/native/types.ts`
+  - native adapter family 新增：
+    - `anthropic-messages`
+  - native 支持的 API 类型新增：
+    - `messages`
+  - `NativePreparedRequest.body` 现在支持：
+    - `OpenAI Responses`
+    - `Anthropic Messages`
+
+- `src/gateway/runtime/native/transport.ts`
+  - 新增 anthropic transport plan：
+    - `POST /v1/messages`
+    - `x-api-key`
+    - `anthropic-version: 2023-06-01`
+  - 当前先按保守策略接成：
+    - `stream: false`
+    - tool roundtrip 可用
+    - 不提前扩复杂 stream 事件
+
+- `src/gateway/runtime/native/request.ts`
+  - native follow-up request builder 不再只支持 OpenAI Responses 的 `function_call_output`
+  - `anthropic-messages` 现在也能把：
+    - assistant text
+    - assistant `tool_use`
+    - user `tool_result`
+    衔接回下一轮请求
+
+- `src/gateway/runtime/native/runtime.ts`
+  - native tool roundtrip 现在会把统一的：
+    - `toolCall`
+    - `outputText`
+    - `isError`
+    传给 follow-up builder
+  - 当前 source 如果是 `anthropic` provider，也会把 `currentApiType` 标成 `messages`
+
+- `src/gateway/runtime/native/capabilities.ts`
+  - capability resolve 顺序改成先匹配 adapter
+  - 不再把所有非-Responses endpoint 都直接判成不支持
+  - 因此 `zhipu / minimax / kimi / deepseek` 这类 anthropic-compatible custom source 已能被明确识别为 native-ready
+
+- `src/main/services/config.service.ts`
+  - 默认 native rollout 策略已按当前真实配置扩到：
+    - `sourceAllowlist`
+      - `custom`
+      - `openai`
+      - `openai-codex`
+      - `zhipu`
+      - `minimax`
+      - `kimi`
+      - `deepseek`
+  - 产品默认策略不再把 `GLM-5 / MiniMax-M2.1` 这种具体模型 ID 写死进配置。
+  - 也就是说，后续用户在 `zhipu / minimax / kimi / deepseek` 下切换到别的模型名时，只要 source 和协议兼容，默认仍可继续走 native/custom 路径。
+  - `modelAllowlistBySource` 这层能力仍然保留，但只作为内部灰度/高级策略，不作为产品默认值。
+
+- 测试同步更新：
+  - `tests/unit/gateway/runtime/native-request.test.ts`
+  - `tests/unit/gateway/runtime/native-normalize.test.ts`
+  - `tests/unit/gateway/runtime/native-transport.test.ts`
+  - `tests/unit/gateway/runtime/native-runtime.test.ts`
+  - `tests/unit/gateway/runtime/registration.test.ts`
+  - `tests/unit/gateway/runtime/routing.test.ts`
+  - `tests/unit/gateway/server/health.test.ts`
+  - `tests/unit/gateway/server/services.test.ts`
+  - `tests/unit/gateway/doctor/report.test.ts`
+
+### 验证
+
+- 单测：
+  - `npm run test:unit -- tests/unit/gateway/runtime/native-request.test.ts tests/unit/gateway/runtime/native-normalize.test.ts tests/unit/gateway/runtime/native-transport.test.ts tests/unit/gateway/runtime/native-runtime.test.ts tests/unit/gateway/runtime/registration.test.ts tests/unit/gateway/runtime/routing.test.ts`
+  - `npm run test:unit -- tests/unit/gateway/server/health.test.ts tests/unit/gateway/server/services.test.ts tests/unit/gateway/doctor/report.test.ts tests/unit/gateway/runtime/orchestrator.test.ts`
+- 构建：
+  - `npm run build`
+
+### 结果
+
+- 通过
+- 定向单测：
+  - `6` 个测试文件，`44` 个测试通过
+  - `4` 个测试文件，`19` 个测试通过
+- 构建通过
+
+### 产品意义
+
+- 这一步不是“又多接了几个模型”
+- 而是把第二批 provider 的接入顺序改成了真正和当前用户环境有关：
+  - 先接当前产品已经提供 API key 入口的 source
+  - 但不把某个用户当前恰好在用的模型 ID 写死成产品默认策略
+  - 不先去做一批看起来很全、但实际当前环境用不到的 provider
+- 这样做的好处是：
+  - 更快把“自定义处理方式”扩到你当前机器上真实可用的模型
+  - 避免把 `GLM / MiniMax / Kimi / DeepSeek / Qwen` 一次性揉成一锅 compat 逻辑
+  - 后面继续扩时，边界更清楚，回退也更稳
+
+### 下一步
+
+- 继续 `M8`
+  - 先用当前这四条 anthropic-compatible custom source 收真实稳定性
+
+## Step 107 - 给 kimi / deepseek 这批 anthropic-compatible 通道补最小稳定性保护
+
+### 做了什么
+
+- 这一步没有再扩新的 provider，而是开始收当前已经接进来的 `kimi / deepseek` 稳定性。
+- native transport plan 现在新增了简单 request timeout：
+  - 默认 `5` 分钟
+  - `deepseek` anthropic-compatible endpoint 放宽到 `10` 分钟
+- 这样后面用户如果切到 `kimi / deepseek`，不会因为上游长时间无响应就一直挂着不结束。
+
+- 同时补了 `DeepSeek anthropic-compatible` 的输入保护：
+  - 当前如果请求里带图片，系统会先在本地拦住
+  - 不再直接把上游兼容错误原样抛出来
+  - 用户看到的是更直接的提示：先去掉当前不支持的内容再试
+
+- native user-facing message 也同步收了一层：
+  - unsupported input 不再只会机械显示原始内部 kind
+  - 现在会优先转成更容易懂的词，例如：
+    - `图片`
+    - `PDF 文件`
+    - `文本附件`
+  - request timeout 也有了单独的人话提示，不再只落成一个笼统失败
+
+### 结果
+
+- 通过
+- 定向单测：`4` 个文件，`23` 个测试通过
+- 构建通过
+
+### 产品意义
+
+- 这一步不是继续“加模型”，而是防止新接入的 `kimi / deepseek` 在真实使用里一上来就显得不稳。
+- 现在用户如果遇到：
+  - 请求太久没有完成
+  - 当前内容类型还不支持
+  系统会更早、更清楚地收住，而不是一直挂住或者抛出难懂的兼容错误。
+
+## Step 108 - 收齐图片边界并把 M8 正式关账
+
+### 做了什么
+
+- 把首批 native 范围里的最后一个图片边界补齐了：
+  - 以前只会把 `request.images` 挡回更稳的处理方式
+  - 现在 `attachments.type === image` 也会一起挡回去
+- 这样在第一批灰度里：
+  - 图片消息
+  - 图片附件
+  都不会误进 native，再靠后面的 provider-specific 兼容逻辑兜底
+
+- 同时把路线图里的 `M8 NativeRuntime 灰度扩展` 改成已完成。
+  - 这表示这阶段的目标已经达成：
+    - provider / model 灰度规则已经有了
+    - compat fallback 已经成型
+    - 第二批产品预设 source 已接入
+    - `kimi / deepseek` 的最小稳定性保护已经补齐
+
+### 结果
+
+- 通过
+- 定向单测：`4` 个文件，`24` 个测试通过
+- 构建通过
+
+### 产品意义
+
+- 这一步不是再加能力，而是把“第一批灰度边界”真正收完整。
+- 现在用户不会再遇到“同样是图片，一个自动回退、一个误进新路径”的不一致体验。
+- 到这里，`M8` 就不再是“还差最后一点”，而是可以正式视为这一阶段已经完成。
+
+## Step 109 - 收齐 Finder / SkillsFan 产品化并把 M5 正式关账
+
+### 做了什么
+
+- 把 `Finder` 与 `SkillsFan` 两个 desktop adapter 从 `planned` 升成了正式 `active`。
+- 不再只是保留 method capability，而是给它们补上了和 `Terminal / Chrome` 一样的产品化 metadata：
+  - `Finder`
+    - `finder.folder-access`
+    - `finder.window-and-search`
+    - `finder.navigation-roundtrip`
+  - `SkillsFan`
+    - `skillsfan.app-control`
+    - `skillsfan.settings-roundtrip`
+
+- desktop smoke flow runner 也已经真正接上这两条新 flow：
+  - `finder.navigation-roundtrip`
+    - 打开 home folder
+    - reveal 一个已知路径
+    - 新开 Finder window
+  - `skillsfan.settings-roundtrip`
+    - 聚焦主窗口
+    - 打开设置
+    - 再切回主窗口
+
+- 设置页文案也一起收口了：
+  - `Finder / SkillsFan` 不再显示“计划支持”
+  - 权限被挡住时，也开始有自己的恢复提示文案
+
+- 同时把路线图里的 `M5 Desktop Productization` 改成已完成。
+  - 这表示：
+    - `Terminal / Chrome / iTerm`
+    - `Finder`
+    - `SkillsFan`
+  - 这第一批桌面产品化范围已经全部进入正式产品态
+
+### 结果
+
+- 通过
+- 定向单测：`desktop-adapters / desktop-smoke-flows / host-runtime index` 相关回归通过
+- 构建通过
+
+### 产品意义
+
+- 这一步不是再扩新 runtime，而是把当前已经存在的桌面能力真正收成完整的一批产品功能。
+- 现在 `电脑自动化` 入口里，不再只有 `Terminal / Chrome / iTerm` 像正式能力；`Finder` 和 `SkillsFan` 也进入了同一套工作流与 smoke flow 产品面。
+- 到这里，`M5` 也可以正式视为这一阶段已经完成，后面就不该再回头在这批 adapter 的产品化元数据上零碎打磨。
+
+## Step 110 - 收齐共享工具 bundle 与 NativeRuntime 首批范围并把 M6 / M7 关账
+
+### 做了什么
+
+- 给 `gateway/tools` 新增了真正的共享 runtime bundle：
+  - `src/gateway/tools/runtime-bundle.ts`
+  - 统一产出：
+    - `claudeSdk` 视图
+    - `native` 视图
+    - runtime-kind provider 过滤
+    - configured shared tool providers resolve
+- `Claude SDK Runtime` 和 `NativeRuntime` 现在都不再各自手工拼 provider 清单：
+  - `sdk-options` 已改成直接使用共享 `claudeSdk` tool bundle
+  - native send path 已改成直接使用共享 `native` tool bundle
+  - native rollout acceptance、registration、gateway health 也都改成复用同一份 provider resolve
+
+- 这意味着共享工具层不再只是“有 catalog / directory / provider definition”，而是已经成为两条 runtime 真正共用的装配入口。
+
+- 同时把 `NativeRuntime v1` 的首批简单任务范围从：
+  - `chat-simple`
+  - `browser-simple`
+  - `terminal-simple`
+- 扩到：
+  - `finder-simple`
+  - `skillsfan-simple`
+
+- 对应地补上了：
+  - rollout preview
+  - rollout validation
+  - rollout acceptance
+  - IPC / preload / renderer API 的 trial target union
+
+- `Finder / SkillsFan` 现在不仅是桌面产品化范围的一部分，也正式进入 `NativeRuntime v1` 的首批简单任务验收范围：
+  - `finder.navigation-roundtrip`
+  - `skillsfan.settings-roundtrip`
+
+- 最后把路线图里的：
+  - `M6 Tool Registry`
+  - `M7 NativeRuntime v1`
+- 一起改成了已完成。
+
+### 结果
+
+- 通过
+- 定向单测：
+  - `gateway/tools`
+  - `gateway/runtime`
+  - `gateway/server`
+  - `gateway/doctor`
+  相关回归通过
+- 构建通过
+
+### 产品意义
+
+- 这一步把之前“已经看起来差不多”的两条主线正式收口了：
+  - `M6` 不再只是共享几份定义，而是 `Claude SDK` 和自定义处理方式真的走同一套工具 bundle
+  - `M7` 不再只是 OpenAI/Codex 能跑，而是第一版 `NativeRuntime` 已经具备统一工具面、统一 readiness、统一验收，以及覆盖当前首批桌面自动化范围的 simple task 边界
+
+- 到这里，后续如果继续推进，就不该再回头补 `M6 / M7` 的底层收口，而应该进入新的阶段，例如：
+  - 后续 provider 扩面
+  - 更复杂 orchestration
+  - 更高阶自动化能力

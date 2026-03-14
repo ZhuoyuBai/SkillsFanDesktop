@@ -7,6 +7,7 @@ import type { WebToolsConfig } from '../../shared/types'
 import type {
   HostEnvironmentStatus,
   HostStep,
+  NativeRuntimeRolloutPolicy,
   RuntimeRouteInfo
 } from '../../shared/types'
 
@@ -201,6 +202,7 @@ export interface BrowserAutomationConfig {
 
 export interface RuntimeConfig {
   mode: 'claude-sdk' | 'hybrid' | 'native';
+  nativeRollout?: NativeRuntimeRolloutPolicy;
 }
 
 export interface HaloConfig {
@@ -623,7 +625,7 @@ export const DEFAULT_CONFIG: HaloConfig = {
     mode: 'ai-browser'
   },
   runtime: {
-    mode: 'claude-sdk'
+    mode: 'hybrid'
   },
   tools: {
     web: {

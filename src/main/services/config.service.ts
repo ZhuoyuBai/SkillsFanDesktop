@@ -12,7 +12,12 @@ import { atomicWriteJsonSync, atomicWriteJson, safeReadJsonSync, safeReadJson, c
 
 // Import analytics config type
 import type { AnalyticsConfig } from './analytics/types'
-import type { AISourcesConfig, CustomSourceConfig, WebToolsConfig } from '../../shared/types'
+import type {
+  AISourcesConfig,
+  CustomSourceConfig,
+  NativeRuntimeRolloutPolicy,
+  WebToolsConfig
+} from '../../shared/types'
 import { DEFAULT_WEB_TOOLS_CONFIG, normalizeWebToolsConfig } from './web-tools/config'
 
 // ============================================================================
@@ -143,6 +148,7 @@ interface HaloConfig {
   }
   runtime?: {
     mode: 'claude-sdk' | 'hybrid' | 'native'
+    nativeRollout?: NativeRuntimeRolloutPolicy
   }
   // Vision model for image preprocessing (used when primary model doesn't support vision)
   imageModel?: {
@@ -288,7 +294,10 @@ const DEFAULT_CONFIG: HaloConfig = {
     }
   },
   runtime: {
-    mode: 'claude-sdk'
+    mode: 'claude-sdk',
+    nativeRollout: {
+      sourceAllowlist: ['custom', 'openai', 'openai-codex', 'zhipu', 'minimax', 'kimi', 'deepseek']
+    }
   },
   onboarding: {
     completed: false
@@ -510,7 +519,22 @@ function mergeConfigWithDefaults(parsed: Record<string, any>): HaloConfig {
         ...parsed.channels?.v2
       }
     },
-    runtime: { ...DEFAULT_CONFIG.runtime, ...parsed.runtime },
+    runtime: {
+      ...DEFAULT_CONFIG.runtime,
+      ...parsed.runtime,
+      nativeRollout: {
+        ...DEFAULT_CONFIG.runtime?.nativeRollout,
+        ...parsed.runtime?.nativeRollout,
+        modelAllowlistBySource: {
+          ...DEFAULT_CONFIG.runtime?.nativeRollout?.modelAllowlistBySource,
+          ...parsed.runtime?.nativeRollout?.modelAllowlistBySource
+        },
+        modelBlocklistBySource: {
+          ...DEFAULT_CONFIG.runtime?.nativeRollout?.modelBlocklistBySource,
+          ...parsed.runtime?.nativeRollout?.modelBlocklistBySource
+        }
+      }
+    },
     tools: normalizeWebToolsConfig(parsed.tools)
   }
 }
@@ -584,7 +608,22 @@ function applyConfigUpdates(currentConfig: HaloConfig, config: Partial<HaloConfi
     }
   }
   if (config.runtime) {
-    newConfig.runtime = { ...currentConfig.runtime, ...config.runtime }
+    newConfig.runtime = {
+      ...currentConfig.runtime,
+      ...config.runtime,
+      nativeRollout: {
+        ...currentConfig.runtime?.nativeRollout,
+        ...config.runtime.nativeRollout,
+        modelAllowlistBySource: {
+          ...currentConfig.runtime?.nativeRollout?.modelAllowlistBySource,
+          ...config.runtime.nativeRollout?.modelAllowlistBySource
+        },
+        modelBlocklistBySource: {
+          ...currentConfig.runtime?.nativeRollout?.modelBlocklistBySource,
+          ...config.runtime.nativeRollout?.modelBlocklistBySource
+        }
+      }
+    }
   }
   if (config.tools) {
     newConfig.tools = normalizeWebToolsConfig({

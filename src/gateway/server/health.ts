@@ -1,5 +1,4 @@
 import { getConfig } from '../../main/services/config.service'
-import { getEnabledExtensions } from '../../main/services/extension'
 import { getAISourceManager } from '../../main/services/ai-sources/manager'
 import { getGatewayAutomationStatus, type GatewayAutomationStatus } from '../automation'
 import { getGatewayChannelStatus, type GatewayChannelStatus } from '../channels'
@@ -19,7 +18,7 @@ import {
 import { runtimeOrchestrator } from '../runtime/orchestrator'
 import { getNativeRuntimeStatus } from '../runtime/native/runtime'
 import { runNativeRolloutAcceptance } from '../runtime/rollout-acceptance'
-import { resolveNativeRolloutStatus } from '../runtime/routing'
+import { resolveNativeRolloutStatus, resolveRuntimeRequestSourceContext } from '../runtime/routing'
 import {
   getGatewaySessionStorePersistenceStatus,
   type GatewaySessionStorePersistenceStatus
@@ -33,7 +32,7 @@ import {
   type GatewayRuntimeStatus,
   type GatewayServiceDescriptor
 } from './services'
-import { buildSharedToolProviderDefinitions } from '../tools/providers'
+import { resolveConfiguredSharedToolProviders } from '../tools'
 
 const EXTERNAL_GATEWAY_SNAPSHOT_MAX_AGE_MS = 15000
 
@@ -61,14 +60,17 @@ function getGatewayRuntimeStatus(host: HostEnvironmentStatus): GatewayRuntimeSta
   const registeredKinds = runtimeOrchestrator.listRegisteredRuntimeKinds()
   const nativeRegistered = runtimeOrchestrator.hasRuntime('native')
   const runtimeEndpoint = getAISourceManager().resolveRuntimeEndpoint()
-  const sharedToolProviders = buildSharedToolProviderDefinitions({
-    effectiveAiBrowserEnabled: config.browserAutomation?.mode !== 'system-browser',
-    includeSkillMcp: true,
-    extensionProviderIds: getEnabledExtensions().map((extension) => extension.manifest.id)
+  const sharedToolProviders = resolveConfiguredSharedToolProviders({
+    config,
+    includeSkillMcp: true
   })
   const native = getNativeRuntimeStatus({
     endpoint: runtimeEndpoint,
     sharedToolProviders
+  })
+  const runtimeRequestSourceContext = resolveRuntimeRequestSourceContext({
+    aiSources: config.aiSources,
+    fallbackModel: config.api?.model || null
   })
 
   return {
@@ -82,8 +84,12 @@ function getGatewayRuntimeStatus(host: HostEnvironmentStatus): GatewayRuntimeSta
       configuredMode,
       hasNativeRuntime: nativeRegistered,
       nativeReady: native.ready,
+      nativeReadinessReasonId: native.readinessReasonId,
       nativeNote: native.note,
-      host
+      host,
+      currentSource: runtimeRequestSourceContext.sourceId,
+      currentModel: runtimeRequestSourceContext.modelId,
+      nativePolicy: config.runtime?.nativeRollout
     }),
     native
   }
@@ -204,7 +210,7 @@ export async function listGatewayServices(): Promise<GatewayServiceDescriptor[]>
 }
 
 export async function runGatewayRuntimeRolloutAcceptance(args: {
-  targetId: 'all' | 'chat-simple' | 'browser-simple' | 'terminal-simple'
+  targetId: 'all' | 'chat-simple' | 'browser-simple' | 'terminal-simple' | 'finder-simple' | 'skillsfan-simple'
   workDir?: string
 }) {
   return await runNativeRolloutAcceptance(args)

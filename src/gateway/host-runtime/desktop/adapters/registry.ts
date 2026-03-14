@@ -131,6 +131,46 @@ const CHROME_PRODUCT_WORKFLOWS: DesktopAdapterWorkflowCapability[] = [
   }
 ]
 
+const FINDER_PRODUCT_WORKFLOWS: DesktopAdapterWorkflowCapability[] = [
+  {
+    id: 'finder.folder-access',
+    displayName: 'Folder Access',
+    supported: true,
+    stage: 'active',
+    methodIds: [
+      'finder.reveal_path',
+      'finder.open_folder',
+      'finder.open_home_folder'
+    ],
+    notes: 'Structured Finder folder opening and reveal flows for common local file navigation tasks.'
+  },
+  {
+    id: 'finder.window-and-search',
+    displayName: 'Window And Search',
+    supported: true,
+    stage: 'active',
+    methodIds: [
+      'finder.new_window',
+      'finder.search'
+    ],
+    notes: 'Finder window creation and on-device metadata search through structured adapter methods.'
+  }
+]
+
+const SKILLSFAN_PRODUCT_WORKFLOWS: DesktopAdapterWorkflowCapability[] = [
+  {
+    id: 'skillsfan.app-control',
+    displayName: 'App Control',
+    supported: true,
+    stage: 'active',
+    methodIds: [
+      'skillsfan.focus_main_window',
+      'skillsfan.open_settings'
+    ],
+    notes: 'First-party app focusing and settings access through structured SkillsFan adapter methods.'
+  }
+]
+
 const TERMINAL_SMOKE_FLOWS: DesktopAdapterSmokeFlowCapability[] = [
   {
     id: 'terminal.command-roundtrip',
@@ -206,6 +246,38 @@ const CHROME_SMOKE_FLOWS: DesktopAdapterSmokeFlowCapability[] = [
   }
 ]
 
+const FINDER_SMOKE_FLOWS: DesktopAdapterSmokeFlowCapability[] = [
+  {
+    id: 'finder.navigation-roundtrip',
+    displayName: 'Finder Navigation Roundtrip',
+    supported: true,
+    stage: 'active',
+    methodIds: [
+      'finder.open_home_folder',
+      'finder.reveal_path',
+      'finder.new_window'
+    ],
+    verification: 'Open the home folder, reveal a known local path, then create a fresh Finder window to confirm the navigation loop stays structured.',
+    notes: 'Validates the core Finder open, reveal, and new-window loop for local navigation.'
+  }
+]
+
+const SKILLSFAN_SMOKE_FLOWS: DesktopAdapterSmokeFlowCapability[] = [
+  {
+    id: 'skillsfan.settings-roundtrip',
+    displayName: 'Settings Roundtrip',
+    supported: true,
+    stage: 'active',
+    methodIds: [
+      'skillsfan.focus_main_window',
+      'skillsfan.open_settings',
+      'skillsfan.focus_main_window'
+    ],
+    verification: 'Focus the main SkillsFan window, open settings, then return focus to the main window to confirm the first-party control loop.',
+    notes: 'Validates the first-party app focus and settings shortcut workflow.'
+  }
+]
+
 export function listDesktopAppAdapters(platform: NodeJS.Platform): DesktopAppAdapterDescriptor[] {
   const isMacOS = platform === 'darwin'
   const unsupportedNote = 'Desktop automation is only available on macOS.'
@@ -226,13 +298,15 @@ export function listDesktopAppAdapters(platform: NodeJS.Platform): DesktopAppAda
     {
       id: 'finder',
       displayName: 'Finder Adapter',
-      supported: false,
-      stage: 'planned',
+      supported: isMacOS,
+      stage: 'active',
       applicationNames: ['Finder'],
       actions: PLANNED_APP_ACTIONS,
       methods: finderAdapterMethods,
+      workflows: isMacOS ? FINDER_PRODUCT_WORKFLOWS : [],
+      smokeFlows: isMacOS ? FINDER_SMOKE_FLOWS : [],
       notes: isMacOS
-        ? 'Planned app-specific adapter for Finder workflows in M5.'
+        ? 'M5-ready adapter for structured Finder navigation, folder access, and search workflows.'
         : unsupportedNote
     },
     {
@@ -266,13 +340,15 @@ export function listDesktopAppAdapters(platform: NodeJS.Platform): DesktopAppAda
     {
       id: 'skillsfan',
       displayName: 'SkillsFan Adapter',
-      supported: false,
-      stage: 'planned',
+      supported: isMacOS,
+      stage: 'active',
       applicationNames: ['SkillsFan'],
       actions: PLANNED_APP_ACTIONS,
       methods: skillsfanAdapterMethods,
+      workflows: isMacOS ? SKILLSFAN_PRODUCT_WORKFLOWS : [],
+      smokeFlows: isMacOS ? SKILLSFAN_SMOKE_FLOWS : [],
       notes: isMacOS
-        ? 'Planned app-specific adapter for first-party app workflows in M5.'
+        ? 'M5-ready adapter for structured first-party SkillsFan control workflows.'
         : unsupportedNote
     }
   ]

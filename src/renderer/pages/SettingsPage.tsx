@@ -38,7 +38,7 @@ import { ConfirmDialog } from '../components/ui/ConfirmDialog'
 import { FeishuSettings } from '../components/settings/FeishuSettings'
 import { useTranslation, setLanguage, getCurrentLanguage, SUPPORTED_LOCALES, type LocaleCode } from '../i18n'
 import { isNoVisionModel } from '../../shared/utils/vision-models'
-import { Loader2, LogOut, Plus, Check, Globe, Key, MessageSquare, Bot, Palette, Server, Settings as SettingsIcon, Wifi, ExternalLink, X, Package, User, Layers, Lock, SlidersHorizontal, Clock, ArrowLeft, Database, RefreshCw, Copy, Monitor, Terminal, FolderOpen, Sparkles, type LucideIcon } from 'lucide-react'
+import { Loader2, LogOut, Plus, Check, Globe, Key, MessageSquare, Bot, Palette, Server, Settings as SettingsIcon, Wifi, ExternalLink, X, Package, User, Layers, Lock, SlidersHorizontal, Clock, ArrowLeft, Database, RefreshCw, Copy, Monitor, Terminal, FolderOpen, Sparkles, Stethoscope, type LucideIcon } from 'lucide-react'
 import { usePlatform } from '../components/layout/Header'
 import { isElectron } from '../api/transport'
 import { useToastStore } from '../stores/toast.store'
@@ -410,11 +410,16 @@ interface GatewayHealthStatusView {
       simpleTasksCanUseNative: boolean
       note: string
       validation?: Array<{
-        id: 'chat-simple' | 'browser-simple' | 'terminal-simple'
+        id: 'chat-simple' | 'browser-simple' | 'terminal-simple' | 'finder-simple' | 'skillsfan-simple'
         state: 'ready' | 'held' | 'blocked'
         blockerCodes: Array<
           'mode_locked'
+          | 'policy_held'
           | 'native_not_ready'
+          | 'compat_no_endpoint'
+          | 'compat_requires_responses'
+          | 'compat_adapter_unavailable'
+          | 'shared_tools_missing'
           | 'permissions_missing'
           | 'workflow_missing'
           | 'smoke_failed'
@@ -441,6 +446,7 @@ interface GatewayHealthStatusView {
     native?: {
       scaffolded: boolean
       ready: boolean
+      readinessReasonId?: string | null
       providerNativeExecution: boolean
       sharedToolRegistryReady: boolean
       taskRoutingReady: boolean
@@ -863,6 +869,7 @@ export function SettingsPage() {
   const [isClearingGatewayDaemonLock, setIsClearingGatewayDaemonLock] = useState(false)
   const [isRecoveringGatewayLauncher, setIsRecoveringGatewayLauncher] = useState(false)
   const [isSavingAutomaticHandling, setIsSavingAutomaticHandling] = useState(false)
+  const [showGatewayDiagnostics, setShowGatewayDiagnostics] = useState(false)
 
   // API Key visibility state
   const [showApiKey, setShowApiKey] = useState(false)
@@ -1071,7 +1078,7 @@ export function SettingsPage() {
   }, [addToast, t])
 
   useEffect(() => {
-    if ((activeSection === 'advanced' || activeSection === 'computer-automation') && !api.isRemoteMode()) {
+    if (activeSection === 'computer-automation' && !api.isRemoteMode()) {
       void loadGatewayDiagnostics({ silent: true })
     }
   }, [activeSection, loadGatewayDiagnostics])
@@ -1209,9 +1216,9 @@ export function SettingsPage() {
     }
   }
 
-  const handleAutomaticHandlingChange = async (enabled: boolean) => {
+  const handleAutomaticHandlingModeChange = async (mode: 'claude-sdk' | 'hybrid') => {
     const currentConfig = config ?? DEFAULT_CONFIG
-    const nextMode: NonNullable<HaloConfig['runtime']>['mode'] = enabled ? 'hybrid' : 'claude-sdk'
+    const nextMode: NonNullable<HaloConfig['runtime']>['mode'] = mode
 
     setIsSavingAutomaticHandling(true)
     try {
@@ -1224,7 +1231,10 @@ export function SettingsPage() {
         }
       }
       setConfig(nextConfig)
-      addToast(enabled ? t('Now using custom handling.') : t('Now using Claude Code SDK only.'), 'success')
+      addToast(
+        nextMode === 'claude-sdk' ? t('Switched to Claude Mode.') : t('Switched to Standard Mode.'),
+        'success'
+      )
       await loadGatewayDiagnostics({ silent: true })
     } catch (error) {
       console.error('[Settings] Failed to update automatic handling mode:', error)
@@ -1905,6 +1915,8 @@ export function SettingsPage() {
   const adapterBlockedDescriptions: Record<string, string> = {
     'terminal': t('terminal_blocked_description'),
     'chrome': t('chrome_blocked_description'),
+    'finder': t('finder_blocked_description'),
+    'skillsfan': t('skillsfan_blocked_description'),
   }
 
   const getBlockedCapabilityLabels = (): string[] => {
@@ -1923,40 +1935,33 @@ export function SettingsPage() {
     }
 
     const currentRuntimeMode = config?.runtime?.mode ?? DEFAULT_CONFIG.runtime.mode
-    const automaticHandlingEnabled = currentRuntimeMode !== 'claude-sdk'
+    const selectedTaskHandlingMode: 'claude-sdk' | 'hybrid' = currentRuntimeMode === 'claude-sdk' ? 'claude-sdk' : 'hybrid'
     const needsAccessibility = gatewayHealth.host.permissions.accessibility.state === 'needs_permission'
     const needsScreenRecording = gatewayHealth.host.permissions.screenRecording.state === 'needs_permission'
     const hasPermissionIssue = needsAccessibility || needsScreenRecording
     const allReady = gatewayHealth.host.desktop.state === 'ready' && !hasPermissionIssue
     const blockedLabels = getBlockedCapabilityLabels()
     const activeAdapters = gatewayHealth.host.desktop.adapters.filter(a => a.stage === 'active' && a.id !== 'generic-macos')
-    const plannedAdapters = gatewayHealth.host.desktop.adapters.filter(a => a.stage === 'planned')
-    const allAdapters = [...activeAdapters, ...plannedAdapters]
 
     return (
       <div className="space-y-4">
-        <div className="rounded-lg border border-border bg-secondary/20 p-4 space-y-3">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex-1 space-y-1">
-              <div className="flex items-center gap-2">
-                <p className="font-medium">{t('Task handling')}</p>
-                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                  automaticHandlingEnabled
-                    ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400'
-                    : 'bg-secondary text-muted-foreground border border-border/60'
-                }`}>
-                  {automaticHandlingEnabled ? t('Custom handling') : t('Claude Code SDK only')}
-                </span>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                {automaticHandlingEnabled
-                  ? t('Supported requests will use your custom handling first. More complex tasks will still stay on Claude Code SDK.')
-                  : t('Everything will use Claude Code SDK.')}
-              </p>
-            </div>
-            <Switch
-              checked={automaticHandlingEnabled}
-              onChange={handleAutomaticHandlingChange}
+        <div className="flex items-center justify-between">
+          <div className="flex-1">
+            <p className="font-medium">{t('Task handling')}</p>
+            <p className="text-sm text-muted-foreground">
+              {selectedTaskHandlingMode === 'hybrid'
+                ? t('Automation tasks are handled by SkillsFan; complex tasks like Agent are handled by Claude.')
+                : t('All tasks are handled by Claude Code SDK.')}
+            </p>
+          </div>
+          <div className="w-44 shrink-0">
+            <Select<'claude-sdk' | 'hybrid'>
+              value={selectedTaskHandlingMode}
+              onChange={handleAutomaticHandlingModeChange}
+              options={[
+                { value: 'claude-sdk', label: t('Claude Mode') },
+                { value: 'hybrid', label: t('Standard Mode') }
+              ]}
               disabled={isSavingAutomaticHandling}
             />
           </div>
@@ -1964,65 +1969,45 @@ export function SettingsPage() {
 
         {/* Permission banner */}
         {hasPermissionIssue && (
-          <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
-            <div className="flex items-start gap-3">
-              <div className="mt-0.5 rounded-full bg-amber-500/10 p-1.5">
-                <Lock className="h-4 w-4 text-amber-600" />
-              </div>
-              <div className="flex-1 space-y-2">
-                <p className="text-sm font-medium text-amber-700 dark:text-amber-400">
-                  {t('System permission required')}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  {needsAccessibility && t('AI needs Accessibility permission to help you with {{capabilities}}.', {
-                    capabilities: blockedLabels.join(t(', '))
-                  })}
-                  {needsAccessibility && needsScreenRecording && ' '}
-                  {needsScreenRecording && t('Screen Recording permission is also needed.')}
-                </p>
-                <div className="text-sm text-muted-foreground space-y-1 mt-1">
-                  <p>{t('permission_step_1')}</p>
-                  <p>{t('permission_step_2')}</p>
-                  <p>{t('permission_step_3')}</p>
-                </div>
-                <div className="flex flex-wrap gap-2 pt-1">
-                  {needsAccessibility && (
-                    <button
-                      onClick={() => handleOpenDesktopPermissionSettings('accessibility')}
-                      className="px-3 py-1.5 bg-amber-500/10 text-amber-700 dark:text-amber-400 text-sm rounded-lg hover:bg-amber-500/20 transition-colors border border-amber-500/30 font-medium"
-                    >
-                      {t('Enable Accessibility')}
-                    </button>
-                  )}
-                  {needsScreenRecording && (
-                    <button
-                      onClick={() => handleOpenDesktopPermissionSettings('screen-recording')}
-                      className="px-3 py-1.5 bg-amber-500/10 text-amber-700 dark:text-amber-400 text-sm rounded-lg hover:bg-amber-500/20 transition-colors border border-amber-500/30 font-medium"
-                    >
-                      {t('Enable Screen Recording')}
-                    </button>
-                  )}
-                </div>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {t('AI will only perform these actions when you explicitly ask.')}
-                </p>
-              </div>
+          <div className="flex items-center justify-between pt-4 border-t border-border">
+            <div className="flex-1">
+              <p className="font-medium text-amber-700 dark:text-amber-400">{t('System permission required')}</p>
+              <p className="text-sm text-muted-foreground">
+                {t('Please enable permissions in System Settings for full functionality.')}
+              </p>
+            </div>
+            <div className="flex gap-2 shrink-0">
+              {needsAccessibility && (
+                <button
+                  onClick={() => handleOpenDesktopPermissionSettings('accessibility')}
+                  className="px-3 py-1.5 bg-amber-500/10 text-amber-700 dark:text-amber-400 text-sm rounded-lg hover:bg-amber-500/20 transition-colors border border-amber-500/30 font-medium"
+                >
+                  {t('Enable Accessibility')}
+                </button>
+              )}
+              {needsScreenRecording && (
+                <button
+                  onClick={() => handleOpenDesktopPermissionSettings('screen-recording')}
+                  className="px-3 py-1.5 bg-amber-500/10 text-amber-700 dark:text-amber-400 text-sm rounded-lg hover:bg-amber-500/20 transition-colors border border-amber-500/30 font-medium"
+                >
+                  {t('Enable Screen Recording')}
+                </button>
+              )}
             </div>
           </div>
         )}
 
         {allReady && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 pt-4 border-t border-border">
             <Check className="h-4 w-4 text-green-600" />
-            <span className="text-sm text-green-600 font-medium">{t('All system permissions granted')}</span>
+            <span className="text-sm text-green-600 font-medium">{t('Permissions ready')}</span>
           </div>
         )}
 
         {/* App list — same style as other settings items */}
-        {allAdapters.map((adapter, index) => {
+        {activeAdapters.map((adapter, index) => {
           const AdapterIcon = adapterIconMap[adapter.id] || Monitor
-          const isPlanned = adapter.stage === 'planned'
-          const hasBlockedWorkflows = !isPlanned && (adapter.workflows || []).some(w => w.blockedByPermission)
+          const hasBlockedWorkflows = (adapter.workflows || []).some(w => w.blockedByPermission)
           const description = adapterDescriptions[adapter.id] || ''
 
           return (
@@ -2037,9 +2022,6 @@ export function SettingsPage() {
                     {adapterDisplayNames[adapter.id] || adapter.displayName || adapter.id}
                   </p>
                 </div>
-                {isPlanned && (
-                  <span className="text-sm text-muted-foreground">{t('Coming soon')}</span>
-                )}
               </div>
               <p className="text-sm text-muted-foreground mt-1">
                 {description}
@@ -2060,6 +2042,19 @@ export function SettingsPage() {
             </div>
           )
         })}
+
+        <div className="pt-4 border-t border-border">
+          <button
+            onClick={() => {
+              setShowGatewayDiagnostics(true)
+              void loadGatewayDiagnostics()
+            }}
+            className="inline-flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <Stethoscope className="w-4 h-4" />
+            {t('Troubleshoot')}
+          </button>
+        </div>
       </div>
     )
   }
@@ -2071,8 +2066,8 @@ export function SettingsPage() {
     { id: 'skills', icon: Package, label: t('Skills') },
     { id: 'spaces', icon: Layers, label: t('Spaces'), desktopOnly: true },
     { id: 'system', icon: SettingsIcon, label: t('System'), desktopOnly: true },
-    { id: 'computer-automation', icon: Monitor, label: t('Computer Automation'), desktopOnly: true },
     { id: 'advanced', icon: SlidersHorizontal, label: t('Advanced'), desktopOnly: true },
+    { id: 'computer-automation', icon: Monitor, label: t('Computer Automation'), desktopOnly: true },
     { id: 'mcp', icon: Server, label: t('MCP Servers'), hidden: true },
     { id: 'display', icon: Palette, label: t('Display & Language') },
     { id: 'feishu', icon: MessageSquare, label: t('Message Channels'), desktopOnly: true },
@@ -2627,23 +2622,23 @@ export function SettingsPage() {
                 <div>
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium">{t('Permission Mode')}</p>
-                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                          isFullAccessEnabled
-                            ? 'bg-amber-500/10 text-amber-600 border border-amber-500/30'
-                            : 'bg-secondary text-muted-foreground border border-border'
-                        }`}>
-                          {isFullAccessEnabled ? t('Full Access') : t('Ask Every Time')}
-                        </span>
-                      </div>
+                      <p className="font-medium">{t('Permission Mode')}</p>
                       <p className="text-sm text-muted-foreground">
                         {isFullAccessEnabled
                           ? t('Run commands, code execution, and sub-agents without asking for confirmation.')
                           : t('Ask before running commands, code execution, or sub-agents.')}
                       </p>
                     </div>
-                    <Switch checked={isFullAccessEnabled} onChange={handlePermissionModeChange} />
+                    <Select<string>
+                      variant="compact"
+                      showCheck={false}
+                      value={isFullAccessEnabled ? 'full' : 'ask'}
+                      onChange={(v) => handlePermissionModeChange(v === 'full')}
+                      options={[
+                        { value: 'ask', label: t('Ask Every Time') },
+                        { value: 'full', label: t('Full Access') }
+                      ]}
+                    />
                   </div>
 
                   {isFullAccessEnabled && (
@@ -2833,24 +2828,82 @@ export function SettingsPage() {
                   </div>
                 </div>
 
-                <div className="pt-4 border-t border-border space-y-4">
-                  <div className="flex items-start justify-between gap-4">
+                {/* Memory Management */}
+                <div className={`pt-4 border-t border-border transition-opacity ${(config?.memory?.enabled ?? true) ? '' : 'opacity-50 pointer-events-none'}`}>
+                  <div className="flex items-center justify-between">
                     <div className="flex-1">
-                      <p className="font-medium">{t('Gateway Diagnostics')}</p>
+                      <p className="font-medium">{t('Memory Management')}</p>
                       <p className="text-sm text-muted-foreground">
-                        {t('Observe gateway runtime health, recovery storage, and background daemon status.')}
+                        {t('View and edit the memory file for current space')}
                       </p>
                     </div>
                     <button
-                      onClick={() => loadGatewayDiagnostics()}
-                      disabled={isLoadingGatewayDiagnostics}
-                      className="inline-flex items-center gap-2 px-3 py-2 text-sm bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/80 transition-colors disabled:opacity-50"
+                      onClick={() => setShowMemoryManager(true)}
+                      className="px-4 py-2 bg-primary/10 text-primary rounded-lg hover:bg-primary/20 transition-colors border border-primary/30"
                     >
-                      <RefreshCw className={`w-4 h-4 ${isLoadingGatewayDiagnostics ? 'animate-spin' : ''}`} />
-                      {isLoadingGatewayDiagnostics ? t('Loading...') : t('Refresh')}
+                      {t('Manage')}
                     </button>
                   </div>
+                </div>
 
+                {/* Clear Memory Button */}
+                <div className={`pt-4 border-t border-border transition-opacity ${(config?.memory?.enabled ?? true) ? '' : 'opacity-50 pointer-events-none'}`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <p className="font-medium">{t('Clear Memory')}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {t('Delete all conversation memory accumulated by AI')}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setShowClearMemoryDialog(true)}
+                      className="px-4 py-2 bg-red-500/10 text-red-500 rounded-lg hover:bg-red-500/20 transition-colors border border-red-500/30"
+                    >
+                      {t('Clear Memory')}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* Gateway Diagnostics Modal */}
+          {showGatewayDiagnostics && (
+            <div
+              className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4"
+              onClick={(e) => {
+                if (e.target === e.currentTarget) setShowGatewayDiagnostics(false)
+              }}
+            >
+              <div className="bg-background border border-border rounded-lg w-full max-w-4xl shadow-lg max-h-[85vh] flex flex-col">
+                {/* Header */}
+                <div className="flex items-center justify-between p-4 border-b border-border">
+                  <div>
+                    <h3 className="font-medium text-foreground">{t('Gateway Diagnostics')}</h3>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {t('Observe gateway runtime health, recovery storage, and background daemon status.')}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => loadGatewayDiagnostics()}
+                      disabled={isLoadingGatewayDiagnostics}
+                      className="inline-flex items-center gap-2 px-3 py-1.5 text-sm bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/80 transition-colors disabled:opacity-50"
+                    >
+                      <RefreshCw className={`w-4 h-4 ${isLoadingGatewayDiagnostics ? 'animate-spin' : ''}`} />
+                      {t('Refresh')}
+                    </button>
+                    <button
+                      onClick={() => setShowGatewayDiagnostics(false)}
+                      className="text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 p-5 overflow-y-auto space-y-5">
                   {!gatewayHealth && isLoadingGatewayDiagnostics && (
                     <div className="rounded-lg border border-border bg-secondary/20 px-4 py-5 text-sm text-muted-foreground flex items-center gap-2">
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -2863,7 +2916,7 @@ export function SettingsPage() {
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                       <div className="rounded-lg border border-border bg-secondary/20 p-4 space-y-3">
                         <div className="flex items-center justify-between gap-3">
-                          <p className="text-sm font-medium">{t('Background service')}</p>
+                          <p className="text-sm font-semibold">{t('Background service')}</p>
                           <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${getStatusBadgeClasses(gatewayHealth.process.state)}`}>
                             {gatewayHealth.gateway.mode === 'external' ? t('External') : t('Embedded')}
                           </span>
@@ -2891,7 +2944,7 @@ export function SettingsPage() {
 
                       <div className="rounded-lg border border-border bg-secondary/20 p-4 space-y-3">
                         <div className="flex items-center justify-between gap-3">
-                          <p className="text-sm font-medium">{t('Command Runtime')}</p>
+                          <p className="text-sm font-semibold">{t('Command Runtime')}</p>
                           <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${getStatusBadgeClasses(
                             gatewayHealth.gateway.mode !== 'external'
                               ? 'disabled'
@@ -2940,7 +2993,7 @@ export function SettingsPage() {
 
                       <div className="rounded-lg border border-border bg-secondary/20 p-4 space-y-3">
                         <div className="flex items-center justify-between gap-3">
-                          <p className="text-sm font-medium">{t('Recovery Storage')}</p>
+                          <p className="text-sm font-semibold">{t('Recovery Storage')}</p>
                           <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${getStatusBadgeClasses(
                             gatewayHealth.sessionStore.lastLoadError
                               || gatewayHealth.sessionStore.lastSaveError
@@ -3019,28 +3072,28 @@ export function SettingsPage() {
                     <div className="rounded-lg border border-border bg-secondary/20 p-4 space-y-3">
                       <div className="flex items-center justify-between gap-3">
                         <div>
-                          <p className="text-sm font-medium">{t('Doctor Report')}</p>
+                          <p className="text-sm font-semibold">{t('Doctor Report')}</p>
                           <p className="text-xs text-muted-foreground mt-1">
                             {t('Generated at {{time}}', { time: formatOptionalTimestamp(gatewayDoctor.generatedAt) })}
                           </p>
                         </div>
-                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${getStatusBadgeClasses(gatewayDoctor.overallState)}`}>
+                        <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${getStatusBadgeClasses(gatewayDoctor.overallState)}`}>
                           {gatewayDoctor.overallState.toUpperCase()}
                         </span>
                       </div>
-                      <div className="space-y-2">
+                      <div className="space-y-1.5">
                         {gatewayDoctor.checks.map((check) => (
                           <div
                             key={check.key}
-                            className="flex items-start justify-between gap-3 rounded-lg border border-border/60 bg-background/50 px-3 py-2"
+                            className="flex items-center gap-3 rounded-lg border border-border/60 bg-background/50 px-3 py-2.5"
                           >
-                            <div className="min-w-0">
+                            <span className={`w-2 h-2 rounded-full shrink-0 ${
+                              check.state === 'ok' ? 'bg-green-500' : check.state === 'warn' ? 'bg-amber-500' : 'bg-red-500'
+                            }`} />
+                            <div className="min-w-0 flex-1">
                               <p className="text-sm font-medium">{check.key}</p>
-                              <p className="text-xs text-muted-foreground mt-1 break-words">{check.summary}</p>
+                              <p className="text-xs text-muted-foreground mt-0.5 break-words">{check.summary}</p>
                             </div>
-                            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${getStatusBadgeClasses(check.state)}`}>
-                              {check.state}
-                            </span>
                           </div>
                         ))}
                       </div>
@@ -3108,7 +3161,7 @@ export function SettingsPage() {
                         )}
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-muted-foreground">
+                      <div className="border-t border-border/60 pt-3 grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-muted-foreground">
                         <p>{t('Registered at')}: {formatOptionalTimestamp(gatewayDaemonStatus.registeredAt)}</p>
                         <p>{t('Updated at')}: {formatOptionalTimestamp(gatewayDaemonStatus.updatedAt)}</p>
                       </div>
@@ -3395,44 +3448,8 @@ export function SettingsPage() {
                     </div>
                   )}
                 </div>
-
-                {/* Memory Management */}
-                <div className={`pt-4 border-t border-border transition-opacity ${(config?.memory?.enabled ?? true) ? '' : 'opacity-50 pointer-events-none'}`}>
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <p className="font-medium">{t('Memory Management')}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {t('View and edit the memory file for current space')}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => setShowMemoryManager(true)}
-                      className="px-4 py-2 bg-primary/10 text-primary rounded-lg hover:bg-primary/20 transition-colors border border-primary/30"
-                    >
-                      {t('Manage')}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Clear Memory Button */}
-                <div className={`pt-4 border-t border-border transition-opacity ${(config?.memory?.enabled ?? true) ? '' : 'opacity-50 pointer-events-none'}`}>
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <p className="font-medium">{t('Clear Memory')}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {t('Delete all conversation memory accumulated by AI')}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => setShowClearMemoryDialog(true)}
-                      className="px-4 py-2 bg-red-500/10 text-red-500 rounded-lg hover:bg-red-500/20 transition-colors border border-red-500/30"
-                    >
-                      {t('Clear Memory')}
-                    </button>
-                  </div>
-                </div>
               </div>
-            </section>
+            </div>
           )}
 
           {/* Memory Manager Modal */}

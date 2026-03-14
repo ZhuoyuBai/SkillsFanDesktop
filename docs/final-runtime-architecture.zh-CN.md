@@ -376,12 +376,12 @@ src/gateway/
 如果按这份最终结构实现，建议顺序如下：
 
 1. 保持 `Claude SDK Runtime` 为长期保留 lane
-2. 继续完成 `M5` 当前的 `Terminal / Chrome / iTerm` 产品化
+2. 完成 `M5` 当前桌面产品化，并把 `Finder / SkillsFan` 一起收口
 3. 实现 `Tool Registry`
 4. 开始做 `NativeRuntime v1`
 5. 让 `NativeRuntime` 调用共享工具层
 6. 引入任务级 runtime 路由策略
-7. 再扩 `Finder / SkillsFan` 和后续更多 app adapter
+7. 再扩更多 app adapter
 
 ### 当前阶段的实际建议
 

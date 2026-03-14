@@ -47,6 +47,31 @@ describe('runtime routing', () => {
     })
   })
 
+  it('keeps image attachment requests on claude-sdk during the first native rollout', () => {
+    expect(resolveRuntimeSelection({
+      configuredMode: 'hybrid',
+      hasNativeRuntime: true,
+      request: {
+        spaceId: 'space-1',
+        conversationId: 'conv-1',
+        message: 'Describe this file',
+        attachments: [
+          {
+            id: 'img-attachment-1',
+            type: 'image',
+            mediaType: 'image/png',
+            data: 'Zm9v',
+            name: 'screenshot.png',
+            size: 3
+          }
+        ]
+      } as any
+    })).toMatchObject({
+      selectedKind: 'claude-sdk',
+      preferredKind: 'claude-sdk'
+    })
+  })
+
   it('keeps ai browser requests on claude-sdk during the first native rollout', () => {
     expect(resolveRuntimeSelection({
       configuredMode: 'hybrid',
@@ -121,6 +146,8 @@ describe('runtime routing', () => {
     expect(resolveRuntimeSelection({
       configuredMode: 'hybrid',
       hasNativeRuntime: false,
+      nativeReadinessReasonId: 'requires-responses',
+      nativeNote: getNativeUserFacingMessage('requiresResponses'),
       request: {
         spaceId: 'space-1',
         conversationId: 'conv-1',
@@ -133,7 +160,123 @@ describe('runtime routing', () => {
     })
   })
 
-  it('keeps non-terminal desktop automation on claude-sdk during the first rollout', () => {
+  it('explains compatibility fallback when hybrid keeps a request off the native path', () => {
+    expect(resolveRuntimeSelection({
+      configuredMode: 'hybrid',
+      hasNativeRuntime: false,
+      nativeReadinessReasonId: 'adapter-unavailable',
+      nativeNote: getNativeUserFacingMessage('outsideScope'),
+      request: {
+        spaceId: 'space-1',
+        conversationId: 'conv-1',
+        message: 'hello'
+      } as any
+    }).reason).toContain(getNativeUserFacingMessage('outsideScope'))
+  })
+
+  it('keeps requests on claude-sdk when the current source is outside the native rollout allowlist', () => {
+    expect(resolveRuntimeSelection({
+      configuredMode: 'hybrid',
+      hasNativeRuntime: true,
+      currentSource: 'glm',
+      currentModel: 'glm-5',
+      nativePolicy: {
+        sourceAllowlist: ['custom', 'openai-codex']
+      },
+      request: {
+        spaceId: 'space-1',
+        conversationId: 'conv-1',
+        message: 'hello'
+      } as any
+    })).toMatchObject({
+      selectedKind: 'claude-sdk',
+      preferredKind: 'claude-sdk',
+      taskComplexity: 'lightweight'
+    })
+  })
+
+  it('still routes allowlisted source and model requests to native', () => {
+    expect(resolveRuntimeSelection({
+      configuredMode: 'hybrid',
+      hasNativeRuntime: true,
+      currentSource: 'openai-codex',
+      currentModel: 'gpt-5.4',
+      nativePolicy: {
+        sourceAllowlist: ['custom', 'openai-codex'],
+        modelAllowlistBySource: {
+          'openai-codex': ['gpt-5.4']
+        }
+      },
+      request: {
+        spaceId: 'space-1',
+        conversationId: 'conv-1',
+        message: 'hello'
+      } as any
+    })).toMatchObject({
+      selectedKind: 'native',
+      preferredKind: 'native'
+    })
+  })
+
+  it('routes allowlisted anthropic-compatible sources to native without hardcoded model ids', () => {
+    expect(resolveRuntimeSelection({
+      configuredMode: 'hybrid',
+      hasNativeRuntime: true,
+      currentSource: 'zhipu',
+      currentModel: 'glm-6-preview',
+      nativePolicy: {
+        sourceAllowlist: ['custom', 'openai-codex', 'zhipu', 'minimax']
+      },
+      request: {
+        spaceId: 'space-1',
+        conversationId: 'conv-1',
+        message: 'Open iTerm and run pwd'
+      } as any
+    })).toMatchObject({
+      selectedKind: 'native',
+      preferredKind: 'native'
+    })
+  })
+
+  it('routes kimi and deepseek sources to native once the anthropic-compatible adapter is available', () => {
+    expect(resolveRuntimeSelection({
+      configuredMode: 'hybrid',
+      hasNativeRuntime: true,
+      currentSource: 'kimi',
+      currentModel: 'kimi-k2.5',
+      nativePolicy: {
+        sourceAllowlist: ['custom', 'openai-codex', 'zhipu', 'minimax', 'kimi', 'deepseek']
+      },
+      request: {
+        spaceId: 'space-1',
+        conversationId: 'conv-1',
+        message: 'Open Chrome and summarize the current page'
+      } as any
+    })).toMatchObject({
+      selectedKind: 'native',
+      preferredKind: 'native'
+    })
+
+    expect(resolveRuntimeSelection({
+      configuredMode: 'hybrid',
+      hasNativeRuntime: true,
+      currentSource: 'deepseek',
+      currentModel: 'DeepSeek-V3.2',
+      nativePolicy: {
+        sourceAllowlist: ['custom', 'openai-codex', 'zhipu', 'minimax', 'kimi', 'deepseek']
+      },
+      request: {
+        spaceId: 'space-1',
+        conversationId: 'conv-1',
+        message: 'Run pwd in iTerm'
+      } as any
+    })).toMatchObject({
+      selectedKind: 'native',
+      preferredKind: 'native'
+    })
+  })
+
+  it('keeps generic desktop automation on claude-sdk during the first rollout', () => {
     expect(resolveRuntimeSelection({
       configuredMode: 'hybrid',
       hasNativeRuntime: true,
@@ -149,6 +292,44 @@ describe('runtime routing', () => {
     })).toMatchObject({
       selectedKind: 'claude-sdk',
       preferredKind: 'claude-sdk'
+    })
+  })
+
+  it('routes simple Finder requests to native during the first rollout', () => {
+    expect(resolveRuntimeSelection({
+      configuredMode: 'hybrid',
+      hasNativeRuntime: true,
+      request: {
+        spaceId: 'space-1',
+        conversationId: 'conv-1',
+        message: 'Open Finder and show the Desktop folder',
+        runtimeTaskHint: {
+          complexity: 'lightweight',
+          tags: ['desktop-automation']
+        }
+      } as any
+    })).toMatchObject({
+      selectedKind: 'native',
+      preferredKind: 'native'
+    })
+  })
+
+  it('routes simple SkillsFan app requests to native during the first rollout', () => {
+    expect(resolveRuntimeSelection({
+      configuredMode: 'hybrid',
+      hasNativeRuntime: true,
+      request: {
+        spaceId: 'space-1',
+        conversationId: 'conv-1',
+        message: 'Open SkillsFan settings',
+        runtimeTaskHint: {
+          complexity: 'lightweight',
+          tags: ['desktop-automation']
+        }
+      } as any
+    })).toMatchObject({
+      selectedKind: 'native',
+      preferredKind: 'native'
     })
   })
 
@@ -267,8 +448,8 @@ describe('runtime routing', () => {
       nativeNote: getNativeUserFacingMessage('openAIReady')
     })).toEqual(expect.objectContaining({
       phase: 'first-batch',
-      includedScopes: ['chat-simple', 'browser-simple', 'terminal-simple'],
-      excludedScopes: ['skills', 'agent-team', 'long-workflow', 'pdf-text-attachments'],
+      includedScopes: ['chat-simple', 'browser-simple', 'terminal-simple', 'finder-simple', 'skillsfan-simple'],
+      excludedScopes: ['skills', 'agent-team', 'long-workflow', 'pdf-text-attachments', 'provider-model-policy'],
       simpleTasksCanUseNative: true,
       note: getNativeUserFacingMessage('hybridRolloutReady')
     }))
@@ -320,6 +501,31 @@ describe('runtime routing', () => {
                 { id: 'terminal.session-targeting', supported: true, stage: 'active', methodIds: [], lastRun: { state: 'passed', startedAt: '2026-03-13T10:00:00.000Z', summary: 'ok' } }
               ],
               errorCodes: []
+            } as any,
+            {
+              id: 'finder',
+              supported: true,
+              stage: 'active',
+              workflows: [
+                { id: 'finder.folder-access', supported: true, stage: 'active', methodIds: [] },
+                { id: 'finder.window-and-search', supported: true, stage: 'active', methodIds: [] }
+              ],
+              smokeFlows: [
+                { id: 'finder.navigation-roundtrip', supported: true, stage: 'active', methodIds: [], lastRun: { state: 'passed', startedAt: '2026-03-13T10:00:00.000Z', summary: 'ok' } }
+              ],
+              errorCodes: []
+            } as any,
+            {
+              id: 'skillsfan',
+              supported: true,
+              stage: 'active',
+              workflows: [
+                { id: 'skillsfan.app-control', supported: true, stage: 'active', methodIds: [] }
+              ],
+              smokeFlows: [
+                { id: 'skillsfan.settings-roundtrip', supported: true, stage: 'active', methodIds: [], lastRun: { state: 'passed', startedAt: '2026-03-13T10:00:00.000Z', summary: 'ok' } }
+              ],
+              errorCodes: []
             } as any
           ],
           errorCodes: []
@@ -334,7 +540,9 @@ describe('runtime routing', () => {
     expect(rollout.validation).toEqual(expect.arrayContaining([
       expect.objectContaining({ id: 'chat-simple', state: 'ready' }),
       expect.objectContaining({ id: 'browser-simple', state: 'ready', latestSmokeState: 'passed' }),
-      expect.objectContaining({ id: 'terminal-simple', state: 'ready', latestSmokeState: 'passed' })
+      expect.objectContaining({ id: 'terminal-simple', state: 'ready', latestSmokeState: 'passed' }),
+      expect.objectContaining({ id: 'finder-simple', state: 'ready', latestSmokeState: 'passed' }),
+      expect.objectContaining({ id: 'skillsfan-simple', state: 'ready', latestSmokeState: 'passed' })
     ]))
   })
 
@@ -343,11 +551,30 @@ describe('runtime routing', () => {
       configuredMode: 'hybrid',
       hasNativeRuntime: false,
       nativeReady: false,
+      nativeReadinessReasonId: 'adapter-unavailable',
       nativeNote: getNativeUserFacingMessage('outsideScope')
     })).toEqual(expect.objectContaining({
       simpleTasksCanUseNative: false,
       note: getNativeUserFacingMessage('outsideScope')
     }))
+  })
+
+  it('classifies protocol incompatibility separately from a generic native-not-ready state', () => {
+    const rollout = resolveNativeRolloutStatus({
+      configuredMode: 'hybrid',
+      hasNativeRuntime: false,
+      nativeReady: false,
+      nativeReadinessReasonId: 'requires-responses',
+      nativeNote: getNativeUserFacingMessage('requiresResponses')
+    })
+
+    expect(rollout.validation).toEqual([
+      expect.objectContaining({ id: 'chat-simple', state: 'blocked', blockerCodes: ['compat_requires_responses'] }),
+      expect.objectContaining({ id: 'browser-simple', state: 'blocked', blockerCodes: ['compat_requires_responses'] }),
+      expect.objectContaining({ id: 'terminal-simple', state: 'blocked', blockerCodes: ['compat_requires_responses'] }),
+      expect.objectContaining({ id: 'finder-simple', state: 'blocked', blockerCodes: ['compat_requires_responses'] }),
+      expect.objectContaining({ id: 'skillsfan-simple', state: 'blocked', blockerCodes: ['compat_requires_responses'] })
+    ])
   })
 
   it('previews which sample tasks currently use native or stay on claude-sdk', () => {
@@ -362,10 +589,36 @@ describe('runtime routing', () => {
       expect.objectContaining({ id: 'chat-simple', selectedKind: 'native' }),
       expect.objectContaining({ id: 'browser-simple', selectedKind: 'native' }),
       expect.objectContaining({ id: 'terminal-simple', selectedKind: 'native' }),
+      expect.objectContaining({ id: 'finder-simple', selectedKind: 'native' }),
+      expect.objectContaining({ id: 'skillsfan-simple', selectedKind: 'native' }),
       expect.objectContaining({ id: 'skills', selectedKind: 'claude-sdk' }),
       expect.objectContaining({ id: 'agent-team', selectedKind: 'claude-sdk' }),
       expect.objectContaining({ id: 'long-workflow', selectedKind: 'claude-sdk' }),
       expect.objectContaining({ id: 'pdf-text-attachments', selectedKind: 'claude-sdk' })
     ]))
+  })
+
+  it('holds first-batch validation when the current source is outside the native rollout policy', () => {
+    const rollout = resolveNativeRolloutStatus({
+      configuredMode: 'hybrid',
+      hasNativeRuntime: true,
+      nativeReady: true,
+      currentSource: 'glm',
+      currentModel: 'glm-5',
+      nativePolicy: {
+        sourceAllowlist: ['custom', 'openai-codex']
+      },
+      nativeNote: getNativeUserFacingMessage('openAIReady')
+    })
+
+    expect(rollout.simpleTasksCanUseNative).toBe(false)
+    expect(rollout.note).toContain('glm')
+    expect(rollout.validation).toEqual([
+      expect.objectContaining({ id: 'chat-simple', state: 'held', blockerCodes: ['policy_held'] }),
+      expect.objectContaining({ id: 'browser-simple', state: 'held', blockerCodes: ['policy_held'] }),
+      expect.objectContaining({ id: 'terminal-simple', state: 'held', blockerCodes: ['policy_held'] }),
+      expect.objectContaining({ id: 'finder-simple', state: 'held', blockerCodes: ['policy_held'] }),
+      expect.objectContaining({ id: 'skillsfan-simple', state: 'held', blockerCodes: ['policy_held'] })
+    ])
   })
 })

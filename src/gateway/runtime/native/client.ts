@@ -1,4 +1,3 @@
-import type { OpenAIResponsesResponse, OpenAIResponsesStreamEvent } from '../../../main/openai-compat-router/types/openai-responses'
 import type {
   NativeNormalizedResponse,
   NativeNormalizedStreamEvent,
@@ -19,6 +18,16 @@ export interface ExecuteNativePreparedRequestOptions {
   fetchImpl?: typeof fetch
   onStreamEvent?: (event: NativeNormalizedStreamEvent) => void | Promise<void>
   signal?: AbortSignal
+}
+
+export class NativeRuntimeRequestTimeoutError extends Error {
+  readonly timeoutMs: number
+
+  constructor(timeoutMs: number) {
+    super(`Native runtime request timed out after ${timeoutMs}ms`)
+    this.name = 'NativeRuntimeRequestTimeoutError'
+    this.timeoutMs = timeoutMs
+  }
 }
 
 export class NativeRuntimeUpstreamError extends Error {
@@ -61,8 +70,8 @@ function responseHeadersToObject(headers: Headers): Record<string, string> {
 
 async function parseUpstreamError(response: Response): Promise<never> {
   const responseText = await response.text().catch(() => '')
-  const parsed = safeJsonParse<{ error?: { code?: string; message?: string }; message?: string }>(responseText)
-  const code = parsed?.error?.code || 'upstream_error'
+  const parsed = safeJsonParse<{ error?: { code?: string; type?: string; message?: string }; message?: string }>(responseText)
+  const code = parsed?.error?.code || parsed?.error?.type || 'upstream_error'
   const message = describeNativeUpstreamError({
     code,
     statusCode: response.status,
@@ -95,6 +104,50 @@ function parseSSEData(line: string): { data: string | null; isDone: boolean } {
   }
 
   return { data, isDone: false }
+}
+
+function createRequestAbortContext(params: {
+  upstreamSignal?: AbortSignal
+  timeoutMs: number
+}): {
+  signal: AbortSignal
+  didTimeout: () => boolean
+  cleanup: () => void
+} {
+  const controller = new AbortController()
+  let didTimeout = false
+
+  const abortFromUpstream = () => {
+    if (!controller.signal.aborted) {
+      controller.abort(params.upstreamSignal?.reason)
+    }
+  }
+
+  if (params.upstreamSignal) {
+    if (params.upstreamSignal.aborted) {
+      controller.abort(params.upstreamSignal.reason)
+    } else {
+      params.upstreamSignal.addEventListener('abort', abortFromUpstream, { once: true })
+    }
+  }
+
+  const timeoutHandle = setTimeout(() => {
+    didTimeout = true
+    if (!controller.signal.aborted) {
+      controller.abort(new Error('native-runtime-timeout'))
+    }
+  }, params.timeoutMs)
+
+  return {
+    signal: controller.signal,
+    didTimeout: () => didTimeout,
+    cleanup: () => {
+      clearTimeout(timeoutHandle)
+      if (params.upstreamSignal) {
+        params.upstreamSignal.removeEventListener('abort', abortFromUpstream)
+      }
+    }
+  }
 }
 
 async function processNativeSSEStream(params: {
@@ -136,7 +189,7 @@ async function processNativeSSEStream(params: {
         continue
       }
 
-      const rawEvent = safeJsonParse<OpenAIResponsesStreamEvent>(data)
+      const rawEvent = safeJsonParse<unknown>(data)
       if (!rawEvent) {
         continue
       }
@@ -144,8 +197,8 @@ async function processNativeSSEStream(params: {
       const normalizedEvent = params.adapter.normalizeStreamEvent(rawEvent)
       streamEvents.push(normalizedEvent)
 
-      if ('response' in rawEvent && rawEvent.response) {
-        finalResponse = params.adapter.normalizeResponse(rawEvent.response)
+      if (rawEvent && typeof rawEvent === 'object' && 'response' in rawEvent && (rawEvent as { response?: unknown }).response) {
+        finalResponse = params.adapter.normalizeResponse((rawEvent as { response: unknown }).response)
       }
 
       if (params.onStreamEvent) {
@@ -163,41 +216,56 @@ export async function executeNativePreparedRequest(params: {
   options?: ExecuteNativePreparedRequestOptions
 }): Promise<NativePreparedRequestExecutionResult> {
   const fetchImpl = params.options?.fetchImpl || fetch
-  const response = await fetchImpl(params.preparedRequest.url, {
-    method: params.preparedRequest.method,
-    headers: params.preparedRequest.headers,
-    body: JSON.stringify(params.preparedRequest.body),
-    signal: params.options?.signal
+  const requestAbortContext = createRequestAbortContext({
+    upstreamSignal: params.options?.signal,
+    timeoutMs: params.preparedRequest.requestTimeoutMs
   })
 
-  if (!response.ok) {
-    await parseUpstreamError(response)
-  }
+  try {
+    const response = await fetchImpl(params.preparedRequest.url, {
+      method: params.preparedRequest.method,
+      headers: params.preparedRequest.headers,
+      body: JSON.stringify(params.preparedRequest.body),
+      signal: requestAbortContext.signal
+    })
 
-  const headers = responseHeadersToObject(response.headers)
+    if (!response.ok) {
+      await parseUpstreamError(response)
+    }
 
-  if (!params.preparedRequest.stream) {
-    const payload = await response.json() as OpenAIResponsesResponse
+    const headers = responseHeadersToObject(response.headers)
+
+    if (!params.preparedRequest.stream) {
+      const payload = await response.json() as unknown
+      return {
+        statusCode: response.status,
+        statusText: response.statusText,
+        headers,
+        response: params.adapter.normalizeResponse(payload),
+        streamEvents: []
+      }
+    }
+
+    const streamed = await processNativeSSEStream({
+      response,
+      adapter: params.adapter,
+      onStreamEvent: params.options?.onStreamEvent
+    })
+
     return {
       statusCode: response.status,
       statusText: response.statusText,
       headers,
-      response: params.adapter.normalizeResponse(payload),
-      streamEvents: []
+      response: streamed.finalResponse,
+      streamEvents: streamed.streamEvents
     }
-  }
+  } catch (error) {
+    if (requestAbortContext.didTimeout()) {
+      throw new NativeRuntimeRequestTimeoutError(params.preparedRequest.requestTimeoutMs)
+    }
 
-  const streamed = await processNativeSSEStream({
-    response,
-    adapter: params.adapter,
-    onStreamEvent: params.options?.onStreamEvent
-  })
-
-  return {
-    statusCode: response.status,
-    statusText: response.statusText,
-    headers,
-    response: streamed.finalResponse,
-    streamEvents: streamed.streamEvents
+    throw error
+  } finally {
+    requestAbortContext.cleanup()
   }
 }

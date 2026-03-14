@@ -15,6 +15,7 @@ import { hostRuntime } from '../../../gateway/host-runtime'
 import { resolveNativeRuntimeRegistrationState } from '../../../gateway/runtime/registration'
 import {
   describeRuntimeSelectionForUser,
+  resolveRuntimeRequestSourceContext,
   resolveRuntimeSelection
 } from '../../../gateway/runtime/routing'
 import { getConfig } from '../config.service'
@@ -60,6 +61,7 @@ import {
   extractResultUsage
 } from './message-utils'
 import { getMemoryIndexManager } from '../memory'
+import { referencesPriorConversation } from '../memory/query-builder'
 import { getEnabledExtensions, runBeforeSendMessageHooks, runHook } from '../extension'
 import {
   updateCompactionState,
@@ -283,10 +285,20 @@ async function sendMessageInternal(
 
   const config = getConfig()
   const nativeRegistrationState = resolveNativeRuntimeRegistrationState()
+  const runtimeRequestSourceContext = resolveRuntimeRequestSourceContext({
+    request,
+    aiSources: config.aiSources,
+    fallbackModel: config.api?.model || null
+  })
   const runtimeSelection = resolveRuntimeSelection({
     configuredMode: config.runtime?.mode || 'claude-sdk',
     hasNativeRuntime: nativeRegistrationState.enabled,
-    request
+    request,
+    currentSource: runtimeRequestSourceContext.sourceId,
+    currentModel: runtimeRequestSourceContext.modelId,
+    nativePolicy: config.runtime?.nativeRollout,
+    nativeReadinessReasonId: nativeRegistrationState.status.readinessReasonId,
+    nativeNote: nativeRegistrationState.status.note
   })
   const runtimeRoute = describeRuntimeSelectionForUser(runtimeSelection)
 
@@ -801,8 +813,9 @@ async function processMessageStream(
         spaceId, message, conversationId, 5
       )
 
-      // 2. Fallback: if few results, supplement with recent conversations
-      if (fragments.length < 2) {
+      // 2. Fallback: only supplement with recent conversations when the user
+      // explicitly refers to prior discussion (e.g. "continue", "之前").
+      if (fragments.length < 2 && referencesPriorConversation(message)) {
         const recentFragments = memoryManager.getRecentFragments(
           spaceId, conversationId, 3
         )

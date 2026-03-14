@@ -166,7 +166,7 @@ export interface SkillsFanAPI {
   unregisterGatewayDaemon: () => Promise<IpcResponse>
   getGatewayStepJournal: (sessionKey: string) => Promise<IpcResponse>
   runGatewayDesktopSmokeFlow: (flowId: string) => Promise<IpcResponse>
-  runGatewayRuntimeRolloutTrial: (targetId?: 'all' | 'chat-simple' | 'browser-simple' | 'terminal-simple') => Promise<IpcResponse>
+  runGatewayRuntimeRolloutTrial: (targetId?: 'all' | 'chat-simple' | 'browser-simple' | 'terminal-simple' | 'finder-simple' | 'skillsfan-simple') => Promise<IpcResponse>
 
   // Event listeners
   onAgentStart: (callback: (data: unknown) => void) => () => void

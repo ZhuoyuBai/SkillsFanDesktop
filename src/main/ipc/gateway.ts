@@ -124,12 +124,12 @@ export function registerGatewayHandlers(): void {
 
   ipcHandle('gateway:runtime-rollout-trial-run', async (_event, targetId?: string) => {
     const normalizedTarget = (targetId || '').trim() || 'all'
-    if (!['all', 'chat-simple', 'browser-simple', 'terminal-simple'].includes(normalizedTarget)) {
+    if (!['all', 'chat-simple', 'browser-simple', 'terminal-simple', 'finder-simple', 'skillsfan-simple'].includes(normalizedTarget)) {
       throw new Error('Please specify which first-batch check to run')
     }
 
     return await runGatewayRuntimeRolloutAcceptance({
-      targetId: normalizedTarget as 'all' | 'chat-simple' | 'browser-simple' | 'terminal-simple',
+      targetId: normalizedTarget as 'all' | 'chat-simple' | 'browser-simple' | 'terminal-simple' | 'finder-simple' | 'skillsfan-simple',
       workDir: process.cwd()
     })
   })

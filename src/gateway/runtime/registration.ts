@@ -1,7 +1,6 @@
 import { getAISourceManager } from '../../main/services/ai-sources/manager'
 import { getConfig } from '../../main/services/config.service'
-import { getEnabledExtensions } from '../../main/services/extension'
-import { buildSharedToolProviderDefinitions } from '../tools/providers'
+import { resolveConfiguredSharedToolProviders } from '../tools'
 import { nativeRuntime, resolveNativeRuntimeStatus, type NativeRuntimeStatus } from './native/runtime'
 import type { AgentRuntime, RuntimeKind } from './types'
 
@@ -16,12 +15,9 @@ interface RuntimeRegistrar {
 }
 
 function resolveCurrentSharedToolProviders() {
-  const config = getConfig()
-
-  return buildSharedToolProviderDefinitions({
-    effectiveAiBrowserEnabled: config.browserAutomation?.mode !== 'system-browser',
-    includeSkillMcp: true,
-    extensionProviderIds: getEnabledExtensions().map((extension) => extension.manifest.id)
+  return resolveConfiguredSharedToolProviders({
+    config: getConfig(),
+    includeSkillMcp: true
   })
 }
 

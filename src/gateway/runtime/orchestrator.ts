@@ -4,7 +4,7 @@ import { getConfig } from '../../main/services/config.service'
 import { canDelegateGatewayCommands, executeGatewayCommand } from '../commands'
 import { claudeSdkRuntime } from './claude-sdk/runtime'
 import { syncNativeRuntimeRegistration } from './registration'
-import { resolveRuntimeSelection } from './routing'
+import { resolveRuntimeRequestSourceContext, resolveRuntimeSelection } from './routing'
 import { bridgeGatewaySessionFromRequest, bridgeGatewayWarmSession } from './session-bridge'
 import type { AgentRuntime, RuntimeKind } from './types'
 
@@ -35,18 +35,29 @@ class RuntimeOrchestrator {
   }
 
   private resolveRuntimeForRequest(request?: AgentRequest): AgentRuntime {
-    const mode = getConfig().runtime?.mode || 'claude-sdk'
+    const config = getConfig()
+    const mode = config.runtime?.mode || 'claude-sdk'
     const claudeRuntime = this.getClaudeRuntime()
-    syncNativeRuntimeRegistration({
+    const nativeRegistrationState = syncNativeRuntimeRegistration({
       registerRuntime: (runtime) => this.registerRuntime(runtime),
       unregisterRuntime: (kind) => this.unregisterRuntime(kind)
     })
     const nativeRuntime = this.runtimes.get('native')
+    const runtimeRequestSourceContext = resolveRuntimeRequestSourceContext({
+      request,
+      aiSources: config.aiSources,
+      fallbackModel: config.api?.model || null
+    })
 
     const decision = resolveRuntimeSelection({
       configuredMode: mode,
       hasNativeRuntime: Boolean(nativeRuntime),
-      request
+      request,
+      currentSource: runtimeRequestSourceContext.sourceId,
+      currentModel: runtimeRequestSourceContext.modelId,
+      nativePolicy: config.runtime?.nativeRollout,
+      nativeReadinessReasonId: nativeRegistrationState.status.readinessReasonId,
+      nativeNote: nativeRegistrationState.status.note
     })
 
     if (decision.fallbackFrom === 'native') {

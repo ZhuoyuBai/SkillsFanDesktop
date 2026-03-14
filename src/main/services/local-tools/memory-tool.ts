@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, s
 import { dirname, isAbsolute, join, relative, resolve } from 'path'
 import { getSpace } from '../space.service'
 import { getMemoryIndexManager } from '../memory'
+import { referencesPriorConversation } from '../memory/query-builder'
 import { normalizeLineRange, truncateText } from './path-utils'
 
 function getWorkspaceRoot(spaceId: string, workDir: string): { workspaceRoot: string; isTemp: boolean } {
@@ -96,7 +97,7 @@ export async function executeMemoryCommand(args: {
     await manager.warmQueryEmbedding(args.query)
     let results = manager.searchRelevant(args.spaceId, args.query, args.conversationId, limit)
 
-    if (results.length < 2) {
+    if (results.length < 2 && referencesPriorConversation(args.query)) {
       const recent = manager.getRecentFragments(args.spaceId, args.conversationId, limit)
       const seen = new Set(results.map((item) => item.id))
       for (const fragment of recent) {

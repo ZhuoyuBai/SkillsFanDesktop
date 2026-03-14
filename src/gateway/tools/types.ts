@@ -21,6 +21,27 @@ export interface BuildToolRegistryResult {
   effectiveAiBrowserEnabled: boolean
 }
 
+export interface RuntimeToolRuntimeView {
+  providerIds: string[]
+}
+
+export interface ClaudeSdkToolRuntimeView extends RuntimeToolRuntimeView {
+  mcpServers: Record<string, unknown>
+  addedMcpServers: string[]
+}
+
+export interface NativeToolRuntimeView extends RuntimeToolRuntimeView {
+  providers: ToolProviderDefinition[]
+  functionTools: NativeFunctionToolDefinition[]
+  sharedToolRegistryReady: boolean
+}
+
+export interface RuntimeToolBundle extends BuildToolRegistryResult {
+  workDir: string
+  claudeSdk: ClaudeSdkToolRuntimeView
+  native: NativeToolRuntimeView
+}
+
 export type ToolCatalogSource = 'built-in' | 'mcp'
 
 export type ToolCatalogCategory =

@@ -10,7 +10,7 @@ import { existsSync, readdirSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { ensureOpenAICompatRouter, encodeBackendConfig } from '../../openai-compat-router'
 import {
-  buildToolRegistry,
+  buildRuntimeToolBundle,
   getBlockedServerSideToolNames,
   getClaudeSdkBuiltInToolNames
 } from '../../../gateway/tools'
@@ -182,11 +182,10 @@ export async function buildSdkOptions(params: BuildSdkOptionsParams): Promise<{
   const additionalDirectories: string[] = config.additionalDirectories || []
 
   const {
-    mcpServers,
-    addedMcpServers,
+    claudeSdk,
     browserAutomationMode,
     effectiveAiBrowserEnabled
-  } = await buildToolRegistry({
+  } = await buildRuntimeToolBundle({
     config,
     workDir,
     spaceId,
@@ -262,13 +261,13 @@ export async function buildSdkOptions(params: BuildSdkOptionsParams): Promise<{
     // Enable file checkpointing for rewind support
     enableFileCheckpointing: true,
     ...(thinkingEnabled ? { thinking: { type: 'enabled' as const, budgetTokens: MAX_THINKING_TOKENS } } : {}),
-    ...(Object.keys(mcpServers).length > 0 ? { mcpServers } : {}),
+    ...(Object.keys(claudeSdk.mcpServers).length > 0 ? { mcpServers: claudeSdk.mcpServers } : {}),
     ...(agents ? { agents } : {}),
     ...(additionalDirectories.length > 0 ? { additionalDirectories } : {}),
     ...(config.maxBudgetUsd ? { maxBudgetUsd: config.maxBudgetUsd } : {})
   }
 
-  return { sdkOptions, addedMcpServers }
+  return { sdkOptions, addedMcpServers: claudeSdk.addedMcpServers }
 }
 
 /**

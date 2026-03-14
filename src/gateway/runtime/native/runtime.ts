@@ -2,18 +2,20 @@ import type { RuntimeEndpoint } from '../../../shared/types/ai-sources'
 import { addMessage, updateLastMessage } from '../../../main/services/conversation.service'
 import { getConfig } from '../../../main/services/config.service'
 import { hostRuntime } from '../../host-runtime'
-import type {
-  NativeFunctionToolDefinition,
-  ToolProviderDefinition
-} from '../../tools/types'
+import type { NativeFunctionToolDefinition, ToolProviderDefinition } from '../../tools/types'
 import type { AgentRuntime } from '../types'
 import {
   describeRuntimeSelectionForUser,
+  resolveRuntimeRequestSourceContext,
   resolveRuntimeSelection
 } from '../routing'
 import { listNativeRuntimeAdapters, resolveNativeRuntimeAdapter } from './adapters'
 import { resolveNativeProviderCapability } from './capabilities'
-import { executeNativePreparedRequest, NativeRuntimeUpstreamError } from './client'
+import {
+  executeNativePreparedRequest,
+  NativeRuntimeRequestTimeoutError,
+  NativeRuntimeUpstreamError
+} from './client'
 import {
   clearNativeActiveRun,
   getNativeActiveRun,
@@ -27,7 +29,11 @@ import {
 import { buildNativeRuntimeFollowupPreparedRequest } from './request'
 import { executeNativeFunctionTool } from './tool-executor'
 import { resolveNativeRuntimeTransportPlan, type NativeRuntimeTransportPlan } from './transport'
-import { describeNativeUpstreamError, getNativeUserFacingMessage } from './user-facing'
+import {
+  describeNativeUnsupportedInputKinds,
+  describeNativeUpstreamError,
+  getNativeUserFacingMessage
+} from './user-facing'
 import type {
   AgentRequest,
   Thought,
@@ -39,6 +45,7 @@ import type {
   NativeAdapterStage,
   NativeNormalizedToolCall,
   NativeNormalizedUsage,
+  NativeRuntimeReadinessReasonId,
   NativeSupportedApiType
 } from './types'
 
@@ -47,6 +54,7 @@ const MAX_NATIVE_TOOL_ROUNDTRIPS = 5
 export interface NativeRuntimeStatus {
   scaffolded: boolean
   ready: boolean
+  readinessReasonId: NativeRuntimeReadinessReasonId | null
   endpointSupported: boolean
   adapterResolved: boolean
   adapterStage: NativeAdapterStage | null
@@ -76,6 +84,7 @@ const DEFAULT_NATIVE_RUNTIME_ADAPTERS = listNativeRuntimeAdapters()
 const DEFAULT_NATIVE_RUNTIME_STATUS: NativeRuntimeStatus = {
   scaffolded: true,
   ready: false,
+  readinessReasonId: null,
   endpointSupported: false,
   adapterResolved: false,
   adapterStage: null,
@@ -126,7 +135,7 @@ export const nativeRuntime: AgentRuntime = {
     if (preparedRequest.unsupportedInputKinds.length > 0) {
       throw new Error(
         getNativeUserFacingMessage('unsupportedInputs', {
-          unsupportedKinds: preparedRequest.unsupportedInputKinds.join('、')
+          unsupportedKinds: describeNativeUnsupportedInputKinds(preparedRequest.unsupportedInputKinds)
         })
       )
     }
@@ -134,11 +143,22 @@ export const nativeRuntime: AgentRuntime = {
     const { spaceId, conversationId } = request
     const abortController = new AbortController()
     hostRuntimeSafeClearTask(conversationId)
-    const configuredMode = getConfig().runtime?.mode || 'claude-sdk'
+    const config = getConfig()
+    const configuredMode = config.runtime?.mode || 'claude-sdk'
+    const runtimeRequestSourceContext = resolveRuntimeRequestSourceContext({
+      request,
+      aiSources: config.aiSources,
+      fallbackModel: config.api?.model || null
+    })
     const runtimeSelection = resolveRuntimeSelection({
       configuredMode: configuredMode === 'claude-sdk' ? 'hybrid' : configuredMode,
       hasNativeRuntime: true,
-      request
+      request,
+      currentSource: runtimeRequestSourceContext.sourceId,
+      currentModel: runtimeRequestSourceContext.modelId,
+      nativePolicy: config.runtime?.nativeRollout,
+      nativeReadinessReasonId: 'ready',
+      nativeNote: getNativeUserFacingMessage('nativeRolloutReady')
     })
     const runtimeRoute = describeRuntimeSelectionForUser(runtimeSelection)
     registerNativeActiveRun({
@@ -306,9 +326,9 @@ export const nativeRuntime: AgentRuntime = {
           })
 
           toolOutputs.push({
-            type: 'function_call_output' as const,
-            call_id: toolCall.id,
-            output: result.outputText
+            toolCall,
+            outputText: result.outputText,
+            isError: result.isError
           })
         }
 
@@ -326,6 +346,7 @@ export const nativeRuntime: AgentRuntime = {
         currentPreparedRequest = buildNativeRuntimeFollowupPreparedRequest({
           preparedRequest: currentPreparedRequest,
           previousResponseId: finalResponse.responseId,
+          assistantResponseText: finalContent,
           toolOutputs
         })
       }
@@ -384,10 +405,16 @@ export function resolveNativeRuntimeStatus(
   const endpointSupported = capability.supported
   const sharedToolRegistryReady = nativeToolProviders.length > 0
   const ready = endpointSupported && sharedToolRegistryReady
+  const readinessReasonId = resolveNativeRuntimeReadinessReasonId({
+    capabilityReasonId: capability.reasonId,
+    sharedToolRegistryReady,
+    ready
+  })
 
   return {
     scaffolded: true,
     ready,
+    readinessReasonId,
     endpointSupported,
     adapterResolved: capability.adapterId !== null,
     adapterStage: capability.adapterStage,
@@ -400,7 +427,9 @@ export function resolveNativeRuntimeStatus(
     availableAdapterIds: DEFAULT_NATIVE_RUNTIME_ADAPTERS.map((adapter) => adapter.id),
     currentSource: endpoint?.source || endpoint?.requestedSource || null,
     currentProvider: endpoint?.provider || null,
-    currentApiType: endpoint?.apiType || null,
+    currentApiType: endpoint?.provider === 'anthropic'
+      ? 'messages'
+      : (endpoint?.apiType || null),
     sharedToolProviderIds: sharedToolProviders.map((provider) => provider.id),
     nativeToolProviderIds: nativeToolProviders.map((provider) => provider.id),
     adapterId: capability.adapterId,
@@ -431,6 +460,26 @@ function resolveNativeRuntimeNote(params: {
   }
 
   return params.capabilityReason
+}
+
+function resolveNativeRuntimeReadinessReasonId(params: {
+  capabilityReasonId: ReturnType<typeof resolveNativeProviderCapability>['reasonId']
+  sharedToolRegistryReady: boolean
+  ready: boolean
+}): NativeRuntimeReadinessReasonId {
+  if (params.ready) {
+    return 'ready'
+  }
+
+  if (!params.sharedToolRegistryReady) {
+    return 'shared-tools-missing'
+  }
+
+  if (params.capabilityReasonId === 'supported') {
+    return 'ready'
+  }
+
+  return params.capabilityReasonId
 }
 
 function resolveSupportedProviders(): string[] {
@@ -538,10 +587,10 @@ async function resolveNativeSharedToolContext(request: Pick<AgentRequest, 'space
 }> {
   const config = getConfig()
   const { getWorkingDir } = await import('../../../main/services/agent/helpers')
-  const { buildToolRegistry, buildNativeFunctionToolDefinitions } = await import('../../tools')
+  const { buildRuntimeToolBundle } = await import('../../tools')
 
   const workDir = request.ralphMode?.projectDir || getWorkingDir(request.spaceId)
-  const registry = await buildToolRegistry({
+  const bundle = await buildRuntimeToolBundle({
     conversationId: request.conversationId,
     spaceId: request.spaceId,
     workDir,
@@ -552,14 +601,10 @@ async function resolveNativeSharedToolContext(request: Pick<AgentRequest, 'space
   })
 
   return {
-    mcpServers: registry.mcpServers,
-    providers: registry.providers,
+    mcpServers: bundle.claudeSdk.mcpServers,
+    providers: bundle.native.providers,
     workDir,
-    nativeFunctionTools: buildNativeFunctionToolDefinitions({
-      mcpServers: registry.mcpServers,
-      providers: registry.providers,
-      directory: registry.directory
-    })
+    nativeFunctionTools: bundle.native.functionTools
   }
 }
 
@@ -620,6 +665,14 @@ function normalizeNativeSendError(error: unknown): { message: string; errorCode?
         fallbackMessage: error.message
       }),
       errorCode: error.statusCode
+    }
+  }
+
+  if (error instanceof NativeRuntimeRequestTimeoutError) {
+    return {
+      message: getNativeUserFacingMessage('requestTimedOut', {
+        minutes: Math.max(1, Math.round(error.timeoutMs / 60_000))
+      })
     }
   }
 

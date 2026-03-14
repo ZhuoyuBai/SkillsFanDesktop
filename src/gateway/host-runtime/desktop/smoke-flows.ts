@@ -559,6 +559,93 @@ async function runChromeDiscoveryRoundtrip(args: {
   return `${application} discovery roundtrip passed.`
 }
 
+async function runFinderNavigationRoundtrip(args: {
+  workDir: string
+  steps: DesktopSmokeFlowExecutionStep[]
+}): Promise<string> {
+  const openHomeExecution = await executeSmokeFlowMethod({
+    steps: args.steps,
+    workDir: args.workDir,
+    adapterId: 'finder',
+    methodId: 'finder.open_home_folder',
+    application: 'Finder',
+    timeoutMs: 8_000
+  })
+  if (!isMethodExecutionSuccessful(openHomeExecution)) {
+    throw createRunError(openHomeExecution)
+  }
+
+  const revealExecution = await executeSmokeFlowMethod({
+    steps: args.steps,
+    workDir: args.workDir,
+    adapterId: 'finder',
+    methodId: 'finder.reveal_path',
+    application: 'Finder',
+    target: args.workDir,
+    timeoutMs: 8_000
+  })
+  if (!isMethodExecutionSuccessful(revealExecution)) {
+    throw createRunError(revealExecution)
+  }
+
+  const newWindowExecution = await executeSmokeFlowMethod({
+    steps: args.steps,
+    workDir: args.workDir,
+    adapterId: 'finder',
+    methodId: 'finder.new_window',
+    application: 'Finder',
+    timeoutMs: 8_000
+  })
+  if (!isMethodExecutionSuccessful(newWindowExecution)) {
+    throw createRunError(newWindowExecution)
+  }
+
+  return 'Finder navigation roundtrip passed.'
+}
+
+async function runSkillsFanSettingsRoundtrip(args: {
+  workDir: string
+  steps: DesktopSmokeFlowExecutionStep[]
+}): Promise<string> {
+  const focusExecution = await executeSmokeFlowMethod({
+    steps: args.steps,
+    workDir: args.workDir,
+    adapterId: 'skillsfan',
+    methodId: 'skillsfan.focus_main_window',
+    application: 'SkillsFan',
+    timeoutMs: 8_000
+  })
+  if (!isMethodExecutionSuccessful(focusExecution)) {
+    throw createRunError(focusExecution)
+  }
+
+  const openSettingsExecution = await executeSmokeFlowMethod({
+    steps: args.steps,
+    workDir: args.workDir,
+    adapterId: 'skillsfan',
+    methodId: 'skillsfan.open_settings',
+    application: 'SkillsFan',
+    timeoutMs: 8_000
+  })
+  if (!isMethodExecutionSuccessful(openSettingsExecution)) {
+    throw createRunError(openSettingsExecution)
+  }
+
+  const refocusExecution = await executeSmokeFlowMethod({
+    steps: args.steps,
+    workDir: args.workDir,
+    adapterId: 'skillsfan',
+    methodId: 'skillsfan.focus_main_window',
+    application: 'SkillsFan',
+    timeoutMs: 8_000
+  })
+  if (!isMethodExecutionSuccessful(refocusExecution)) {
+    throw createRunError(refocusExecution)
+  }
+
+  return 'SkillsFan settings roundtrip passed.'
+}
+
 export function getDesktopSmokeFlowRunSnapshot(flowId: string): DesktopSmokeFlowExecutionResult | null {
   const value = smokeFlowRuns.get(flowId)
   return value ? cloneRun(value) : null
@@ -611,6 +698,12 @@ export async function runDesktopSmokeFlow(args: {
         break
       case 'chrome.discovery-roundtrip':
         summary = await runChromeDiscoveryRoundtrip({ workDir, steps })
+        break
+      case 'finder.navigation-roundtrip':
+        summary = await runFinderNavigationRoundtrip({ workDir, steps })
+        break
+      case 'skillsfan.settings-roundtrip':
+        summary = await runSkillsFanSettingsRoundtrip({ workDir, steps })
         break
       default:
         throw new Error(`Desktop smoke flow ${args.flowId} is not executable yet.`)

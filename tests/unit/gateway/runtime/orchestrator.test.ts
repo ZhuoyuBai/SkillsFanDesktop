@@ -58,7 +58,9 @@ describe('runtime orchestrator', () => {
     mocks.syncNativeRuntimeRegistration.mockImplementation(() => ({
       enabled: false,
       status: {
-        ready: false
+        ready: false,
+        readinessReasonId: 'adapter-unavailable',
+        note: 'The current model is not in the automatic handling range yet.'
       }
     }))
     mocks.getConfig.mockReturnValue({
@@ -123,7 +125,7 @@ describe('runtime orchestrator', () => {
       request
     })
     expect(consoleWarnSpy).toHaveBeenCalledWith(
-      '[Runtime] runtime.mode="native" is configured, but no native runtime is registered. Falling back to claude-sdk. (runtime.mode prefers native, but no native runtime is registered)'
+      '[Runtime] runtime.mode="native" is configured, but no native runtime is registered. Falling back to claude-sdk. (runtime.mode prefers native, but it is currently held back (The current model is not in the automatic handling range yet.))'
     )
   })
 

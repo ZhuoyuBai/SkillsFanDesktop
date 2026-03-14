@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
-import { executeNativePreparedRequest, NativeRuntimeUpstreamError } from '../../../../src/gateway/runtime/native/client'
+import {
+  executeNativePreparedRequest,
+  NativeRuntimeRequestTimeoutError,
+  NativeRuntimeUpstreamError
+} from '../../../../src/gateway/runtime/native/client'
 import { getNativeRuntimeAdapter } from '../../../../src/gateway/runtime/native/adapters'
 import { getNativeUserFacingMessage } from '../../../../src/gateway/runtime/native/user-facing'
 
@@ -171,8 +175,65 @@ describe('native runtime upstream client', () => {
     })
 
     expect(fetchImpl).toHaveBeenCalledWith(preparedRequest.url, expect.objectContaining({
-      signal: controller.signal
+      signal: expect.any(AbortSignal)
     }))
+  })
+
+  it('turns a timed-out upstream request into a typed native timeout error', async () => {
+    vi.useFakeTimers()
+    try {
+      const adapter = getNativeRuntimeAdapter('anthropic-messages')
+      expect(adapter).not.toBeNull()
+
+      const preparedRequest = adapter!.prepareRequest({
+        mainWindow: null,
+        endpoint: {
+          requestedSource: 'kimi',
+          source: 'kimi',
+          authMode: 'api-key',
+          provider: 'anthropic',
+          baseUrl: 'https://api.moonshot.cn/anthropic',
+          apiKey: 'key',
+          model: 'kimi-k2-thinking',
+          apiType: undefined
+        },
+        sharedToolProviders: [],
+        request: {
+          spaceId: 'space-timeout',
+          conversationId: 'conv-timeout',
+          message: 'Hello'
+        } as any
+      })
+
+      const timedRequest = {
+        ...preparedRequest,
+        requestTimeoutMs: 50
+      }
+
+      const fetchImpl = vi.fn<typeof fetch>((_url, init) => new Promise((_, reject) => {
+        const signal = init?.signal as AbortSignal
+        signal.addEventListener('abort', () => {
+          reject(new DOMException('Aborted', 'AbortError'))
+        }, { once: true })
+      }))
+
+      const promise = executeNativePreparedRequest({
+        preparedRequest: timedRequest,
+        adapter: adapter!,
+        options: { fetchImpl }
+      })
+      const capturedError = promise.then(() => null, (caught) => caught)
+
+      await vi.advanceTimersByTimeAsync(60)
+
+      const error = await capturedError
+      expect(error).toBeInstanceOf(NativeRuntimeRequestTimeoutError)
+      expect(error).toEqual(expect.objectContaining({
+        timeoutMs: 50
+      }))
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('executes a streaming prepared request and emits normalized stream events', async () => {

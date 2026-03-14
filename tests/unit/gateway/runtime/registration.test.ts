@@ -75,11 +75,11 @@ describe('native runtime registration', () => {
       requestedSource: 'custom',
       source: 'custom',
       authMode: 'api-key',
-      provider: 'anthropic',
-      baseUrl: 'https://api.anthropic.com/v1/messages',
+      provider: 'openai',
+      baseUrl: 'https://api.openai.com/v1/chat/completions',
       apiKey: 'key',
-      model: 'claude-sonnet',
-      apiType: undefined
+      model: 'gpt-4.1',
+      apiType: 'chat_completions'
     })
 
     const registerRuntime = vi.fn()

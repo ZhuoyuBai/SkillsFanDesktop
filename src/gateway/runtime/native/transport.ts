@@ -5,14 +5,15 @@ import type { NativeAdapterId } from './types'
 export interface NativeRuntimeTransportPlan {
   adapterId: NativeAdapterId
   endpointUrl: string
-  apiType: 'responses'
+  requestTimeoutMs: number
+  apiType: 'responses' | 'messages'
   defaultTransport: 'auto'
   supportsWebSocket: boolean
   websocketWarmup: boolean
   storePolicy: 'force-true' | 'force-false'
   serverCompactionCapable: boolean
   serverCompactionDefault: boolean
-  authHeaderMode: 'bearer'
+  authHeaderMode: 'bearer' | 'x-api-key'
   extraHeaderKeys: string[]
   note: string
 }
@@ -41,6 +42,22 @@ function isAzureOpenAIResponsesBaseUrl(baseUrl: string): boolean {
   }
 }
 
+const DEFAULT_NATIVE_REQUEST_TIMEOUT_MS = 5 * 60_000
+const DEEPSEEK_NATIVE_REQUEST_TIMEOUT_MS = 10 * 60_000
+
+function isDeepSeekSource(endpoint: RuntimeEndpoint): boolean {
+  const source = (endpoint.source || endpoint.requestedSource || '').toLowerCase()
+  if (source === 'deepseek') {
+    return true
+  }
+
+  try {
+    return new URL(endpoint.baseUrl).hostname.toLowerCase() === 'api.deepseek.com'
+  } catch {
+    return endpoint.baseUrl.toLowerCase().includes('api.deepseek.com')
+  }
+}
+
 export function resolveNativeRuntimeTransportPlan(
   endpoint?: RuntimeEndpoint | null
 ): NativeRuntimeTransportResolution {
@@ -63,6 +80,7 @@ export function resolveNativeRuntimeTransportPlan(
       plan: {
         adapterId: adapter.id,
         endpointUrl: endpoint.baseUrl,
+        requestTimeoutMs: DEFAULT_NATIVE_REQUEST_TIMEOUT_MS,
         apiType: 'responses',
         defaultTransport: 'auto',
         supportsWebSocket: true,
@@ -85,6 +103,7 @@ export function resolveNativeRuntimeTransportPlan(
       plan: {
         adapterId: adapter.id,
         endpointUrl: endpoint.baseUrl,
+        requestTimeoutMs: DEFAULT_NATIVE_REQUEST_TIMEOUT_MS,
         apiType: 'responses',
         defaultTransport: 'auto',
         supportsWebSocket: true,
@@ -97,6 +116,29 @@ export function resolveNativeRuntimeTransportPlan(
         note: 'OpenAI Codex Responses uses auto transport, disables warmup by default, and forces store=false.'
       },
       reason: 'Transport plan resolved for the OpenAI Codex Responses adapter.'
+    }
+  }
+
+  if (adapter.id === 'anthropic-messages') {
+    return {
+      plan: {
+        adapterId: adapter.id,
+        endpointUrl: `${endpoint.baseUrl.replace(/\/$/, '')}/v1/messages`,
+        requestTimeoutMs: isDeepSeekSource(endpoint)
+          ? DEEPSEEK_NATIVE_REQUEST_TIMEOUT_MS
+          : DEFAULT_NATIVE_REQUEST_TIMEOUT_MS,
+        apiType: 'messages',
+        defaultTransport: 'auto',
+        supportsWebSocket: false,
+        websocketWarmup: false,
+        storePolicy: 'force-false',
+        serverCompactionCapable: false,
+        serverCompactionDefault: false,
+        authHeaderMode: 'x-api-key',
+        extraHeaderKeys: Object.keys(endpoint.headers || {}),
+        note: 'Anthropic-compatible Messages uses direct HTTPS requests, disables warmup, and keeps tool roundtrips on the messages endpoint.'
+      },
+      reason: 'Transport plan resolved for the Anthropic Messages adapter.'
     }
   }
 

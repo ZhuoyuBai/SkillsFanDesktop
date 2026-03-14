@@ -18,6 +18,7 @@ describe('native runtime transport plan', () => {
     expect(resolution.plan).toEqual({
       adapterId: 'openai-responses',
       endpointUrl: 'https://api.openai.com/v1/responses',
+      requestTimeoutMs: 300000,
       apiType: 'responses',
       defaultTransport: 'auto',
       supportsWebSocket: true,
@@ -49,6 +50,7 @@ describe('native runtime transport plan', () => {
     expect(resolution.plan).toEqual({
       adapterId: 'openai-codex-responses',
       endpointUrl: 'https://chatgpt.com/backend-api/codex/responses',
+      requestTimeoutMs: 300000,
       apiType: 'responses',
       defaultTransport: 'auto',
       supportsWebSocket: true,
@@ -60,6 +62,54 @@ describe('native runtime transport plan', () => {
       extraHeaderKeys: ['ChatGPT-Account-ID'],
       note: 'OpenAI Codex Responses uses auto transport, disables warmup by default, and forces store=false.'
     })
+  })
+
+  it('builds the anthropic-compatible messages transport plan for current zhipu/minimax-style custom sources', () => {
+    const resolution = resolveNativeRuntimeTransportPlan({
+      requestedSource: 'zhipu',
+      source: 'zhipu',
+      authMode: 'api-key',
+      provider: 'anthropic',
+      baseUrl: 'https://open.bigmodel.cn/api/anthropic',
+      apiKey: 'key',
+      model: 'GLM-5',
+      apiType: undefined
+    })
+
+    expect(resolution.plan).toEqual({
+      adapterId: 'anthropic-messages',
+      endpointUrl: 'https://open.bigmodel.cn/api/anthropic/v1/messages',
+      requestTimeoutMs: 300000,
+      apiType: 'messages',
+      defaultTransport: 'auto',
+      supportsWebSocket: false,
+      websocketWarmup: false,
+      storePolicy: 'force-false',
+      serverCompactionCapable: false,
+      serverCompactionDefault: false,
+      authHeaderMode: 'x-api-key',
+      extraHeaderKeys: [],
+      note: 'Anthropic-compatible Messages uses direct HTTPS requests, disables warmup, and keeps tool roundtrips on the messages endpoint.'
+    })
+  })
+
+  it('uses a longer timeout for deepseek anthropic-compatible requests', () => {
+    const resolution = resolveNativeRuntimeTransportPlan({
+      requestedSource: 'deepseek',
+      source: 'deepseek',
+      authMode: 'api-key',
+      provider: 'anthropic',
+      baseUrl: 'https://api.deepseek.com/anthropic',
+      apiKey: 'key',
+      model: 'DeepSeek-V3.2',
+      apiType: undefined
+    })
+
+    expect(resolution.plan).toEqual(expect.objectContaining({
+      adapterId: 'anthropic-messages',
+      endpointUrl: 'https://api.deepseek.com/anthropic/v1/messages',
+      requestTimeoutMs: 600000
+    }))
   })
 
   it('does not build a transport plan for providers outside the explicit v1 scope', () => {

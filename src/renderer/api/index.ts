@@ -627,7 +627,7 @@ export const api = {
   },
 
   runGatewayRuntimeRolloutTrial: async (
-    targetId?: 'all' | 'chat-simple' | 'browser-simple' | 'terminal-simple'
+    targetId?: 'all' | 'chat-simple' | 'browser-simple' | 'terminal-simple' | 'finder-simple' | 'skillsfan-simple'
   ): Promise<ApiResponse> => {
     if (!isElectron()) {
       return { success: false, error: i18n.t('This feature is only available in the desktop app') }

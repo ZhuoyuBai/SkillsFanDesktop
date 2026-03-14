@@ -31,6 +31,7 @@ describe('native runtime scaffold', () => {
     expect(status).toEqual({
       scaffolded: true,
       ready: false,
+      readinessReasonId: null,
       endpointSupported: false,
       adapterResolved: false,
       adapterStage: null,
@@ -38,9 +39,9 @@ describe('native runtime scaffold', () => {
       providerNativeExecution: false,
       sharedToolRegistryReady: true,
       taskRoutingReady: true,
-      supportedProviders: ['openai', 'openai-codex'],
-      supportedApiTypes: ['responses'],
-      availableAdapterIds: ['openai-responses', 'openai-codex-responses'],
+      supportedProviders: ['anthropic', 'openai', 'openai-codex'],
+      supportedApiTypes: ['messages', 'responses'],
+      availableAdapterIds: ['anthropic-messages', 'openai-responses', 'openai-codex-responses'],
       currentSource: null,
       currentProvider: null,
       currentApiType: null,
@@ -91,7 +92,7 @@ describe('native runtime scaffold', () => {
     expect(getNativeRuntimeStatus()).toEqual(expect.objectContaining({
       ready: false,
       providerNativeExecution: false,
-      supportedProviders: ['openai', 'openai-codex']
+      supportedProviders: ['anthropic', 'openai', 'openai-codex']
     }))
   })
 
@@ -127,6 +128,7 @@ describe('native runtime scaffold', () => {
 
     expect(status).toEqual(expect.objectContaining({
       ready: true,
+      readinessReasonId: 'ready',
       endpointSupported: true,
       adapterResolved: true,
       adapterStage: 'ready',
@@ -134,13 +136,14 @@ describe('native runtime scaffold', () => {
       currentSource: 'openai-codex',
       currentProvider: 'oauth',
       currentApiType: 'responses',
-      availableAdapterIds: ['openai-responses', 'openai-codex-responses'],
+      availableAdapterIds: ['anthropic-messages', 'openai-responses', 'openai-codex-responses'],
       sharedToolProviderIds: ['local-tools', 'skill'],
       nativeToolProviderIds: ['local-tools'],
       adapterId: 'openai-codex-responses',
       transport: {
         adapterId: 'openai-codex-responses',
         endpointUrl: 'https://chatgpt.com/backend-api/codex/responses',
+        requestTimeoutMs: 300000,
         apiType: 'responses',
         defaultTransport: 'auto',
         supportsWebSocket: true,
@@ -159,16 +162,16 @@ describe('native runtime scaffold', () => {
     expect(status.note).toBe(getNativeUserFacingMessage('codexReady'))
   })
 
-  it('keeps native runtime unready when the current endpoint is not an OpenAI-family Responses endpoint', () => {
+  it('marks native runtime as ready for anthropic-compatible custom sources with shared native tools', () => {
     const status = resolveNativeRuntimeStatus({
       endpoint: {
-        requestedSource: 'custom',
-        source: 'custom',
+        requestedSource: 'zhipu',
+        source: 'zhipu',
         authMode: 'api-key',
         provider: 'anthropic',
-        baseUrl: 'https://api.anthropic.com',
+        baseUrl: 'https://open.bigmodel.cn/api/anthropic',
         apiKey: 'key',
-        model: 'claude-sonnet',
+        model: 'GLM-5',
         apiType: undefined
       },
       sharedToolProviders: [
@@ -183,15 +186,53 @@ describe('native runtime scaffold', () => {
     })
 
     expect(status).toEqual(expect.objectContaining({
-      ready: false,
-      endpointSupported: false,
+      ready: true,
+      readinessReasonId: 'ready',
+      endpointSupported: true,
       currentProvider: 'anthropic',
-      adapterId: null
+      currentApiType: 'messages',
+      adapterId: 'anthropic-messages',
+      transport: {
+        adapterId: 'anthropic-messages',
+        endpointUrl: 'https://open.bigmodel.cn/api/anthropic/v1/messages',
+        requestTimeoutMs: 300000,
+        apiType: 'messages',
+        defaultTransport: 'auto',
+        supportsWebSocket: false,
+        websocketWarmup: false,
+        storePolicy: 'force-false',
+        serverCompactionCapable: false,
+        serverCompactionDefault: false,
+        authHeaderMode: 'x-api-key',
+        extraHeaderKeys: [],
+        note: 'Anthropic-compatible Messages uses direct HTTPS requests, disables warmup, and keeps tool roundtrips on the messages endpoint.'
+      }
     }))
-    expect(status.note).toBe(getNativeUserFacingMessage('requiresResponses'))
+    expect(status.note).toBe(getNativeUserFacingMessage('anthropicReady'))
   })
 
   it('derives provider capability contracts for OpenAI Responses and Codex Responses', () => {
+    expect(resolveNativeProviderCapability({
+      requestedSource: 'zhipu',
+      source: 'zhipu',
+      authMode: 'api-key',
+      provider: 'anthropic',
+      baseUrl: 'https://open.bigmodel.cn/api/anthropic',
+      apiKey: 'key',
+      model: 'GLM-5',
+      apiType: undefined
+    })).toEqual({
+      supported: true,
+      reasonId: 'supported',
+      adapterId: 'anthropic-messages',
+      adapterStage: 'ready',
+      providerNativeExecution: true,
+      supportsStreaming: false,
+      supportsToolCalls: true,
+      supportsUsage: true,
+      reason: getNativeUserFacingMessage('anthropicReady')
+    })
+
     expect(resolveNativeProviderCapability({
       requestedSource: 'custom',
       source: 'custom',
@@ -203,6 +244,7 @@ describe('native runtime scaffold', () => {
       apiType: 'responses'
     })).toEqual({
       supported: true,
+      reasonId: 'supported',
       adapterId: 'openai-responses',
       adapterStage: 'ready',
       providerNativeExecution: true,
@@ -223,6 +265,7 @@ describe('native runtime scaffold', () => {
       apiType: 'responses'
     })).toEqual({
       supported: true,
+      reasonId: 'supported',
       adapterId: 'openai-codex-responses',
       adapterStage: 'ready',
       providerNativeExecution: true,

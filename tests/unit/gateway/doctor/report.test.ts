@@ -37,8 +37,8 @@ const mocks = vi.hoisted(() => ({
       hybridTaskRouting: true,
       rollout: {
         phase: 'first-batch',
-        includedScopes: ['chat-simple', 'browser-simple', 'terminal-simple'],
-        excludedScopes: ['skills', 'agent-team', 'long-workflow', 'pdf-text-attachments'],
+        includedScopes: ['chat-simple', 'browser-simple', 'terminal-simple', 'finder-simple', 'skillsfan-simple'],
+        excludedScopes: ['skills', 'agent-team', 'long-workflow', 'pdf-text-attachments', 'provider-model-policy'],
         simpleTasksCanUseNative: false,
         note: 'The existing route is still the only route in use, so the new route is not taking over yet.',
         validation: []
@@ -46,6 +46,7 @@ const mocks = vi.hoisted(() => ({
       native: {
         scaffolded: true,
         ready: false,
+        readinessReasonId: 'no-endpoint',
         endpointSupported: false,
         adapterResolved: false,
         adapterStage: null,
@@ -53,9 +54,9 @@ const mocks = vi.hoisted(() => ({
         providerNativeExecution: false,
         sharedToolRegistryReady: true,
         taskRoutingReady: true,
-        supportedProviders: ['openai', 'openai-codex'],
-        supportedApiTypes: ['responses'],
-        availableAdapterIds: ['openai-responses', 'openai-codex-responses'],
+        supportedProviders: ['anthropic', 'openai', 'openai-codex'],
+        supportedApiTypes: ['messages', 'responses'],
+        availableAdapterIds: ['anthropic-messages', 'openai-responses', 'openai-codex-responses'],
         currentSource: null,
         currentProvider: null,
         currentApiType: null,

@@ -17,6 +17,7 @@ interface SelectProps<T extends string | number = string> {
   placeholder?: string
   disabled?: boolean
   header?: string
+  showCheck?: boolean
 }
 
 const triggerStyles = {
@@ -33,7 +34,8 @@ export function Select<T extends string | number = string>({
   className,
   placeholder,
   disabled = false,
-  header
+  header,
+  showCheck = true
 }: SelectProps<T>) {
   const [isOpen, setIsOpen] = useState(false)
   const [highlightedIndex, setHighlightedIndex] = useState(-1)
@@ -227,12 +229,14 @@ export function Select<T extends string | number = string>({
                 option.disabled && 'opacity-40 cursor-not-allowed'
               )}
             >
-              <Check
-                className={cn(
-                  'flex-shrink-0 w-3.5 h-3.5',
-                  option.value === value ? 'opacity-100' : 'opacity-0'
-                )}
-              />
+              {showCheck && (
+                <Check
+                  className={cn(
+                    'flex-shrink-0 w-3.5 h-3.5',
+                    option.value === value ? 'opacity-100' : 'opacity-0'
+                  )}
+                />
+              )}
               <span className="truncate">{option.label}</span>
             </div>
           ))}

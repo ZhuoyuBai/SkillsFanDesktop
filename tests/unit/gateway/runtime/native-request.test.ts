@@ -86,7 +86,8 @@ describe('native runtime request builder', () => {
       'Content-Type': 'application/json',
       'X-Test-Header': 'value'
     }))
-    expect(prepared.body).toEqual(expect.objectContaining({
+    const openAIBody = prepared.body as any
+    expect(openAIBody).toEqual(expect.objectContaining({
       model: 'gpt-5.4',
       stream: true,
       stream_options: { include_usage: true },
@@ -122,7 +123,7 @@ describe('native runtime request builder', () => {
         skillsfan_tool_provider_ids: 'local-tools'
       })
     }))
-    expect(prepared.body.input).toEqual([
+    expect(openAIBody.input).toEqual([
       {
         role: 'developer',
         content: expect.stringContaining('Use concise output.')
@@ -231,7 +232,8 @@ describe('native runtime request builder', () => {
       }
     ])
     expect(prepared.unsupportedInputKinds).toEqual(['pdf-attachment', 'text-attachment'])
-    expect(prepared.body).toEqual(expect.objectContaining({
+    const codexBody = prepared.body as any
+    expect(codexBody).toEqual(expect.objectContaining({
       store: false,
       model: 'gpt-5.4',
       tools: [
@@ -283,24 +285,31 @@ describe('native runtime request builder', () => {
     const followup = buildNativeRuntimeFollowupPreparedRequest({
       preparedRequest: initial,
       previousResponseId: 'resp_123',
+      assistantResponseText: '',
       toolOutputs: [
         {
-          type: 'function_call_output',
-          call_id: 'call_1',
-          output: 'tool ok'
+          toolCall: {
+            id: 'call_1',
+            name: 'chrome_list_tabs',
+            argumentsText: '{"windowIndex":0}',
+            status: 'completed'
+          },
+          outputText: 'tool ok',
+          isError: false
         }
       ]
     })
 
-    expect(followup.body.previous_response_id).toBe('resp_123')
-    expect(followup.body.input).toEqual([
+    const followupResponsesBody = followup.body as any
+    expect(followupResponsesBody.previous_response_id).toBe('resp_123')
+    expect(followupResponsesBody.input).toEqual([
       {
         type: 'function_call_output',
         call_id: 'call_1',
         output: 'tool ok'
       }
     ])
-    expect(followup.body.model).toBe('gpt-5.4')
+    expect(followupResponsesBody.model).toBe('gpt-5.4')
     expect(followup.nativeTools).toEqual(initial.nativeTools)
   })
 
@@ -353,7 +362,8 @@ describe('native runtime request builder', () => {
       } as any
     })
 
-    expect(prepared.body.tools).toEqual([
+    const askUserBody = prepared.body as any
+    expect(askUserBody.tools).toEqual([
       {
         type: 'function',
         name: 'app__ask_user_question',
@@ -369,9 +379,195 @@ describe('native runtime request builder', () => {
         strict: false
       }
     ])
-    expect(prepared.body.input[0]).toEqual({
+    expect(askUserBody.input[0]).toEqual({
       role: 'developer',
       content: 'If one important detail is still unclear, call app__ask_user_question before guessing. Ask only one short, simple question at a time, avoid technical wording, and give up to three clear choices whenever possible.'
     })
+  })
+
+  it('builds an anthropic-compatible request and follow-up for configured custom sources like zhipu/minimax', () => {
+    const adapter = getNativeRuntimeAdapter('anthropic-messages')
+    expect(adapter).not.toBeNull()
+
+    const prepared = adapter!.prepareRequest({
+      mainWindow: null,
+      endpoint: {
+        requestedSource: 'zhipu',
+        source: 'zhipu',
+        authMode: 'api-key',
+        provider: 'anthropic',
+        baseUrl: 'https://open.bigmodel.cn/api/anthropic',
+        apiKey: 'glm-key',
+        model: 'GLM-5',
+        apiType: undefined
+      },
+      sharedToolProviders: [
+        {
+          id: 'local-tools',
+          kind: 'mcp',
+          source: 'app',
+          description: 'local tools',
+          runtimeKinds: ['claude-sdk', 'native']
+        }
+      ],
+      nativeFunctionTools: [
+        {
+          name: 'mcp__local-tools__terminal_run_command',
+          providerId: 'local-tools',
+          sourceToolName: 'terminal_run_command',
+          description: 'Run a terminal command.',
+          parameters: {
+            type: 'object',
+            properties: {
+              command: { type: 'string' }
+            },
+            required: ['command'],
+            additionalProperties: false
+          },
+          strict: false
+        }
+      ],
+      request: {
+        spaceId: 'space-zhipu',
+        conversationId: 'conversation-zhipu',
+        message: 'Open iTerm and run pwd.',
+        messagePrefix: 'Keep the reply short.',
+        thinkingEffort: 'high'
+      } as any
+    })
+
+    expect(prepared).toEqual(expect.objectContaining({
+      adapterId: 'anthropic-messages',
+      method: 'POST',
+      url: 'https://open.bigmodel.cn/api/anthropic/v1/messages',
+      requestTimeoutMs: 300000,
+      stream: false,
+      toolProviderIds: ['local-tools'],
+      unsupportedInputKinds: []
+    }))
+    expect(prepared.headers).toEqual(expect.objectContaining({
+      'x-api-key': 'glm-key',
+      'anthropic-version': '2023-06-01',
+      'Content-Type': 'application/json'
+    }))
+    const anthropicBody = prepared.body as any
+    expect(anthropicBody).toEqual(expect.objectContaining({
+      model: 'GLM-5',
+      max_tokens: 8192,
+      tool_choice: { type: 'auto' },
+      metadata: expect.objectContaining({
+        skillsfan_native_adapter: 'anthropic-messages',
+        skillsfan_tool_provider_ids: 'local-tools'
+      })
+    }))
+    expect(anthropicBody.messages).toEqual([
+      {
+        role: 'user',
+        content: 'Open iTerm and run pwd.'
+      }
+    ])
+
+    const followup = buildNativeRuntimeFollowupPreparedRequest({
+      preparedRequest: prepared,
+      previousResponseId: 'msg_123',
+      assistantResponseText: 'I need to run a tool first.',
+      toolOutputs: [
+        {
+          toolCall: {
+            id: 'toolu_1',
+            name: 'mcp__local-tools__terminal_run_command',
+            argumentsText: '{"command":"pwd"}',
+            status: 'completed'
+          },
+          outputText: '/Users/zhuoyu',
+          isError: false
+        }
+      ]
+    })
+
+    const anthropicFollowupBody = followup.body as any
+    expect(anthropicFollowupBody.messages).toEqual([
+      {
+        role: 'user',
+        content: 'Open iTerm and run pwd.'
+      },
+      {
+        role: 'assistant',
+        content: [
+          {
+            type: 'text',
+            text: 'I need to run a tool first.'
+          },
+          {
+            type: 'tool_use',
+            id: 'toolu_1',
+            name: 'mcp__local-tools__terminal_run_command',
+            input: {
+              command: 'pwd'
+            }
+          }
+        ]
+      },
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'tool_result',
+            tool_use_id: 'toolu_1',
+            content: '/Users/zhuoyu',
+            is_error: false
+          }
+        ]
+      }
+    ])
+  })
+
+  it('blocks deepseek anthropic-compatible image inputs before sending upstream', () => {
+    const adapter = getNativeRuntimeAdapter('anthropic-messages')
+    expect(adapter).not.toBeNull()
+
+    const prepared = adapter!.prepareRequest({
+      mainWindow: null,
+      endpoint: {
+        requestedSource: 'deepseek',
+        source: 'deepseek',
+        authMode: 'api-key',
+        provider: 'anthropic',
+        baseUrl: 'https://api.deepseek.com/anthropic',
+        apiKey: 'deepseek-key',
+        model: 'DeepSeek-V3.2',
+        apiType: undefined
+      },
+      sharedToolProviders: [],
+      nativeFunctionTools: [],
+      request: {
+        spaceId: 'space-deepseek',
+        conversationId: 'conversation-deepseek',
+        message: 'Describe this screenshot.',
+        images: [
+          {
+            id: 'img-1',
+            type: 'image',
+            mediaType: 'image/png',
+            data: 'Zm9v'
+          }
+        ]
+      } as any
+    })
+
+    expect(prepared).toEqual(expect.objectContaining({
+      adapterId: 'anthropic-messages',
+      requestTimeoutMs: 600000,
+      unsupportedInputKinds: ['image-input']
+    }))
+    expect((prepared.body as any).messages).toEqual([
+      {
+        role: 'user',
+        content: 'Describe this screenshot.'
+      }
+    ])
+    expect((prepared.body as any).metadata).toEqual(expect.objectContaining({
+      skillsfan_unsupported_inputs: 'image-input'
+    }))
   })
 })

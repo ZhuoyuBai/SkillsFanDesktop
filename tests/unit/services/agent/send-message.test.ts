@@ -26,7 +26,13 @@ const mocks = vi.hoisted(() => ({
   buildCompactionPrompt: vi.fn(),
   getCompactionStatus: vi.fn(),
   clearCompactionState: vi.fn(),
-  clearHostSteps: vi.fn()
+  clearHostSteps: vi.fn(),
+  memoryManager: {
+    enabled: true,
+    warmQueryEmbedding: vi.fn(async () => {}),
+    searchRelevant: vi.fn(() => []),
+    getRecentFragments: vi.fn(() => [])
+  }
 }))
 
 vi.mock('../../../../src/main/services/agent/lane-queue', () => ({
@@ -130,10 +136,7 @@ vi.mock('../../../../src/main/services/agent/compaction-monitor', () => ({
 }))
 
 vi.mock('../../../../src/main/services/memory', () => ({
-  getMemoryIndexManager: vi.fn(() => ({
-    searchRelevant: vi.fn(async () => []),
-    add: vi.fn(async () => {})
-  }))
+  getMemoryIndexManager: vi.fn(() => mocks.memoryManager)
 }))
 
 vi.mock('../../../../src/gateway/host-runtime', () => ({
@@ -155,6 +158,7 @@ describe('send-message', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    mocks.memoryManager.enabled = true
     mocks.getStatus.mockReturnValue({ running: false, queued: 0 })
     mocks.enqueue.mockResolvedValue(undefined)
     mocks.buildMessageContent.mockReturnValue('hello')
@@ -185,6 +189,31 @@ describe('send-message', () => {
     mocks.updateLastMessage.mockReturnValue({ id: 'assistant-1' })
     mocks.parseSDKMessage.mockReturnValue(null)
   })
+
+  function mockSuccessfulStream(): void {
+    const toolThought = {
+      id: 'tool-1',
+      type: 'tool_use',
+      content: '',
+      timestamp: '2026-03-10T00:00:00.000Z',
+      toolName: 'TeamCreate',
+      toolInput: { name: 'research-team' }
+    }
+
+    mocks.enqueue.mockImplementationOnce(async (_conversationId: string, run: () => Promise<void>) => run())
+    mocks.parseSDKMessage.mockImplementation((sdkMessage: { type: string }) => {
+      if (sdkMessage.type === 'assistant') return toolThought
+      return null
+    })
+    mocks.getOrCreateV2Session.mockResolvedValue({
+      setPermissionMode: vi.fn(async () => {}),
+      send: vi.fn(),
+      stream: async function* () {
+        yield { type: 'assistant', message: { content: [] } }
+        yield { type: 'result' }
+      }
+    })
+  }
 
   it('notifies renderer when message is queued behind a running task', async () => {
     mocks.getStatus.mockReturnValue({ running: true, queued: 2 })
@@ -234,19 +263,7 @@ describe('send-message', () => {
       toolInput: { name: 'research-team' }
     }
 
-    mocks.enqueue.mockImplementationOnce(async (_conversationId: string, run: () => Promise<void>) => run())
-    mocks.parseSDKMessage.mockImplementation((sdkMessage: { type: string }) => {
-      if (sdkMessage.type === 'assistant') return toolThought
-      return null
-    })
-    mocks.getOrCreateV2Session.mockResolvedValue({
-      setPermissionMode: vi.fn(async () => {}),
-      send: vi.fn(),
-      stream: async function* () {
-        yield { type: 'assistant', message: { content: [] } }
-        yield { type: 'result' }
-      }
-    })
+    mockSuccessfulStream()
 
     await expect(sendMessage(null, request)).resolves.toBeUndefined()
 
@@ -261,5 +278,41 @@ describe('send-message', () => {
     expect(mocks.sendToRenderer.mock.calls.some(([eventName]) => eventName === 'agent:complete')).toBe(true)
     expect(mocks.sendToRenderer.mock.calls.some(([eventName]) => eventName === 'agent:error')).toBe(false)
     expect(mocks.clearHostSteps).toHaveBeenCalledWith('conv-1')
+  })
+
+  it('does not fall back to recent conversations for low-signal prompts in a new conversation', async () => {
+    mockSuccessfulStream()
+
+    await expect(sendMessage(null, {
+      ...request,
+      message: '你'
+    })).resolves.toBeUndefined()
+
+    expect(mocks.memoryManager.warmQueryEmbedding).toHaveBeenCalledWith('你')
+    expect(mocks.memoryManager.searchRelevant).toHaveBeenCalledWith('space-1', '你', 'conv-1', 5)
+    expect(mocks.memoryManager.getRecentFragments).not.toHaveBeenCalled()
+  })
+
+  it('falls back to recent conversations when the user explicitly references prior context', async () => {
+    mocks.memoryManager.searchRelevant.mockReturnValueOnce([])
+    mocks.memoryManager.getRecentFragments.mockReturnValueOnce([
+      {
+        id: 99,
+        conversation_id: 'conv-previous',
+        space_id: 'space-1',
+        role: 'user',
+        content: '打开 finder，打开桌面',
+        created_at: '2026-03-10T00:00:00.000Z',
+        conversation_title: '打开 finder，打开桌面'
+      }
+    ])
+    mockSuccessfulStream()
+
+    await expect(sendMessage(null, {
+      ...request,
+      message: '继续上次那个任务'
+    })).resolves.toBeUndefined()
+
+    expect(mocks.memoryManager.getRecentFragments).toHaveBeenCalledWith('space-1', 'conv-1', 3)
   })
 })

@@ -1,8 +1,7 @@
 import { getAISourceManager } from '../../main/services/ai-sources'
 import { getConfig } from '../../main/services/config.service'
-import { getEnabledExtensions } from '../../main/services/extension'
 import { runDesktopSmokeFlow } from '../host-runtime/desktop/smoke-flows'
-import { buildSharedToolProviderDefinitions } from '../tools/providers'
+import { buildRuntimeToolBundle, resolveConfiguredSharedToolProviders } from '../tools'
 import { resolveNativeRuntimeAdapter } from './native/adapters'
 import { executeNativePreparedRequest } from './native/client'
 import { resolveNativeRuntimeStatus } from './native/runtime'
@@ -20,7 +19,9 @@ import type {
 const FIRST_BATCH_TRIAL_IDS: NativeRolloutValidationId[] = [
   'chat-simple',
   'browser-simple',
-  'terminal-simple'
+  'terminal-simple',
+  'finder-simple',
+  'skillsfan-simple'
 ]
 
 class NativeRolloutAcceptanceError extends Error {
@@ -119,7 +120,7 @@ async function runAcceptanceChecks(args: {
 }): Promise<NativeRolloutTrialCheckResult[]> {
   switch (args.id) {
     case 'chat-simple':
-      return [await runChatSimpleAcceptanceCheck()]
+      return [await runChatSimpleAcceptanceCheck(args.workDir)]
     case 'browser-simple':
       return await runDesktopAcceptanceChecks({
         flowIds: ['chrome.tab-roundtrip', 'chrome.discovery-roundtrip'],
@@ -130,18 +131,27 @@ async function runAcceptanceChecks(args: {
         flowIds: ['terminal.command-roundtrip', 'terminal.session-targeting'],
         workDir: args.workDir
       })
+    case 'finder-simple':
+      return await runDesktopAcceptanceChecks({
+        flowIds: ['finder.navigation-roundtrip'],
+        workDir: args.workDir
+      })
+    case 'skillsfan-simple':
+      return await runDesktopAcceptanceChecks({
+        flowIds: ['skillsfan.settings-roundtrip'],
+        workDir: args.workDir
+      })
   }
 }
 
-async function runChatSimpleAcceptanceCheck(): Promise<NativeRolloutTrialCheckResult> {
+async function runChatSimpleAcceptanceCheck(workDir?: string): Promise<NativeRolloutTrialCheckResult> {
   const manager = getAISourceManager()
   await manager.ensureInitialized()
   const endpoint = manager.resolveRuntimeEndpoint()
   const config = getConfig()
-  const sharedToolProviders = buildSharedToolProviderDefinitions({
-    effectiveAiBrowserEnabled: config.browserAutomation?.mode !== 'system-browser',
-    includeSkillMcp: true,
-    extensionProviderIds: getEnabledExtensions().map((extension) => extension.manifest.id)
+  const sharedToolProviders = resolveConfiguredSharedToolProviders({
+    config,
+    includeSkillMcp: true
   })
   const nativeStatus = resolveNativeRuntimeStatus({
     endpoint,
@@ -158,6 +168,16 @@ async function runChatSimpleAcceptanceCheck(): Promise<NativeRolloutTrialCheckRe
     throw new Error(adapterResolution.reason)
   }
 
+  const toolBundle = await buildRuntimeToolBundle({
+    conversationId: 'runtime-rollout-check-chat',
+    spaceId: 'runtime-rollout-check',
+    workDir: workDir || process.cwd(),
+    config,
+    aiBrowserEnabled: false,
+    includeSkillMcp: true,
+    includeSubagentTools: true
+  })
+
   const preparedRequest = adapter.prepareRequest({
     mainWindow: null,
     request: {
@@ -167,8 +187,8 @@ async function runChatSimpleAcceptanceCheck(): Promise<NativeRolloutTrialCheckRe
       messagePrefix: 'Reply with the single word READY. Do not use any tools. Do not ask follow-up questions.'
     },
     endpoint,
-    sharedToolProviders: [],
-    nativeFunctionTools: []
+    sharedToolProviders: toolBundle.native.providers,
+    nativeFunctionTools: toolBundle.native.functionTools
   })
 
   const result = await executeNativePreparedRequest({
@@ -236,6 +256,10 @@ function resolveRunningSummary(id: NativeRolloutValidationId): string {
       return 'Checking whether simple browser tasks are ready on this device.'
     case 'terminal-simple':
       return 'Checking whether simple terminal tasks are ready on this device.'
+    case 'finder-simple':
+      return 'Checking whether simple Finder tasks are ready on this device.'
+    case 'skillsfan-simple':
+      return 'Checking whether simple SkillsFan app tasks are ready on this device.'
   }
 }
 
@@ -247,6 +271,10 @@ function resolveSuccessSummary(id: NativeRolloutValidationId): string {
       return 'Simple browser tasks are ready to try on the new route.'
     case 'terminal-simple':
       return 'Simple terminal tasks are ready to try on the new route.'
+    case 'finder-simple':
+      return 'Simple Finder tasks are ready to try on the new route.'
+    case 'skillsfan-simple':
+      return 'Simple SkillsFan app tasks are ready to try on the new route.'
   }
 }
 
@@ -258,5 +286,9 @@ function resolveFailureSummary(id: NativeRolloutValidationId): string {
       return 'The simple browser check did not pass.'
     case 'terminal-simple':
       return 'The simple terminal check did not pass.'
+    case 'finder-simple':
+      return 'The simple Finder check did not pass.'
+    case 'skillsfan-simple':
+      return 'The simple SkillsFan app check did not pass.'
   }
 }

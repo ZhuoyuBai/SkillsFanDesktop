@@ -227,4 +227,94 @@ describe('desktop smoke flow runner', () => {
       state: 'failed'
     })
   })
+
+  it('runs a finder navigation smoke flow and stores the latest passed result', async () => {
+    mocks.executeDesktopAdapterMethod.mockImplementation(async ({ input }: { input: { methodId: string; target?: string } }) => {
+      switch (input.methodId) {
+        case 'finder.open_home_folder':
+          return {
+            adapterId: 'finder',
+            methodId: input.methodId,
+            stage: 'active',
+            result: okResult(),
+            successText: 'Opened the home folder in Finder.'
+          }
+        case 'finder.reveal_path':
+          return {
+            adapterId: 'finder',
+            methodId: input.methodId,
+            stage: 'active',
+            result: okResult(),
+            successText: `Revealed ${input.target} in Finder.`
+          }
+        case 'finder.new_window':
+          return {
+            adapterId: 'finder',
+            methodId: input.methodId,
+            stage: 'active',
+            result: okResult(),
+            successText: 'Opened a new Finder window.'
+          }
+        default:
+          throw new Error(`Unexpected method: ${input.methodId}`)
+      }
+    })
+
+    const result = await runDesktopSmokeFlow({
+      flowId: 'finder.navigation-roundtrip',
+      workDir: '/tmp/skillsfan-finder-smoke'
+    })
+
+    expect(result.state).toBe('passed')
+    expect(result.steps.map((step) => step.methodId)).toEqual([
+      'finder.open_home_folder',
+      'finder.reveal_path',
+      'finder.new_window'
+    ])
+    expect(getDesktopSmokeFlowRunSnapshot('finder.navigation-roundtrip')).toMatchObject({
+      state: 'passed',
+      summary: 'Finder navigation roundtrip passed.'
+    })
+  })
+
+  it('runs a skillsfan settings smoke flow and stores the latest passed result', async () => {
+    mocks.executeDesktopAdapterMethod.mockImplementation(async ({ input }: { input: { methodId: string } }) => {
+      switch (input.methodId) {
+        case 'skillsfan.focus_main_window':
+          return {
+            adapterId: 'skillsfan',
+            methodId: input.methodId,
+            stage: 'active',
+            result: okResult(),
+            successText: 'Focused SkillsFan.'
+          }
+        case 'skillsfan.open_settings':
+          return {
+            adapterId: 'skillsfan',
+            methodId: input.methodId,
+            stage: 'active',
+            result: okResult(),
+            successText: 'Opened settings in SkillsFan.'
+          }
+        default:
+          throw new Error(`Unexpected method: ${input.methodId}`)
+      }
+    })
+
+    const result = await runDesktopSmokeFlow({
+      flowId: 'skillsfan.settings-roundtrip',
+      workDir: '/tmp'
+    })
+
+    expect(result.state).toBe('passed')
+    expect(result.steps.map((step) => step.methodId)).toEqual([
+      'skillsfan.focus_main_window',
+      'skillsfan.open_settings',
+      'skillsfan.focus_main_window'
+    ])
+    expect(getDesktopSmokeFlowRunSnapshot('skillsfan.settings-roundtrip')).toMatchObject({
+      state: 'passed',
+      summary: 'SkillsFan settings roundtrip passed.'
+    })
+  })
 })

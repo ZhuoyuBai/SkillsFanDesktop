@@ -591,6 +591,26 @@ describe('host runtime adapters', () => {
         supported: true
       })
     ])
+    expect(status.desktop.adapters.find((adapter) => adapter.id === 'finder')).toEqual(expect.objectContaining({
+      stage: 'active',
+      supported: process.platform === 'darwin',
+      workflows: expect.arrayContaining([
+        expect.objectContaining({
+          id: 'finder.folder-access',
+          blockedByPermission: false
+        }),
+        expect.objectContaining({
+          id: 'finder.window-and-search',
+          blockedByPermission: process.platform === 'darwin'
+        })
+      ]),
+      smokeFlows: expect.arrayContaining([
+        expect.objectContaining({
+          id: 'finder.navigation-roundtrip',
+          blockedByPermission: process.platform === 'darwin'
+        })
+      ])
+    }))
     expect(status.desktop.adapters.find((adapter) => adapter.id === 'terminal')).toEqual(expect.objectContaining({
       stage: 'active',
       supported: process.platform === 'darwin',
@@ -644,6 +664,22 @@ describe('host runtime adapters', () => {
         }),
         expect.objectContaining({
           id: 'chrome.discovery-roundtrip',
+          blockedByPermission: process.platform === 'darwin'
+        })
+      ])
+    }))
+    expect(status.desktop.adapters.find((adapter) => adapter.id === 'skillsfan')).toEqual(expect.objectContaining({
+      stage: 'active',
+      supported: process.platform === 'darwin',
+      workflows: expect.arrayContaining([
+        expect.objectContaining({
+          id: 'skillsfan.app-control',
+          blockedByPermission: process.platform === 'darwin'
+        })
+      ]),
+      smokeFlows: expect.arrayContaining([
+        expect.objectContaining({
+          id: 'skillsfan.settings-roundtrip',
           blockedByPermission: process.platform === 'darwin'
         })
       ])

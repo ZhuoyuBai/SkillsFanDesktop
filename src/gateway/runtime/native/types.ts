@@ -1,4 +1,5 @@
 import type { RuntimeEndpoint } from '../../../shared/types/ai-sources'
+import type { AnthropicRequest } from '../../../main/openai-compat-router/types/anthropic'
 import type {
   OpenAIResponsesRequest,
   OpenAIResponsesResponse,
@@ -11,9 +12,23 @@ import type {
 import type { RuntimeSendMessageInput, RuntimeWarmSessionInput } from '../types'
 import { getNativeUserFacingMessage } from './user-facing'
 
-export type NativeAdapterId = 'openai-responses' | 'openai-codex-responses'
+export type NativeAdapterId =
+  | 'openai-responses'
+  | 'openai-codex-responses'
+  | 'anthropic-messages'
 export type NativeAdapterStage = 'scaffolded' | 'ready'
-export type NativeSupportedApiType = 'chat_completions' | 'responses'
+export type NativeSupportedApiType = 'chat_completions' | 'responses' | 'messages'
+export type NativeProviderCapabilityReasonId =
+  | 'supported'
+  | 'no-endpoint'
+  | 'requires-responses'
+  | 'adapter-unavailable'
+export type NativeRuntimeReadinessReasonId =
+  | 'ready'
+  | 'no-endpoint'
+  | 'requires-responses'
+  | 'adapter-unavailable'
+  | 'shared-tools-missing'
 
 export interface PrepareNativeRuntimeRequestInput extends RuntimeSendMessageInput {
   endpoint: RuntimeEndpoint
@@ -21,13 +36,16 @@ export interface PrepareNativeRuntimeRequestInput extends RuntimeSendMessageInpu
   nativeFunctionTools?: NativeFunctionToolDefinition[]
 }
 
+export type NativePreparedRequestBody = OpenAIResponsesRequest | AnthropicRequest
+
 export interface NativePreparedRequest {
   adapterId: NativeAdapterId
   adapterDisplayName: string
   method: 'POST'
   url: string
+  requestTimeoutMs: number
   headers: Record<string, string>
-  body: OpenAIResponsesRequest
+  body: NativePreparedRequestBody
   stream: boolean
   toolProviderIds: string[]
   nativeTools: NativeFunctionToolDefinition[]
@@ -102,8 +120,8 @@ export interface NativeRuntimeAdapter {
   note: string
   matches(endpoint: RuntimeEndpoint): boolean
   prepareRequest(input: PrepareNativeRuntimeRequestInput): NativePreparedRequest
-  normalizeResponse(response: OpenAIResponsesResponse): NativeNormalizedResponse
-  normalizeStreamEvent(event: OpenAIResponsesStreamEvent): NativeNormalizedStreamEvent
+  normalizeResponse(response: OpenAIResponsesResponse | unknown): NativeNormalizedResponse
+  normalizeStreamEvent(event: OpenAIResponsesStreamEvent | unknown): NativeNormalizedStreamEvent
   sendMessage(input: RuntimeSendMessageInput & { endpoint: RuntimeEndpoint }): Promise<void>
   ensureSessionWarm?(input: RuntimeWarmSessionInput & { endpoint: RuntimeEndpoint }): Promise<void>
 }

@@ -336,8 +336,8 @@ describe('gateway health', () => {
       hybridTaskRouting: true,
       rollout: {
         phase: 'first-batch',
-        includedScopes: ['chat-simple', 'browser-simple', 'terminal-simple'],
-        excludedScopes: ['skills', 'agent-team', 'long-workflow', 'pdf-text-attachments'],
+        includedScopes: ['chat-simple', 'browser-simple', 'terminal-simple', 'finder-simple', 'skillsfan-simple'],
+        excludedScopes: ['skills', 'agent-team', 'long-workflow', 'pdf-text-attachments', 'provider-model-policy'],
         simpleTasksCanUseNative: false,
         note: getNativeUserFacingMessage('openAIReady'),
         validation: expect.arrayContaining([
@@ -353,6 +353,7 @@ describe('gateway health', () => {
       native: {
         scaffolded: true,
         ready: true,
+        readinessReasonId: 'ready',
         endpointSupported: true,
         adapterResolved: true,
         adapterStage: 'ready',
@@ -360,9 +361,9 @@ describe('gateway health', () => {
         providerNativeExecution: true,
         sharedToolRegistryReady: true,
         taskRoutingReady: true,
-        supportedProviders: ['openai', 'openai-codex'],
-        supportedApiTypes: ['responses'],
-        availableAdapterIds: ['openai-responses', 'openai-codex-responses'],
+        supportedProviders: ['anthropic', 'openai', 'openai-codex'],
+        supportedApiTypes: ['messages', 'responses'],
+        availableAdapterIds: ['anthropic-messages', 'openai-responses', 'openai-codex-responses'],
         currentSource: 'openai-codex',
         currentProvider: 'oauth',
         currentApiType: 'responses',
@@ -372,6 +373,7 @@ describe('gateway health', () => {
         transport: {
           adapterId: 'openai-codex-responses',
           endpointUrl: 'https://chatgpt.com/backend-api/codex/responses',
+          requestTimeoutMs: 300000,
           apiType: 'responses',
           defaultTransport: 'auto',
           supportsWebSocket: true,
@@ -576,8 +578,8 @@ describe('gateway health', () => {
         hybridTaskRouting: true,
         rollout: {
           phase: 'first-batch',
-          includedScopes: ['chat-simple', 'browser-simple', 'terminal-simple'],
-          excludedScopes: ['skills', 'agent-team', 'long-workflow', 'pdf-text-attachments'],
+          includedScopes: ['chat-simple', 'browser-simple', 'terminal-simple', 'finder-simple', 'skillsfan-simple'],
+          excludedScopes: ['skills', 'agent-team', 'long-workflow', 'pdf-text-attachments', 'provider-model-policy'],
           simpleTasksCanUseNative: true,
           note: 'The new route now takes the first batch of simple tasks first, and anything outside that scope falls back to the existing route.',
           validation: []
@@ -585,6 +587,7 @@ describe('gateway health', () => {
         native: {
           scaffolded: true,
           ready: true,
+          readinessReasonId: 'ready',
           endpointSupported: true,
           adapterResolved: true,
           adapterStage: 'ready',
@@ -592,9 +595,9 @@ describe('gateway health', () => {
           providerNativeExecution: true,
           sharedToolRegistryReady: true,
           taskRoutingReady: true,
-          supportedProviders: ['openai', 'openai-codex'],
-          supportedApiTypes: ['responses'],
-          availableAdapterIds: ['openai-responses', 'openai-codex-responses'],
+          supportedProviders: ['anthropic', 'openai', 'openai-codex'],
+          supportedApiTypes: ['messages', 'responses'],
+          availableAdapterIds: ['anthropic-messages', 'openai-responses', 'openai-codex-responses'],
           currentSource: 'openai-codex',
           currentProvider: 'oauth',
           currentApiType: 'responses',
@@ -604,6 +607,7 @@ describe('gateway health', () => {
           transport: {
             adapterId: 'openai-codex-responses',
             endpointUrl: 'https://chatgpt.com/backend-api/codex/responses',
+            requestTimeoutMs: 300000,
             apiType: 'responses',
             defaultTransport: 'auto',
             supportsWebSocket: true,
@@ -732,7 +736,7 @@ describe('gateway health', () => {
     expect(health.runtime.rollout).toEqual(expect.objectContaining({
       phase: 'first-batch',
       simpleTasksCanUseNative: true,
-      includedScopes: ['chat-simple', 'browser-simple', 'terminal-simple']
+      includedScopes: ['chat-simple', 'browser-simple', 'terminal-simple', 'finder-simple', 'skillsfan-simple']
     }))
     expect(health.sessionStore.sessionCount).toBe(8)
     expect(health.stepJournal.persistedStepCount).toBe(18)
@@ -749,6 +753,106 @@ describe('gateway health', () => {
         expect.objectContaining({ key: 'command-runtime', state: 'ready' }),
         expect.objectContaining({ key: 'agent-runtime', state: 'ready' }),
         expect.objectContaining({ key: 'step-journal', state: 'ready' })
+      ])
+    )
+  })
+
+  it('reports rollout hold notes when the current source is outside the native allowlist', async () => {
+    mocks.getConfig.mockReturnValue({
+      runtime: {
+        mode: 'hybrid',
+        nativeRollout: {
+          sourceAllowlist: ['custom', 'openai-codex']
+        }
+      },
+      api: {
+        model: 'glm-5'
+      },
+      aiSources: {
+        current: 'glm',
+        glm: {
+          model: 'glm-5',
+          loggedIn: true,
+          availableModels: ['glm-5']
+        }
+      },
+      browserAutomation: {
+        mode: 'ai-browser'
+      }
+    })
+    mocks.getRuntime.mockReturnValue({
+      kind: 'claude-sdk'
+    })
+    mocks.listRegisteredRuntimeKinds.mockReturnValue(['claude-sdk', 'native'])
+    mocks.hasRuntime.mockReturnValue(true)
+
+    const health = await getGatewayHealth()
+
+    expect(health.runtime.rollout).toEqual(expect.objectContaining({
+      simpleTasksCanUseNative: false,
+      note: expect.stringContaining('glm')
+    }))
+    expect(health.runtime.rollout?.validation).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'chat-simple',
+          state: 'held',
+          blockerCodes: ['policy_held']
+        })
+      ])
+    )
+  })
+
+  it('reports protocol incompatibility as a compatibility blocker', async () => {
+    mocks.getConfig.mockReturnValue({
+      runtime: {
+        mode: 'hybrid'
+      },
+      api: {
+        model: 'gpt-4.1'
+      },
+      aiSources: {
+        current: 'custom',
+        custom: {
+          provider: 'openai',
+          model: 'gpt-4.1',
+          apiKey: 'key',
+          apiUrl: 'https://api.openai.com/v1/chat/completions'
+        }
+      },
+      browserAutomation: {
+        mode: 'ai-browser'
+      }
+    })
+    mocks.resolveRuntimeEndpoint.mockReturnValue({
+      requestedSource: 'custom',
+      source: 'custom',
+      authMode: 'api-key',
+      provider: 'openai',
+      baseUrl: 'https://api.openai.com/v1/chat/completions',
+      apiKey: 'key',
+      model: 'gpt-4.1',
+      apiType: 'chat_completions'
+    })
+    mocks.getRuntime.mockReturnValue({
+      kind: 'claude-sdk'
+    })
+    mocks.listRegisteredRuntimeKinds.mockReturnValue(['claude-sdk'])
+    mocks.hasRuntime.mockReturnValue(false)
+
+    const health = await getGatewayHealth()
+
+    expect(health.runtime.rollout).toEqual(expect.objectContaining({
+      simpleTasksCanUseNative: false,
+      note: getNativeUserFacingMessage('requiresResponses')
+    }))
+    expect(health.runtime.rollout?.validation).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'chat-simple',
+          state: 'blocked',
+          blockerCodes: ['compat_requires_responses']
+        })
       ])
     )
   })

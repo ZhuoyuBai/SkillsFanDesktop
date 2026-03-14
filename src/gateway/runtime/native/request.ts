@@ -12,11 +12,13 @@ import type {
 import { NATIVE_BUILTIN_PROVIDER_ID as BUILTIN_PROVIDER_ID } from '../../tools/types'
 import { resolveNativeRuntimeTransportPlan } from './transport'
 import type {
+  NativeNormalizedToolCall,
   NativeRuntimeAdapter,
   NativePreparedRequest,
   PrepareNativeRuntimeRequestInput
 } from './types'
 import { getNativeUserFacingMessage } from './user-facing'
+import { buildAnthropicNativeRuntimeFollowupPreparedRequest } from './anthropic-request'
 
 function truncateMetadataValue(value: string, maxLength = 512): string {
   return value.length > maxLength ? value.slice(0, maxLength) : value
@@ -254,6 +256,7 @@ export function buildNativeRuntimePreparedRequest(
     adapterDisplayName: adapter.displayName,
     method: 'POST',
     url: transportResolution.plan.endpointUrl,
+    requestTimeoutMs: transportResolution.plan.requestTimeoutMs,
     headers: buildNativeRuntimeHeaders(input),
     body,
     stream,
@@ -266,11 +269,28 @@ export function buildNativeRuntimePreparedRequest(
 export function buildNativeRuntimeFollowupPreparedRequest(params: {
   preparedRequest: NativePreparedRequest
   previousResponseId: string
-  toolOutputs: OpenAIResponsesFunctionCallOutput[]
+  assistantResponseText?: string
+  toolOutputs: Array<{
+    toolCall: NativeNormalizedToolCall
+    outputText: string
+    isError: boolean
+  }>
 }): NativePreparedRequest {
+  if (params.preparedRequest.adapterId === 'anthropic-messages') {
+    return buildAnthropicNativeRuntimeFollowupPreparedRequest({
+      preparedRequest: params.preparedRequest,
+      assistantResponseText: params.assistantResponseText,
+      toolOutputs: params.toolOutputs
+    })
+  }
+
   const body: OpenAIResponsesRequest = {
-    ...params.preparedRequest.body,
-    input: params.toolOutputs,
+    ...(params.preparedRequest.body as OpenAIResponsesRequest),
+    input: params.toolOutputs.map((toolOutput) => ({
+      type: 'function_call_output' as const,
+      call_id: toolOutput.toolCall.id,
+      output: toolOutput.outputText
+    })) satisfies OpenAIResponsesFunctionCallOutput[],
     previous_response_id: params.previousResponseId
   }
 

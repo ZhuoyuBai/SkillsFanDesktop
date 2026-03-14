@@ -10,7 +10,9 @@ const mocks = vi.hoisted(() => ({
   resolveRuntimeEndpoint: vi.fn(),
   getEnabledExtensions: vi.fn(() => []),
   executeNativePreparedRequest: vi.fn(),
-  runDesktopSmokeFlow: vi.fn()
+  runDesktopSmokeFlow: vi.fn(),
+  buildRuntimeToolBundle: vi.fn(),
+  resolveConfiguredSharedToolProviders: vi.fn()
 }))
 
 vi.mock('../../../../src/main/services/config.service', () => ({
@@ -26,6 +28,11 @@ vi.mock('../../../../src/main/services/ai-sources', () => ({
 
 vi.mock('../../../../src/main/services/extension', () => ({
   getEnabledExtensions: mocks.getEnabledExtensions
+}))
+
+vi.mock('../../../../src/gateway/tools', () => ({
+  buildRuntimeToolBundle: mocks.buildRuntimeToolBundle,
+  resolveConfiguredSharedToolProviders: mocks.resolveConfiguredSharedToolProviders
 }))
 
 vi.mock('../../../../src/gateway/runtime/native/client', async () => {
@@ -54,6 +61,30 @@ describe('native rollout acceptance', () => {
     vi.clearAllMocks()
     clearNativeRolloutTrialSnapshotsForTests()
     mocks.ensureInitialized.mockResolvedValue(undefined)
+    mocks.resolveConfiguredSharedToolProviders.mockReturnValue([
+      {
+        id: 'local-tools',
+        kind: 'mcp',
+        source: 'app',
+        description: 'local tools',
+        runtimeKinds: ['claude-sdk', 'native']
+      }
+    ])
+    mocks.buildRuntimeToolBundle.mockResolvedValue({
+      native: {
+        providers: [
+          {
+            id: 'local-tools',
+            kind: 'mcp',
+            source: 'app',
+            description: 'local tools',
+            runtimeKinds: ['claude-sdk', 'native']
+          }
+        ],
+        functionTools: [],
+        sharedToolRegistryReady: true
+      }
+    })
     mocks.resolveRuntimeEndpoint.mockReturnValue({
       requestedSource: 'custom',
       source: 'custom',
@@ -139,6 +170,16 @@ describe('native rollout acceptance', () => {
         summary: 'Terminal session targeting passed.',
         error: null
       })
+      .mockResolvedValueOnce({
+        state: 'passed',
+        summary: 'Finder navigation roundtrip passed.',
+        error: null
+      })
+      .mockResolvedValueOnce({
+        state: 'passed',
+        summary: 'SkillsFan settings roundtrip passed.',
+        error: null
+      })
 
     const results = await runNativeRolloutAcceptance({
       targetId: 'all'
@@ -147,13 +188,17 @@ describe('native rollout acceptance', () => {
     expect(results.map((item) => item.id)).toEqual([
       'chat-simple',
       'browser-simple',
-      'terminal-simple'
+      'terminal-simple',
+      'finder-simple',
+      'skillsfan-simple'
     ])
     expect(mocks.runDesktopSmokeFlow.mock.calls.map((call) => call[0].flowId)).toEqual([
       'chrome.tab-roundtrip',
       'chrome.discovery-roundtrip',
       'terminal.command-roundtrip',
-      'terminal.session-targeting'
+      'terminal.session-targeting',
+      'finder.navigation-roundtrip',
+      'skillsfan.settings-roundtrip'
     ])
   })
 
@@ -182,6 +227,36 @@ describe('native rollout acceptance', () => {
     expect(results[0].checks).toHaveLength(2)
     expect(getNativeRolloutTrialSnapshot('browser-simple')).toEqual(expect.objectContaining({
       state: 'failed'
+    }))
+  })
+
+  it('runs dedicated Finder and SkillsFan checks when requested', async () => {
+    mocks.runDesktopSmokeFlow
+      .mockResolvedValueOnce({
+        state: 'passed',
+        summary: 'Finder navigation roundtrip passed.',
+        error: null
+      })
+      .mockResolvedValueOnce({
+        state: 'passed',
+        summary: 'SkillsFan settings roundtrip passed.',
+        error: null
+      })
+
+    const finderResult = await runNativeRolloutAcceptance({
+      targetId: 'finder-simple'
+    })
+    const skillsfanResult = await runNativeRolloutAcceptance({
+      targetId: 'skillsfan-simple'
+    })
+
+    expect(finderResult[0]).toEqual(expect.objectContaining({
+      id: 'finder-simple',
+      state: 'passed'
+    }))
+    expect(skillsfanResult[0]).toEqual(expect.objectContaining({
+      id: 'skillsfan-simple',
+      state: 'passed'
     }))
   })
 })

@@ -1,5 +1,12 @@
 export type RuntimeRouteKind = 'claude-sdk' | 'native'
 
+export interface NativeRuntimeRolloutPolicy {
+  sourceAllowlist?: string[]
+  sourceBlocklist?: string[]
+  modelAllowlistBySource?: Record<string, string[]>
+  modelBlocklistBySource?: Record<string, string[]>
+}
+
 export type RuntimeRouteExperience = 'new-route' | 'existing-route'
 
 export type RuntimeRouteNoteId =

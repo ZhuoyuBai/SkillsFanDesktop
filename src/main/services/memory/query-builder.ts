@@ -27,6 +27,11 @@ const CHINESE_STOP_CHARS = new Set([
   '来', '去', '会', '能', '要', '把', '被', '给', '让', '从'
 ])
 
+const PRIOR_CONTEXT_PATTERNS = [
+  /\b(?:continue|resume|pick up|follow up|last time|previous|earlier|before|as discussed|we discussed|we talked about)\b/i,
+  /(继续|接着|延续|上次|之前|刚才|刚刚|前面|此前|聊过|说过|提到过|上一个|上一条)/
+]
+
 /**
  * Extract meaningful keywords for LIKE-based search.
  *
@@ -64,4 +69,18 @@ export function extractSearchKeywords(text: string): string[] {
 
   // Deduplicate and limit
   return Array.from(new Set(keywords)).slice(0, 15)
+}
+
+/**
+ * Detect whether the user is explicitly referring to prior conversation context.
+ *
+ * This is intentionally stricter than keyword extraction. We only want to use
+ * "recent conversation" fallback when the prompt clearly asks to continue or
+ * revisit earlier discussion, otherwise a new conversation can inherit the
+ * previous task too aggressively.
+ */
+export function referencesPriorConversation(text: string): boolean {
+  const normalized = text.trim()
+  if (!normalized) return false
+  return PRIOR_CONTEXT_PATTERNS.some((pattern) => pattern.test(normalized))
 }

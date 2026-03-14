@@ -1,10 +1,12 @@
 import type { RuntimeEndpoint } from '../../../../shared/types/ai-sources'
+import { anthropicMessagesNativeAdapter } from './anthropic-messages'
 import { openAICodexResponsesNativeAdapter } from './openai-codex-responses'
 import { openAIResponsesNativeAdapter } from './openai-responses'
 import type { NativeAdapterId, NativeRuntimeAdapter, NativeRuntimeAdapterResolution } from '../types'
 import { getNativeUserFacingMessage } from '../user-facing'
 
 const NATIVE_RUNTIME_ADAPTERS: NativeRuntimeAdapter[] = [
+  anthropicMessagesNativeAdapter,
   openAIResponsesNativeAdapter,
   openAICodexResponsesNativeAdapter
 ]

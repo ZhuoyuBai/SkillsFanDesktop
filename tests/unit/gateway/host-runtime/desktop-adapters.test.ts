@@ -39,7 +39,7 @@ import {
 } from '../../../../src/gateway/host-runtime/desktop/adapters/terminal'
 
 describe('desktop app adapter registry', () => {
-  it('lists generic, active, and planned desktop adapters for macOS', () => {
+  it('lists generic and active desktop adapters for macOS', () => {
     const adapters = listDesktopAppAdapters('darwin')
 
     expect(adapters.map((adapter) => adapter.id)).toEqual([
@@ -57,8 +57,27 @@ describe('desktop app adapter registry', () => {
     })
     expect(adapters[1]).toMatchObject({
       id: 'finder',
-      supported: false,
-      stage: 'planned'
+      supported: true,
+      stage: 'active',
+      workflows: [
+        expect.objectContaining({
+          id: 'finder.folder-access',
+          stage: 'active',
+          supported: true
+        }),
+        expect.objectContaining({
+          id: 'finder.window-and-search',
+          stage: 'active',
+          supported: true
+        })
+      ],
+      smokeFlows: [
+        expect.objectContaining({
+          id: 'finder.navigation-roundtrip',
+          stage: 'active',
+          supported: true
+        })
+      ]
     })
     expect(adapters[2]).toMatchObject({
       id: 'terminal',
@@ -133,6 +152,25 @@ describe('desktop app adapter registry', () => {
         })
       ]
     })
+    expect(adapters[4]).toMatchObject({
+      id: 'skillsfan',
+      supported: true,
+      stage: 'active',
+      workflows: [
+        expect.objectContaining({
+          id: 'skillsfan.app-control',
+          stage: 'active',
+          supported: true
+        })
+      ],
+      smokeFlows: [
+        expect.objectContaining({
+          id: 'skillsfan.settings-roundtrip',
+          stage: 'active',
+          supported: true
+        })
+      ]
+    })
     expect(adapters[1]?.methods).toEqual([
       expect.objectContaining({
         id: 'finder.reveal_path',
@@ -161,6 +199,20 @@ describe('desktop app adapter registry', () => {
       expect.objectContaining({
         id: 'finder.search',
         action: 'run_applescript',
+        stage: 'active',
+        supported: true
+      })
+    ])
+    expect(adapters[4]?.methods).toEqual([
+      expect.objectContaining({
+        id: 'skillsfan.focus_main_window',
+        action: 'focus_window',
+        stage: 'active',
+        supported: true
+      }),
+      expect.objectContaining({
+        id: 'skillsfan.open_settings',
+        action: 'press_key',
         stage: 'active',
         supported: true
       })

@@ -3,6 +3,10 @@ import {
   normalizeNativeRuntimeResponse,
   normalizeNativeRuntimeStreamEvent
 } from '../../../../src/gateway/runtime/native/normalize'
+import {
+  normalizeAnthropicNativeRuntimeResponse,
+  normalizeAnthropicNativeRuntimeStreamEvent
+} from '../../../../src/gateway/runtime/native/anthropic-normalize'
 
 describe('native runtime response normalization', () => {
   it('normalizes completed Responses output into text, tool calls, and usage', () => {
@@ -174,6 +178,73 @@ describe('native runtime response normalization', () => {
       },
       incompleteReason: null,
       errorCode: 'upstream_error',
+      errorMessage: 'Provider failed'
+    })
+  })
+
+  it('normalizes anthropic-compatible message responses into text, tool calls, and usage', () => {
+    const normalized = normalizeAnthropicNativeRuntimeResponse({
+      id: 'msg_1',
+      type: 'message',
+      role: 'assistant',
+      content: [
+        {
+          type: 'text',
+          text: 'I need to run a command.'
+        },
+        {
+          type: 'tool_use',
+          id: 'toolu_1',
+          name: 'mcp__local-tools__terminal_run_command',
+          input: {
+            command: 'pwd'
+          }
+        }
+      ],
+      model: 'GLM-5',
+      stop_reason: 'tool_use',
+      stop_sequence: null,
+      usage: {
+        input_tokens: 120,
+        output_tokens: 45,
+        cache_read_input_tokens: 12
+      }
+    })
+
+    expect(normalized).toEqual({
+      responseId: 'msg_1',
+      model: 'GLM-5',
+      status: 'completed',
+      outputText: 'I need to run a command.',
+      refusalText: null,
+      toolCalls: [
+        {
+          id: 'toolu_1',
+          name: 'mcp__local-tools__terminal_run_command',
+          argumentsText: '{"command":"pwd"}',
+          status: 'completed'
+        }
+      ],
+      usage: {
+        inputTokens: 120,
+        cachedInputTokens: 12,
+        outputTokens: 45,
+        reasoningTokens: 0,
+        totalTokens: 165
+      },
+      incompleteReason: null,
+      error: null
+    })
+
+    expect(normalizeAnthropicNativeRuntimeStreamEvent({
+      type: 'error',
+      error: {
+        type: 'api_error',
+        message: 'Provider failed'
+      }
+    })).toEqual({
+      kind: 'error',
+      errorCode: 'api_error',
       errorMessage: 'Provider failed'
     })
   })
