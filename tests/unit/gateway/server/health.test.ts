@@ -334,6 +334,22 @@ describe('gateway health', () => {
       registeredKinds: ['claude-sdk'],
       nativeRegistered: false,
       hybridTaskRouting: true,
+      rollout: {
+        phase: 'first-batch',
+        includedScopes: ['chat-simple', 'browser-simple', 'terminal-simple'],
+        excludedScopes: ['skills', 'agent-team', 'long-workflow', 'pdf-text-attachments'],
+        simpleTasksCanUseNative: false,
+        note: getNativeUserFacingMessage('openAIReady'),
+        validation: expect.arrayContaining([
+          expect.objectContaining({ id: 'chat-simple' }),
+          expect.objectContaining({ id: 'browser-simple' }),
+          expect.objectContaining({ id: 'terminal-simple' })
+        ]),
+        previews: expect.arrayContaining([
+          expect.objectContaining({ id: 'chat-simple', selectedKind: 'claude-sdk' }),
+          expect.objectContaining({ id: 'skills', selectedKind: 'claude-sdk' })
+        ])
+      },
       native: {
         scaffolded: true,
         ready: true,
@@ -558,6 +574,14 @@ describe('gateway health', () => {
         registeredKinds: ['claude-sdk', 'native'],
         nativeRegistered: true,
         hybridTaskRouting: true,
+        rollout: {
+          phase: 'first-batch',
+          includedScopes: ['chat-simple', 'browser-simple', 'terminal-simple'],
+          excludedScopes: ['skills', 'agent-team', 'long-workflow', 'pdf-text-attachments'],
+          simpleTasksCanUseNative: true,
+          note: 'The new route now takes the first batch of simple tasks first, and anything outside that scope falls back to the existing route.',
+          validation: []
+        },
         native: {
           scaffolded: true,
           ready: true,
@@ -705,6 +729,11 @@ describe('gateway health', () => {
     expect(health.remote.server.port).toBe(4567)
     expect(health.runtime.activeKind).toBe('native')
     expect(health.runtime.nativeRegistered).toBe(true)
+    expect(health.runtime.rollout).toEqual(expect.objectContaining({
+      phase: 'first-batch',
+      simpleTasksCanUseNative: true,
+      includedScopes: ['chat-simple', 'browser-simple', 'terminal-simple']
+    }))
     expect(health.sessionStore.sessionCount).toBe(8)
     expect(health.stepJournal.persistedStepCount).toBe(18)
     expect(health.commands.processRole).toBe('external-gateway')

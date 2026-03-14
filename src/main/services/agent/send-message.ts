@@ -12,6 +12,11 @@
 import fs from 'node:fs/promises'
 import { BrowserWindow } from 'electron'
 import { hostRuntime } from '../../../gateway/host-runtime'
+import { resolveNativeRuntimeRegistrationState } from '../../../gateway/runtime/registration'
+import {
+  describeRuntimeSelectionForUser,
+  resolveRuntimeSelection
+} from '../../../gateway/runtime/routing'
 import { getConfig } from '../config.service'
 import { getConversation, saveSessionId, addMessage, updateLastMessage } from '../conversation.service'
 import {
@@ -273,13 +278,23 @@ async function sendMessageInternal(
 
   hostRuntime.stepReporter.clearTask(conversationId)
 
-  // Notify frontend that this queued message is now actually executing
-  sendToRenderer('agent:start', spaceId, conversationId, {})
-
   const attCount = (images?.length || 0) + (attachments?.length || 0)
   console.log(`[Agent] sendMessage: conv=${conversationId}${attCount > 0 ? `, attachments=${attCount}` : ''}${aiBrowserEnabled ? ', AI Browser enabled' : ''}${thinkingEnabled ? ', thinking=ON' : ''}${canvasContext?.isOpen ? `, canvas tabs=${canvasContext.tabCount}` : ''}${ralphMode?.enabled ? ', Ralph mode' : ''}`)
 
   const config = getConfig()
+  const nativeRegistrationState = resolveNativeRuntimeRegistrationState()
+  const runtimeSelection = resolveRuntimeSelection({
+    configuredMode: config.runtime?.mode || 'claude-sdk',
+    hasNativeRuntime: nativeRegistrationState.enabled,
+    request
+  })
+  const runtimeRoute = describeRuntimeSelectionForUser(runtimeSelection)
+
+  // Notify frontend that this queued message is now actually executing
+  sendToRenderer('agent:start', spaceId, conversationId, {
+    runtimeRoute
+  })
+
   // Ralph mode uses projectDir as working directory
   const workDir = ralphMode?.enabled ? ralphMode.projectDir : getWorkingDir(spaceId)
 
@@ -377,7 +392,7 @@ async function sendMessageInternal(
   let stderrBuffer = ''
 
   // Register this session in the active sessions map
-  const sessionState = createSessionState(spaceId, conversationId, abortController)
+  const sessionState = createSessionState(spaceId, conversationId, abortController, runtimeRoute)
   registerActiveSession(conversationId, sessionState)
 
   if (shouldPersistUserMessage) {

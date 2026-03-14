@@ -7,7 +7,7 @@ describe('native question shaping', () => {
   })
 
   it('rewrites technical project-choice questions into simpler user wording', () => {
-    vi.stubEnv('LANG', 'zh_CN.UTF-8')
+    vi.stubEnv('LC_ALL', 'zh_CN.UTF-8')
 
     expect(normalizeNativeQuestionInput({
       question: 'Please choose the target project directory.',
@@ -27,7 +27,7 @@ describe('native question shaping', () => {
   })
 
   it('keeps already user-friendly questions unchanged', () => {
-    vi.stubEnv('LANG', 'zh_CN.UTF-8')
+    vi.stubEnv('LC_ALL', 'zh_CN.UTF-8')
 
     expect(normalizeNativeQuestionInput({
       question: '你想先整理页面，还是先关掉不相关的页面？',

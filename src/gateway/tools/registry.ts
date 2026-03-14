@@ -2,6 +2,8 @@ import { hostRuntime } from '../host-runtime'
 import { getEnabledMcpServers } from '../../main/services/agent/helpers'
 import { getEnabledExtensions, runGetMcpServersHooks } from '../../main/services/extension'
 import { createSkillMcpServer } from '../../main/services/skill'
+import { buildToolCatalog } from './catalog'
+import { buildSharedToolDirectory } from './directory'
 import { buildSharedToolProviderDefinitions } from './providers'
 import type { BuildToolRegistryParams, BuildToolRegistryResult } from './types'
 
@@ -68,13 +70,25 @@ export async function buildToolRegistry(params: BuildToolRegistryParams): Promis
     }
   }
 
+  const providers = buildSharedToolProviderDefinitions({
+    effectiveAiBrowserEnabled,
+    includeSkillMcp,
+    extensionProviderIds
+  })
+  const catalog = buildToolCatalog({
+    aiBrowserEnabled: effectiveAiBrowserEnabled,
+    includeSkillMcp,
+    includeSubagentTools
+  })
+
   return {
     mcpServers,
     addedMcpServers,
-    providers: buildSharedToolProviderDefinitions({
-      effectiveAiBrowserEnabled,
-      includeSkillMcp,
-      extensionProviderIds
+    providers,
+    catalog,
+    directory: buildSharedToolDirectory({
+      catalog,
+      providers
     }),
     browserAutomationMode,
     effectiveAiBrowserEnabled

@@ -93,6 +93,14 @@ vi.mock('../../../../src/main/services/agent/sdk-options', () => ({
   }))
 }))
 
+vi.mock('../../../../src/gateway/runtime/registration', () => ({
+  resolveNativeRuntimeRegistrationState: () => ({
+    enabled: false,
+    status: { ready: false }
+  }),
+  syncNativeRuntimeRegistration: vi.fn()
+}))
+
 vi.mock('../../../../src/main/services/agent/message-utils', () => ({
   formatCanvasContext: vi.fn(() => ''),
   buildMessageContent: mocks.buildMessageContent,

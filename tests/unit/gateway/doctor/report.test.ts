@@ -35,6 +35,14 @@ const mocks = vi.hoisted(() => ({
       registeredKinds: ['claude-sdk'],
       nativeRegistered: false,
       hybridTaskRouting: true,
+      rollout: {
+        phase: 'first-batch',
+        includedScopes: ['chat-simple', 'browser-simple', 'terminal-simple'],
+        excludedScopes: ['skills', 'agent-team', 'long-workflow', 'pdf-text-attachments'],
+        simpleTasksCanUseNative: false,
+        note: 'The existing route is still the only route in use, so the new route is not taking over yet.',
+        validation: []
+      },
       native: {
         scaffolded: true,
         ready: false,
@@ -217,7 +225,11 @@ describe('gateway doctor report', () => {
       expect.objectContaining({ key: 'command-runtime', state: 'ok' }),
       expect.objectContaining({ key: 'session-store', state: 'ok' }),
       expect.objectContaining({ key: 'step-journal', state: 'ok' }),
-      expect.objectContaining({ key: 'runtime', state: 'warn' }),
+      expect.objectContaining({
+        key: 'runtime',
+        state: 'warn',
+        summary: 'The existing route is still the only route in use, so the new route is not taking over yet.'
+      }),
       expect.objectContaining({ key: 'host-permissions', state: 'warn' })
     ])
   })

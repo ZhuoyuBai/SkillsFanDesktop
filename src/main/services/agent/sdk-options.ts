@@ -9,7 +9,11 @@
 import { existsSync, readdirSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { ensureOpenAICompatRouter, encodeBackendConfig } from '../../openai-compat-router'
-import { buildToolRegistry } from '../../../gateway/tools'
+import {
+  buildToolRegistry,
+  getBlockedServerSideToolNames,
+  getClaudeSdkBuiltInToolNames
+} from '../../../gateway/tools'
 import { AI_BROWSER_SYSTEM_PROMPT } from '../ai-browser/prompt'
 import { createCanUseTool } from './permission-handler'
 import { buildSystemPromptAppend, inferOpenAIWireApi } from './helpers'
@@ -49,19 +53,6 @@ When the user asks for fresh online information, source links, citations, or pag
 2. Perform the web research directly in the primary agent.
 3. Use \`mcp__web-tools__WebSearch\` and \`mcp__web-tools__WebFetch\` directly so SkillsFan can manage permissions and results correctly.
 `
-
-const DISALLOWED_SERVER_SIDE_TOOLS = [
-  'WebSearch',
-  'WebFetch',
-  'web_search',
-  'web_fetch',
-  'code_execution',
-  'bash_code_execution',
-  'text_editor_code_execution',
-  'tool_search_tool_regex',
-  'tool_search_tool_bm25',
-  'memory'
-]
 
 export interface ResolvedSdkTransport {
   anthropicBaseUrl: string
@@ -186,25 +177,7 @@ export async function buildSdkOptions(params: BuildSdkOptionsParams): Promise<{
   // Extension MCP servers
   const enabledExtensions = getEnabledExtensions()
 
-  const builtInTools = [
-    // Core file tools
-    'Read', 'Write', 'Edit', 'Grep', 'Glob',
-    // Execution
-    'Bash',
-    // Task management — let Claude create visual task checklists
-    'TodoWrite', 'TaskOutput',
-    // Notebook — let Claude edit Jupyter notebooks
-    'NotebookEdit',
-    // Sub-agent — parallel task execution (permission via canUseTool)
-    'Task',
-    // User interaction — let Claude ask clarifying questions
-    'AskUserQuestion',
-    // Agent Teams — multi-agent coordination
-    'TeamCreate', 'TeamDelete', 'SendMessage',
-    'TaskCreate', 'TaskUpdate', 'TaskList', 'TaskGet',
-    // Planning and isolation
-    'EnterPlanMode', 'EnterWorktree',
-  ]
+  const builtInTools = getClaudeSdkBuiltInToolNames()
 
   const sdkOptions: Record<string, any> = {
     model: sdkModel,
@@ -247,7 +220,7 @@ export async function buildSdkOptions(params: BuildSdkOptionsParams): Promise<{
     maxTurns: 50,
     allowedTools: builtInTools,
     tools: builtInTools,
-    disallowedTools: DISALLOWED_SERVER_SIDE_TOOLS,
+    disallowedTools: getBlockedServerSideToolNames(),
     permissionMode: 'acceptEdits' as const,
     canUseTool: createCanUseTool(workDir, spaceId, conversationId),
     includePartialMessages: true,

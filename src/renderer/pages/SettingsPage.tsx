@@ -403,6 +403,41 @@ interface GatewayHealthStatusView {
     registeredKinds?: string[]
     nativeRegistered?: boolean
     hybridTaskRouting?: boolean
+    rollout?: {
+      phase: 'first-batch'
+      includedScopes: string[]
+      excludedScopes: string[]
+      simpleTasksCanUseNative: boolean
+      note: string
+      validation?: Array<{
+        id: 'chat-simple' | 'browser-simple' | 'terminal-simple'
+        state: 'ready' | 'held' | 'blocked'
+        blockerCodes: Array<
+          'mode_locked'
+          | 'native_not_ready'
+          | 'permissions_missing'
+          | 'workflow_missing'
+          | 'smoke_failed'
+        >
+        relatedWorkflowIds: string[]
+        relatedSmokeFlowIds: string[]
+        latestSmokeState: 'passed' | 'failed' | 'running' | 'missing'
+        lastTrial?: {
+          state: 'running' | 'passed' | 'failed'
+          startedAt: string
+          finishedAt?: string
+          durationMs?: number
+          summary: string
+          error?: string | null
+        } | null
+      }>
+      previews: Array<{
+        id: string
+        selectedKind: 'claude-sdk' | 'native'
+        fallbackFrom?: 'claude-sdk' | 'native'
+        reason: string
+      }>
+    }
     native?: {
       scaffolded: boolean
       ready: boolean
@@ -827,6 +862,7 @@ export function SettingsPage() {
   const [activeGatewayDaemonCommand, setActiveGatewayDaemonCommand] = useState<'install' | 'uninstall' | null>(null)
   const [isClearingGatewayDaemonLock, setIsClearingGatewayDaemonLock] = useState(false)
   const [isRecoveringGatewayLauncher, setIsRecoveringGatewayLauncher] = useState(false)
+  const [isSavingSimpleTaskTrial, setIsSavingSimpleTaskTrial] = useState(false)
 
   // API Key visibility state
   const [showApiKey, setShowApiKey] = useState(false)
@@ -1170,6 +1206,31 @@ export function SettingsPage() {
       addToast(t('Failed'), 'error')
     } finally {
       setActiveDesktopSmokeFlowId(null)
+    }
+  }
+
+  const handleAutomaticHandlingChange = async (enabled: boolean) => {
+    const currentConfig = config ?? DEFAULT_CONFIG
+    const nextMode: NonNullable<HaloConfig['runtime']>['mode'] = enabled ? 'hybrid' : 'claude-sdk'
+
+    setIsSavingSimpleTaskTrial(true)
+    try {
+      await api.setConfig({ runtime: { mode: nextMode } })
+      const nextConfig: HaloConfig = {
+        ...currentConfig,
+        runtime: {
+          ...(currentConfig.runtime ?? DEFAULT_CONFIG.runtime),
+          mode: nextMode
+        }
+      }
+      setConfig(nextConfig)
+      addToast(enabled ? t('Now using custom handling.') : t('Now using Claude Code SDK only.'), 'success')
+      await loadGatewayDiagnostics({ silent: true })
+    } catch (error) {
+      console.error('[Settings] Failed to update automatic handling mode:', error)
+      addToast(t('Save failed'), 'error')
+    } finally {
+      setIsSavingSimpleTaskTrial(false)
     }
   }
 
@@ -1861,6 +1922,8 @@ export function SettingsPage() {
       return null
     }
 
+    const currentRuntimeMode = config?.runtime?.mode ?? DEFAULT_CONFIG.runtime.mode
+    const automaticHandlingEnabled = currentRuntimeMode !== 'claude-sdk'
     const needsAccessibility = gatewayHealth.host.permissions.accessibility.state === 'needs_permission'
     const needsScreenRecording = gatewayHealth.host.permissions.screenRecording.state === 'needs_permission'
     const hasPermissionIssue = needsAccessibility || needsScreenRecording
@@ -1872,6 +1935,33 @@ export function SettingsPage() {
 
     return (
       <div className="space-y-4">
+        <div className="rounded-lg border border-border bg-secondary/20 p-4 space-y-3">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1 space-y-1">
+              <div className="flex items-center gap-2">
+                <p className="font-medium">{t('Task handling')}</p>
+                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                  automaticHandlingEnabled
+                    ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400'
+                    : 'bg-secondary text-muted-foreground border border-border/60'
+                }`}>
+                  {automaticHandlingEnabled ? t('Custom handling') : t('Claude Code SDK only')}
+                </span>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {automaticHandlingEnabled
+                  ? t('Supported requests will use your custom handling first. More complex tasks will still stay on Claude Code SDK.')
+                  : t('Everything will use Claude Code SDK.')}
+              </p>
+            </div>
+            <Switch
+              checked={automaticHandlingEnabled}
+              onChange={handleAutomaticHandlingChange}
+              disabled={isSavingSimpleTaskTrial}
+            />
+          </div>
+        </div>
+
         {/* Permission banner */}
         {hasPermissionIssue && (
           <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
@@ -2773,27 +2863,15 @@ export function SettingsPage() {
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                       <div className="rounded-lg border border-border bg-secondary/20 p-4 space-y-3">
                         <div className="flex items-center justify-between gap-3">
-                          <p className="text-sm font-medium">{t('Gateway Runtime')}</p>
+                          <p className="text-sm font-medium">{t('Background service')}</p>
                           <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${getStatusBadgeClasses(gatewayHealth.process.state)}`}>
                             {gatewayHealth.gateway.mode === 'external' ? t('External') : t('Embedded')}
                           </span>
                         </div>
                         <div className="grid grid-cols-2 gap-3 text-sm">
                           <div>
-                            <p className="text-xs text-muted-foreground">{t('Runtime')}</p>
-                            <p className="mt-1 font-medium">{gatewayHealth.runtime.activeKind}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-muted-foreground">{t('Configured Mode')}</p>
-                            <p className="mt-1 font-medium">{gatewayHealth.runtime.configuredMode}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-muted-foreground">{t('Registered Runtimes')}</p>
-                            <p className="mt-1 font-medium">{(gatewayHealth.runtime.registeredKinds || []).join(', ') || '—'}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-muted-foreground">{t('Hybrid Routing')}</p>
-                            <p className="mt-1 font-medium">{gatewayHealth.runtime.hybridTaskRouting ? t('Task-based') : t('Mode-only')}</p>
+                            <p className="text-xs text-muted-foreground">{t('Service')}</p>
+                            <p className="mt-1 font-medium">{gatewayHealth.gateway.mode === 'external' ? t('Runs in the background') : t('Runs inside the app')}</p>
                           </div>
                           <div>
                             <p className="text-xs text-muted-foreground">{t('Process')}</p>
@@ -2809,38 +2887,6 @@ export function SettingsPage() {
                           <span>{t('Heartbeat Age')}: {formatDurationMs(gatewayHealth.process.heartbeatAgeMs)}</span>
                           <span>{t('Checked At')}: {formatOptionalTimestamp(gatewayHealth.checkedAt)}</span>
                         </div>
-                        {gatewayHealth.runtime.native && (
-                          <div className="rounded-lg border border-border/60 bg-background/60 px-3 py-2 text-xs text-muted-foreground space-y-1">
-                            <div className="flex flex-wrap gap-3">
-                              <span>{t('Native Lane')}: {gatewayHealth.runtime.nativeRegistered ? t('Registered') : t('Scaffolded')}</span>
-                              <span>{t('Ready')}: {gatewayHealth.runtime.native.ready ? t('Yes') : t('No')}</span>
-                              <span>{t('Provider-native')}: {gatewayHealth.runtime.native.providerNativeExecution ? t('Enabled') : t('Planned')}</span>
-                            </div>
-                            <div className="flex flex-wrap gap-3">
-                              <span>{t('Providers')}: {gatewayHealth.runtime.native.supportedProviders.join(', ') || '—'}</span>
-                              <span>{t('API Types')}: {gatewayHealth.runtime.native.supportedApiTypes.join(', ') || '—'}</span>
-                            </div>
-                            <div className="flex flex-wrap gap-3">
-                              <span>{t('Pending Approvals')}: {gatewayHealth.runtime.native.interaction.pendingToolApprovalCount}</span>
-                              <span>{t('Pending Questions')}: {gatewayHealth.runtime.native.interaction.pendingUserQuestionCount}</span>
-                            </div>
-                            {gatewayHealth.runtime.native.interaction.pendingUserQuestionPreview && (
-                              <div>
-                                <span>{t('Waiting for this reply')}: {gatewayHealth.runtime.native.interaction.pendingUserQuestionPreview}</span>
-                              </div>
-                            )}
-                            <div className="flex flex-wrap gap-3">
-                              <span>{t('Last Approval Request')}: {formatOptionalTimestamp(gatewayHealth.runtime.native.interaction.lastToolApprovalRequestedAt)}</span>
-                              <span>{t('Last Question Request')}: {formatOptionalTimestamp(gatewayHealth.runtime.native.interaction.lastUserQuestionRequestedAt)}</span>
-                            </div>
-                            <p>{gatewayHealth.runtime.native.note}</p>
-                          </div>
-                        )}
-                        {gatewayHealth.runtime.fallbackActive && (
-                          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
-                            {t('Configured runtime is falling back to a different active runtime.')}
-                          </div>
-                        )}
                       </div>
 
                       <div className="rounded-lg border border-border bg-secondary/20 p-4 space-y-3">

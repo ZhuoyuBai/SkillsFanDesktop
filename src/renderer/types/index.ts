@@ -4,7 +4,11 @@
 
 import type { ThinkingEffort } from '../../shared/utils/openai-models'
 import type { WebToolsConfig } from '../../shared/types'
-import type { HostEnvironmentStatus, HostStep } from '../../shared/types/host-runtime'
+import type {
+  HostEnvironmentStatus,
+  HostStep,
+  RuntimeRouteInfo
+} from '../../shared/types'
 
 // API Provider Configuration
 export type ApiProvider = 'anthropic' | 'openai';
@@ -512,7 +516,7 @@ export interface AgentErrorEvent extends AgentEventBase {
   error: string;
 }
 
-export type { HostEnvironmentStatus, HostStep };
+export type { HostEnvironmentStatus, HostStep, RuntimeRouteInfo };
 
 // Token usage statistics from SDK result message
 export interface TokenUsage {

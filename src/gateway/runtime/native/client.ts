@@ -18,6 +18,7 @@ export interface NativePreparedRequestExecutionResult {
 export interface ExecuteNativePreparedRequestOptions {
   fetchImpl?: typeof fetch
   onStreamEvent?: (event: NativeNormalizedStreamEvent) => void | Promise<void>
+  signal?: AbortSignal
 }
 
 export class NativeRuntimeUpstreamError extends Error {
@@ -165,7 +166,8 @@ export async function executeNativePreparedRequest(params: {
   const response = await fetchImpl(params.preparedRequest.url, {
     method: params.preparedRequest.method,
     headers: params.preparedRequest.headers,
-    body: JSON.stringify(params.preparedRequest.body)
+    body: JSON.stringify(params.preparedRequest.body),
+    signal: params.options?.signal
   })
 
   if (!response.ok) {

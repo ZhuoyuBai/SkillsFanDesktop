@@ -1,4 +1,5 @@
 import type { RuntimeKind } from '../runtime/types'
+import type { SharedToolDirectoryEntry } from './directory'
 
 export interface BuildToolRegistryParams {
   conversationId: string
@@ -14,6 +15,8 @@ export interface BuildToolRegistryResult {
   mcpServers: Record<string, any>
   addedMcpServers: string[]
   providers: ToolProviderDefinition[]
+  catalog: ToolCatalogEntry[]
+  directory: SharedToolDirectoryEntry[]
   browserAutomationMode: 'ai-browser' | 'system-browser'
   effectiveAiBrowserEnabled: boolean
 }

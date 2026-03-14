@@ -1,5 +1,17 @@
 import { sendToRenderer } from '../../../main/services/agent/helpers'
 import type { ToolCall, UserQuestionInfo } from '../../../main/services/agent/types'
+import { getNativeUserFacingMessage } from './user-facing'
+
+const DEFAULT_NATIVE_USER_QUESTION_TIMEOUT_MS = 5 * 60 * 1000
+
+export class NativeUserQuestionTimeoutError extends Error {
+  constructor(timeoutMs = DEFAULT_NATIVE_USER_QUESTION_TIMEOUT_MS) {
+    super(getNativeUserFacingMessage('questionTimedOut', {
+      minutes: Math.max(1, Math.round(timeoutMs / 60_000))
+    }))
+    this.name = 'NativeUserQuestionTimeoutError'
+  }
+}
 
 export interface NativeRuntimeInteractionStatus {
   pendingToolApprovalCount: number
@@ -24,7 +36,9 @@ interface NativePendingUserQuestion {
   spaceId: string
   conversationId: string
   questionInfo: UserQuestionInfo
+  timeout: NodeJS.Timeout
   resolve: (answers: Record<string, string>) => void
+  reject: (error: Error) => void
 }
 
 const pendingNativeToolApprovals = new Map<string, NativePendingToolApproval>()
@@ -107,12 +121,14 @@ export async function requestNativeUserQuestion(params: {
   conversationId: string
   questions: UserQuestionInfo['questions']
   toolId?: string
+  timeoutMs?: number
 }): Promise<Record<string, string>> {
   const questionInfo: UserQuestionInfo = {
     toolId: params.toolId || `native-question-${Date.now()}`,
     questions: params.questions,
     inputResolve: null
   }
+  const timeoutMs = params.timeoutMs ?? DEFAULT_NATIVE_USER_QUESTION_TIMEOUT_MS
 
   lastUserQuestionRequestedAt = new Date().toISOString()
   sendToRenderer('agent:user-question', params.spaceId, params.conversationId, {
@@ -120,12 +136,28 @@ export async function requestNativeUserQuestion(params: {
     questions: params.questions
   })
 
-  return await new Promise((resolve) => {
+  return await new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      const pending = pendingNativeUserQuestions.get(params.conversationId)
+      if (!pending) {
+        return
+      }
+
+      pendingNativeUserQuestions.delete(params.conversationId)
+      lastUserQuestionResolvedAt = new Date().toISOString()
+      sendToRenderer('agent:user-question-answered', params.spaceId, params.conversationId, {
+        timedOut: true
+      })
+      pending.reject(new NativeUserQuestionTimeoutError(timeoutMs))
+    }, timeoutMs)
+
     pendingNativeUserQuestions.set(params.conversationId, {
       spaceId: params.spaceId,
       conversationId: params.conversationId,
       questionInfo,
-      resolve
+      timeout,
+      resolve,
+      reject
     })
   })
 }
@@ -140,6 +172,7 @@ export function resolveNativeUserQuestion(
   }
 
   pendingNativeUserQuestions.delete(conversationId)
+  clearTimeout(pending.timeout)
   pending.resolve(answers)
   lastUserQuestionResolvedAt = new Date().toISOString()
   sendToRenderer('agent:user-question-answered', pending.spaceId, conversationId, {})
@@ -148,6 +181,9 @@ export function resolveNativeUserQuestion(
 
 export function resetNativeRuntimeInteractionForTests(): void {
   pendingNativeToolApprovals.clear()
+  for (const pendingQuestion of pendingNativeUserQuestions.values()) {
+    clearTimeout(pendingQuestion.timeout)
+  }
   pendingNativeUserQuestions.clear()
   lastToolApprovalRequestedAt = null
   lastToolApprovalResolvedAt = null

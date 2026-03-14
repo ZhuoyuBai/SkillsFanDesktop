@@ -18,6 +18,8 @@ import {
 } from '../process'
 import { runtimeOrchestrator } from '../runtime/orchestrator'
 import { getNativeRuntimeStatus } from '../runtime/native/runtime'
+import { runNativeRolloutAcceptance } from '../runtime/rollout-acceptance'
+import { resolveNativeRolloutStatus } from '../runtime/routing'
 import {
   getGatewaySessionStorePersistenceStatus,
   type GatewaySessionStorePersistenceStatus
@@ -52,7 +54,7 @@ export interface GatewayHealthStatus {
   services: GatewayServiceDescriptor[]
 }
 
-function getGatewayRuntimeStatus(): GatewayRuntimeStatus {
+function getGatewayRuntimeStatus(host: HostEnvironmentStatus): GatewayRuntimeStatus {
   const config = getConfig()
   const configuredMode = config.runtime?.mode || 'claude-sdk'
   const activeKind = runtimeOrchestrator.getRuntime().kind
@@ -64,6 +66,10 @@ function getGatewayRuntimeStatus(): GatewayRuntimeStatus {
     includeSkillMcp: true,
     extensionProviderIds: getEnabledExtensions().map((extension) => extension.manifest.id)
   })
+  const native = getNativeRuntimeStatus({
+    endpoint: runtimeEndpoint,
+    sharedToolProviders
+  })
 
   return {
     configuredMode,
@@ -72,10 +78,14 @@ function getGatewayRuntimeStatus(): GatewayRuntimeStatus {
     registeredKinds,
     nativeRegistered,
     hybridTaskRouting: true,
-    native: getNativeRuntimeStatus({
-      endpoint: runtimeEndpoint,
-      sharedToolProviders
-    })
+    rollout: resolveNativeRolloutStatus({
+      configuredMode,
+      hasNativeRuntime: nativeRegistered,
+      nativeReady: native.ready,
+      nativeNote: native.note,
+      host
+    }),
+    native
   }
 }
 
@@ -108,9 +118,9 @@ export async function collectLocalGatewayHealth(): Promise<GatewayHealthStatus> 
   const channels = getGatewayChannelStatus()
   const commands = getGatewayCommandRuntimeStatus()
   const remote = getRemoteAccessStatus()
-  const runtime = getGatewayRuntimeStatus()
   const automation = getGatewayAutomationStatus()
   const host = await hostRuntime.status.getEnvironmentStatus()
+  const runtime = getGatewayRuntimeStatus(host)
   const sessionStore = getGatewaySessionStorePersistenceStatus()
   const stepJournal = stepReporterRuntime.getPersistenceStatus()
   const services = buildGatewayServiceRegistry({
@@ -191,4 +201,11 @@ export async function getGatewayHealth(): Promise<GatewayHealthStatus> {
 
 export async function listGatewayServices(): Promise<GatewayServiceDescriptor[]> {
   return (await getGatewayHealth()).services
+}
+
+export async function runGatewayRuntimeRolloutAcceptance(args: {
+  targetId: 'all' | 'chat-simple' | 'browser-simple' | 'terminal-simple'
+  workDir?: string
+}) {
+  return await runNativeRolloutAcceptance(args)
 }

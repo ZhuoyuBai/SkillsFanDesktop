@@ -11,6 +11,7 @@ type NativeUserFacingMessageKey =
   | 'unsupportedInputs'
   | 'noFinalResponse'
   | 'requestFailed'
+  | 'requestCancelled'
   | 'incomplete'
   | 'tooManyToolSteps'
   | 'toolInputInvalid'
@@ -24,6 +25,10 @@ type NativeUserFacingMessageKey =
   | 'toolUnavailable'
   | 'systemBrowserOnly'
   | 'resolvedModelRequired'
+  | 'questionTimedOut'
+  | 'existingRouteLocked'
+  | 'hybridRolloutReady'
+  | 'nativeRolloutReady'
   | 'upstreamRateLimit'
   | 'upstreamAuth'
   | 'upstreamQuota'
@@ -35,16 +40,17 @@ const COPY: Record<
 > = {
   'zh-CN': {
     noEndpoint: '当前没有可用的模型连接，请先检查模型设置。',
-    requiresResponses: '当前选择的模型暂时还不能走这条新路线。',
-    outsideScope: '当前选择的模型还没加入这一批支持范围。',
-    openAIReady: '当前选择的模型已经可以走这条新路线。',
-    codexReady: '当前选择的模型已经可以走这条新路线。',
-    sharedToolsNotReady: '这条新路线快准备好了，但常用操作还没有全部接好。',
-    scaffoldReadyButInactive: '这条新路线已经准备好了，但你当前选择的模型还没切到这里。',
+    requiresResponses: '当前选择的模型暂时还不能使用这种自动处理方式。',
+    outsideScope: '当前选择的模型暂时还不在自动处理范围内。',
+    openAIReady: '当前选择的模型已经可以使用这种自动处理方式。',
+    codexReady: '当前选择的模型已经可以使用这种自动处理方式。',
+    sharedToolsNotReady: '这种自动处理方式快准备好了，但常用操作还没有全部接好。',
+    scaffoldReadyButInactive: '这种自动处理方式已经准备好了，但你当前选择的模型还没切到这里。',
     unsupportedInputs: ({ unsupportedKinds }) =>
       `这次发送的内容里有暂时还不支持的类型：${String(unsupportedKinds)}。现在请先只发送文字或图片。`,
     noFinalResponse: '这次请求提前结束了，没有返回完整结果。请重试一次。',
     requestFailed: '这次请求没有顺利完成，请稍后再试。',
+    requestCancelled: '这次处理已停止。如果你还想继续，重新发一句话就可以。',
     incomplete: ({ reason }) =>
       typeof reason === 'string' && reason.trim()
         ? `这次请求提前结束了，原因是：${reason}。请再试一次。`
@@ -61,6 +67,11 @@ const COPY: Record<
     toolUnavailable: '当前这一步暂时不可用。',
     systemBrowserOnly: '这一步需要用你平时的浏览器来打开，请先在设置里切换浏览器模式。',
     resolvedModelRequired: '当前没有选到可用的模型，请先检查模型设置。',
+    questionTimedOut: ({ minutes }) =>
+      `这次等待已结束。超过 ${String(minutes)} 分钟没有收到你的回答。如果你还想继续，重新发一句话就可以。`,
+    existingRouteLocked: '你当前选择了稳定优先，所以系统会继续使用更稳的处理方式。',
+    hybridRolloutReady: '系统已经可以自动处理一部分简单任务了；更复杂的任务仍会继续使用更稳的处理方式。',
+    nativeRolloutReady: '系统会优先使用更快的处理方式；超出范围的任务会自动回到更稳的处理方式。',
     upstreamRateLimit: '请求有点太快了，请稍等一下再试。',
     upstreamAuth: '当前账号或密钥暂时不能使用，请检查登录状态或密钥设置。',
     upstreamQuota: '当前账号可用额度不足，暂时无法继续。',
@@ -68,16 +79,17 @@ const COPY: Record<
   },
   'zh-TW': {
     noEndpoint: '目前沒有可用的模型連線，請先檢查模型設定。',
-    requiresResponses: '目前選擇的模型暫時還不能走這條新路線。',
-    outsideScope: '目前選擇的模型還沒加入這一批支援範圍。',
-    openAIReady: '目前選擇的模型已經可以走這條新路線。',
-    codexReady: '目前選擇的模型已經可以走這條新路線。',
-    sharedToolsNotReady: '這條新路線快準備好了，但常用操作還沒有全部接好。',
-    scaffoldReadyButInactive: '這條新路線已經準備好了，但你目前選擇的模型還沒切到這裡。',
+    requiresResponses: '目前選擇的模型暫時還不能使用這種自動處理方式。',
+    outsideScope: '目前選擇的模型暫時還不在自動處理範圍內。',
+    openAIReady: '目前選擇的模型已經可以使用這種自動處理方式。',
+    codexReady: '目前選擇的模型已經可以使用這種自動處理方式。',
+    sharedToolsNotReady: '這種自動處理方式快準備好了，但常用操作還沒有全部接好。',
+    scaffoldReadyButInactive: '這種自動處理方式已經準備好了，但你目前選擇的模型還沒切到這裡。',
     unsupportedInputs: ({ unsupportedKinds }) =>
       `這次送出的內容裡有暫時還不支援的類型：${String(unsupportedKinds)}。目前請先只送文字或圖片。`,
     noFinalResponse: '這次請求提早結束了，沒有回傳完整結果。請再試一次。',
     requestFailed: '這次請求沒有順利完成，請稍後再試。',
+    requestCancelled: '這次處理已停止。如果你還想繼續，重新發一句話就可以。',
     incomplete: ({ reason }) =>
       typeof reason === 'string' && reason.trim()
         ? `這次請求提早結束了，原因是：${reason}。請再試一次。`
@@ -94,6 +106,11 @@ const COPY: Record<
     toolUnavailable: '目前這一步暫時不可用。',
     systemBrowserOnly: '這一步需要用你平常的瀏覽器來開啟，請先在設定裡切換瀏覽器模式。',
     resolvedModelRequired: '目前沒有選到可用的模型，請先檢查模型設定。',
+    questionTimedOut: ({ minutes }) =>
+      `這次等待已結束。超過 ${String(minutes)} 分鐘沒有收到你的回答。如果你還想繼續，重新發一句話就可以。`,
+    existingRouteLocked: '你目前選擇了穩定優先，所以系統會繼續使用更穩的處理方式。',
+    hybridRolloutReady: '系統已經可以自動處理一部分簡單任務了；更複雜的任務仍會繼續使用更穩的處理方式。',
+    nativeRolloutReady: '系統會優先使用更快的處理方式；超出範圍的任務會自動回到更穩的處理方式。',
     upstreamRateLimit: '請求有點太快了，請稍等一下再試。',
     upstreamAuth: '目前帳號或金鑰暫時不能使用，請檢查登入狀態或金鑰設定。',
     upstreamQuota: '目前帳號可用額度不足，暫時無法繼續。',
@@ -101,16 +118,17 @@ const COPY: Record<
   },
   en: {
     noEndpoint: 'No model connection is available right now. Please check the model settings.',
-    requiresResponses: 'The current model cannot use this new route yet.',
-    outsideScope: 'The current model is not in the first supported batch yet.',
-    openAIReady: 'The current model is ready to use the new route.',
-    codexReady: 'The current model is ready to use the new route.',
-    sharedToolsNotReady: 'The new route is almost ready, but common actions are not fully connected yet.',
-    scaffoldReadyButInactive: 'The new route is ready, but the current model is still using the existing route.',
+    requiresResponses: 'The current model cannot use this automatic handling mode yet.',
+    outsideScope: 'The current model is not in the automatic handling range yet.',
+    openAIReady: 'The current model is ready to use this automatic handling mode.',
+    codexReady: 'The current model is ready to use this automatic handling mode.',
+    sharedToolsNotReady: 'This automatic handling mode is almost ready, but common actions are not fully connected yet.',
+    scaffoldReadyButInactive: 'This automatic handling mode is ready, but the current model is still using the steadier way.',
     unsupportedInputs: ({ unsupportedKinds }) =>
       `This message includes content that is not supported here yet: ${String(unsupportedKinds)}. For now, please use text or images only.`,
     noFinalResponse: 'This request ended early and did not return a complete result. Please try again.',
     requestFailed: 'This request could not be completed. Please try again.',
+    requestCancelled: 'This request was stopped. If you still want to continue, just send a new message.',
     incomplete: ({ reason }) =>
       typeof reason === 'string' && reason.trim()
         ? `This request ended early: ${reason}. Please try again.`
@@ -127,6 +145,11 @@ const COPY: Record<
     toolUnavailable: 'This step is not available right now.',
     systemBrowserOnly: 'This step needs to open in your normal browser. Please change the browser mode in settings first.',
     resolvedModelRequired: 'No usable model was selected. Please check the model settings.',
+    questionTimedOut: ({ minutes }) =>
+      `This wait has ended. No reply was received within ${String(minutes)} minutes. If you still want to continue, just send a new message.`,
+    existingRouteLocked: 'The app is still set to prefer the steadier way, so it will keep using that for now.',
+    hybridRolloutReady: 'The app can already handle some simple tasks automatically, while more complex work stays on the steadier way.',
+    nativeRolloutReady: 'The app now prefers the faster way first, and anything outside that scope falls back to the steadier way.',
     upstreamRateLimit: 'Requests are being sent too quickly. Please wait a moment and try again.',
     upstreamAuth: 'The current account or key cannot be used right now. Please check sign-in or key settings.',
     upstreamQuota: 'This account does not have enough available quota right now.',

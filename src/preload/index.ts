@@ -166,6 +166,7 @@ export interface SkillsFanAPI {
   unregisterGatewayDaemon: () => Promise<IpcResponse>
   getGatewayStepJournal: (sessionKey: string) => Promise<IpcResponse>
   runGatewayDesktopSmokeFlow: (flowId: string) => Promise<IpcResponse>
+  runGatewayRuntimeRolloutTrial: (targetId?: 'all' | 'chat-simple' | 'browser-simple' | 'terminal-simple') => Promise<IpcResponse>
 
   // Event listeners
   onAgentStart: (callback: (data: unknown) => void) => () => void
@@ -582,6 +583,7 @@ const api: SkillsFanAPI = {
   unregisterGatewayDaemon: () => ipcRenderer.invoke('gateway:daemon-unregister'),
   getGatewayStepJournal: (sessionKey) => ipcRenderer.invoke('gateway:step-journal', sessionKey),
   runGatewayDesktopSmokeFlow: (flowId) => ipcRenderer.invoke('gateway:desktop-smoke-flow-run', flowId),
+  runGatewayRuntimeRolloutTrial: (targetId) => ipcRenderer.invoke('gateway:runtime-rollout-trial-run', targetId),
 
   // Event listeners
   onAgentStart: (callback) => createEventListener('agent:start', callback),

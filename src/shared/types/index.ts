@@ -22,3 +22,6 @@ export * from './web-tools'
 
 // Host runtime step/activity types
 export * from './host-runtime'
+
+// Runtime routing / lane info
+export * from './runtime'

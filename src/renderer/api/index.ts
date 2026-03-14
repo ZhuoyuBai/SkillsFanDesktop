@@ -626,6 +626,15 @@ export const api = {
     return window.skillsfan.runGatewayDesktopSmokeFlow(flowId)
   },
 
+  runGatewayRuntimeRolloutTrial: async (
+    targetId?: 'all' | 'chat-simple' | 'browser-simple' | 'terminal-simple'
+  ): Promise<ApiResponse> => {
+    if (!isElectron()) {
+      return { success: false, error: i18n.t('This feature is only available in the desktop app') }
+    }
+    return window.skillsfan.runGatewayRuntimeRolloutTrial(targetId)
+  },
+
   getGatewayStepJournal: async (sessionKey: string): Promise<ApiResponse> => {
     if (!isElectron()) {
       return { success: false, error: i18n.t('This feature is only available in the desktop app') }

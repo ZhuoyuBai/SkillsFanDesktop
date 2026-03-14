@@ -17,12 +17,22 @@ import { MessageItem } from './MessageItem'
 import { CollapsedThoughtProcess } from './CollapsedThoughtProcess'
 import { LinearStream } from './LinearStream'
 import { CompactNotice } from './CompactNotice'
+import { RuntimeRouteBanner } from './RuntimeRouteBanner'
 import { BrowserTaskCard, isBrowserTool } from '../tool/BrowserTaskCard'
 import { DesktopResultCard } from '../tool/DesktopResultCard'
 import { buildDesktopResultModel } from '../tool/desktop-result-parser'
 import { HostActivityCard } from '../tool/HostActivityCard'
 import { HostStatusBanner } from '../tool/HostStatusBanner'
-import type { Message, Thought, CompactInfo, TextSegment, HostEnvironmentStatus, HostStep, ImageAttachment } from '../../types'
+import type {
+  Message,
+  Thought,
+  CompactInfo,
+  TextSegment,
+  HostEnvironmentStatus,
+  HostStep,
+  ImageAttachment,
+  RuntimeRouteInfo
+} from '../../types'
 import type { SubagentRunEntry } from '../../stores/chat.store'
 import { api } from '../../api'
 import { useTranslation } from '../../i18n'
@@ -58,6 +68,7 @@ interface MessageListProps {
   lastSegmentIndex?: number
   // SDK status line
   sdkStatus?: string | null
+  runtimeRoute?: RuntimeRouteInfo | null
   // Host/browser/desktop activity
   hostSteps?: HostStep[]
   hostStatus?: HostEnvironmentStatus | null
@@ -119,6 +130,7 @@ export function MessageList({
   textSegments = [],
   lastSegmentIndex = 0,
   sdkStatus,
+  runtimeRoute = null,
   hostSteps = [],
   hostStatus = null,
   activityCollapsed = false,
@@ -309,6 +321,12 @@ export function MessageList({
       {/* Current generation block: Linear Stream (Claude Code style) */}
       {(isGenerating || hasSubagentActivity || hasHostActivity) && (
         <div className="animate-fade-in">
+          {runtimeRoute && (
+            <div className="mb-4">
+              <RuntimeRouteBanner route={runtimeRoute} />
+            </div>
+          )}
+
           {/* Real-time browser task card */}
           {isGenerating && streamingBrowserToolCalls.length > 0 && (
             <div className="mb-4">

@@ -203,6 +203,7 @@ export function ChatView({ isCompact = false }: ChatViewProps) {
     pendingToolApproval,
     pendingUserQuestion,
     sdkStatus,
+    runtimeRoute,
     hostSteps,
     activityCollapsed
   } = session
@@ -481,6 +482,7 @@ export function ChatView({ isCompact = false }: ChatViewProps) {
                 textSegments={textSegments}
                 lastSegmentIndex={lastSegmentIndex}
                 sdkStatus={sdkStatus}
+                runtimeRoute={runtimeRoute}
                 hostSteps={hostSteps}
                 hostStatus={hostStatus}
                 activityCollapsed={activityCollapsed}

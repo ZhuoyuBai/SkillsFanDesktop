@@ -20,6 +20,7 @@ import type {
   SessionState,
   Thought
 } from './types'
+import type { RuntimeRouteInfo } from '../../../shared/types'
 import {
   getHeadlessElectronPath,
   getWorkingDir,
@@ -386,12 +387,14 @@ export function invalidateAllSessions(): void {
 export function createSessionState(
   spaceId: string,
   conversationId: string,
-  abortController: AbortController
+  abortController: AbortController,
+  runtimeRoute?: RuntimeRouteInfo | null
 ): SessionState {
   return {
     abortController,
     spaceId,
     conversationId,
+    runtimeRoute: runtimeRoute || null,
     pendingPermissionResolve: null,
     pendingPermissionToolCall: null,
     thoughts: [],

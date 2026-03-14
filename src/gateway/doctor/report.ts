@@ -268,7 +268,7 @@ export async function collectLocalGatewayDoctorReport(
       ? {
           key: 'runtime',
           state: 'warn',
-          summary: `Configured runtime.mode=${health.runtime.configuredMode}, but active runtime is ${health.runtime.activeKind}.`,
+          summary: health.runtime.rollout?.note || `Configured runtime.mode=${health.runtime.configuredMode}, but active runtime is ${health.runtime.activeKind}.`,
           metadata: health.runtime as unknown as Record<string, unknown>
         }
       : ((health.runtime.native?.interaction.pendingToolApprovalCount || 0) > 0
@@ -276,15 +276,18 @@ export async function collectLocalGatewayDoctorReport(
         ? {
             key: 'runtime',
             state: 'ok',
-            summary: `Runtime is healthy (${health.runtime.activeKind}); native lane has ${health.runtime.native?.interaction.pendingToolApprovalCount || 0} pending approval(s) and ${health.runtime.native?.interaction.pendingUserQuestionCount || 0} pending question(s).${health.runtime.native?.interaction.pendingUserQuestionPreview ? ` Waiting for: ${health.runtime.native.interaction.pendingUserQuestionPreview}` : ''}`,
+            summary: `Runtime is healthy (${health.runtime.activeKind}); waiting on ${health.runtime.native?.interaction.pendingToolApprovalCount || 0} confirmation(s) and ${health.runtime.native?.interaction.pendingUserQuestionCount || 0} answer(s).${health.runtime.native?.interaction.pendingUserQuestionPreview ? ` Waiting for: ${health.runtime.native.interaction.pendingUserQuestionPreview}` : ''}`,
             metadata: health.runtime as unknown as Record<string, unknown>
           }
       : {
           key: 'runtime',
           state: 'ok',
-          summary: health.runtime.nativeRegistered
-            ? `Runtime is healthy (${health.runtime.activeKind}); native lane is registered.`
-            : `Runtime is healthy (${health.runtime.activeKind}); native lane is scaffolded but not registered yet.`,
+          summary: health.runtime.rollout?.validation?.length
+            ? `Runtime is healthy (${health.runtime.activeKind}); automatic handling is ready for ${health.runtime.rollout.validation.filter((item) => item.state === 'ready').length} task group(s), held for ${health.runtime.rollout.validation.filter((item) => item.state === 'held').length}, and blocked for ${health.runtime.rollout.validation.filter((item) => item.state === 'blocked').length}.`
+            : health.runtime.rollout?.note
+            || (health.runtime.nativeRegistered
+              ? `Runtime is healthy (${health.runtime.activeKind}); automatic handling is available.`
+              : `Runtime is healthy (${health.runtime.activeKind}); automatic handling is still preparing.`),
           metadata: health.runtime as unknown as Record<string, unknown>
         },
     (

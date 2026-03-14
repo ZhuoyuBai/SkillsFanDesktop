@@ -7,9 +7,19 @@ import type {
   ToolProviderDefinition
 } from '../../tools/types'
 import type { AgentRuntime } from '../types'
+import {
+  describeRuntimeSelectionForUser,
+  resolveRuntimeSelection
+} from '../routing'
 import { listNativeRuntimeAdapters, resolveNativeRuntimeAdapter } from './adapters'
 import { resolveNativeProviderCapability } from './capabilities'
 import { executeNativePreparedRequest, NativeRuntimeUpstreamError } from './client'
+import {
+  clearNativeActiveRun,
+  getNativeActiveRun,
+  registerNativeActiveRun,
+  updateNativeActiveRunContent
+} from './active-runs'
 import {
   getNativeRuntimeInteractionStatus,
   type NativeRuntimeInteractionStatus
@@ -122,8 +132,34 @@ export const nativeRuntime: AgentRuntime = {
     }
 
     const { spaceId, conversationId } = request
+    const abortController = new AbortController()
     hostRuntimeSafeClearTask(conversationId)
-    await sendNativeRendererEvent('agent:start', spaceId, conversationId, {})
+    const configuredMode = getConfig().runtime?.mode || 'claude-sdk'
+    const runtimeSelection = resolveRuntimeSelection({
+      configuredMode: configuredMode === 'claude-sdk' ? 'hybrid' : configuredMode,
+      hasNativeRuntime: true,
+      request
+    })
+    const runtimeRoute = describeRuntimeSelectionForUser(runtimeSelection)
+    registerNativeActiveRun({
+      spaceId,
+      conversationId,
+      runtimeRoute,
+      startedAt: Date.now(),
+      abortController,
+      requestContext: {
+        aiBrowserEnabled: request.aiBrowserEnabled,
+        thinkingEnabled: request.thinkingEnabled,
+        thinkingEffort: request.thinkingEffort,
+        model: request.model,
+        modelSource: request.modelSource,
+        routeHint: request.routeHint,
+        runtimeTaskHint: request.runtimeTaskHint
+      }
+    })
+    await sendNativeRendererEvent('agent:start', spaceId, conversationId, {
+      runtimeRoute
+    })
 
     addMessage(spaceId, conversationId, {
       role: 'user',
@@ -151,9 +187,11 @@ export const nativeRuntime: AgentRuntime = {
           preparedRequest: currentPreparedRequest,
           adapter,
           options: {
+            signal: abortController.signal,
             async onStreamEvent(event) {
               if (event.kind === 'text-delta' && event.delta) {
                 streamedContent += event.delta
+                updateNativeActiveRunContent(conversationId, streamedContent)
                 await sendNativeRendererEvent('agent:message', spaceId, conversationId, {
                   type: 'message',
                   content: streamedContent,
@@ -165,6 +203,7 @@ export const nativeRuntime: AgentRuntime = {
               if (event.kind === 'text-done' && typeof event.text === 'string') {
                 streamedContent = event.text
                 latestAssistantContent = event.text
+                updateNativeActiveRunContent(conversationId, event.text)
                 await sendNativeRendererEvent('agent:message', spaceId, conversationId, {
                   type: 'message',
                   content: streamedContent,
@@ -188,6 +227,7 @@ export const nativeRuntime: AgentRuntime = {
         const finalContent = finalResponse.outputText || finalResponse.refusalText || ''
         if (finalContent) {
           latestAssistantContent = finalContent
+          updateNativeActiveRunContent(conversationId, finalContent)
         }
 
         aggregatedTokenUsage = accumulateTokenUsage(
@@ -235,6 +275,10 @@ export const nativeRuntime: AgentRuntime = {
 
         const toolOutputs = []
         for (const toolCall of finalResponse.toolCalls) {
+          if (abortController.signal.aborted) {
+            throw new Error(getNativeUserFacingMessage('requestCancelled'))
+          }
+
           const preparedTool = currentPreparedRequest.nativeTools.find((tool) => tool.name === toolCall.name)
           const result = preparedTool
             ? await executeNativeFunctionTool({
@@ -268,6 +312,10 @@ export const nativeRuntime: AgentRuntime = {
           })
         }
 
+        if (abortController.signal.aborted) {
+          throw new Error(getNativeUserFacingMessage('requestCancelled'))
+        }
+
         updateLastMessage(spaceId, conversationId, {
           content: latestAssistantContent,
           thoughts: [...assistantThoughts],
@@ -284,12 +332,16 @@ export const nativeRuntime: AgentRuntime = {
 
       throw new Error(getNativeUserFacingMessage('tooManyToolSteps'))
     } catch (error) {
+      const activeRun = getNativeActiveRun(conversationId)
+      const suppressedByInject = activeRun?.abortReason === 'inject'
       const normalized = normalizeNativeSendError(error)
-      await sendNativeRendererEvent('agent:error', spaceId, conversationId, {
-        type: 'error',
-        error: normalized.message,
-        errorCode: normalized.errorCode
-      })
+      if (!suppressedByInject) {
+        await sendNativeRendererEvent('agent:error', spaceId, conversationId, {
+          type: 'error',
+          error: normalized.message,
+          errorCode: normalized.errorCode
+        })
+      }
 
       if (error instanceof NativeRuntimeUpstreamError) {
         throw new NativeRuntimeUpstreamError({
@@ -306,6 +358,8 @@ export const nativeRuntime: AgentRuntime = {
       }
 
       throw new Error(normalized.message)
+    } finally {
+      clearNativeActiveRun(conversationId)
     }
   },
 
@@ -503,7 +557,8 @@ async function resolveNativeSharedToolContext(request: Pick<AgentRequest, 'space
     workDir,
     nativeFunctionTools: buildNativeFunctionToolDefinitions({
       mcpServers: registry.mcpServers,
-      providers: registry.providers
+      providers: registry.providers,
+      directory: registry.directory
     })
   }
 }
@@ -548,6 +603,15 @@ function accumulateTokenUsage(
 }
 
 function normalizeNativeSendError(error: unknown): { message: string; errorCode?: number } {
+  if (
+    (typeof DOMException !== 'undefined' && error instanceof DOMException && error.name === 'AbortError')
+    || (error instanceof Error && error.name === 'AbortError')
+  ) {
+    return {
+      message: getNativeUserFacingMessage('requestCancelled')
+    }
+  }
+
   if (error instanceof NativeRuntimeUpstreamError) {
     return {
       message: describeNativeUpstreamError({

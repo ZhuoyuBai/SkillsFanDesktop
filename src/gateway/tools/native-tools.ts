@@ -1,15 +1,19 @@
 import type { McpSdkServerConfigWithInstance } from '@anthropic-ai/claude-agent-sdk'
 import { z } from 'zod'
+import { findSharedToolDirectoryEntry } from './directory'
 import type {
   NativeFunctionToolDefinition,
   NativeFunctionToolParameters,
+  SharedToolDirectoryEntry,
   ToolProviderDefinition
 } from './types'
 import { NATIVE_BUILTIN_PROVIDER_ID as BUILTIN_PROVIDER_ID } from './types'
+import { SHARED_BUILT_IN_TOOL_CATALOG } from './built-ins'
 
 interface BuildNativeFunctionToolDefinitionsInput {
   mcpServers: Record<string, unknown>
   providers: ToolProviderDefinition[]
+  directory?: SharedToolDirectoryEntry[]
 }
 
 interface RegisteredSdkTool {
@@ -95,6 +99,7 @@ function listRegisteredSdkTools(server: McpSdkServerConfigWithInstance): Array<[
 }
 
 function buildAskUserQuestionToolDefinition(): NativeFunctionToolDefinition {
+  const sharedDescription = SHARED_BUILT_IN_TOOL_CATALOG.find((entry) => entry.name === 'AskUserQuestion')?.description
   const parameters: NativeFunctionToolParameters = {
     type: 'object',
     properties: {
@@ -128,10 +133,18 @@ function buildAskUserQuestionToolDefinition(): NativeFunctionToolDefinition {
     name: 'app__ask_user_question',
     providerId: BUILTIN_PROVIDER_ID,
     sourceToolName: 'AskUserQuestion',
-    description: 'Pause and ask the user one short follow-up question when a key detail is still unclear.',
+    description: sharedDescription || 'Pause and ask the user one short follow-up question when a key detail is still unclear.',
     parameters,
     strict: false
   }
+}
+
+function buildCatalogDescriptionLookup(directory: SharedToolDirectoryEntry[] | undefined): Map<string, string> {
+  const lookup = new Map<string, string>()
+  for (const entry of directory || []) {
+    lookup.set(entry.name, entry.description)
+  }
+  return lookup
 }
 
 export function buildNativeFunctionToolDefinitions(
@@ -144,6 +157,7 @@ export function buildNativeFunctionToolDefinitions(
   )
 
   const definitions: NativeFunctionToolDefinition[] = []
+  const catalogDescriptions = buildCatalogDescriptionLookup(input.directory)
 
   for (const [providerId, server] of Object.entries(input.mcpServers)) {
     if (!nativeProviderIds.has(providerId) || !isSdkServerConfig(server)) {
@@ -155,11 +169,17 @@ export function buildNativeFunctionToolDefinitions(
         continue
       }
 
+      const nativeName = buildNativeFunctionToolName(providerId, toolName)
+      const directoryEntry = findSharedToolDirectoryEntry(input.directory, nativeName)
+      if (directoryEntry && !directoryEntry.runtimeKinds.includes('native')) {
+        continue
+      }
+
       definitions.push({
-        name: buildNativeFunctionToolName(providerId, toolName),
+        name: nativeName,
         providerId,
         sourceToolName: toolName,
-        description: tool.description || `${toolName} from ${providerId}`,
+        description: catalogDescriptions.get(nativeName) || tool.description || `${toolName} from ${providerId}`,
         parameters: normalizeFunctionToolParameters(tool.inputSchema),
         strict: false
       })

@@ -5,6 +5,7 @@ import type { GatewayCommandRuntimeStatus } from '../commands'
 import type { GatewayDaemonStatus } from '../daemon'
 import type { StepJournalPersistenceStatus } from '../host-runtime/step-reporter/runtime'
 import type { GatewayLauncherStatus, GatewayProcessStatus } from '../process'
+import type { NativeRolloutStatus } from '../runtime/routing'
 import type { RuntimeKind } from '../runtime/types'
 import type { NativeRuntimeStatus } from '../runtime/native/runtime'
 import type { GatewaySessionStorePersistenceStatus } from '../sessions'
@@ -35,6 +36,7 @@ export interface GatewayRuntimeStatus {
   registeredKinds?: RuntimeKind[]
   nativeRegistered?: boolean
   hybridTaskRouting?: boolean
+  rollout?: NativeRolloutStatus
   native?: NativeRuntimeStatus
 }
 
@@ -184,12 +186,16 @@ export function buildGatewayServiceRegistry(input: GatewayServiceRegistryInput):
     category: 'runtime',
     state: input.runtime.fallbackActive ? 'degraded' : 'ready',
     summary: input.runtime.fallbackActive
-      ? `Configured runtime.mode=${input.runtime.configuredMode}, but active runtime is ${input.runtime.activeKind}.`
+      ? input.runtime.rollout?.note || `Configured runtime.mode=${input.runtime.configuredMode}, but active runtime is ${input.runtime.activeKind}.`
       : (input.runtime.native?.interaction.pendingToolApprovalCount || input.runtime.native?.interaction.pendingUserQuestionCount)
-        ? `Active runtime is ${input.runtime.activeKind}; native lane has ${input.runtime.native?.interaction.pendingToolApprovalCount || 0} pending approval(s) and ${input.runtime.native?.interaction.pendingUserQuestionCount || 0} pending question(s).${input.runtime.native?.interaction.pendingUserQuestionPreview ? ` Waiting for: ${input.runtime.native.interaction.pendingUserQuestionPreview}` : ''}`
+        ? `Active runtime is ${input.runtime.activeKind}; waiting on ${input.runtime.native?.interaction.pendingToolApprovalCount || 0} confirmation(s) and ${input.runtime.native?.interaction.pendingUserQuestionCount || 0} answer(s).${input.runtime.native?.interaction.pendingUserQuestionPreview ? ` Waiting for: ${input.runtime.native.interaction.pendingUserQuestionPreview}` : ''}`
+      : input.runtime.rollout?.validation?.length
+        ? `Active runtime is ${input.runtime.activeKind}; automatic handling is ready for ${input.runtime.rollout.validation.filter((item) => item.state === 'ready').length} task group(s), held for ${input.runtime.rollout.validation.filter((item) => item.state === 'held').length}, and blocked for ${input.runtime.rollout.validation.filter((item) => item.state === 'blocked').length}.`
+      : input.runtime.rollout?.note
+        ? input.runtime.rollout.note
       : input.runtime.nativeRegistered
-        ? `Active runtime is ${input.runtime.activeKind}; native lane is registered.`
-        : `Active runtime is ${input.runtime.activeKind}; native lane is scaffolded but not registered yet.`,
+        ? `Active runtime is ${input.runtime.activeKind}; automatic handling is available.`
+        : `Active runtime is ${input.runtime.activeKind}; automatic handling is still preparing.`,
     metadata: {
       configuredMode: input.runtime.configuredMode,
       activeKind: input.runtime.activeKind,
@@ -197,6 +203,8 @@ export function buildGatewayServiceRegistry(input: GatewayServiceRegistryInput):
       registeredKinds: input.runtime.registeredKinds || [input.runtime.activeKind],
       nativeRegistered: input.runtime.nativeRegistered ?? false,
       hybridTaskRouting: input.runtime.hybridTaskRouting ?? false,
+      rollout: input.runtime.rollout || null,
+      rolloutValidation: input.runtime.rollout?.validation || [],
       native: input.runtime.native || null
     }
   }

@@ -113,6 +113,68 @@ describe('native runtime upstream client', () => {
     })
   })
 
+  it('forwards AbortSignal to the upstream fetch call', async () => {
+    const adapter = getNativeRuntimeAdapter('openai-responses')
+    expect(adapter).not.toBeNull()
+
+    const preparedRequest = adapter!.prepareRequest({
+      mainWindow: null,
+      endpoint: {
+        requestedSource: 'custom',
+        source: 'custom',
+        authMode: 'api-key',
+        provider: 'openai',
+        baseUrl: 'https://api.openai.com/v1/responses',
+        apiKey: 'sk-test',
+        model: 'gpt-5.4',
+        apiType: 'responses',
+        forceStream: false
+      },
+      sharedToolProviders: [],
+      request: {
+        spaceId: 'space-1',
+        conversationId: 'conv-abort',
+        message: 'Hello'
+      } as any
+    })
+
+    const controller = new AbortController()
+    const fetchImpl = vi.fn<typeof fetch>(async () => new Response(JSON.stringify({
+      id: 'resp_abort',
+      object: 'response',
+      created_at: 1,
+      model: 'gpt-5.4',
+      status: 'completed',
+      output: [],
+      usage: {
+        input_tokens: 1,
+        input_tokens_details: { cached_tokens: 0 },
+        output_tokens: 0,
+        output_tokens_details: { reasoning_tokens: 0 },
+        total_tokens: 1
+      },
+      error: null
+    }), {
+      status: 200,
+      headers: {
+        'content-type': 'application/json'
+      }
+    }))
+
+    await executeNativePreparedRequest({
+      preparedRequest,
+      adapter: adapter!,
+      options: {
+        fetchImpl,
+        signal: controller.signal
+      }
+    })
+
+    expect(fetchImpl).toHaveBeenCalledWith(preparedRequest.url, expect.objectContaining({
+      signal: controller.signal
+    }))
+  })
+
   it('executes a streaming prepared request and emits normalized stream events', async () => {
     const adapter = getNativeRuntimeAdapter('openai-codex-responses')
     expect(adapter).not.toBeNull()

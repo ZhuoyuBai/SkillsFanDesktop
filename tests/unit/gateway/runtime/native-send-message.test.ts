@@ -61,11 +61,13 @@ vi.mock('../../../../src/gateway/tools', () => ({
 }))
 
 import { nativeRuntime } from '../../../../src/gateway/runtime/native/runtime'
+import { clearAllNativeActiveRunsForTests } from '../../../../src/gateway/runtime/native/active-runs'
 import { getNativeUserFacingMessage } from '../../../../src/gateway/runtime/native/user-facing'
 
 describe('native runtime sendMessage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    clearAllNativeActiveRunsForTests()
     mocks.ensureInitialized.mockResolvedValue(undefined)
     mocks.getConfig.mockReturnValue({
       browserAutomation: { mode: 'ai-browser' }
@@ -155,8 +157,7 @@ describe('native runtime sendMessage', () => {
       request: {
         spaceId: 'space-1',
         conversationId: 'conv-1',
-        message: 'Hello native',
-        aiBrowserEnabled: true
+        message: 'Hello native'
       } as any
     })
 
@@ -197,7 +198,12 @@ describe('native runtime sendMessage', () => {
       }
     })
     expect(mocks.sendToRenderer.mock.calls).toEqual([
-      ['agent:start', 'space-1', 'conv-1', {}],
+      ['agent:start', 'space-1', 'conv-1', expect.objectContaining({
+        runtimeRoute: expect.objectContaining({
+          selectedKind: 'native',
+          experience: 'new-route'
+        })
+      })],
       ['agent:message', 'space-1', 'conv-1', {
         type: 'message',
         content: 'Hel',
@@ -307,7 +313,12 @@ describe('native runtime sendMessage', () => {
     ])
 
     expect(mocks.sendToRenderer.mock.calls).toEqual([
-      ['agent:start', 'space-3', 'conv-3', {}],
+      ['agent:start', 'space-3', 'conv-3', expect.objectContaining({
+        runtimeRoute: expect.objectContaining({
+          selectedKind: 'native',
+          experience: 'new-route'
+        })
+      })],
       ['agent:thought', 'space-3', 'conv-3', {
         thought: {
           id: 'call_1',
@@ -433,6 +444,27 @@ describe('native runtime sendMessage', () => {
       type: 'error',
       error: getNativeUserFacingMessage('upstreamRateLimit'),
       errorCode: 429
+    })
+  })
+
+  it('maps aborted native requests to a stopped message', async () => {
+    const abortError = new Error('aborted')
+    abortError.name = 'AbortError'
+    mocks.executeNativePreparedRequest.mockRejectedValue(abortError)
+
+    await expect(nativeRuntime.sendMessage({
+      mainWindow: null,
+      request: {
+        spaceId: 'space-4',
+        conversationId: 'conv-4',
+        message: 'Hello native'
+      } as any
+    })).rejects.toThrow(getNativeUserFacingMessage('requestCancelled'))
+
+    expect(mocks.sendToRenderer).toHaveBeenCalledWith('agent:error', 'space-4', 'conv-4', {
+      type: 'error',
+      error: getNativeUserFacingMessage('requestCancelled'),
+      errorCode: undefined
     })
   })
 })

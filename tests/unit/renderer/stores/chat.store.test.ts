@@ -37,6 +37,30 @@ describe('chat store host activity', () => {
     expect(useChatStore.getState().getSession('conv-1').hostSteps).toEqual([])
   })
 
+  it('stores the selected runtime route when a run starts', () => {
+    useChatStore.getState().handleAgentStart({
+      spaceId: 'space-1',
+      conversationId: 'conv-1',
+      runtimeRoute: {
+        selectedKind: 'native',
+        preferredKind: 'native',
+        experience: 'new-route',
+        noteId: 'new-route-simple-task',
+        configuredMode: 'hybrid',
+        taskComplexity: 'lightweight'
+      }
+    })
+
+    expect(useChatStore.getState().getSession('conv-1').runtimeRoute).toEqual({
+      selectedKind: 'native',
+      preferredKind: 'native',
+      experience: 'new-route',
+      noteId: 'new-route-simple-task',
+      configuredMode: 'hybrid',
+      taskComplexity: 'lightweight'
+    })
+  })
+
   it('keeps only the most recent host steps in session state', () => {
     for (let index = 0; index < 30; index += 1) {
       useChatStore.getState().handleAgentHostStep({

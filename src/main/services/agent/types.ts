@@ -6,6 +6,7 @@
  */
 
 import { BrowserWindow } from 'electron'
+import type { RuntimeRouteInfo } from '../../../shared/types'
 
 // ============================================
 // API Credentials
@@ -271,6 +272,7 @@ export interface SessionState {
   abortController: AbortController
   spaceId: string
   conversationId: string
+  runtimeRoute?: RuntimeRouteInfo | null
   pendingPermissionResolve: ((approved: boolean) => void) | null
   pendingPermissionToolCall: ToolCall | null
   thoughts: Thought[]  // Backend accumulates thoughts (Single Source of Truth)

@@ -9,6 +9,7 @@ vi.mock('../../../../src/main/services/agent/helpers', () => ({
 }))
 
 import {
+  NativeUserQuestionTimeoutError,
   getNativeRuntimeInteractionStatus,
   requestNativeToolApproval,
   requestNativeUserQuestion,
@@ -20,6 +21,7 @@ import {
 describe('native runtime interaction', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.useRealTimers()
     resetNativeRuntimeInteractionForTests()
   })
 
@@ -129,6 +131,42 @@ describe('native runtime interaction', () => {
       'space-1',
       'conv-2',
       {}
+    )
+  })
+
+  it('times out a pending native user question after the default wait window', async () => {
+    vi.useFakeTimers()
+
+    const pendingAnswer = requestNativeUserQuestion({
+      spaceId: 'space-1',
+      conversationId: 'conv-timeout',
+      questions: [
+        {
+          header: '请选择',
+          question: '你想继续处理哪一个项目？',
+          options: [
+            { label: 'web-app', description: '继续处理前台项目' }
+          ],
+          multiSelect: false
+        }
+      ]
+    })
+    const timedOutAssertion = expect(pendingAnswer).rejects.toBeInstanceOf(NativeUserQuestionTimeoutError)
+
+    await vi.advanceTimersByTimeAsync(5 * 60 * 1000)
+
+    await timedOutAssertion
+    expect(getNativeRuntimeInteractionStatus()).toEqual(expect.objectContaining({
+      pendingUserQuestionCount: 0,
+      pendingUserQuestionPreview: null
+    }))
+    expect(mocks.sendToRenderer).toHaveBeenCalledWith(
+      'agent:user-question-answered',
+      'space-1',
+      'conv-timeout',
+      expect.objectContaining({
+        timedOut: true
+      })
     )
   })
 })

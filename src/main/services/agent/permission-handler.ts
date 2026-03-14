@@ -7,6 +7,7 @@
 
 import path from 'path'
 import { canDelegateGatewayCommands, executeGatewayCommand } from '../../../gateway/commands'
+import { isBlockedServerSideTool } from '../../../gateway/tools'
 import {
   resolveNativeToolApproval,
   resolveNativeUserQuestion
@@ -35,19 +36,6 @@ export type CanUseToolFn = (
   input: Record<string, unknown>,
   options: { signal: AbortSignal }
 ) => Promise<ToolPermissionResult>
-
-const BLOCKED_SERVER_SIDE_TOOLS = new Set([
-  'WebSearch',
-  'WebFetch',
-  'web_search',
-  'web_fetch',
-  'code_execution',
-  'bash_code_execution',
-  'text_editor_code_execution',
-  'tool_search_tool_regex',
-  'tool_search_tool_bm25',
-  'memory'
-])
 
 const WEB_RESEARCH_TASK_HINTS = [
   'mcp__web-tools__',
@@ -305,7 +293,7 @@ export function createCanUseTool(
       })
     }
 
-    if (BLOCKED_SERVER_SIDE_TOOLS.has(toolName)) {
+    if (isBlockedServerSideTool(toolName)) {
       return {
         behavior: 'deny' as const,
         message: `Built-in server-side tool "${toolName}" is disabled. Use local MCP tools instead.`

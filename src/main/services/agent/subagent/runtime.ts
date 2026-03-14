@@ -21,6 +21,10 @@ import {
   findPreferredGatewaySessionByConversationId
 } from '../../../../gateway/sessions'
 import { resolveSubagentGatewayRoute } from '../../../../gateway/sessions/automation'
+import {
+  isBlockedServerSideTool,
+  isHostedSubagentDisallowedBuiltInTool
+} from '../../../../gateway/tools'
 import type {
   SerializedSubagentRun,
   SubagentRun,
@@ -36,33 +40,6 @@ const MAX_AUTO_ANNOUNCE_RETRIES = 2
 const REGISTRY_VERSION = 1
 const REGISTRY_FLUSH_DEBOUNCE_MS = 200
 const RESTART_INTERRUPTED_ERROR = 'Hosted subagent was interrupted because the app restarted before it finished.'
-
-const DISALLOWED_CHILD_BUILTIN_TOOLS = new Set([
-  'Task',
-  'AskUserQuestion',
-  'TeamCreate',
-  'TeamDelete',
-  'SendMessage',
-  'TaskCreate',
-  'TaskUpdate',
-  'TaskList',
-  'TaskGet',
-  'EnterPlanMode',
-  'EnterWorktree'
-])
-
-const BLOCKED_SERVER_SIDE_TOOLS = new Set([
-  'WebSearch',
-  'WebFetch',
-  'web_search',
-  'web_fetch',
-  'code_execution',
-  'bash_code_execution',
-  'text_editor_code_execution',
-  'tool_search_tool_regex',
-  'tool_search_tool_bm25',
-  'memory'
-])
 
 const SUBAGENT_SYSTEM_PROMPT = `
 
@@ -566,7 +543,7 @@ function createSubagentCanUseTool(workDir: string) {
     if (
       toolName === 'mcp__local-tools__subagent_spawn'
       || toolName === 'mcp__local-tools__subagents'
-      || DISALLOWED_CHILD_BUILTIN_TOOLS.has(toolName)
+      || isHostedSubagentDisallowedBuiltInTool(toolName)
     ) {
       return {
         behavior: 'deny' as const,
@@ -574,7 +551,7 @@ function createSubagentCanUseTool(workDir: string) {
       }
     }
 
-    if (BLOCKED_SERVER_SIDE_TOOLS.has(toolName)) {
+    if (isBlockedServerSideTool(toolName)) {
       return {
         behavior: 'deny' as const,
         message: `The "${toolName}" tool is not available in background tasks. Use alternative local tools instead.`
@@ -730,10 +707,10 @@ async function runSubagent(runId: string): Promise<void> {
 
     sdkOptions.canUseTool = createSubagentCanUseTool(sdkOptions.cwd)
     sdkOptions.allowedTools = (sdkOptions.allowedTools || []).filter(
-      (toolName: string) => !DISALLOWED_CHILD_BUILTIN_TOOLS.has(toolName)
+      (toolName: string) => !isHostedSubagentDisallowedBuiltInTool(toolName)
     )
     sdkOptions.tools = (sdkOptions.tools || []).filter(
-      (toolName: string) => !DISALLOWED_CHILD_BUILTIN_TOOLS.has(toolName)
+      (toolName: string) => !isHostedSubagentDisallowedBuiltInTool(toolName)
     )
     sdkOptions.maxTurns = Math.min(30, sdkOptions.maxTurns || 30)
 

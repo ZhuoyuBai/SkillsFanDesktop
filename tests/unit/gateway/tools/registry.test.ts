@@ -84,6 +84,23 @@ describe('buildToolRegistry', () => {
       'local-tools': { type: 'stdio', command: 'local-tools' },
       'web-tools': { type: 'stdio', command: 'web-tools' }
     })
+    expect(result.catalog).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: 'Read', source: 'built-in' }),
+      expect.objectContaining({ name: 'mcp__local-tools__memory', source: 'mcp' })
+    ]))
+    expect(result.directory).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        name: 'Read',
+        providerId: 'built-in',
+        runtimeKinds: ['claude-sdk']
+      }),
+      expect.objectContaining({
+        name: 'mcp__local-tools__memory',
+        providerId: 'local-tools',
+        runtimeKinds: ['claude-sdk', 'native'],
+        permissionPolicyKind: 'allow'
+      })
+    ]))
     expect(mocks.createBrowserMcpServer).not.toHaveBeenCalled()
   })
 
@@ -131,6 +148,8 @@ describe('buildToolRegistry', () => {
       'local-tools': { type: 'stdio', command: 'local-tools' },
       'web-tools': { type: 'stdio', command: 'web-tools' }
     })
+    expect(result.catalog.some((entry) => entry.name === 'mcp__ai-browser__browser_new_page')).toBe(false)
+    expect(result.directory.some((entry) => entry.name === 'mcp__local-tools__open_url' && entry.permissionPolicyKind === 'system-browser-only')).toBe(true)
     expect(mocks.createBrowserMcpServer).not.toHaveBeenCalled()
   })
 
@@ -195,6 +214,23 @@ describe('buildToolRegistry', () => {
       skill: { type: 'stdio', command: 'skill' },
       calendar: { type: 'stdio', command: 'calendar-mcp' }
     })
+    expect(result.catalog).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: 'mcp__ai-browser__browser_new_page' }),
+      expect.objectContaining({ name: 'mcp__local-tools__subagent_spawn' }),
+      expect.objectContaining({ name: 'mcp__skill__Skill' })
+    ]))
+    expect(result.directory).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        name: 'mcp__ai-browser__browser_new_page',
+        providerId: 'ai-browser',
+        runtimeKinds: ['claude-sdk', 'native']
+      }),
+      expect.objectContaining({
+        name: 'mcp__skill__Skill',
+        providerId: 'skill',
+        runtimeKinds: ['claude-sdk']
+      })
+    ]))
     expect(mocks.createBrowserMcpServer).toHaveBeenCalledWith('automated', {
       spaceId: 'space-3',
       conversationId: 'conv-3'

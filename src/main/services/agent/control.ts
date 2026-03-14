@@ -12,6 +12,11 @@
 import { BrowserWindow } from 'electron'
 import { canDelegateGatewayCommands, executeGatewayCommand } from '../../../gateway/commands'
 import { sendMessage } from '../../../gateway/runtime/orchestrator'
+import {
+  abortNativeActiveRun,
+  getNativeActiveRun,
+  listNativeActiveRuns
+} from '../../../gateway/runtime/native/active-runs'
 import { getGatewaySessionStepJournal, stepReporterRuntime } from '../../../gateway/host-runtime'
 import { listGatewaySubagentRunsForConversation } from '../../../gateway/automation/subagents'
 import { findPreferredGatewaySessionByConversationId } from '../../../gateway/sessions/store'
@@ -19,6 +24,7 @@ import { activeSessions, v2Sessions } from './session-manager'
 import { getConversation, updateLastMessage } from '../conversation.service'
 import { agentQueue } from './lane-queue'
 import type { Thought, Attachment, ImageAttachment } from './types'
+import type { RuntimeRouteInfo } from '../../../shared/types'
 import type { HostStep } from '../../../shared/types/host-runtime'
 import {
   killSubagentRun,
@@ -100,6 +106,7 @@ export async function stopGeneration(conversationId?: string): Promise<void> {
 
     // Stop specific session
     const session = activeSessions.get(conversationId)
+    const nativeRunStopped = abortNativeActiveRun(conversationId, 'stop')
     if (session) {
       session.abortController.abort()
       activeSessions.delete(conversationId)
@@ -123,6 +130,8 @@ export async function stopGeneration(conversationId?: string): Promise<void> {
       }
 
       console.log(`[Agent] Stopped generation for conversation: ${conversationId}`)
+    } else if (nativeRunStopped) {
+      console.log(`[Agent] Stopped native generation for conversation: ${conversationId}`)
     }
   } else {
     // Stop all sessions (backward compatibility)
@@ -158,6 +167,9 @@ export async function stopGeneration(conversationId?: string): Promise<void> {
       console.log(`[Agent] Stopped generation for conversation: ${convId}`)
     }
     activeSessions.clear()
+    for (const nativeRun of listNativeActiveRuns()) {
+      abortNativeActiveRun(nativeRun.conversationId, 'stop')
+    }
     console.log('[Agent] All generations stopped')
   }
 
@@ -217,6 +229,37 @@ export async function interruptAndInject(
   // 1. Get current session state
   const sessionState = activeSessions.get(conversationId)
   const v2SessionInfo = v2Sessions.get(conversationId)
+  const nativeRun = getNativeActiveRun(conversationId)
+
+  if ((!sessionState || !v2SessionInfo) && nativeRun) {
+    const previousUserMessage = getLatestUserMessage(spaceId, conversationId)
+    const continuationPrefix = buildContinuationPrefix(previousUserMessage)
+
+    if (nativeRun.latestContent?.trim()) {
+      updateLastMessage(spaceId, conversationId, {
+        content: nativeRun.latestContent
+      })
+    }
+
+    abortNativeActiveRun(conversationId, 'inject')
+
+    await sendMessage(mainWindow, {
+      spaceId,
+      conversationId,
+      message,
+      messagePrefix: continuationPrefix || undefined,
+      images,
+      attachments,
+      aiBrowserEnabled: nativeRun.requestContext?.aiBrowserEnabled,
+      thinkingEnabled: nativeRun.requestContext?.thinkingEnabled,
+      thinkingEffort: nativeRun.requestContext?.thinkingEffort,
+      model: nativeRun.requestContext?.model,
+      modelSource: nativeRun.requestContext?.modelSource,
+      routeHint: nativeRun.requestContext?.routeHint,
+      runtimeTaskHint: nativeRun.requestContext?.runtimeTaskHint
+    })
+    return
+  }
 
   if (!sessionState || !v2SessionInfo) {
     throw new Error('No active session to inject into')
@@ -280,14 +323,17 @@ export async function interruptAndInject(
  * Check if a conversation has an active generation
  */
 export function isGenerating(conversationId: string): boolean {
-  return activeSessions.has(conversationId)
+  return activeSessions.has(conversationId) || getNativeActiveRun(conversationId) !== null
 }
 
 /**
  * Get all active session conversation IDs
  */
 export function getActiveSessions(): string[] {
-  return Array.from(activeSessions.keys())
+  return Array.from(new Set([
+    ...Array.from(activeSessions.keys()),
+    ...listNativeActiveRuns().map((run) => run.conversationId)
+  ]))
 }
 
 /**
@@ -303,7 +349,7 @@ export interface ActiveSessionWithKeys {
  * Get all active sessions enriched with gateway session keys.
  */
 export function getActiveSessionsWithKeys(): ActiveSessionWithKeys[] {
-  return Array.from(activeSessions.keys()).map((conversationId) => {
+  return getActiveSessions().map((conversationId) => {
     const gwSession = findPreferredGatewaySessionByConversationId(conversationId)
     return {
       conversationId,
@@ -369,11 +415,13 @@ export function getSessionState(conversationId: string): {
     durationMs?: number
   }>
   hostSteps: HostStep[]
+  runtimeRoute?: RuntimeRouteInfo | null
   spaceId?: string
   sessionKey?: string
   mainSessionKey?: string
 } {
   const session = activeSessions.get(conversationId)
+  const nativeRun = getNativeActiveRun(conversationId)
   const subagentRuns = listGatewaySubagentRunsForConversation(conversationId)
   const gwSession = findPreferredGatewaySessionByConversationId(conversationId)
   const hostSteps = gwSession
@@ -381,11 +429,13 @@ export function getSessionState(conversationId: string): {
     : stepReporterRuntime.listSteps(conversationId)
   if (!session) {
     return {
-      isActive: false,
+      isActive: nativeRun !== null,
       thoughts: [],
       taskProgress: [],
       subagentRuns,
       hostSteps: hostSteps.length > 0 ? hostSteps : [],
+      runtimeRoute: nativeRun?.runtimeRoute || null,
+      spaceId: nativeRun?.spaceId,
       sessionKey: gwSession?.sessionKey,
       mainSessionKey: gwSession?.mainSessionKey
     }
@@ -399,6 +449,7 @@ export function getSessionState(conversationId: string): {
     })),
     subagentRuns,
     hostSteps: hostSteps.length > 0 ? hostSteps : [],
+    runtimeRoute: session.runtimeRoute || null,
     spaceId: session.spaceId,
     sessionKey: gwSession?.sessionKey,
     mainSessionKey: gwSession?.mainSessionKey

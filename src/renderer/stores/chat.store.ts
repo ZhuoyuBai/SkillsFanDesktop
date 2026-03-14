@@ -21,7 +21,22 @@
 
 import { create } from 'zustand'
 import { api } from '../api'
-import type { Conversation, ConversationMeta, Message, ToolCall, Artifact, Thought, AgentEventBase, ImageAttachment, Attachment, CompactInfo, CanvasContext, TextSegment, HostStep } from '../types'
+import type {
+  Conversation,
+  ConversationMeta,
+  Message,
+  ToolCall,
+  Artifact,
+  Thought,
+  AgentEventBase,
+  ImageAttachment,
+  Attachment,
+  CompactInfo,
+  CanvasContext,
+  TextSegment,
+  HostStep,
+  RuntimeRouteInfo
+} from '../types'
 import { hasAnyAISource } from '../types'
 import { canvasLifecycle } from '../services/canvas-lifecycle'
 import { useAppStore } from './app.store'
@@ -84,6 +99,8 @@ interface SessionState {
   draftContent: string
   // SDK status line message (ephemeral, clears when generation completes)
   sdkStatus: string | null
+  // Human-facing runtime route for the current run
+  runtimeRoute: RuntimeRouteInfo | null
   // Sub-agent task progress (from agent:task-update events)
   taskProgressMap: Map<string, TaskProgress>
   // Hosted subagent runtime runs (from agent:subagent-update events)
@@ -180,6 +197,7 @@ function createEmptySessionState(): SessionState {
     pendingUserQuestion: null,
     draftContent: '',
     sdkStatus: null,
+    runtimeRoute: null,
     taskProgressMap: new Map(),
     subagentRunMap: new Map(),
     hostSteps: []
@@ -291,7 +309,7 @@ interface ChatState {
   addTaskStatus: (conversationId: string, taskContent: string, status: string) => void
 
   // Event handlers (called from App component) - with session IDs
-  handleAgentStart: (data: AgentEventBase) => void
+  handleAgentStart: (data: AgentEventBase & { runtimeRoute?: RuntimeRouteInfo | null }) => void
   handleAgentMessage: (data: AgentEventBase & { content: string; isComplete: boolean }) => void
   handleAgentToolCall: (data: AgentEventBase & ToolCall) => void
   handleAgentToolResult: (data: AgentEventBase & { toolId: string; result: string; isError: boolean }) => void
@@ -588,6 +606,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           taskProgress?: TaskProgress[]
           subagentRuns?: SubagentRunEntry[]
           hostSteps?: HostStep[]
+          runtimeRoute?: RuntimeRouteInfo | null
           spaceId?: string
         }
         const recoveredTaskProgress = new Map(
@@ -622,7 +641,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
               thoughts: sessionState.thoughts,
               taskProgressMap: recoveredTaskProgress,
               subagentRunMap: recoveredSubagentRuns,
-              hostSteps: recoveredHostSteps
+              hostSteps: recoveredHostSteps,
+              runtimeRoute: sessionState.runtimeRoute || null
             })
 
             return { sessions: newSessions }
@@ -1235,7 +1255,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   // Handle agent start - reset session state when a message actually begins executing
   // This is sent by the backend when a queued message starts processing (not when queued)
   handleAgentStart: (data) => {
-    const { conversationId } = data
+    const { conversationId, runtimeRoute } = data as AgentEventBase & { runtimeRoute?: RuntimeRouteInfo | null }
     logger.debug(`[ChatStore] handleAgentStart [${conversationId}]`)
 
     set((state) => {
@@ -1251,6 +1271,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         pendingToolApproval: null,
         compactInfo: null,
         sdkStatus: null,
+        runtimeRoute: runtimeRoute || null,
         textSegments: [],
         lastSegmentIndex: 0,
         hostSteps: []
@@ -1354,14 +1375,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set((state) => {
       const newSessions = new Map(state.sessions)
       const session = newSessions.get(conversationId) || createEmptySessionState()
-      newSessions.set(conversationId, {
-        ...session,
-        error,
-        isGenerating: false,
-        isThinking: false,
-        sdkStatus: null,
-        thoughts: [...session.thoughts, errorThought]
-      })
+        newSessions.set(conversationId, {
+          ...session,
+          error,
+          isGenerating: false,
+          isThinking: false,
+          sdkStatus: null,
+          thoughts: [...session.thoughts, errorThought]
+        })
       return { sessions: newSessions }
     })
   },

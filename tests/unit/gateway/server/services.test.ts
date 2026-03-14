@@ -120,6 +120,14 @@ describe('gateway service registry', () => {
         registeredKinds: ['claude-sdk'],
         nativeRegistered: false,
         hybridTaskRouting: true,
+        rollout: {
+          phase: 'first-batch',
+          includedScopes: ['chat-simple', 'browser-simple', 'terminal-simple'],
+          excludedScopes: ['skills', 'agent-team', 'long-workflow', 'pdf-text-attachments'],
+          simpleTasksCanUseNative: false,
+          note: 'The existing route is still the only route in use, so the new route is not taking over yet.',
+          validation: []
+        },
         native: {
           scaffolded: true,
           ready: false,
@@ -297,6 +305,15 @@ describe('gateway service registry', () => {
         desktopRunningSmokeFlowIds: [],
         desktopPassedSmokeFlowIds: [],
         desktopFailedSmokeFlowIds: []
+      })
+    }))
+    expect(services.find((service) => service.key === 'agent-runtime')).toEqual(expect.objectContaining({
+      summary: 'The existing route is still the only route in use, so the new route is not taking over yet.',
+      metadata: expect.objectContaining({
+        rollout: expect.objectContaining({
+          phase: 'first-batch',
+          simpleTasksCanUseNative: false
+        })
       })
     }))
   })

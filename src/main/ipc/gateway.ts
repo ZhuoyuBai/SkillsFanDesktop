@@ -16,7 +16,11 @@ import {
   getGatewayProcessStatus,
   recoverExternalGatewayLauncher
 } from '../../gateway/process'
-import { getGatewayHealth, listGatewayServices } from '../../gateway/server/health'
+import {
+  getGatewayHealth,
+  listGatewayServices,
+  runGatewayRuntimeRolloutAcceptance
+} from '../../gateway/server/health'
 import { ipcHandle } from './utils'
 
 export function registerGatewayHandlers(): void {
@@ -114,6 +118,18 @@ export function registerGatewayHandlers(): void {
 
     return await runDesktopSmokeFlow({
       flowId: flowId.trim(),
+      workDir: process.cwd()
+    })
+  })
+
+  ipcHandle('gateway:runtime-rollout-trial-run', async (_event, targetId?: string) => {
+    const normalizedTarget = (targetId || '').trim() || 'all'
+    if (!['all', 'chat-simple', 'browser-simple', 'terminal-simple'].includes(normalizedTarget)) {
+      throw new Error('Please specify which first-batch check to run')
+    }
+
+    return await runGatewayRuntimeRolloutAcceptance({
+      targetId: normalizedTarget as 'all' | 'chat-simple' | 'browser-simple' | 'terminal-simple',
       workDir: process.cwd()
     })
   })

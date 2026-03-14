@@ -5721,3 +5721,977 @@ npm run build
   - 补 native lane 的 user-question 历史、超时和恢复
   - 再收一轮“失败后怎么提示用户下一步”
   - 再评估哪一批简单任务可以优先切到 native lane
+
+## Step 88: Native lane 追问增加简单超时，并缩小首批放量范围
+
+### 本步目标
+
+- 给 native lane 的追问补一个简单超时，避免任务一直卡在“等你回答”状态。
+- 同时把首批默认放量范围收窄，只让当前更稳的任务先走 native lane。
+
+### 更新
+
+- 更新：
+  - `src/gateway/runtime/native/interaction.ts`
+    - native 追问现在默认等待 `5` 分钟
+    - 超时后会：
+      - 自动清掉 pending question
+      - 通知前端收起提问卡片
+      - 返回一条明确、非技术的提示：
+        - 这次等待已结束
+        - 如果还想继续，重新发一句话即可
+  - `src/gateway/runtime/native/user-facing.ts`
+    - 新增 `questionTimedOut` 用户提示文案
+  - `src/gateway/runtime/routing.ts`
+    - `hybrid / native` 路由现在会把当前还不适合首批 native 放量的请求继续留在 `claude-sdk`
+    - 当前先做最小保护：
+      - 带 `pdf / text` 附件的请求不会强行走 native
+      - 避免用户直接撞到 native v1 还没补齐的输入边界
+- 更新测试：
+  - `tests/unit/gateway/runtime/native-interaction.test.ts`
+  - `tests/unit/gateway/runtime/routing.test.ts`
+  - `tests/unit/gateway/runtime/native-runtime.test.ts`
+  - `tests/unit/gateway/runtime/native-send-message.test.ts`
+  - `tests/unit/gateway/runtime/native-tool-executor.test.ts`
+
+### 这一小步的定位
+
+- 这一步解决的是：
+  - native lane 不会因为一条未回答的追问一直挂着
+  - 首批走 native 的请求范围更保守，更接近“稳定可用”
+- 这一步没有试图解决的是：
+  - 复杂的超时恢复策略
+  - 长期历史、自动重试或多轮恢复
+
+### 验证
+
+```bash
+npm run test:unit -- tests/unit/gateway/runtime/native-interaction.test.ts tests/unit/gateway/runtime/routing.test.ts tests/unit/gateway/runtime/native-tool-executor.test.ts tests/unit/gateway/runtime/native-runtime.test.ts tests/unit/gateway/runtime/native-send-message.test.ts
+npm run build
+```
+
+### 结果
+
+- 通过
+- 单测：`5` 个测试文件，`22` 个测试通过
+- 构建：通过
+
+### 下一步
+
+- 继续 `M7`
+  - 再补一轮 native lane 的失败提示和用户可见状态
+  - 再继续沿技术文档推进 provider-native 的稳定放量
+
+## Step 89: 把 native lane 首批放量范围做成用户可见说明
+
+### 本步目标
+
+- 让用户在设置页和诊断里直接看懂：
+  - 这条新路线现在会先处理哪些任务
+  - 哪些任务还会继续留在原来的路线
+  - 当前模型和当前设置为什么还没有完全切过去
+
+### 更新
+
+- 更新：
+  - `src/gateway/runtime/routing.ts`
+    - 新增首批 native 放量范围定义：
+      - 已纳入：
+        - 普通问答
+        - 简单浏览器任务
+        - 简单终端任务
+      - 暂时仍留在原路线：
+        - 技能
+        - 多助手协作
+        - 长任务链
+        - PDF / 文本附件
+    - 新增 `resolveNativeRolloutStatus()`，统一生成当前放量说明
+  - `src/gateway/runtime/native/user-facing.ts`
+    - 新增更直白的放量状态文案：
+      - 仍只用原路线
+      - 首批简单任务已可先走新路线
+      - 超出范围会自动回到原路线
+  - `src/gateway/server/health.ts`
+  - `src/gateway/server/services.ts`
+  - `src/gateway/doctor/report.ts`
+    - runtime health / services / doctor 现在都会携带 rollout 状态
+  - `src/renderer/pages/SettingsPage.tsx`
+    - `Gateway Diagnostics` 现在新增：
+      - 当前模型状态
+      - 当前放量范围
+      - 会先走新路线的任务标签
+      - 仍走原路线的任务标签
+    - fallback 提示也不再只是泛泛地说“回退了”，而是直接说明原因
+  - `src/renderer/i18n/locales/en.json`
+  - `src/renderer/i18n/locales/zh-CN.json`
+  - `src/renderer/i18n/locales/zh-TW.json`
+    - 补齐这一轮新增 UI 的三语文案
+- 更新测试：
+  - `tests/unit/gateway/runtime/routing.test.ts`
+  - `tests/unit/gateway/server/health.test.ts`
+  - `tests/unit/gateway/server/services.test.ts`
+  - `tests/unit/gateway/doctor/report.test.ts`
+
+### 这一小步的定位
+
+- 这一步解决的是：
+  - 用户终于能直接看到“新路线现在能接哪些简单任务”
+  - 用户能看懂为什么当前还没完全切过去
+  - PM 视角下，这条新路线已经从“内部状态”变成“产品里能解释清楚的状态”
+- 这一步没有试图解决的是：
+  - 更复杂的灰度策略
+  - 自动分配流量比例
+  - 第二批 provider 的接入
+
+### 验证
+
+```bash
+npm run test:unit -- tests/unit/gateway/runtime/routing.test.ts tests/unit/gateway/server/health.test.ts tests/unit/gateway/server/services.test.ts tests/unit/gateway/doctor/report.test.ts
+npm run build
+```
+
+### 结果
+
+- 通过
+- 单测：`4` 个测试文件，`15` 个测试通过
+- 构建：通过
+
+### 下一步
+
+- 继续 `M7`
+  - 开始做首批 simple task 的真实放量与更清楚的回退原因
+  - 再做一轮更贴近真实任务的验收，而不是只看内部链路
+
+## Step 90: 把 simple task 例子直接放到设置页
+
+### 本步目标
+
+- 让用户不只是看到“普通问答 / 简单浏览器任务 / 简单终端任务”这些分类词。
+- 而是能直接看到几条例子，知道什么算首批 simple task，什么还不算。
+
+### 更新
+
+- 更新：
+  - `src/renderer/pages/SettingsPage.tsx`
+    - 在 `Gateway Diagnostics > Current rollout` 里新增例子列表
+    - 现在会直接展示：
+      - 会先走新路线的例子
+      - 仍走原路线的例子
+  - `src/renderer/i18n/locales/en.json`
+  - `src/renderer/i18n/locales/zh-CN.json`
+  - `src/renderer/i18n/locales/zh-TW.json`
+    - 补齐 simple task 示例文案
+
+### 这一小步的定位
+
+- 这一步解决的是：
+  - 用户终于能看懂“simple task”不是一个抽象词
+  - 产品上这条新路线的首批范围更容易解释
+- 这一步没有试图解决的是：
+  - 自动判定更多边界任务
+  - 扩大首批放量范围
+
+### 验证
+
+```bash
+npm run build
+```
+
+### 结果
+
+- 通过
+- 构建：通过
+
+### 下一步
+
+- 继续 `M7`
+  - 真正开始做首批 simple task 的小范围放量与验收
+
+## Step 91: 把 simple task 示例升级成真实路由预览
+
+### 本步目标
+
+- 不只告诉用户“simple task 包括哪些例子”。
+- 还要直接告诉用户：如果现在真的发这类任务，它会走新路线还是原来的路线。
+
+### 更新
+
+- 更新：
+  - `src/gateway/runtime/routing.ts`
+    - 新增首批放量的 preview 计算
+    - 现在会用真实路由规则去预览这些典型任务：
+      - 普通问答
+      - 简单浏览器任务
+      - 简单终端任务
+      - 技能
+      - 多助手协作
+      - 长任务链
+      - PDF / 文本附件
+  - `src/renderer/pages/SettingsPage.tsx`
+    - `Current rollout` 下新增“如果你现在发这些任务”列表
+    - 每条示例都会直接显示：
+      - 会走新路线
+      - 或会留在原路线
+  - `src/renderer/i18n/locales/en.json`
+  - `src/renderer/i18n/locales/zh-CN.json`
+  - `src/renderer/i18n/locales/zh-TW.json`
+    - 补齐动态预览相关文案
+- 更新测试：
+  - `tests/unit/gateway/runtime/routing.test.ts`
+  - `tests/unit/gateway/server/health.test.ts`
+  - `tests/unit/gateway/server/services.test.ts`
+  - `tests/unit/gateway/doctor/report.test.ts`
+
+### 这一小步的定位
+
+- 这一步解决的是：
+  - 用户能直接看到“现在发这类任务会走哪条路线”
+  - PM 视角能更明确地区分：
+    - 静态支持范围
+    - 当前真实可用路径
+- 这一步没有试图解决的是：
+  - 自动化放量比例控制
+  - 多轮流量实验
+
+### 验证
+
+```bash
+npm run test:unit -- tests/unit/gateway/runtime/routing.test.ts tests/unit/gateway/server/health.test.ts tests/unit/gateway/server/services.test.ts tests/unit/gateway/doctor/report.test.ts
+npm run build
+```
+
+### 结果
+
+- 通过
+- 单测：`4` 个测试文件，`16` 个测试通过
+- 构建：通过
+
+### 下一步
+
+- 继续 `M7`
+  - 进入首批 simple task 的真实放量与验收
+
+## Step 92: 把真实对话的 runtime 路线接到聊天里
+
+### 本步目标
+
+- 不只在设置页里说明“哪些任务可能走新路线”。
+- 还要在一次真实对话开始时，直接告诉用户：这次实际走的是新路线还是原路线。
+
+### 更新
+
+- 更新：
+  - `src/shared/types/runtime.ts`
+    - 新增跨进程可复用的 `RuntimeRouteInfo`
+  - `src/gateway/runtime/routing.ts`
+    - 新增 `describeRuntimeSelectionForUser()`
+    - 把 runtime 选择结果映射成用户可见的路线说明
+  - `src/main/services/agent/send-message.ts`
+  - `src/gateway/runtime/native/runtime.ts`
+    - 在真实请求开始执行时，把当前路线随 `agent:start` 一起发到前端
+  - `src/renderer/stores/chat.store.ts`
+    - 会话状态现在会记住本次真实路线
+  - `src/renderer/components/chat/RuntimeRouteBanner.tsx`
+  - `src/renderer/components/chat/MessageList.tsx`
+  - `src/renderer/components/chat/ChatView.tsx`
+    - 在聊天流里新增一条轻量提示：
+      - 这次先走新路线
+      - 或这次继续走原路线
+    - 并配上一句人话原因
+  - `src/renderer/i18n/locales/en.json`
+  - `src/renderer/i18n/locales/zh-CN.json`
+  - `src/renderer/i18n/locales/zh-TW.json`
+    - 补齐真实路线提示的三语文案
+- 更新测试：
+  - `tests/unit/gateway/runtime/routing.test.ts`
+  - `tests/unit/gateway/runtime/native-send-message.test.ts`
+  - `tests/unit/renderer/stores/chat.store.test.ts`
+
+### 这一小步的定位
+
+- 这一步解决的是：
+  - 用户不只知道“理论上哪些任务属于首批”
+  - 还能在真实执行时看到“这次到底走了哪条路线”
+- 这一步没有试图解决的是：
+  - 对话级历史统计
+  - 路线切换报表
+  - 更复杂的放量分析
+
+### 验证
+
+```bash
+npm run test:unit -- tests/unit/gateway/runtime/routing.test.ts tests/unit/gateway/runtime/native-send-message.test.ts tests/unit/renderer/stores/chat.store.test.ts
+npm run build
+```
+
+### 结果
+
+- 通过
+- 单测：`3` 个测试文件，`17` 个测试通过
+- 构建：通过
+
+### 下一步
+
+- 继续 `M7`
+  - 开始做首批 simple task 的真实放量与验收
+
+## Step 93：把首批 simple task 的真实放量边界收窄到“够用就收”
+
+### 背景
+
+- 前一轮已经把“这次实际走的是新路线还是原路线”接到了聊天里。
+- 但当时的放量边界仍然偏宽，很多“理论上是轻任务、实际并不适合首批 native”的请求也可能命中新路线。
+- 这一步的目标不是做更复杂的分类系统，而是按产品经理视角把首批 native rollout 收到一个更稳的范围：
+  - 保留：短问答、简单浏览器任务、简单终端任务
+  - 暂不放：图片、AI 浏览器、多步骤长请求、超出 `Terminal / Chrome / iTerm` 的桌面自动化
+
+### 更新
+
+- 更新：
+  - `src/gateway/runtime/routing.ts`
+    - 新增首批 native rollout 的真实 scope 解析
+    - 现在会明确把这些请求留在原路线：
+      - `pdf / text attachments`
+      - 图片请求
+      - `aiBrowserEnabled`
+      - 继续已有工作流的请求
+      - 多步骤长文本请求
+      - `skills / agent-team / long automation`
+      - 超出 `Terminal / Chrome` 范围的通用 desktop automation
+    - 同时保留三类首批 simple task：
+      - `chat-simple`
+      - `browser-simple`
+      - `terminal-simple`
+- 更新测试：
+  - `tests/unit/gateway/runtime/routing.test.ts`
+    - 新增图片、AI 浏览器、多步骤长请求、非终端桌面自动化的回归
+  - `tests/unit/gateway/runtime/native-send-message.test.ts`
+    - 同步新的首批范围，避免把 AI 浏览器请求继续当成 native baseline
+
+### 这一小步的定位
+
+- 这一步解决的是：
+  - 首批 native rollout 不再“只要轻任务就先上”
+  - 而是正式缩到“短问答 + 简单浏览器 + 简单终端”这三类
+- 这一步没有做的是：
+  - 更复杂的模型分类
+  - 历史统计
+  - 复杂灰度控制
+
+### 验证
+
+```bash
+npm run test:unit -- tests/unit/gateway/runtime/routing.test.ts tests/unit/gateway/runtime/native-send-message.test.ts tests/unit/services/agent/control.test.ts tests/unit/renderer/stores/chat.store.test.ts
+npm run build
+```
+
+### 结果
+
+- 通过
+- 单测：`4` 个测试文件，`26` 个测试通过
+- 构建：通过
+
+### 下一步
+
+- 继续 `M7`
+  - 开始做首批 simple task 的真实放量验收，不再继续扩宽边界
+
+## Step 94：把首批 simple task 验收做成可直接运行的检查入口
+
+### 背景
+
+- 前面几步已经把首批 native rollout 的范围、例子、真实路由预览和聊天内路线提示都做出来了。
+- 但那时用户仍然只能“看说明、看状态”，还不能真正点一下验证：
+  - 短问答是否真的能走新路线
+  - 简单浏览器任务是否真的 ready
+  - 简单终端任务是否真的 ready
+- 这一步的目标不是再做复杂统计系统，而是按“够用就收”的产品标准，把首批验收做成：
+  - 单项可运行
+  - 整组可运行
+  - 最近一次结果可见
+
+### 本轮改动
+
+- `src/gateway/runtime/rollout-types.ts`
+  - 抽出首批 rollout validation / trial 的共享类型：
+    - `NativeRolloutValidationId`
+    - `NativeRolloutTrialResult`
+    - `NativeRolloutTrialCheckResult`
+
+- `src/gateway/runtime/rollout-trials.ts`
+  - 新增首批 simple task 验收结果的轻量内存态快照层
+  - 只记录最近一次结果，不做复杂历史系统
+
+- `src/gateway/runtime/rollout-acceptance.ts`
+  - 新增首批 simple task 的统一验收执行器
+  - 支持：
+    - `chat-simple`
+    - `browser-simple`
+    - `terminal-simple`
+    - `all`
+  - `chat-simple`
+    - 走真实 native endpoint
+    - 发一个最小短问答请求，要求只回复 `READY`
+    - 用来验证：
+      - 当前 source/adapter 是否真的 ready
+      - 当前新路线是否能完成一条最基本的短问答
+  - `browser-simple`
+    - 复用现有 desktop smoke flows：
+      - `chrome.tab-roundtrip`
+      - `chrome.discovery-roundtrip`
+  - `terminal-simple`
+    - 复用现有 desktop smoke flows：
+      - `terminal.command-roundtrip`
+      - `terminal.session-targeting`
+
+- `src/gateway/runtime/routing.ts`
+  - 把最近一次 trial snapshot 挂进 `rollout.validation[].lastTrial`
+  - 这样 health / settings 不需要另起一套状态模型
+
+- `src/gateway/server/health.ts`
+  - 新增 runtime rollout acceptance 的 gateway facade
+
+- `src/main/ipc/gateway.ts`
+  - 新增 IPC：
+    - `gateway:runtime-rollout-trial-run`
+
+- `src/preload/index.ts`
+- `src/renderer/api/index.ts`
+  - 新增桌面端 API：
+    - `runGatewayRuntimeRolloutTrial(targetId)`
+
+- `src/renderer/pages/SettingsPage.tsx`
+  - 在 `Settings > Gateway Diagnostics > Current rollout > First batch trial status` 下新增：
+    - `Run first batch checks`
+    - 每个任务组自己的 `Run this check`
+  - 新增“最近一次试跑”状态展示：
+    - 运行中 / 通过 / 失败
+    - 开始时间
+    - 耗时
+    - 摘要
+    - 错误原因
+
+- `src/renderer/i18n/locales/en.json`
+- `src/renderer/i18n/locales/zh-CN.json`
+- `src/renderer/i18n/locales/zh-TW.json`
+  - 补齐首批验收按钮和结果文案
+
+- `tests/unit/gateway/runtime/rollout-acceptance.test.ts`
+  - 新增首批 simple task 验收测试：
+    - `chat-simple` 通过
+    - `all` 顺序执行
+    - `browser-simple` 失败回写 snapshot
+
+### 结果
+
+- 通过
+- 单测：
+  - `tests/unit/gateway/runtime/rollout-acceptance.test.ts`
+  - `tests/unit/gateway/runtime/routing.test.ts`
+  - `tests/unit/gateway/server/health.test.ts`
+  - `tests/unit/gateway/server/services.test.ts`
+  - `tests/unit/gateway/doctor/report.test.ts`
+  - 合计 `5` 个测试文件，`27` 个测试通过
+- 构建：`npm run build` 通过
+
+### 产品意义
+
+- 用户现在不只是能看“首批 simple task 理论上可不可以”。
+- 还可以直接点一下，真正验证：
+  - 短问答
+  - 简单浏览器任务
+  - 简单终端任务
+  当前机器是不是 ready。
+- 这让 `M7` 从“状态可见”推进到了“首批真实验收可运行”。
+
+### 下一步
+
+- 继续 `M7`
+  - 不再继续堆说明和状态
+  - 开始做首批 simple task 的真实放量与更清楚的回退原因
+
+## Step 95：把首批试用范围做成用户可直接切换的入口
+
+### 做了什么
+
+- `src/renderer/pages/SettingsPage.tsx`
+  - 在 `Settings > Computer Automation / 电脑自动化` 顶部新增 `Simple task trial / 简单任务试用` 卡片
+  - 直接提供自动保存开关：
+    - 关闭时：统一回到 `claude-sdk`
+    - 打开时：统一切到 `hybrid`
+  - 卡片会直接显示：
+    - 当前选择
+    - 首批会先试新方式的任务例子
+    - 仍继续用稳定方式的任务例子
+    - 一键运行首批检查
+  - 不再要求用户先理解 `claude-sdk / hybrid / native`
+
+- `src/renderer/components/chat/RuntimeRouteBanner.tsx`
+  - 沿用原组件逻辑，但通过三语文案把聊天内提示从“新路线 / 原路线”统一改成：
+    - `先试新方式`
+    - `稳定方式`
+  - 同时把原因解释收成更口语化表达
+
+- `src/renderer/i18n/locales/en.json`
+- `src/renderer/i18n/locales/zh-CN.json`
+- `src/renderer/i18n/locales/zh-TW.json`
+  - 把 `Current rollout / route / new route / existing route` 相关词统一收成：
+    - `Current trial scope / 当前试用范围 / 目前試用範圍`
+    - `new way / 新方式`
+    - `stable way / 稳定方式 / 穩定方式`
+  - 新增首批试用开关所需文案
+  - 补齐简体/繁体 `Enabled` 等缺口
+
+- `src/gateway/runtime/native/user-facing.ts`
+  - 把 native rollout 相关用户文案同步改成：
+    - `只使用稳定方式`
+    - `首批简单任务先试新方式`
+    - `超出范围自动回到稳定方式`
+
+### 结果
+
+- 通过
+- 单测：
+  - `tests/unit/gateway/runtime/routing.test.ts`
+  - `tests/unit/gateway/runtime/native-runtime.test.ts`
+  - `tests/unit/gateway/server/health.test.ts`
+  - `tests/unit/gateway/server/services.test.ts`
+  - `tests/unit/gateway/doctor/report.test.ts`
+  - 合计 `5` 个测试文件，`31` 个测试通过
+- 构建：`npm run build` 通过
+
+### 产品意义
+
+- 首批 simple task 不再只是“设置页里看得到、诊断里解释得到”的能力。
+- 现在它已经变成了一个普通用户能直接理解和切换的入口：
+  - 打开：短问答、简单浏览器任务、简单终端任务会先试新方式
+  - 关闭：全部继续用稳定方式
+- 聊天里也不再直接出现“route / rollout”这类词，用户会看到“这次先试新方式”或“这次继续用稳定方式”。
+
+### 下一步
+
+- 继续 `M7`
+  - 不再继续打磨这套入口本身
+  - 开始把首批 simple task 真正当作可试用范围去跑和观察
+
+## Step 96：收回用户侧“试用”概念，改成自动选择与快速检查
+
+### 做了什么
+
+- `src/renderer/pages/SettingsPage.tsx`
+  - 保留原来的内部路由和快速检查能力
+  - 但把用户侧入口从“简单任务试用”改成“任务处理方式”
+  - 用户现在看到的是：
+    - `自动选择`
+    - `稳定优先`
+    - `快速检查结果`
+  - 不再让普通用户面对“试用 / 首批试用 / 新路线 / 原路线”这类更像测试工具的概念
+
+- `src/renderer/i18n/locales/en.json`
+- `src/renderer/i18n/locales/zh-CN.json`
+- `src/renderer/i18n/locales/zh-TW.json`
+  - 把用户侧相关文案统一收成：
+    - `任务处理方式`
+    - `自动选择`
+    - `稳定优先`
+    - `当前自动处理范围`
+    - `快速检查结果`
+    - `更快的处理方式 / 更稳的处理方式`
+
+- `src/gateway/runtime/native/user-facing.ts`
+  - 把 native lane 对普通用户的说明也同步改成：
+    - 自动处理方式
+    - 更快的处理方式
+    - 更稳的处理方式
+  - 避免继续向非技术用户暴露“新路线 / 首批放量 / rollout”这类内部概念
+
+- `src/gateway/server/services.ts`
+- `src/gateway/doctor/report.ts`
+  - 把诊断摘要里的 `rollout / native lane` 收成更容易理解的：
+    - 自动处理
+    - 等你确认 / 等你回答
+
+### 结果
+
+- 通过
+- 单测：
+  - `tests/unit/gateway/server/health.test.ts`
+  - `tests/unit/gateway/server/services.test.ts`
+  - `tests/unit/gateway/doctor/report.test.ts`
+  - `tests/unit/gateway/runtime/routing.test.ts`
+  - `tests/unit/gateway/runtime/native-runtime.test.ts`
+  - 合计 `5` 个测试文件，`31` 个测试通过
+- 构建：`npm run build` 通过
+
+### 产品意义
+
+- 系统内部仍然保留首批范围控制和快速验收能力。
+- 但用户侧已经不再像“测试工具”：
+  - 不会再看到“试用”
+  - 不需要理解“新路线 / 原路线”
+  - 只需要理解：
+    - 当前系统是自动选择
+    - 还是稳定优先
+    - 以及这台电脑是否已经通过快速检查
+
+### 下一步
+
+- 继续 `M7`
+  - 不再继续打磨“试用”概念
+  - 直接进入 simple task 的真实使用与稳定性收口
+
+## Step 97：把设置页收成一个开关，不再展示这条能力的任务状态
+
+### 做了什么
+
+- `src/renderer/pages/SettingsPage.tsx`
+  - `电脑自动化` 页面顶部现在只保留一个用户入口：
+    - `全部使用 Claude Code SDK`
+    - `自定义处理方式`
+  - 不再向普通用户展示：
+    - 当前自动处理范围
+    - 快速检查结果
+    - 首批任务状态
+    - 这条能力当前是否 ready 的细分说明
+  - `Gateway Diagnostics` 中的 runtime 卡片也同步收窄为“后台服务是否正常运行”，不再显示 route / lane / runtime 细节
+
+- `src/renderer/i18n/locales/en.json`
+- `src/renderer/i18n/locales/zh-CN.json`
+- `src/renderer/i18n/locales/zh-TW.json`
+  - 新增更贴近产品的话术：
+    - `任务处理方式`
+    - `自定义处理方式`
+    - `全部使用 Claude Code SDK`
+    - `支持的请求会优先使用你的自定义处理方式`
+    - `当前所有任务都会使用 Claude Code SDK`
+
+### 结果
+
+- 通过
+- 单测：
+  - `tests/unit/gateway/server/health.test.ts`
+  - `tests/unit/gateway/server/services.test.ts`
+  - `tests/unit/gateway/doctor/report.test.ts`
+  - `tests/unit/gateway/runtime/routing.test.ts`
+  - `tests/unit/gateway/runtime/native-runtime.test.ts`
+  - 合计 `5` 个测试文件，`31` 个测试通过
+- 构建：`npm run build` 通过
+
+### 产品意义
+
+- 普通用户现在不需要理解：
+  - 当前是哪条 runtime
+  - 哪一批任务处于什么状态
+  - internal rollout / trial / ready 之类的概念
+- 设置页只保留一个真正需要用户决定的问题：
+  - 全部使用 Claude Code SDK
+  - 还是启用自定义处理方式
+
+### 下一步
+
+- 继续 `M7`
+  - 沿技术主线继续做 native lane 的稳定性与共享工具层
+  - 不再把内部试运行/任务状态继续暴露到普通设置里
+
+## Step 98：补齐自定义处理方式的“停止”和“打断后继续”闭环
+
+### 做了什么
+
+- `src/gateway/runtime/native/active-runs.ts`
+  - active native run 现在会记录：
+    - `AbortController`
+    - 最近一段输出内容
+    - 当前请求的轻量上下文
+  - 新增：
+    - `abortNativeActiveRun()`
+    - `listNativeActiveRuns()`
+    - `updateNativeActiveRunContent()`
+
+- `src/gateway/runtime/native/client.ts`
+  - upstream request 现在支持 `AbortSignal`
+
+- `src/gateway/runtime/native/runtime.ts`
+  - native request 开始时会注册可中断的 active run
+  - 流式输出时会持续记录最近一段内容
+  - 如果用户点停止，会把这次请求真正中断
+  - 如果用户是在处理中途补一句话，旧请求会静默中断，不再额外弹一条错误
+
+- `src/main/services/agent/control.ts`
+  - `stopGeneration()` 现在不只会停 Claude 会话，也会停当前正在运行的 native request
+  - `interruptAndInject()` 在 native request 正在执行时不再报“没有活动会话”
+  - 现在会：
+    - 保存已生成的部分内容
+    - 中断当前 native request
+    - 带着原来的轻量上下文重新发起新消息
+  - `isGenerating()` / `getActiveSessions()` 也开始把 native active runs 算进去
+
+- 测试：
+  - `tests/unit/services/agent/control.test.ts`
+  - `tests/unit/gateway/runtime/native-send-message.test.ts`
+  - `tests/unit/gateway/runtime/native-client.test.ts`
+  - `tests/unit/gateway/runtime/native-runtime.test.ts`
+
+### 结果
+
+- 通过
+- 单测：
+  - `tests/unit/services/agent/control.test.ts`
+  - `tests/unit/gateway/runtime/native-send-message.test.ts`
+  - `tests/unit/gateway/runtime/native-client.test.ts`
+  - `tests/unit/gateway/runtime/native-runtime.test.ts`
+  - 合计 `4` 个测试文件，`22` 个测试通过
+- 构建：`npm run build` 通过
+
+### 产品意义
+
+- 自定义处理方式现在不再只是“能开始跑”
+- 也开始具备和原来 Claude Code SDK 更接近的基础体验：
+  - 可以停止
+  - 可以在处理中途补一句话继续
+  - 不会因为这两件事就直接断掉
+
+### 下一步
+
+- 继续 `M7`
+  - 再收一轮 native lane 的真实使用稳定性
+  - 再往共享工具层和第二批 provider adapter 前进
+
+## Step 99 - 共享工具层合并内置工具与禁用清单
+
+### 做了什么
+
+- `src/gateway/tools/built-ins.ts`
+  - 新增共享内置工具清单：
+    - Claude Code SDK 默认允许的 built-in tools
+    - 平台统一禁用的 server-side tools
+    - hosted subagent 不允许使用的 built-in tools
+  - 新增统一 helper：
+    - `getClaudeSdkBuiltInToolNames()`
+    - `getBlockedServerSideToolNames()`
+    - `isBlockedServerSideTool()`
+    - `getHostedSubagentDisallowedBuiltInToolNames()`
+    - `isHostedSubagentDisallowedBuiltInTool()`
+
+- `src/gateway/tools/catalog.ts`
+  - built-in catalog 不再自己维护一份重复列表
+  - 现在直接复用 `SHARED_BUILT_IN_TOOL_CATALOG`
+
+- `src/gateway/tools/registry.ts`
+  - shared tool registry 现在会把统一 `catalog` 一起返回
+  - 不再只有 MCP server / provider 定义
+
+- `src/gateway/tools/native-tools.ts`
+  - native lane 导出的 function tools 开始优先复用共享 tool catalog 的说明文案
+  - 这意味着 Claude Code SDK 工具搜索里看到的描述，与 native lane 真正发给 OpenAI/Codex 的 tool 描述开始统一
+
+- `src/main/services/agent/sdk-options.ts`
+  - Claude Code SDK 的 `allowedTools / tools / disallowedTools`
+    不再在本地手写
+  - 现在直接复用共享工具层的 built-in 和 blocked tool 清单
+
+- `src/main/services/agent/permission-handler.ts`
+  - 平台统一禁用的 server-side tool 判断不再自己维护一份 Set
+  - 改成复用共享 helper
+
+- `src/main/services/agent/subagent/runtime.ts`
+  - hosted subagent 的 built-in tool 限制与 blocked server-side tool 限制
+    也改成复用共享 helper
+
+- 测试：
+  - 新增 `tests/unit/gateway/tools/built-ins.test.ts`
+  - 回归：
+    - `tests/unit/services/agent/sdk-options.test.ts`
+    - `tests/unit/services/agent/permission-handler.test.ts`
+    - `tests/unit/gateway/tools/registry.test.ts`
+    - `tests/unit/gateway/tools/policies.test.ts`
+
+### 结果
+
+- 通过
+- 单测：
+  - `tests/unit/gateway/tools/built-ins.test.ts`
+  - `tests/unit/services/agent/sdk-options.test.ts`
+  - `tests/unit/services/agent/permission-handler.test.ts`
+  - `tests/unit/gateway/tools/registry.test.ts`
+  - `tests/unit/gateway/tools/policies.test.ts`
+  - 合计 `5` 个测试文件，`76` 个测试通过
+- 构建：`npm run build` 通过
+
+### 产品意义
+
+- 这一步不是新增用户可见功能，而是把“自定义处理方式”和 `Claude Code SDK`
+  背后共用的工具能力再收紧了一层
+- 以后新增或下线某个 built-in tool、禁用某类 server-side tool、调整 hosted subagent
+  的允许范围时，不再需要在三四个地方各改一遍
+- 这会直接降低后面继续做共享工具层和 native provider 扩展时的返工风险
+
+### 下一步
+
+- 继续 `M6`
+  - 再往共享工具 metadata / execution profile 收一层
+- 继续 `M7`
+  - 让自定义处理方式和 Claude Code SDK 复用更多同一套工具描述与执行边界
+
+## Step 100 - 共享工具目录进入 registry，并统一 native tool 描述来源
+
+### 做了什么
+
+- `src/gateway/tools/directory.ts`
+  - 新增共享工具目录构建器：
+    - 把 `catalog + providers + permission policy`
+      合成一份统一的工具目录
+  - 每条工具目录现在会带：
+    - `providerId`
+    - `providerSource`
+    - `runtimeKinds`
+    - `permissionPolicyKind`
+
+- `src/gateway/tools/registry.ts`
+  - shared tool registry 不再只返回：
+    - `mcpServers`
+    - `providers`
+    - `catalog`
+  - 现在还会返回：
+    - `directory`
+
+- `src/gateway/tools/native-tools.ts`
+  - native function tools 现在优先使用共享工具目录里的描述
+  - 并且会按 `directory.runtimeKinds`
+    再做一层过滤：
+    - 只把当前允许 `native` 使用的工具导出给 OpenAI/Codex
+
+- `src/gateway/runtime/native/runtime.ts`
+  - native lane 现在不再只把 `catalog` 传给 tool definitions builder
+  - 改成直接传完整 `directory`
+
+- 测试：
+  - `tests/unit/gateway/tools/registry.test.ts`
+  - `tests/unit/gateway/tools/native-tools.test.ts`
+  - `tests/unit/gateway/tools/built-ins.test.ts`
+  - `tests/unit/services/agent/sdk-options.test.ts`
+  - `tests/unit/services/agent/permission-handler.test.ts`
+  - `tests/unit/gateway/runtime/native-runtime.test.ts`
+  - `tests/unit/gateway/runtime/native-send-message.test.ts`
+
+### 结果
+
+- 通过
+- 单测：
+  - `8` 个测试文件，`91` 个测试通过
+- 构建：
+  - `npm run build` 通过
+
+### 产品意义
+
+- 这一步的意义不是“多了一个用户可见按钮”
+- 而是：
+  - 现在系统里已经开始有一份真正统一的“工具说明书”
+  - `Claude Code SDK` 和自定义处理方式看到的工具能力描述更一致
+  - 后面如果某个工具只该给 `Claude Code SDK` 用、或者已经准备好给自定义处理方式用，
+    也可以在一处统一标出来
+- 这会让后面继续扩 provider-native、继续收 shared tool execution profile 时更稳，不容易再出现
+  “两边叫法不同、边界不同、说明不同”的问题
+
+### 下一步
+
+- 继续 `M6`
+  - 再收一层 shared tool execution profile / capability mapping
+- 继续 `M7`
+  - 让 native lane 在工具执行边界上继续贴近共享工具目录
+
+## Step 101 - NativeRuntime 首批范围、追问超时与 active run 控制收口
+
+### 做了什么
+
+- `src/gateway/runtime/routing.ts`
+  - hybrid/native 路由不再只看“轻任务/复杂任务”二元判断
+  - 现在额外引入首批 rollout scope：
+    - `chat-simple`
+    - `browser-simple`
+    - `terminal-simple`
+  - 会按消息形状判断请求是否落在首批 native 范围内
+
+- 新增：
+  - `src/gateway/runtime/rollout-types.ts`
+  - `src/gateway/runtime/rollout-trials.ts`
+  - `src/gateway/runtime/rollout-acceptance.ts`
+  - 把首批范围、试跑记录、验收结果收成一套显式模型
+  - `health / services / settings` 可以开始复用同一份 rollout 状态
+
+- `src/main/services/agent/send-message.ts`
+  - 每次真正开始请求前会同步 native registration 状态
+  - `agent:start` 事件现在会把 runtime route info 一起透给前端
+  - 前端不再只能靠设置页猜测当前到底走了哪条 runtime
+
+- `src/gateway/runtime/native/interaction.ts`
+  - native lane 用户追问增加默认 `5` 分钟超时
+  - 超时后会结束等待，并提示“如果还想继续，重新发一句话就可以”
+
+- `src/gateway/runtime/native/client.ts`
+  - upstream request 继续接入 `AbortSignal`
+
+- `src/gateway/runtime/native/runtime.ts`
+  - active run 注册、流式内容缓存、stop/interrupt-and-continue 闭环继续接实
+  - native lane 现在既能真正停掉进行中的请求，也能在用户中途追发一句话时保留部分输出并重新发送
+
+- 用户感知层：
+  - `src/gateway/runtime/native/user-facing.ts`
+  - `src/renderer/components/chat/RuntimeRouteBanner.tsx`
+  - `src/renderer/stores/chat.store.ts`
+  - `src/renderer/pages/SettingsPage.tsx`
+  - 新路线/旧路线的解释文案、runtime route banner、设置页状态与 route info 透传一起补齐
+
+- 测试：
+  - 新增/更新 routing、interaction、control、native runtime、rollout acceptance、chat store 等单测
+
+### 验证
+
+- 定向修复：
+  - `tests/unit/services/agent/send-message.test.ts`
+    - 新增 mock `resolveNativeRuntimeRegistrationState()`
+    - 解决测试环境里 `app.getAppPath()` 未 mock 的阻塞
+- 定向验证：
+  - `npm exec vitest run tests/unit/services/agent/send-message.test.ts --config tests/vitest.config.ts`
+  - `npm exec vitest run tests/unit/gateway/runtime/native-question-shaping.test.ts tests/unit/gateway/channels/runtime.test.ts --config tests/vitest.config.ts`
+- 全量单测：
+  - `npm run test:unit`
+
+### 结果
+
+- 当前 `102` 个测试文件里：
+  - `101` 个通过
+  - `1` 个失败
+- 当前唯一残余失败：
+  - `tests/unit/gateway/channels/runtime.test.ts`
+  - 原因是 channel runtime status 现在多了 `relay` 字段，但该测试断言还停留在旧结构
+  - 这不是本轮 NativeRuntime 行为回归
+- 本轮新增修复：
+  - `tests/unit/services/agent/send-message.test.ts` 已恢复通过
+  - `tests/unit/gateway/runtime/native-question-shaping.test.ts` 已恢复通过
+
+### Codex smoke test 记录
+
+- 真实 upstream smoke 本轮未执行
+- 当前本机开发数据里：
+  - `~/.skillsfan-dev/auth.json` 不存在
+  - `~/.skillsfan-dev/config.json` 当前 source 是 `zhipu`
+  - `OPENAI_API_KEY` / `HALO_TEST_API_KEY` 也都未设置
+- 这意味着当前环境里没有可直接复用的 `openai-codex` 凭据，无法完成“真实 Codex source → 实际 upstream transport”这一步验证
+- 因此本轮没有发现新的 Codex upstream 兼容性结论，也没有进行基于真实请求的修补
+
+### 产品意义
+
+- `NativeRuntime` 这一步已经不只是“能跑 OpenAI/Codex”
+- 也开始具备更像正式灰度能力的边界：
+  - 只放量给首批简单消息形状
+  - 前端能明确看到当前为什么走新路线或旧路线
+  - 用户追问不会无限等待
+  - 进行中的 native request 可以真正停止、打断后继续
+
+### 下一步
+
+- 继续 `M7`
+  - 在有真实 `openai-codex` 凭据的环境补做 end-to-end smoke
+  - 再根据真实 upstream 结果决定是否需要修 `endpoint / schema / error mapping`
+- 继续 `M8`
+  - 在现有 rollout scope 基础上再扩第二批 provider / model 级灰度
