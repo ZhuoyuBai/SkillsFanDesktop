@@ -23,7 +23,6 @@ import { getConversation, saveSessionId, addMessage, updateLastMessage } from '.
 import {
   isAIBrowserTool
 } from '../ai-browser/tool-utils'
-import { hasSkills, ensureSkillsInitialized } from '../skill'
 import type {
   AgentRequest,
   ToolCall,
@@ -429,11 +428,6 @@ async function sendMessageInternal(
     const electronPath = getHeadlessElectronPath()
     console.log(`[Agent] Using headless Electron as Node runtime: ${electronPath}`)
 
-    // Ensure skills are loaded before creating session
-    // This determines if Skill MCP server should be added and triggers session rebuild if needed
-    await ensureSkillsInitialized()
-    const skillsAvailable = hasSkills()
-
     // Log MCP servers if configured (only enabled ones)
     const enabledMcpServers = getEnabledMcpServers(config.mcpServers || {})
     const mcpServerNames = enabledMcpServers ? Object.keys(enabledMcpServers) : []
@@ -448,7 +442,6 @@ async function sendMessageInternal(
     const { getExtensionHash } = await import('../extension')
     const sessionConfig: SessionConfig = {
       aiBrowserEnabled: effectiveAiBrowserEnabled,
-      hasSkills: skillsAvailable,
       browserAutomationMode,
       customInstructionsHash: ci?.enabled && ci?.content ? ci.content : undefined,
       extensionHash: getExtensionHash()
@@ -485,7 +478,6 @@ async function sendMessageInternal(
         },
         aiBrowserEnabled: !!aiBrowserEnabled,
         thinkingEnabled: !!thinkingEnabled,
-        includeSkillMcp: skillsAvailable,
         ralphSystemPromptAppend: ralphMode?.systemPromptAppend || '',
         routed: transport.routed
       })
@@ -496,10 +488,6 @@ async function sendMessageInternal(
       if (addedMcpServers.includes('web-tools')) {
         console.log(`[Agent][${conversationId}] Web Tools MCP server added`)
       }
-      if (addedMcpServers.includes('skill')) {
-        console.log(`[Agent][${conversationId}] Skill MCP server added`)
-      }
-
       // Get or create persistent V2 session for this conversation
       // Pass config for rebuild detection when aiBrowserEnabled changes
       const v2Session = await getOrCreateV2Session(spaceId, conversationId, sdkOptions, sessionId, sessionConfig)

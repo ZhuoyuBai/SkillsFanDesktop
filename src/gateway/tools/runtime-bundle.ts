@@ -18,11 +18,9 @@ export function resolveRuntimeKindToolProviders(
 
 export function resolveConfiguredSharedToolProviders(args: {
   config: Record<string, any>
-  includeSkillMcp?: boolean
 }): ToolProviderDefinition[] {
   return buildSharedToolProviderDefinitions({
     effectiveAiBrowserEnabled: args.config.browserAutomation?.mode !== 'system-browser',
-    includeSkillMcp: args.includeSkillMcp ?? true,
     extensionProviderIds: getEnabledExtensions().map((extension) => extension.manifest.id)
   })
 }

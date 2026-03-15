@@ -98,7 +98,6 @@ export interface BuildSdkOptionsParams {
   onStderr: (data: string) => void
   aiBrowserEnabled?: boolean
   thinkingEnabled?: boolean
-  includeSkillMcp?: boolean
   includeSubagentTools?: boolean
   ralphSystemPromptAppend?: string
   /** Whether the API goes through the OpenAI-compat router (non-Anthropic backend) */
@@ -169,7 +168,6 @@ export async function buildSdkOptions(params: BuildSdkOptionsParams): Promise<{
     onStderr,
     aiBrowserEnabled = false,
     thinkingEnabled = false,
-    includeSkillMcp = false,
     includeSubagentTools = true,
     ralphSystemPromptAppend = '',
     routed = false
@@ -191,7 +189,6 @@ export async function buildSdkOptions(params: BuildSdkOptionsParams): Promise<{
     spaceId,
     conversationId,
     aiBrowserEnabled,
-    includeSkillMcp,
     includeSubagentTools
   })
 

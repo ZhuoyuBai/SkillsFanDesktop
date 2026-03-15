@@ -18,11 +18,6 @@ vi.mock('../../../../src/main/services/conversation.service', () => ({
   getConversation: vi.fn(() => null)
 }))
 
-vi.mock('../../../../src/main/services/skill', () => ({
-  ensureSkillsInitialized: vi.fn(async () => {}),
-  hasSkills: vi.fn(() => false)
-}))
-
 vi.mock('../../../../src/main/services/agent/helpers', () => ({
   getHeadlessElectronPath: vi.fn(() => '/mock/electron'),
   getWorkingDir: vi.fn(() => '/mock/workdir'),
@@ -58,7 +53,7 @@ import {
   v2Sessions
 } from '../../../../src/main/services/agent/session-manager'
 
-function makeSessionInfo(session: { close: () => void }, config: { aiBrowserEnabled: boolean; hasSkills: boolean; browserAutomationMode?: 'ai-browser' | 'system-browser' }) {
+function makeSessionInfo(session: { close: () => void }, config: { aiBrowserEnabled: boolean; browserAutomationMode?: 'ai-browser' | 'system-browser' }) {
   return {
     session,
     spaceId: 'space-1',
@@ -89,12 +84,11 @@ describe('session-manager', () => {
   })
 
   it('detects when a V2 session needs rebuild', () => {
-    const existing = makeSessionInfo({ close: vi.fn() }, { aiBrowserEnabled: false, hasSkills: false, browserAutomationMode: 'ai-browser' })
+    const existing = makeSessionInfo({ close: vi.fn() }, { aiBrowserEnabled: false, browserAutomationMode: 'ai-browser' })
 
-    expect(needsSessionRebuild(existing as any, { aiBrowserEnabled: false, hasSkills: false, browserAutomationMode: 'ai-browser' })).toBe(false)
-    expect(needsSessionRebuild(existing as any, { aiBrowserEnabled: true, hasSkills: false, browserAutomationMode: 'ai-browser' })).toBe(true)
-    expect(needsSessionRebuild(existing as any, { aiBrowserEnabled: false, hasSkills: true, browserAutomationMode: 'ai-browser' })).toBe(true)
-    expect(needsSessionRebuild(existing as any, { aiBrowserEnabled: false, hasSkills: false, browserAutomationMode: 'system-browser' })).toBe(true)
+    expect(needsSessionRebuild(existing as any, { aiBrowserEnabled: false, browserAutomationMode: 'ai-browser' })).toBe(false)
+    expect(needsSessionRebuild(existing as any, { aiBrowserEnabled: true, browserAutomationMode: 'ai-browser' })).toBe(true)
+    expect(needsSessionRebuild(existing as any, { aiBrowserEnabled: false, browserAutomationMode: 'system-browser' })).toBe(true)
   })
 
   it('reuses existing session and rebuilds when config changes', async () => {
@@ -109,7 +103,7 @@ describe('session-manager', () => {
       'conv-1',
       { model: 'claude' },
       undefined,
-      { aiBrowserEnabled: false, hasSkills: false, browserAutomationMode: 'ai-browser' }
+      { aiBrowserEnabled: false, browserAutomationMode: 'ai-browser' }
     )
     expect(first).toBe(firstSession)
     expect(mocks.unstableV2CreateSession).toHaveBeenCalledTimes(1)
@@ -119,7 +113,7 @@ describe('session-manager', () => {
       'conv-1',
       { model: 'claude' },
       undefined,
-      { aiBrowserEnabled: false, hasSkills: false, browserAutomationMode: 'ai-browser' }
+      { aiBrowserEnabled: false, browserAutomationMode: 'ai-browser' }
     )
     expect(reused).toBe(firstSession)
     expect(mocks.unstableV2CreateSession).toHaveBeenCalledTimes(1)
@@ -129,7 +123,7 @@ describe('session-manager', () => {
       'conv-1',
       { model: 'claude' },
       undefined,
-      { aiBrowserEnabled: true, hasSkills: false, browserAutomationMode: 'ai-browser' }
+      { aiBrowserEnabled: true, browserAutomationMode: 'ai-browser' }
     )
     expect(firstSession.close).toHaveBeenCalledTimes(1)
     expect(rebuilt).toBe(rebuiltSession)
@@ -141,11 +135,11 @@ describe('session-manager', () => {
     const activeSession = { close: vi.fn() }
     v2Sessions.set(
       'idle-conv',
-      makeSessionInfo(idleSession, { aiBrowserEnabled: false, hasSkills: false, browserAutomationMode: 'ai-browser' }) as any
+      makeSessionInfo(idleSession, { aiBrowserEnabled: false, browserAutomationMode: 'ai-browser' }) as any
     )
     v2Sessions.set(
       'active-conv',
-      makeSessionInfo(activeSession, { aiBrowserEnabled: false, hasSkills: false, browserAutomationMode: 'ai-browser' }) as any
+      makeSessionInfo(activeSession, { aiBrowserEnabled: false, browserAutomationMode: 'ai-browser' }) as any
     )
 
     const state = createSessionState('space-1', 'active-conv', new AbortController())
@@ -168,8 +162,8 @@ describe('session-manager', () => {
   it('closes all sessions on shutdown', () => {
     const s1 = { close: vi.fn() }
     const s2 = { close: vi.fn() }
-    v2Sessions.set('conv-1', makeSessionInfo(s1, { aiBrowserEnabled: false, hasSkills: false, browserAutomationMode: 'ai-browser' }) as any)
-    v2Sessions.set('conv-2', makeSessionInfo(s2, { aiBrowserEnabled: true, hasSkills: true, browserAutomationMode: 'system-browser' }) as any)
+    v2Sessions.set('conv-1', makeSessionInfo(s1, { aiBrowserEnabled: false, browserAutomationMode: 'ai-browser' }) as any)
+    v2Sessions.set('conv-2', makeSessionInfo(s2, { aiBrowserEnabled: true, browserAutomationMode: 'system-browser' }) as any)
 
     closeAllV2Sessions()
 

@@ -6,7 +6,6 @@ const mocks = vi.hoisted(() => ({
   createBrowserMcpServer: vi.fn(),
   createLocalToolsMcpServer: vi.fn(),
   createWebToolsMcpServer: vi.fn(),
-  createSkillMcpServer: vi.fn(),
   createCanUseTool: vi.fn(),
   buildSystemPromptAppend: vi.fn(),
   getEnabledMcpServers: vi.fn(),
@@ -38,10 +37,6 @@ vi.mock('../../../../src/main/services/web-tools/sdk-mcp-server', () => ({
   createWebToolsMcpServer: mocks.createWebToolsMcpServer
 }))
 
-vi.mock('../../../../src/main/services/skill', () => ({
-  createSkillMcpServer: mocks.createSkillMcpServer
-}))
-
 vi.mock('../../../../src/main/services/agent/permission-handler', () => ({
   createCanUseTool: mocks.createCanUseTool
 }))
@@ -62,7 +57,6 @@ describe('sdk-options', () => {
     mocks.createBrowserMcpServer.mockReturnValue({ type: 'stdio', command: 'ai-browser' })
     mocks.createLocalToolsMcpServer.mockReturnValue({ type: 'stdio', command: 'local-tools' })
     mocks.createWebToolsMcpServer.mockReturnValue({ type: 'stdio', command: 'web-tools' })
-    mocks.createSkillMcpServer.mockResolvedValue({ type: 'stdio', command: 'skill' })
     mocks.createCanUseTool.mockReturnValue(vi.fn())
     mocks.buildSystemPromptAppend.mockReturnValue('[BASE_PROMPT]')
     mocks.getEnabledMcpServers.mockReturnValue({})
@@ -219,7 +213,6 @@ describe('sdk-options', () => {
         spaceId: 'space-1',
         conversationId: 'conv-1',
         aiBrowserEnabled: false,
-        includeSkillMcp: false,
         includeSubagentTools: true
       })
       expect(mocks.createCanUseTool).toHaveBeenCalledWith('/tmp/space-1', 'space-1', 'conv-1')
@@ -229,7 +222,7 @@ describe('sdk-options', () => {
       expect(onStderr).toHaveBeenCalledWith('stderr message')
     })
 
-    it('adds ai-browser + skill MCP and thinking tokens when enabled', async () => {
+    it('adds ai-browser MCP and thinking tokens when enabled', async () => {
       mocks.getEnabledMcpServers.mockReturnValue({
         github: { type: 'stdio', command: 'github-mcp' }
       })
@@ -249,11 +242,10 @@ describe('sdk-options', () => {
         onStderr: vi.fn(),
         aiBrowserEnabled: true,
         thinkingEnabled: true,
-        includeSkillMcp: true,
         ralphSystemPromptAppend: '[RALPH_APPEND]'
       })
 
-      expect(addedMcpServers).toEqual(['local-tools', 'web-tools', 'ai-browser', 'skill'])
+      expect(addedMcpServers).toEqual(['local-tools', 'web-tools', 'ai-browser'])
       expect(mocks.createBrowserMcpServer).toHaveBeenCalledTimes(1)
       expect(mocks.createBrowserMcpServer).toHaveBeenCalledWith('automated', {
         spaceId: 'space-2',
@@ -261,7 +253,6 @@ describe('sdk-options', () => {
       })
       expect(mocks.createLocalToolsMcpServer).toHaveBeenCalledTimes(1)
       expect(mocks.createWebToolsMcpServer).toHaveBeenCalledTimes(1)
-      expect(mocks.createSkillMcpServer).toHaveBeenCalledTimes(1)
       expect(sdkOptions.thinking).toEqual({ type: 'enabled', budgetTokens: 10240 })
       expect(sdkOptions.systemPrompt.append).toContain('[BASE_PROMPT]')
       expect(sdkOptions.systemPrompt.append).toContain('[AI_BROWSER_PROMPT]')
@@ -284,8 +275,7 @@ describe('sdk-options', () => {
         github: { type: 'stdio', command: 'github-mcp' },
         'local-tools': { type: 'stdio', command: 'local-tools' },
         'web-tools': { type: 'stdio', command: 'web-tools' },
-        'ai-browser': { type: 'stdio', command: 'ai-browser' },
-        skill: { type: 'stdio', command: 'skill' }
+        'ai-browser': { type: 'stdio', command: 'ai-browser' }
       })
       expect(mocks.buildSystemPromptAppend).toHaveBeenCalledWith('/tmp/space-2', 'gpt-4.1', false)
     })
@@ -319,7 +309,6 @@ describe('sdk-options', () => {
         spaceId: 'space-3',
         conversationId: 'conv-3',
         aiBrowserEnabled: false,
-        includeSkillMcp: false,
         includeSubagentTools: true
       })
       expect(sdkOptions.systemPrompt.append).toContain('System Browser Mode')

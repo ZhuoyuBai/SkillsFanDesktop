@@ -13,6 +13,7 @@ import {
   shouldSuppressSetModelStatus,
   stripLeadingSetModelStatus
 } from '../../../shared/utils/sdk-status'
+import { isSkillToolName } from '../../../shared/skill-tools'
 
 // ============================================
 // Canvas Context Formatting
@@ -222,7 +223,7 @@ export function parseSDKMessage(message: any, displayModel?: string, parentToolI
         }
         // Tool use blocks
         if (block.type === 'tool_use') {
-          const isSkillInvocation = block.name === 'Skill'
+          const isSkillInvocation = isSkillToolName(block.name)
           const toolInput = block.name === 'WebSearch' && block.input && typeof block.input === 'object'
             ? sanitizeWebSearchInput(block.input as Record<string, unknown>)
             : block.input

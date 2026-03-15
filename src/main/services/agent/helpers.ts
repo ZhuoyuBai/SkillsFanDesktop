@@ -18,6 +18,7 @@ import {
   relayGatewayGlobalEvent,
   shouldRelayGatewayChannelEvents
 } from '../../../gateway/channels/relay'
+import { CLAUDE_NATIVE_SKILL_TOOL_NAME } from '../../../shared/skill-tools'
 import type { ElectronChannel } from '../channel'
 import type { ApiCredentials, MainWindowRef } from './types'
 
@@ -435,7 +436,7 @@ TodoWrite 和 Task 可以组合：先用 TodoWrite 展示整体计划，再用 T
 
 ### Skill 调用
 
-如果任务匹配某个可用的 Skill，优先调用 Skill 工具加载专业指令。
+如果任务匹配某个可用的 Skill，优先调用 Claude Code 原生的 \`${CLAUDE_NATIVE_SKILL_TOOL_NAME}\` 工具。
 `
 }
 

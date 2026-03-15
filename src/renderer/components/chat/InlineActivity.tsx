@@ -27,6 +27,7 @@ import {
   getLatestVisibleActiveToolUseIds,
   getMatchingToolResult
 } from '../../../shared/utils/thought-dedupe'
+import { getInvokedSkillName, isSkillToolName } from '../../../shared/skill-tools'
 
 interface InlineActivityProps {
   thoughts: Thought[]
@@ -91,7 +92,7 @@ function getActivityText(thought: Thought, t: (key: string, params?: Record<stri
     case 'AskUserQuestion':
       return t('Waiting for response...')
     case 'Skill':
-      return t('Running {{skill}}...', { skill: String(input?.skill || 'skill') })
+      return t('Running {{skill}}...', { skill: getInvokedSkillName(input) })
     default:
       return thought.toolName ? `${thought.toolName}...` : t('Processing...')
   }
@@ -139,7 +140,7 @@ function getCompletedText(thought: Thought, t: (key: string, params?: Record<str
     case 'AskUserQuestion':
       return t('Got response')
     case 'Skill':
-      return t('Ran {{skill}}', { skill: String(input?.skill || 'skill') })
+      return t('Ran {{skill}}', { skill: getInvokedSkillName(input) })
     default:
       return thought.toolName ? `${thought.toolName}` : t('Done')
   }
@@ -335,7 +336,7 @@ export function InlineActivity({
     return topLevelTools.map(toolUse => {
       const isComplete = hasResult(toolUse)
       const isError = isErrorResult(toolUse)
-      const isSkill = toolUse.toolName === 'Skill'
+      const isSkill = isSkillToolName(toolUse.toolName)
 
       // Collect child tools for Skills
       let childTools: ChildToolItem[] = []

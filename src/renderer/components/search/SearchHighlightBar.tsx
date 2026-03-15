@@ -13,11 +13,13 @@
 
 import { useRef, useMemo } from 'react'
 import { ChevronUp, ChevronDown, Search, X } from 'lucide-react'
+import { useTranslation } from '../../i18n'
 import { cn } from '@/lib/utils'
 import { useSearchStore } from '@/stores/search.store'
 import { useChatStore } from '@/stores/chat.store'
 
 export function SearchHighlightBar() {
+  const { t } = useTranslation()
   const {
     isHighlightBarVisible,
     highlightQuery,
@@ -151,8 +153,8 @@ export function SearchHighlightBar() {
                   ? 'hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer'
                   : 'text-muted-foreground/40 cursor-not-allowed'
               )}
-              title="Earlier result (↑)"
-              aria-label="Earlier result"
+              title={t('Earlier result (↑)')}
+              aria-label={t('Earlier result')}
             >
               <ChevronUp size={16} />
             </button>
@@ -166,8 +168,8 @@ export function SearchHighlightBar() {
                   ? 'hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer'
                   : 'text-muted-foreground/40 cursor-not-allowed'
               )}
-              title="More recent result (↓)"
-              aria-label="More recent result"
+              title={t('More recent result (↓)')}
+              aria-label={t('More recent result')}
             >
               <ChevronDown size={16} />
             </button>
@@ -181,8 +183,8 @@ export function SearchHighlightBar() {
             <button
               onClick={handleEditSearch}
               className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-              title="Edit search (Ctrl+K)"
-              aria-label="Edit search"
+              title={t('Edit search (Ctrl+K)')}
+              aria-label={t('Edit search')}
             >
               <Search size={16} />
             </button>
@@ -190,8 +192,8 @@ export function SearchHighlightBar() {
             <button
               onClick={handleClose}
               className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-              title="Close (Esc)"
-              aria-label="Close search"
+              title={t('Close (Esc)')}
+              aria-label={t('Close search')}
             >
               <X size={16} />
             </button>

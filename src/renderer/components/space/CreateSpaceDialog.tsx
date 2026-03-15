@@ -183,9 +183,9 @@ export function CreateSpaceDialog({ isOpen, onClose, onCreated }: CreateSpaceDia
                   ? 'bg-foreground/10 ring-2 ring-foreground/30'
                   : 'bg-secondary/40 hover:bg-secondary/60'
               }`}
-              title="无"
+              title={t('None')}
             >
-              <span className="text-xs text-muted-foreground">无</span>
+              <span className="text-xs text-muted-foreground">{t('None')}</span>
             </button>
             {SPACE_ICONS.map((iconId) => {
               const colorConfig = SPACE_ICON_COLORS.find(c => c.id === newSpaceIconColor)
@@ -209,7 +209,7 @@ export function CreateSpaceDialog({ isOpen, onClose, onCreated }: CreateSpaceDia
 
         {/* 3. Color picker */}
         <div className="mb-6">
-          <label className="block text-sm text-muted-foreground font-medium mb-2.5">颜色</label>
+          <label className="block text-sm text-muted-foreground font-medium mb-2.5">{t('Color')}</label>
           <div className="flex gap-2">
             {SPACE_ICON_COLORS.map((color) => (
               <button

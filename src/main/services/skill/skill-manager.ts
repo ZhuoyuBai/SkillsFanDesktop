@@ -11,13 +11,21 @@ import {
   rmSync,
   readFileSync,
   copyFileSync,
+  writeFileSync,
   readdirSync,
   statSync
 } from 'fs'
 import { tmpdir } from 'os'
 import AdmZip from 'adm-zip'
-import { getSkillsDir, getSkill } from './skill-registry'
+import { getClaudeSkillsDir, getSkillsDir, getSkill } from './skill-registry'
 import { parseFrontmatter } from './frontmatter'
+
+const CLAUDE_SYNC_METADATA_FILE = '.skillsfan-sync.json'
+
+interface ClaudeSyncMetadata {
+  managedBy: 'skillsfan'
+  skillName: string
+}
 
 // Validation errors
 export class SkillValidationError extends Error {
@@ -69,11 +77,11 @@ function validateSkillStructure(
 /**
  * Generate unique skill name if conflict exists
  */
-function generateUniqueSkillName(baseName: string, skillsDir: string): string {
+function generateUniqueSkillName(baseName: string, ...skillDirs: string[]): string {
   let counter = 1
   let newName = baseName
 
-  while (existsSync(join(skillsDir, newName))) {
+  while (skillDirs.some((dir) => existsSync(join(dir, newName)))) {
     newName = `${baseName}-${counter}`
     counter++
   }
@@ -131,6 +139,117 @@ function copyDirectory(src: string, dest: string): void {
   }
 }
 
+function ensureDirectory(dir: string): void {
+  if (!existsSync(dir)) {
+    mkdirSync(dir, { recursive: true })
+  }
+}
+
+function getClaudeSkillPath(skillName: string): string {
+  return join(getClaudeSkillsDir(), skillName)
+}
+
+function getClaudeSyncMetadataPath(skillPath: string): string {
+  return join(skillPath, CLAUDE_SYNC_METADATA_FILE)
+}
+
+function readClaudeSyncMetadata(skillPath: string): ClaudeSyncMetadata | null {
+  const metadataPath = getClaudeSyncMetadataPath(skillPath)
+  if (!existsSync(metadataPath)) {
+    return null
+  }
+
+  try {
+    const metadata = JSON.parse(readFileSync(metadataPath, 'utf-8')) as ClaudeSyncMetadata
+    if (metadata.managedBy === 'skillsfan' && typeof metadata.skillName === 'string') {
+      return metadata
+    }
+  } catch {
+    // Ignore invalid metadata and treat as unmanaged.
+  }
+
+  return null
+}
+
+function isSkillsFanManagedClaudeSkill(skillPath: string, skillName: string): boolean {
+  const metadata = readClaudeSyncMetadata(skillPath)
+  return metadata?.managedBy === 'skillsfan' && metadata.skillName === skillName
+}
+
+function writeClaudeSyncMetadata(skillPath: string, skillName: string): void {
+  writeFileSync(
+    getClaudeSyncMetadataPath(skillPath),
+    JSON.stringify({ managedBy: 'skillsfan', skillName } satisfies ClaudeSyncMetadata, null, 2),
+    'utf-8'
+  )
+}
+
+function resolveInstallConflict(
+  skillName: string,
+  conflictResolution: 'replace' | 'rename' | 'cancel' | undefined
+): {
+  finalSkillName?: string
+  conflict?: { skillName: string; existingPath: string }
+  error?: string
+} {
+  const skillsDir = getSkillsDir()
+  const claudeSkillsDir = getClaudeSkillsDir()
+  const skillsFanPath = join(skillsDir, skillName)
+  const claudePath = join(claudeSkillsDir, skillName)
+  const hasSkillsFanConflict = existsSync(skillsFanPath)
+  const hasUnmanagedClaudeConflict = existsSync(claudePath) && !isSkillsFanManagedClaudeSkill(claudePath, skillName)
+
+  if (!hasSkillsFanConflict && !hasUnmanagedClaudeConflict) {
+    return { finalSkillName: skillName }
+  }
+
+  if (!conflictResolution) {
+    return {
+      conflict: {
+        skillName,
+        existingPath: hasSkillsFanConflict ? skillsFanPath : claudePath
+      }
+    }
+  }
+
+  if (conflictResolution === 'cancel') {
+    return { error: 'Installation cancelled by user' }
+  }
+
+  if (conflictResolution === 'rename') {
+    return {
+      finalSkillName: generateUniqueSkillName(skillName, skillsDir, claudeSkillsDir)
+    }
+  }
+
+  return { finalSkillName: skillName }
+}
+
+function removeClaudeSyncedSkillIfManaged(skillName: string): void {
+  const claudePath = getClaudeSkillPath(skillName)
+  if (!existsSync(claudePath)) {
+    return
+  }
+
+  if (isSkillsFanManagedClaudeSkill(claudePath, skillName)) {
+    rmSync(claudePath, { recursive: true, force: true })
+  }
+}
+
+function syncSkillToClaude(skillName: string, sourcePath: string): void {
+  const claudeSkillsDir = getClaudeSkillsDir()
+  const targetPath = getClaudeSkillPath(skillName)
+
+  ensureDirectory(claudeSkillsDir)
+
+  if (existsSync(targetPath)) {
+    rmSync(targetPath, { recursive: true, force: true })
+  }
+
+  copyDirectory(sourcePath, targetPath)
+  writeClaudeSyncMetadata(targetPath, skillName)
+}
+
 /**
  * Install skill from archive file
  *
@@ -163,55 +282,39 @@ export async function installSkill(
 
     const skillName = validation.skillName!
     const skillsDir = getSkillsDir()
-    const targetPath = join(skillsDir, skillName)
-
-    // Step 3: Check for conflicts
-    if (existsSync(targetPath)) {
-      // If no resolution provided, return conflict info for user to decide
-      if (!conflictResolution) {
-        return {
-          success: false,
-          conflict: { skillName, existingPath: targetPath }
-        }
-      }
-
-      // Handle conflict based on resolution
-      if (conflictResolution === 'cancel') {
-        return { success: false, error: 'Installation cancelled by user' }
-      } else if (conflictResolution === 'replace') {
-        // Delete existing skill
-        rmSync(targetPath, { recursive: true, force: true })
-      } else if (conflictResolution === 'rename') {
-        // Generate new unique name
-        const uniqueName = generateUniqueSkillName(skillName, skillsDir)
-        const uniquePath = join(skillsDir, uniqueName)
-
-        // Ensure skills directory exists
-        if (!existsSync(skillsDir)) {
-          mkdirSync(skillsDir, { recursive: true })
-        }
-
-        // Copy to unique path
-        copyDirectory(tempDir, uniquePath)
-
-        return {
-          success: true,
-          data: { skillName: uniqueName, path: uniquePath }
-        }
+    const conflictResult = resolveInstallConflict(skillName, conflictResolution)
+    if (conflictResult.conflict) {
+      return {
+        success: false,
+        conflict: conflictResult.conflict
       }
     }
+    if (conflictResult.error) {
+      return { success: false, error: conflictResult.error }
+    }
+    const finalSkillName = conflictResult.finalSkillName || skillName
+    const targetPath = join(skillsDir, finalSkillName)
+    const claudeTargetPath = getClaudeSkillPath(finalSkillName)
 
     // Step 4: Ensure skills directory exists
-    if (!existsSync(skillsDir)) {
-      mkdirSync(skillsDir, { recursive: true })
+    ensureDirectory(skillsDir)
+
+    // Replace any prior managed Claude sync for this name before copying.
+    removeClaudeSyncedSkillIfManaged(finalSkillName)
+    if (existsSync(targetPath)) {
+      rmSync(targetPath, { recursive: true, force: true })
+    }
+    if (existsSync(claudeTargetPath)) {
+      rmSync(claudeTargetPath, { recursive: true, force: true })
     }
 
     // Step 5: Copy to final destination
     copyDirectory(tempDir, targetPath)
+    syncSkillToClaude(finalSkillName, targetPath)
 
     return {
       success: true,
-      data: { skillName, path: targetPath }
+      data: { skillName: finalSkillName, path: targetPath }
     }
   } catch (err) {
     const error = err as Error
@@ -243,12 +346,20 @@ export function deleteSkill(skillName: string): {
   try {
     const skillsDir = getSkillsDir()
     const skillPath = join(skillsDir, skillName)
+    const claudeSkillPath = getClaudeSkillPath(skillName)
+    const hasSkillsFanSkill = existsSync(skillPath)
+    const hasManagedClaudeCopy = isSkillsFanManagedClaudeSkill(claudeSkillPath, skillName)
 
-    if (!existsSync(skillPath)) {
+    if (!hasSkillsFanSkill && !hasManagedClaudeCopy) {
       return { success: false, error: 'Skill not found' }
     }
 
-    rmSync(skillPath, { recursive: true, force: true })
+    if (hasSkillsFanSkill) {
+      rmSync(skillPath, { recursive: true, force: true })
+    }
+    if (hasManagedClaudeCopy) {
+      rmSync(claudeSkillPath, { recursive: true, force: true })
+    }
     return { success: true }
   } catch (err) {
     return {

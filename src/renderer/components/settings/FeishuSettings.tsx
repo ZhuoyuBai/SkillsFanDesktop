@@ -153,7 +153,7 @@ export function FeishuSettings({ config }: { config: Record<string, unknown> }) 
         {/* Credentials */}
         <div className="space-y-3">
           <div>
-            <label className="block text-sm text-muted-foreground mb-1">App ID</label>
+            <label className="block text-sm text-muted-foreground mb-1">{t('App ID')}</label>
             <input
               type="text"
               value={appId}
@@ -163,7 +163,7 @@ export function FeishuSettings({ config }: { config: Record<string, unknown> }) 
             />
           </div>
           <div>
-            <label className="block text-sm text-muted-foreground mb-1">App Secret</label>
+            <label className="block text-sm text-muted-foreground mb-1">{t('App Secret')}</label>
             <div className="relative">
               <input
                 type={showSecret ? 'text' : 'password'}

@@ -2,7 +2,6 @@ import type { ToolProviderDefinition } from './types'
 
 export interface BuildSharedToolProviderDefinitionsOptions {
   effectiveAiBrowserEnabled: boolean
-  includeSkillMcp: boolean
   extensionProviderIds?: string[]
 }
 
@@ -33,16 +32,6 @@ export function buildSharedToolProviderDefinitions(
       source: 'app',
       description: 'Automated browser MCP tools backed by the shared HostRuntime browser adapter.',
       runtimeKinds: ['claude-sdk', 'native']
-    })
-  }
-
-  if (options.includeSkillMcp) {
-    providers.push({
-      id: 'skill',
-      kind: 'mcp',
-      source: 'app',
-      description: 'Local skill loading MCP tools exposed through the shared skill runtime.',
-      runtimeKinds: ['claude-sdk']
     })
   }
 

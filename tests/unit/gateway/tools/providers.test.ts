@@ -5,8 +5,7 @@ import { buildSharedToolProviderDefinitions } from '../../../../src/gateway/tool
 describe('shared tool provider definitions', () => {
   it('returns app-managed providers by default', () => {
     expect(buildSharedToolProviderDefinitions({
-      effectiveAiBrowserEnabled: false,
-      includeSkillMcp: false
+      effectiveAiBrowserEnabled: false
     })).toEqual([
       {
         id: 'local-tools',
@@ -25,10 +24,9 @@ describe('shared tool provider definitions', () => {
     ])
   })
 
-  it('adds ai-browser, skill, and extension providers when enabled', () => {
+  it('adds ai-browser and extension providers when enabled', () => {
     expect(buildSharedToolProviderDefinitions({
       effectiveAiBrowserEnabled: true,
-      includeSkillMcp: true,
       extensionProviderIds: ['calendar']
     })).toEqual([
       {
@@ -51,13 +49,6 @@ describe('shared tool provider definitions', () => {
         source: 'app',
         description: 'Automated browser MCP tools backed by the shared HostRuntime browser adapter.',
         runtimeKinds: ['claude-sdk', 'native']
-      },
-      {
-        id: 'skill',
-        kind: 'mcp',
-        source: 'app',
-        description: 'Local skill loading MCP tools exposed through the shared skill runtime.',
-        runtimeKinds: ['claude-sdk']
       },
       {
         id: 'calendar',

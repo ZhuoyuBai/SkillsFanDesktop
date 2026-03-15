@@ -173,7 +173,6 @@ export interface CreateLocalToolsMcpServerOptions {
   spaceId: string
   conversationId: string
   aiBrowserEnabled?: boolean
-  includeSkillMcp?: boolean
   includeSubagentTools?: boolean
 }
 
@@ -194,7 +193,6 @@ function getToolUseId(extra: unknown): string | undefined {
 export function createLocalToolsMcpServer(options: CreateLocalToolsMcpServerOptions) {
   const catalog = buildToolCatalog({
     aiBrowserEnabled: options.aiBrowserEnabled,
-    includeSkillMcp: options.includeSkillMcp,
     includeSubagentTools: options.includeSubagentTools
   })
 

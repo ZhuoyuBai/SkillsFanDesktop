@@ -1157,7 +1157,7 @@ export function SettingsPage() {
       await api.openExternal(url)
     } catch (error) {
       console.error('[Settings] Failed to open macOS permission settings:', error)
-      addToast('Failed to open System Settings', 'error')
+      addToast(t('Failed to open System Settings'), 'error')
     }
   }
 
@@ -1900,7 +1900,7 @@ export function SettingsPage() {
 
   const adapterDisplayNames: Record<string, string> = {
     'terminal': t('Terminal'),
-    'chrome': t('Chrome Browser'),
+    'chrome': t('Browser (Chrome)'),
     'finder': t('Finder'),
     'skillsfan': 'SkillsFan',
   }
@@ -2007,7 +2007,6 @@ export function SettingsPage() {
         {/* App list — same style as other settings items */}
         {activeAdapters.map((adapter, index) => {
           const AdapterIcon = adapterIconMap[adapter.id] || Monitor
-          const hasBlockedWorkflows = (adapter.workflows || []).some(w => w.blockedByPermission)
           const description = adapterDescriptions[adapter.id] || ''
 
           return (
@@ -2026,19 +2025,6 @@ export function SettingsPage() {
               <p className="text-sm text-muted-foreground mt-1">
                 {description}
               </p>
-              {hasBlockedWorkflows && (
-                <div className="flex items-center gap-2 mt-2">
-                  <p className="text-sm text-amber-600 dark:text-amber-400">
-                    {adapterBlockedDescriptions[adapter.id] || ''}
-                  </p>
-                  <button
-                    onClick={() => handleOpenDesktopPermissionSettings('accessibility')}
-                    className="text-sm text-amber-700 dark:text-amber-400 underline hover:no-underline whitespace-nowrap"
-                  >
-                    {t('Enable now')}
-                  </button>
-                </div>
-              )}
             </div>
           )
         })}
@@ -2881,7 +2867,7 @@ export function SettingsPage() {
                   <div>
                     <h3 className="font-medium text-foreground">{t('Gateway Diagnostics')}</h3>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {t('Observe gateway runtime health, recovery storage, and background daemon status.')}
+                      {t('View the status of the automation system to help troubleshoot issues.')}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -2916,35 +2902,41 @@ export function SettingsPage() {
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                       <div className="rounded-lg border border-border bg-secondary/20 p-4 space-y-3">
                         <div className="flex items-center justify-between gap-3">
-                          <p className="text-sm font-semibold">{t('Background service')}</p>
+                          <div>
+                            <p className="text-sm font-semibold">{t('Background service')}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">{t('The core service that runs automation tasks')}</p>
+                          </div>
                           <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${getStatusBadgeClasses(gatewayHealth.process.state)}`}>
                             {gatewayHealth.gateway.mode === 'external' ? t('External') : t('Embedded')}
                           </span>
                         </div>
                         <div className="grid grid-cols-2 gap-3 text-sm">
                           <div>
-                            <p className="text-xs text-muted-foreground">{t('Service')}</p>
+                            <p className="text-xs text-muted-foreground">{t('Running Mode')}</p>
                             <p className="mt-1 font-medium">{gatewayHealth.gateway.mode === 'external' ? t('Runs in the background') : t('Runs inside the app')}</p>
                           </div>
                           <div>
-                            <p className="text-xs text-muted-foreground">{t('Process')}</p>
+                            <p className="text-xs text-muted-foreground">{t('Status')}</p>
                             <p className="mt-1 font-medium">{gatewayHealth.process.state}</p>
                           </div>
                           <div>
-                            <p className="text-xs text-muted-foreground">{t('Launcher')}</p>
+                            <p className="text-xs text-muted-foreground">{t('Auto-start')}</p>
                             <p className="mt-1 font-medium">{gatewayHealth.launcher.state}</p>
                           </div>
                         </div>
                         <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
-                          <span>{t('PID')}: {gatewayHealth.process.pid ?? '—'}</span>
-                          <span>{t('Heartbeat Age')}: {formatDurationMs(gatewayHealth.process.heartbeatAgeMs)}</span>
-                          <span>{t('Checked At')}: {formatOptionalTimestamp(gatewayHealth.checkedAt)}</span>
+                          <span>{t('Process ID')}: {gatewayHealth.process.pid ?? '—'}</span>
+                          <span>{t('Last Heartbeat')}: {formatDurationMs(gatewayHealth.process.heartbeatAgeMs)}</span>
+                          <span>{t('Last Checked')}: {formatOptionalTimestamp(gatewayHealth.checkedAt)}</span>
                         </div>
                       </div>
 
                       <div className="rounded-lg border border-border bg-secondary/20 p-4 space-y-3">
                         <div className="flex items-center justify-between gap-3">
-                          <p className="text-sm font-semibold">{t('Command Runtime')}</p>
+                          <div>
+                            <p className="text-sm font-semibold">{t('Task Executor')}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">{t('Processes and executes automation commands')}</p>
+                          </div>
                           <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${getStatusBadgeClasses(
                             gatewayHealth.gateway.mode !== 'external'
                               ? 'disabled'
@@ -2963,25 +2955,25 @@ export function SettingsPage() {
                         </div>
                         <div className="grid grid-cols-2 gap-3 text-sm">
                           <div>
-                            <p className="text-xs text-muted-foreground">{t('Role')}</p>
+                            <p className="text-xs text-muted-foreground">{t('Mode')}</p>
                             <p className="mt-1 font-medium">{gatewayHealth.commands.processRole || '—'}</p>
                           </div>
                           <div>
-                            <p className="text-xs text-muted-foreground">{t('Pending')}</p>
+                            <p className="text-xs text-muted-foreground">{t('Queued')}</p>
                             <p className="mt-1 font-medium">{gatewayHealth.commands.pendingCount}</p>
                           </div>
                           <div>
-                            <p className="text-xs text-muted-foreground">{t('Processed')}</p>
+                            <p className="text-xs text-muted-foreground">{t('Completed')}</p>
                             <p className="mt-1 font-medium">{gatewayHealth.commands.processedCount}</p>
                           </div>
                           <div>
-                            <p className="text-xs text-muted-foreground">{t('Failed')}</p>
+                            <p className="text-xs text-muted-foreground">{t('Errors')}</p>
                             <p className="mt-1 font-medium">{gatewayHealth.commands.failedCount}</p>
                           </div>
                         </div>
                         <div className="space-y-1 text-xs text-muted-foreground">
-                          <p>{t('Last Command')}: {gatewayHealth.commands.lastCommandName || '—'}</p>
-                          <p>{t('Last Activity')}: {formatOptionalTimestamp(gatewayHealth.commands.lastCommandAt)}</p>
+                          <p>{t('Last Task')}: {gatewayHealth.commands.lastCommandName || '—'}</p>
+                          <p>{t('Last Active')}: {formatOptionalTimestamp(gatewayHealth.commands.lastCommandAt)}</p>
                           <p>{t('Last Success')}: {formatOptionalTimestamp(gatewayHealth.commands.lastSuccessAt)}</p>
                         </div>
                         {gatewayHealth.commands.lastError && (
@@ -2993,7 +2985,10 @@ export function SettingsPage() {
 
                       <div className="rounded-lg border border-border bg-secondary/20 p-4 space-y-3">
                         <div className="flex items-center justify-between gap-3">
-                          <p className="text-sm font-semibold">{t('Recovery Storage')}</p>
+                          <div>
+                            <p className="text-sm font-semibold">{t('Data Backup')}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">{t('Auto-saves progress to prevent data loss')}</p>
+                          </div>
                           <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${getStatusBadgeClasses(
                             gatewayHealth.sessionStore.lastLoadError
                               || gatewayHealth.sessionStore.lastSaveError
@@ -3008,7 +3003,7 @@ export function SettingsPage() {
                         <div className="space-y-3 text-sm">
                           <div className="rounded-lg border border-border/60 bg-background/50 p-3">
                             <div className="flex items-center justify-between gap-3">
-                              <p className="font-medium">{t('Session Store')}</p>
+                              <p className="font-medium">{t('Session Backup')}</p>
                               <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${getStatusBadgeClasses(
                                 !gatewayHealth.sessionStore.enabled
                                   ? 'disabled'
@@ -3038,7 +3033,7 @@ export function SettingsPage() {
 
                           <div className="rounded-lg border border-border/60 bg-background/50 p-3">
                             <div className="flex items-center justify-between gap-3">
-                              <p className="font-medium">{t('Step Journal')}</p>
+                              <p className="font-medium">{t('Step Log')}</p>
                               <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${getStatusBadgeClasses(
                                 !gatewayHealth.stepJournal.enabled
                                   ? 'disabled'
@@ -3046,7 +3041,7 @@ export function SettingsPage() {
                                     ? 'warn'
                                     : 'ok'
                               )}`}>
-                                {gatewayHealth.stepJournal.enabled ? t('Persisting') : t('Disabled')}
+                                {gatewayHealth.stepJournal.enabled ? t('Recording') : t('Disabled')}
                               </span>
                             </div>
                             <p className="mt-2 text-xs text-muted-foreground">
@@ -3073,6 +3068,7 @@ export function SettingsPage() {
                       <div className="flex items-center justify-between gap-3">
                         <div>
                           <p className="text-sm font-semibold">{t('Doctor Report')}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">{t('Checks if all components are working properly')}</p>
                           <p className="text-xs text-muted-foreground mt-1">
                             {t('Generated at {{time}}', { time: formatOptionalTimestamp(gatewayDoctor.generatedAt) })}
                           </p>
@@ -3091,7 +3087,18 @@ export function SettingsPage() {
                               check.state === 'ok' ? 'bg-green-500' : check.state === 'warn' ? 'bg-amber-500' : 'bg-red-500'
                             }`} />
                             <div className="min-w-0 flex-1">
-                              <p className="text-sm font-medium">{check.key}</p>
+                              <p className="text-sm font-medium">{
+                                ({
+                                  'daemon': t('Background Service'),
+                                  'gateway-launcher': t('Auto-start'),
+                                  'gateway-process': t('Service Process'),
+                                  'command-runtime': t('Task Executor'),
+                                  'session-store': t('Session Backup'),
+                                  'step-journal': t('Step Log'),
+                                  'runtime': t('System Runtime'),
+                                  'host-permissions': t('System Permissions'),
+                                } as Record<string, string>)[check.key] || check.key
+                              }</p>
                               <p className="text-xs text-muted-foreground mt-0.5 break-words">{check.summary}</p>
                             </div>
                           </div>
@@ -3124,7 +3131,7 @@ export function SettingsPage() {
                         <div className="rounded-lg border border-border/60 bg-background/50 p-3">
                           <p className="text-xs text-muted-foreground">{t('Manager')}</p>
                           <p className="mt-1 font-medium">{formatGatewayManagerLabel(gatewayDaemonStatus.manager)}</p>
-                          <p className="mt-2 text-xs text-muted-foreground">{t('Desired mode')}: {gatewayDaemonStatus.desiredMode}</p>
+                          <p className="mt-2 text-xs text-muted-foreground">{t('Run mode')}: {gatewayDaemonStatus.desiredMode === 'daemon' ? t('Always Run in Background') : t('Only Run with App')}</p>
                           <p className="mt-1 text-xs text-muted-foreground">{t('Auto Start')}: {gatewayDaemonStatus.autoStartEnabled ? t('Enabled') : t('Disabled')}</p>
                         </div>
                         <div className="rounded-lg border border-border/60 bg-background/50 p-3">
@@ -3141,14 +3148,14 @@ export function SettingsPage() {
                           disabled={activeGatewayDaemonAction !== null || !gatewayDaemonStatus.installable}
                           className="px-4 py-2 bg-primary text-primary-foreground text-sm rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50"
                         >
-                          {activeGatewayDaemonAction === 'register' ? t('Saving...') : t('Enable Daemon Mode')}
+                          {activeGatewayDaemonAction === 'register' ? t('Saving...') : t('Always Run in Background')}
                         </button>
                         <button
                           onClick={handleUnregisterGatewayDaemon}
                           disabled={activeGatewayDaemonAction !== null}
                           className="px-4 py-2 bg-secondary text-secondary-foreground text-sm rounded-lg hover:bg-secondary/80 transition-colors disabled:opacity-50"
                         >
-                          {activeGatewayDaemonAction === 'unregister' ? t('Saving...') : t('Use Manual Mode')}
+                          {activeGatewayDaemonAction === 'unregister' ? t('Saving...') : t('Only Run with App')}
                         </button>
                         {shouldShowGatewayLauncherRecovery && (
                           <button

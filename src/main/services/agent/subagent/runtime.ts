@@ -3,7 +3,6 @@ import { randomUUID } from 'node:crypto'
 import { existsSync, mkdirSync, readdirSync } from 'node:fs'
 import { getConfig } from '../../config.service'
 import { getHaloDir } from '../../config.service'
-import { ensureSkillsInitialized, hasSkills } from '../../skill'
 import { isAIBrowserTool } from '../../ai-browser/tool-utils'
 import type { ApiCredentials, SessionConfig, V2SDKSession } from '../types'
 import { getApiCredentials, getHeadlessElectronPath, getMainWindow, sendToRenderer } from '../helpers'
@@ -666,16 +665,12 @@ async function runSubagent(runId: string): Promise<void> {
     const transport = await resolveSdkTransport(credentials)
     const electronPath = getHeadlessElectronPath()
 
-    await ensureSkillsInitialized()
-    const skillsAvailable = hasSkills()
-
     const { getExtensionHash } = await import('../../extension')
     const browserAutomationMode = config.browserAutomation?.mode === 'system-browser'
       ? 'system-browser'
       : 'ai-browser'
     const sessionConfig: SessionConfig = {
       aiBrowserEnabled: false,
-      hasSkills: skillsAvailable,
       browserAutomationMode,
       customInstructionsHash: config.customInstructions?.enabled && config.customInstructions?.content
         ? config.customInstructions.content
@@ -699,7 +694,6 @@ async function runSubagent(runId: string): Promise<void> {
       },
       aiBrowserEnabled: false,
       thinkingEnabled: false,
-      includeSkillMcp: skillsAvailable,
       includeSubagentTools: false,
       ralphSystemPromptAppend: SUBAGENT_SYSTEM_PROMPT,
       routed: transport.routed

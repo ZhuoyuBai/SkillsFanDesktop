@@ -150,8 +150,7 @@ async function runChatSimpleAcceptanceCheck(workDir?: string): Promise<NativeRol
   const endpoint = manager.resolveRuntimeEndpoint()
   const config = getConfig()
   const sharedToolProviders = resolveConfiguredSharedToolProviders({
-    config,
-    includeSkillMcp: true
+    config
   })
   const nativeStatus = resolveNativeRuntimeStatus({
     endpoint,
@@ -174,7 +173,6 @@ async function runChatSimpleAcceptanceCheck(workDir?: string): Promise<NativeRol
     workDir: workDir || process.cwd(),
     config,
     aiBrowserEnabled: false,
-    includeSkillMcp: true,
     includeSubagentTools: true
   })
 

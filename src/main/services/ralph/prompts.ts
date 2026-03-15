@@ -4,6 +4,7 @@
  */
 
 import type { RalphTask, UserStory } from './types'
+import { CLAUDE_NATIVE_SKILL_TOOL_NAME } from '../../../shared/skill-tools'
 
 /**
  * Skill info for prompt generation
@@ -94,14 +95,14 @@ Only update CLAUDE.md if you have **genuinely reusable knowledge** that would he
 
 Before implementing each step of a story, you MUST check for available skills:
 
-1. **Find available skills** - Call the \`Skill\` tool to view its description, which contains an \`<available_skills>\` section listing all installed skills
+1. **Find available skills** - Prefer any explicit skills list already provided in the prompt or task context
 2. **Match task to skill** - If a skill's description matches your current task, you MUST use it
-3. **Invoke the skill** - Use the \`Skill\` tool with the skill name to load and execute it
+3. **Invoke the skill** - Use the native \`${CLAUDE_NATIVE_SKILL_TOOL_NAME}\` tool with the skill name to load and execute it
 4. **Prefer skills over custom code** - Skills are pre-built, tested solutions; ALWAYS use them instead of writing from scratch
 
 **How to find skills:**
-- The Skill tool's description contains all available skills with their names and descriptions
-- Each skill is listed in \`<skill><name>...</name><description>...</description></skill>\` format
+- Prefer any explicit skill names and descriptions already included in the current context
+- If you already know the skill name, call the native \`${CLAUDE_NATIVE_SKILL_TOOL_NAME}\` tool directly
 - Match the skill description to your current task
 
 **Examples of when to use skills:**
@@ -201,7 +202,7 @@ export function buildIterationPrompt(task: RalphTask, story: UserStory, skills?:
 The following skills are installed. Before writing code, check if any skill can accomplish your task:
 ${skills.map(s => `- **${s.name}**: ${s.description}`).join('\n')}
 
-**IMPORTANT:** Use the \`Skill\` tool to invoke a skill when it matches your task!
+**IMPORTANT:** Use the native \`${CLAUDE_NATIVE_SKILL_TOOL_NAME}\` tool to invoke a skill when it matches your task!
 `
     : ''
 

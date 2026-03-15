@@ -7,7 +7,6 @@ export interface BuildToolRegistryParams {
   workDir: string
   config: Record<string, any>
   aiBrowserEnabled?: boolean
-  includeSkillMcp?: boolean
   includeSubagentTools?: boolean
 }
 

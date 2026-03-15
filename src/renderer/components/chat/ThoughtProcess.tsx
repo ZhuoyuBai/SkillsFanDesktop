@@ -23,6 +23,7 @@ import { getToolIcon } from '../icons/ToolIcons'
 import { TodoCard, parseTodoInput } from '../tool/TodoCard'
 import type { Thought } from '../../types'
 import { useTranslation } from '../../i18n'
+import { getInvokedSkillName } from '../../../shared/skill-tools'
 
 interface ThoughtProcessProps {
   thoughts: Thought[]
@@ -133,7 +134,7 @@ function getActionSummaryData(thoughts: Thought[]): { key: string; params?: Reco
         case 'AskUserQuestion': return { key: 'Waiting for user response...' }
         // Skill tool - show the skill name
         case 'Skill': {
-          const skillName = (input?.skill as string) || 'skill'
+          const skillName = getInvokedSkillName(input)
           return { key: 'Running {{skill}}...', params: { skill: skillName } }
         }
         default: return { key: 'Processing...' }

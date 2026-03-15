@@ -4,7 +4,6 @@ const mocks = vi.hoisted(() => ({
   createBrowserMcpServer: vi.fn(),
   createLocalToolsMcpServer: vi.fn(),
   createWebToolsMcpServer: vi.fn(),
-  createSkillMcpServer: vi.fn(),
   getEnabledMcpServers: vi.fn(),
   getEnabledExtensions: vi.fn(),
   runGetMcpServersHooks: vi.fn()
@@ -24,10 +23,6 @@ vi.mock('../../../../src/main/services/local-tools/sdk-mcp-server', () => ({
 
 vi.mock('../../../../src/main/services/web-tools/sdk-mcp-server', () => ({
   createWebToolsMcpServer: mocks.createWebToolsMcpServer
-}))
-
-vi.mock('../../../../src/main/services/skill', () => ({
-  createSkillMcpServer: mocks.createSkillMcpServer
 }))
 
 vi.mock('../../../../src/main/services/agent/helpers', () => ({
@@ -67,7 +62,6 @@ describe('runtime tool bundle', () => {
       }
     })
     mocks.createWebToolsMcpServer.mockReturnValue({ type: 'stdio', command: 'web-tools' })
-    mocks.createSkillMcpServer.mockResolvedValue({ type: 'stdio', command: 'skill' })
     mocks.getEnabledMcpServers.mockReturnValue({})
     mocks.getEnabledExtensions.mockReturnValue([])
     mocks.runGetMcpServersHooks.mockResolvedValue({})
@@ -78,8 +72,7 @@ describe('runtime tool bundle', () => {
       conversationId: 'conv-1',
       spaceId: 'space-1',
       workDir: '/tmp/space-1',
-      config: { mcpServers: {} },
-      includeSkillMcp: true
+      config: { mcpServers: {} }
     })
 
     expect(bundle.workDir).toBe('/tmp/space-1')
@@ -102,11 +95,10 @@ describe('runtime tool bundle', () => {
             }
           }
         },
-        'web-tools': { type: 'stdio', command: 'web-tools' },
-        skill: { type: 'stdio', command: 'skill' }
+        'web-tools': { type: 'stdio', command: 'web-tools' }
       },
-      addedMcpServers: ['local-tools', 'web-tools', 'skill'],
-      providerIds: ['local-tools', 'web-tools', 'skill']
+      addedMcpServers: ['local-tools', 'web-tools'],
+      providerIds: ['local-tools', 'web-tools']
     })
     expect(bundle.native.providers.map((provider) => provider.id)).toEqual(['local-tools', 'web-tools'])
     expect(bundle.native.sharedToolRegistryReady).toBe(true)
@@ -131,11 +123,10 @@ describe('runtime tool bundle', () => {
         browserAutomation: {
           mode: 'system-browser'
         }
-      },
-      includeSkillMcp: true
+      }
     })
 
-    expect(providers.map((provider) => provider.id)).toEqual(['local-tools', 'web-tools', 'skill', 'calendar'])
+    expect(providers.map((provider) => provider.id)).toEqual(['local-tools', 'web-tools', 'calendar'])
     expect(resolveRuntimeKindToolProviders(providers, 'native').map((provider) => provider.id)).toEqual([
       'local-tools',
       'web-tools',

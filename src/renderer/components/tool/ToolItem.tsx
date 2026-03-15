@@ -8,6 +8,7 @@ import { memo, useState, useEffect, useRef, useCallback } from 'react'
 import { ChevronRight, Maximize2 } from 'lucide-react'
 import { InlineDiff } from './InlineDiff'
 import { useTranslation } from '../../i18n'
+import { getInvokedSkillName, isSkillToolName } from '../../../shared/skill-tools'
 
 // ============================================
 // Utility Functions
@@ -137,11 +138,13 @@ export function getActivityText(
       return getText(t('Editing notebook...'), t('Edited notebook'))
     case 'AskUserQuestion':
       return getText(t('Waiting for response...'), t('Got response'))
-    case 'Skill':
+    case 'Skill': {
+      const skillName = getInvokedSkillName(input)
       return getText(
-        t('Running {{skill}}...', { skill: String(input.skill || 'skill') }),
-        t('Ran {{skill}}', { skill: String(input.skill || 'skill') })
+        t('Running {{skill}}...', { skill: skillName }),
+        t('Ran {{skill}}', { skill: skillName })
       )
+    }
     default:
       return toolName ? (isComplete ? toolName : `${toolName}...`) : (isComplete ? t('Done') : t('Processing...'))
   }
@@ -181,6 +184,7 @@ function shouldAutoExpand(toolName: string, toolOutput?: string, isError?: boole
 function hasExpandableContent(toolName: string, toolOutput?: string, toolInput?: Record<string, unknown>): boolean {
   // Edit tool always has expandable diff (from toolInput)
   if (toolName === 'Edit' && toolInput?.old_string && toolInput?.new_string) return true
+  if (isSkillToolName(toolName)) return false
   // Other tools need toolOutput
   return !!toolOutput && toolOutput.trim().length > 0
 }

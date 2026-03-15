@@ -16,8 +16,7 @@ interface RuntimeRegistrar {
 
 function resolveCurrentSharedToolProviders() {
   return resolveConfiguredSharedToolProviders({
-    config: getConfig(),
-    includeSkillMcp: true
+    config: getConfig()
   })
 }
 

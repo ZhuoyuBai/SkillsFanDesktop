@@ -61,8 +61,7 @@ function getGatewayRuntimeStatus(host: HostEnvironmentStatus): GatewayRuntimeSta
   const nativeRegistered = runtimeOrchestrator.hasRuntime('native')
   const runtimeEndpoint = getAISourceManager().resolveRuntimeEndpoint()
   const sharedToolProviders = resolveConfiguredSharedToolProviders({
-    config,
-    includeSkillMcp: true
+    config
   })
   const native = getNativeRuntimeStatus({
     endpoint: runtimeEndpoint,

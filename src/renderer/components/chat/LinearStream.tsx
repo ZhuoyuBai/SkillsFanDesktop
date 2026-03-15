@@ -32,6 +32,7 @@ import {
   getLatestVisibleActiveToolUseIds,
   getMatchingToolResult
 } from '../../../shared/utils/thought-dedupe'
+import { getInvokedSkillName, isSkillToolName } from '../../../shared/skill-tools'
 
 interface LinearStreamProps {
   thoughts: Thought[]
@@ -232,14 +233,11 @@ export function LinearStream({
       return null
     }
 
-    // Track Skill tool uses for grouping child tools
-    const skillToolIds = new Set<string>()
     const childToolMap = new Map<string, TimelineItem[]>()
 
     // First, identify all Skill tools and their children
     for (const thought of thoughts) {
-      if (thought.type === 'tool_use' && thought.toolName === 'Skill') {
-        skillToolIds.add(thought.id)
+      if (thought.type === 'tool_use' && isSkillToolName(thought.toolName)) {
         childToolMap.set(thought.id, [])
       }
     }
@@ -286,13 +284,13 @@ export function LinearStream({
         }
 
         // Handle Skill tool specially
-        if (thought.toolName === 'Skill') {
+        if (isSkillToolName(thought.toolName)) {
           const result = getToolResult(thought)
           items.push({
             id: thought.id,
             timestamp: thought.timestamp,
             type: 'skill',
-            skillName: String(thought.toolInput?.skill || 'skill'),
+            skillName: getInvokedSkillName(thought.toolInput),
             isComplete,
             isError: result?.isError || false,
             duration: result?.duration,

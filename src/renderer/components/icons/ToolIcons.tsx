@@ -93,6 +93,7 @@ import {
   Bolt,
   type LucideIcon
 } from 'lucide-react'
+import { CLAUDE_NATIVE_SKILL_TOOL_NAME } from '../../../shared/skill-tools'
 
 // Tool name to icon mapping
 export const toolIconMap: Record<string, LucideIcon> = {
@@ -127,6 +128,7 @@ export const toolIconMap: Record<string, LucideIcon> = {
 
   // Other
   AskUserQuestion: MessageSquare,
+  [CLAUDE_NATIVE_SKILL_TOOL_NAME]: Sparkles,
   'mcp__local-tools__text_editor_code_execution': FileEdit,
   'mcp__local-tools__tool_search_tool_regex': Search,
   'mcp__local-tools__tool_search_tool_bm25': Search,

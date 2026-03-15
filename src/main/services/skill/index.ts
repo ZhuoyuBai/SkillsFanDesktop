@@ -8,16 +8,14 @@ export {
   initializeRegistry,
   getAllSkills,
   getSkill,
-  hasSkills,
   getSkillsDir,
+  getClaudeSkillsDir,
   reloadSkills,
   updateSpaceWorkDir,
   ensureSkillsInitialized
 } from './skill-registry'
 
 export { startSkillWatcher, stopSkillWatcher } from './skill-watcher'
-
-export { createSkillMcpServer } from './skill-mcp-server'
 
 export {
   installSkill,

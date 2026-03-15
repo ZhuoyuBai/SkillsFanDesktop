@@ -4,7 +4,6 @@ const mocks = vi.hoisted(() => ({
   createBrowserMcpServer: vi.fn(),
   createLocalToolsMcpServer: vi.fn(),
   createWebToolsMcpServer: vi.fn(),
-  createSkillMcpServer: vi.fn(),
   getEnabledMcpServers: vi.fn(),
   getEnabledExtensions: vi.fn(),
   runGetMcpServersHooks: vi.fn()
@@ -26,10 +25,6 @@ vi.mock('../../../../src/main/services/web-tools/sdk-mcp-server', () => ({
   createWebToolsMcpServer: mocks.createWebToolsMcpServer
 }))
 
-vi.mock('../../../../src/main/services/skill', () => ({
-  createSkillMcpServer: mocks.createSkillMcpServer
-}))
-
 vi.mock('../../../../src/main/services/agent/helpers', () => ({
   getEnabledMcpServers: mocks.getEnabledMcpServers
 }))
@@ -47,7 +42,6 @@ describe('buildToolRegistry', () => {
     mocks.createBrowserMcpServer.mockReturnValue({ type: 'stdio', command: 'ai-browser' })
     mocks.createLocalToolsMcpServer.mockReturnValue({ type: 'stdio', command: 'local-tools' })
     mocks.createWebToolsMcpServer.mockReturnValue({ type: 'stdio', command: 'web-tools' })
-    mocks.createSkillMcpServer.mockResolvedValue({ type: 'stdio', command: 'skill' })
     mocks.getEnabledMcpServers.mockReturnValue({})
     mocks.getEnabledExtensions.mockReturnValue([])
     mocks.runGetMcpServersHooks.mockResolvedValue({})
@@ -153,7 +147,7 @@ describe('buildToolRegistry', () => {
     expect(mocks.createBrowserMcpServer).not.toHaveBeenCalled()
   })
 
-  it('adds skill, ai-browser, and extension MCP servers when enabled', async () => {
+  it('adds ai-browser and extension MCP servers when enabled', async () => {
     mocks.getEnabledExtensions.mockReturnValue([{ manifest: { id: 'calendar' } }])
     mocks.runGetMcpServersHooks.mockResolvedValue({
       calendar: { type: 'stdio', command: 'calendar-mcp' }
@@ -164,12 +158,11 @@ describe('buildToolRegistry', () => {
       spaceId: 'space-3',
       workDir: '/tmp/space-3',
       config: { mcpServers: {} },
-      aiBrowserEnabled: true,
-      includeSkillMcp: true
+      aiBrowserEnabled: true
     })
 
     expect(result.effectiveAiBrowserEnabled).toBe(true)
-    expect(result.addedMcpServers).toEqual(['local-tools', 'web-tools', 'ai-browser', 'skill', 'calendar'])
+    expect(result.addedMcpServers).toEqual(['local-tools', 'web-tools', 'ai-browser', 'calendar'])
     expect(result.providers).toEqual([
       {
         id: 'local-tools',
@@ -193,13 +186,6 @@ describe('buildToolRegistry', () => {
         runtimeKinds: ['claude-sdk', 'native']
       },
       {
-        id: 'skill',
-        kind: 'mcp',
-        source: 'app',
-        description: 'Local skill loading MCP tools exposed through the shared skill runtime.',
-        runtimeKinds: ['claude-sdk']
-      },
-      {
         id: 'calendar',
         kind: 'mcp',
         source: 'extension',
@@ -211,24 +197,17 @@ describe('buildToolRegistry', () => {
       'local-tools': { type: 'stdio', command: 'local-tools' },
       'web-tools': { type: 'stdio', command: 'web-tools' },
       'ai-browser': { type: 'stdio', command: 'ai-browser' },
-      skill: { type: 'stdio', command: 'skill' },
       calendar: { type: 'stdio', command: 'calendar-mcp' }
     })
     expect(result.catalog).toEqual(expect.arrayContaining([
       expect.objectContaining({ name: 'mcp__ai-browser__browser_new_page' }),
-      expect.objectContaining({ name: 'mcp__local-tools__subagent_spawn' }),
-      expect.objectContaining({ name: 'mcp__skill__Skill' })
+      expect.objectContaining({ name: 'mcp__local-tools__subagent_spawn' })
     ]))
     expect(result.directory).toEqual(expect.arrayContaining([
       expect.objectContaining({
         name: 'mcp__ai-browser__browser_new_page',
         providerId: 'ai-browser',
         runtimeKinds: ['claude-sdk', 'native']
-      }),
-      expect.objectContaining({
-        name: 'mcp__skill__Skill',
-        providerId: 'skill',
-        runtimeKinds: ['claude-sdk']
       })
     ]))
     expect(mocks.createBrowserMcpServer).toHaveBeenCalledWith('automated', {

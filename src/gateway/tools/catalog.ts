@@ -430,17 +430,8 @@ const AI_BROWSER_TOOLS: ToolCatalogEntry[] = [
   { name: 'mcp__ai-browser__browser_screenshot', description: 'Take a screenshot of the page or a selected element.', source: 'mcp', server: 'ai-browser', category: 'browser' }
 ]
 
-const SKILL_TOOL: ToolCatalogEntry = {
-  name: 'mcp__skill__Skill',
-  description: 'Load a Skill package with task-specific instructions from the local skill registry.',
-  source: 'mcp',
-  server: 'skill',
-  category: 'skills'
-}
-
 export function buildToolCatalog(options: {
   aiBrowserEnabled?: boolean
-  includeSkillMcp?: boolean
   includeSubagentTools?: boolean
 }): ToolCatalogEntry[] {
   const baseTools = options.includeSubagentTools === false
@@ -454,10 +445,6 @@ export function buildToolCatalog(options: {
 
   if (options.aiBrowserEnabled) {
     catalog.push(...AI_BROWSER_TOOLS)
-  }
-
-  if (options.includeSkillMcp) {
-    catalog.push(SKILL_TOOL)
   }
 
   return catalog

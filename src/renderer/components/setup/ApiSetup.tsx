@@ -304,7 +304,7 @@ export function ApiSetup({ onBack, showBack = false, initialProviderId }: ApiSet
             {/* API Key input */}
             <div>
               <div className="flex items-center justify-between mb-2">
-                <label className="text-sm text-muted-foreground">API Key</label>
+                <label className="text-sm text-muted-foreground">{t('API Key')}</label>
                 {selectedProvider && !PROVIDER_PRESETS.find(p => p.id === selectedProvider)?.isCustom && (
                   <a
                     href={PROVIDER_PRESETS.find(p => p.id === selectedProvider)?.docsUrl}

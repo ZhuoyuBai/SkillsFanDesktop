@@ -57,11 +57,6 @@ vi.mock('../../../../src/main/services/ai-browser/tool-utils', () => ({
   isAIBrowserTool: vi.fn(() => false)
 }))
 
-vi.mock('../../../../src/main/services/skill', () => ({
-  hasSkills: vi.fn(() => false),
-  ensureSkillsInitialized: vi.fn(async () => {})
-}))
-
 vi.mock('../../../../src/main/services/agent/helpers', () => ({
   getHeadlessElectronPath: vi.fn(() => '/mock/electron'),
   getWorkingDir: vi.fn(() => '/mock/workdir'),

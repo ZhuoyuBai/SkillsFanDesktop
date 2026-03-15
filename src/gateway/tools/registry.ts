@@ -1,7 +1,6 @@
 import { hostRuntime } from '../host-runtime'
 import { getEnabledMcpServers } from '../../main/services/agent/helpers'
 import { getEnabledExtensions, runGetMcpServersHooks } from '../../main/services/extension'
-import { createSkillMcpServer } from '../../main/services/skill'
 import { buildToolCatalog } from './catalog'
 import { buildSharedToolDirectory } from './directory'
 import { buildSharedToolProviderDefinitions } from './providers'
@@ -14,7 +13,6 @@ export async function buildToolRegistry(params: BuildToolRegistryParams): Promis
     workDir,
     config,
     aiBrowserEnabled = false,
-    includeSkillMcp = false,
     includeSubagentTools = true
   } = params
 
@@ -37,7 +35,6 @@ export async function buildToolRegistry(params: BuildToolRegistryParams): Promis
     spaceId,
     conversationId,
     aiBrowserEnabled: effectiveAiBrowserEnabled,
-    includeSkillMcp,
     includeSubagentTools
   })
   addedMcpServers.push('local-tools')
@@ -54,11 +51,6 @@ export async function buildToolRegistry(params: BuildToolRegistryParams): Promis
     addedMcpServers.push('ai-browser')
   }
 
-  if (includeSkillMcp) {
-    mcpServers['skill'] = await createSkillMcpServer()
-    addedMcpServers.push('skill')
-  }
-
   const enabledExtensions = getEnabledExtensions()
   const extensionProviderIds: string[] = []
   if (enabledExtensions.length > 0) {
@@ -72,12 +64,10 @@ export async function buildToolRegistry(params: BuildToolRegistryParams): Promis
 
   const providers = buildSharedToolProviderDefinitions({
     effectiveAiBrowserEnabled,
-    includeSkillMcp,
     extensionProviderIds
   })
   const catalog = buildToolCatalog({
     aiBrowserEnabled: effectiveAiBrowserEnabled,
-    includeSkillMcp,
     includeSubagentTools
   })
 

@@ -596,7 +596,6 @@ async function resolveNativeSharedToolContext(request: Pick<AgentRequest, 'space
     workDir,
     config,
     aiBrowserEnabled: request.aiBrowserEnabled,
-    includeSkillMcp: true,
     includeSubagentTools: true
   })
 

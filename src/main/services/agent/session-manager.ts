@@ -11,7 +11,6 @@
 import { unstable_v2_createSession } from '@anthropic-ai/claude-agent-sdk'
 import { getConfig, onApiConfigChange } from '../config.service'
 import { getConversation } from '../conversation.service'
-import { ensureSkillsInitialized, hasSkills } from '../skill'
 import { clearCompactionState, clearAllCompactionStates } from './compaction-monitor'
 import type {
   V2SDKSession,
@@ -102,7 +101,6 @@ export function stopSessionCleanup(): void {
  */
 export function needsSessionRebuild(existing: V2SessionInfo, newConfig: SessionConfig): boolean {
   return existing.config.aiBrowserEnabled !== newConfig.aiBrowserEnabled
-    || existing.config.hasSkills !== newConfig.hasSkills
     || existing.config.browserAutomationMode !== newConfig.browserAutomationMode
     || existing.config.customInstructionsHash !== newConfig.customInstructionsHash
     || existing.config.extensionHash !== newConfig.extensionHash
@@ -192,7 +190,7 @@ export async function getOrCreateV2Session(
     conversationId,
     createdAt: Date.now(),
     lastUsedAt: Date.now(),
-    config: config || { aiBrowserEnabled: false, hasSkills: false }
+    config: config || { aiBrowserEnabled: false }
   })
 
   // Start cleanup if not already running
@@ -249,10 +247,7 @@ export async function ensureSessionWarm(
     console.log(`[Agent] ${credentials.provider} provider enabled (warm): routing via ${anthropicBaseUrl}, apiType=${transport.apiType}`)
   }
 
-  await ensureSkillsInitialized()
-  const skillsAvailable = hasSkills()
-
-  const { sdkOptions, addedMcpServers } = await buildSdkOptions({
+  const { sdkOptions } = await buildSdkOptions({
     conversationId,
     spaceId,
     workDir,
@@ -266,13 +261,8 @@ export async function ensureSessionWarm(
     onStderr: (data: string) => {
       console.error(`[Agent][${conversationId}] CLI stderr (warm):`, data)
     },
-    includeSkillMcp: skillsAvailable,
     routed: transport.routed
   })
-
-  if (addedMcpServers.includes('skill')) {
-    console.log(`[Agent] Skill MCP server added for warm-up: ${conversationId}`)
-  }
 
   try {
     console.log(`[Agent] Warming up V2 session: ${conversationId}`)
@@ -282,14 +272,13 @@ export async function ensureSessionWarm(
     const { getExtensionHash } = await import('../extension')
     const sessionConfig: SessionConfig = {
       aiBrowserEnabled: false,  // Default to false for warm-up (user hasn't enabled it yet)
-      hasSkills: skillsAvailable,
       browserAutomationMode: (config as any).browserAutomation?.mode === 'system-browser' ? 'system-browser' : 'ai-browser',
       customInstructionsHash: ci?.enabled && ci?.content ? ci.content : undefined,
       extensionHash: getExtensionHash()
     }
 
     await getOrCreateV2Session(spaceId, conversationId, sdkOptions, sessionId, sessionConfig)
-    console.log(`[Agent] V2 session warmed up: ${conversationId}, hasSkills: ${skillsAvailable}`)
+    console.log(`[Agent] V2 session warmed up: ${conversationId}`)
   } catch (error) {
     console.error(`[Agent] Failed to warm up session ${conversationId}:`, error)
     // Don't throw on warm-up failure, sendMessage() will reinitialize (just slower)

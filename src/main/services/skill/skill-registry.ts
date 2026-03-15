@@ -49,6 +49,10 @@ export function getSkillsDir(): string {
   return join(home, '.skillsfan', 'skills')
 }
 
+export function getClaudeSkillsDir(): string {
+  return join(homedir(), '.claude', 'skills')
+}
+
 /**
  * 初始化技能注册表 — 扫描所有来源
  * 优先级：项目级 > SkillsFan > 全局 Claude > Claude Skills > Agents Skills
@@ -168,13 +172,6 @@ export async function reloadSkills(spaceWorkDir?: string): Promise<SkillInfo[]> 
 export async function updateSpaceWorkDir(workDir: string | undefined): Promise<void> {
   currentSpaceWorkDir = workDir
   await reloadSkills()
-}
-
-/**
- * 检查是否有可用技能
- */
-export function hasSkills(): boolean {
-  return skillCache.size > 0
 }
 
 /**
