@@ -1,6 +1,6 @@
 {
   "name": "skillsfan",
-  "version": "0.2.8",
+  "version": "0.2.9",
   "description": "技能范 - AI 技能助手",
   "type": "module",
   "main": "./out/main/index.mjs",
