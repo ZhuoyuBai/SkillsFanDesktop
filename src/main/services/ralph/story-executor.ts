@@ -22,6 +22,7 @@ interface ExecutionState {
   completionSignal: CompletionSignal | null
   error: string | null
   abortController: AbortController | null
+  sessionId: string | null
 }
 
 const executionStates = new Map<string, ExecutionState>()
@@ -37,7 +38,8 @@ function getExecutionState(storyId: string): ExecutionState {
       currentOutput: '',
       completionSignal: null,
       error: null,
-      abortController: null
+      abortController: null,
+      sessionId: null
     }
     executionStates.set(storyId, state)
   }
@@ -78,6 +80,7 @@ export async function executeStory(
   state.abortController = new AbortController()
 
   const sessionId = `ralph-${task.id}-${story.id}`
+  state.sessionId = sessionId
 
   try {
     // Dynamically import agent service to avoid circular dependencies
@@ -113,6 +116,11 @@ export async function executeStory(
       timeoutId = setTimeout(() => {
         reject(new Error('Story execution timed out after 30 minutes'))
       }, 30 * 60 * 1000)
+
+      state.abortController?.signal.addEventListener('abort', () => {
+        if (timeoutId) clearTimeout(timeoutId)
+        reject(new Error('Story execution aborted'))
+      }, { once: true })
     })
 
     // Check for completion signals in the output
@@ -204,11 +212,21 @@ export async function executeStory(
 /**
  * Stop execution of a story
  */
-export async function stopStoryExecution(storyId: string): Promise<void> {
+export async function stopStoryExecution(taskId: string, storyId: string): Promise<void> {
   const state = executionStates.get(storyId)
   if (state?.abortController) {
     state.abortController.abort()
   }
+  const sessionId = state?.sessionId || `ralph-${taskId}-${storyId}`
+
+  try {
+    const { stopGeneration, closeV2Session } = await import('../agent')
+    await stopGeneration(sessionId)
+    closeV2Session(sessionId)
+  } catch (error) {
+    console.error(`[Ralph] Failed to stop story execution ${storyId}:`, error)
+  }
+
   cleanupExecutionState(storyId)
 }
 

@@ -21,7 +21,7 @@ import type {
   TaskSchedule
 } from '../../shared/types/loop-task'
 import { scheduleTask, unscheduleTask } from './scheduler.service'
-import { getCurrentTask, stopTask as stopRalphTask } from './ralph'
+import { getTask as getRalphTask, stopTask as stopRalphTask } from './ralph'
 
 const INDEX_VERSION = 1
 
@@ -368,7 +368,7 @@ export async function deleteTask(spaceId: string, taskId: string): Promise<boole
     return false
   }
 
-  const runningTask = getCurrentTask()
+  const runningTask = await getRalphTask(taskId)
   if (runningTask && runningTask.id === taskId && runningTask.status === 'running') {
     console.log(`[LoopTask] Stopping running task before delete: ${taskId}`)
     await stopRalphTask(taskId)

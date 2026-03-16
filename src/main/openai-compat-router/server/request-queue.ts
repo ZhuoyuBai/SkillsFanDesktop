@@ -1,39 +1,63 @@
 /**
  * Request Queue
  *
- * Prevents concurrent requests to the same upstream provider
- * This solves 429 errors caused by parallel request behavior
+ * Limits concurrent requests to the same upstream provider.
+ * A small amount of parallelism is necessary for multi-task agent flows,
+ * especially when multiple conversations or tool follow-up turns overlap.
  */
 
-const requestQueues = new Map<string, Promise<void>>()
+interface RequestQueueState {
+  active: number
+  waiters: Array<() => void>
+}
+
+const requestQueues = new Map<string, RequestQueueState>()
+
+function getMaxConcurrentRequests(): number {
+  const raw = Number.parseInt(process.env.HALO_OPENAI_MAX_CONCURRENT_REQUESTS || '', 10)
+  if (Number.isFinite(raw)) {
+    return Math.max(1, Math.min(8, raw))
+  }
+  return 4
+}
 
 /**
  * Execute a function with request queue protection
  *
- * Ensures only one request per key is in flight at a time.
- * Subsequent requests wait for the previous one to complete.
+ * Allows a bounded number of in-flight requests per key.
+ * Additional requests wait until a slot is available.
  */
 export async function withRequestQueue<T>(key: string, fn: () => Promise<T>): Promise<T> {
-  // Wait for any pending request with the same key
-  const pending = requestQueues.get(key)
-  if (pending) {
-    await pending.catch(() => {}) // Ignore errors from previous request
+  let queue = requestQueues.get(key)
+  if (!queue) {
+    queue = { active: 0, waiters: [] }
+    requestQueues.set(key, queue)
   }
 
-  // Create a new promise for this request
-  let resolve: () => void
-  const thisRequest = new Promise<void>((r) => {
-    resolve = r
-  })
-  requestQueues.set(key, thisRequest)
+  const maxConcurrent = getMaxConcurrentRequests()
+
+  if (queue.active >= maxConcurrent) {
+    await new Promise<void>((resolve) => {
+      queue!.waiters.push(resolve)
+    })
+  } else {
+    queue.active += 1
+  }
 
   try {
     return await fn()
   } finally {
-    resolve!()
-    // Clean up if this is still the current request
-    if (requestQueues.get(key) === thisRequest) {
-      requestQueues.delete(key)
+    const current = requestQueues.get(key)
+    if (current) {
+      const next = current.waiters.shift()
+      if (next) {
+        next()
+      } else {
+        current.active = Math.max(0, current.active - 1)
+        if (current.active === 0) {
+          requestQueues.delete(key)
+        }
+      }
     }
   }
 }

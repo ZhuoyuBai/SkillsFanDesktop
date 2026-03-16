@@ -30,7 +30,7 @@ vi.mock('@main/services/scheduler.service', () => ({
 }))
 
 vi.mock('@main/services/ralph', () => ({
-  getCurrentTask: vi.fn(() => null),
+  getTask: vi.fn(async () => null),
   stopTask: vi.fn(async () => undefined)
 }))
 

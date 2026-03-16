@@ -69,28 +69,31 @@ export function getHeadlessElectronPath(): string {
       mkdirSync(headlessDir, { recursive: true })
     }
 
-    // Check if symlink exists and points to correct target
+    // Check if symlink exists and points to correct target.
+    // Use lstatSync instead of existsSync so broken symlinks are still detected
+    // and replaced after the app path changes in development.
     let needsSymlink = true
 
-    if (existsSync(headlessSymlinkPath)) {
-      try {
-        const stat = lstatSync(headlessSymlinkPath)
-        if (stat.isSymbolicLink()) {
-          const currentTarget = readlinkSync(headlessSymlinkPath)
-          if (currentTarget === electronPath) {
-            needsSymlink = false
-          } else {
-            // Symlink exists but points to wrong target, remove it
-            console.log('[Agent] Symlink target changed, recreating...')
-            unlinkSync(headlessSymlinkPath)
-          }
+    try {
+      const stat = lstatSync(headlessSymlinkPath)
+      if (stat.isSymbolicLink()) {
+        const currentTarget = readlinkSync(headlessSymlinkPath)
+        if (currentTarget === electronPath) {
+          needsSymlink = false
         } else {
-          // Not a symlink (maybe old copy), remove it
-          console.log('[Agent] Removing old non-symlink file...')
+          // Symlink exists but points to wrong target, remove it
+          console.log('[Agent] Symlink target changed, recreating...')
           unlinkSync(headlessSymlinkPath)
         }
-      } catch {
-        // If we can't read it, try to remove and recreate
+      } else {
+        // Not a symlink (maybe old copy), remove it
+        console.log('[Agent] Removing old non-symlink file...')
+        unlinkSync(headlessSymlinkPath)
+      }
+    } catch (error) {
+      const err = error as NodeJS.ErrnoException
+      if (err.code !== 'ENOENT') {
+        // If we can't read it cleanly, try to remove and recreate
         try {
           unlinkSync(headlessSymlinkPath)
         } catch { /* ignore */ }

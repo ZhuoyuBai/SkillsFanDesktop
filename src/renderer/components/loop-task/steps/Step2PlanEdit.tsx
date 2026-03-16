@@ -308,12 +308,13 @@ export function Step2PlanEdit({ spaceId, onCancel }: Step2PlanEditProps) {
       // Clear log and go to step 3 (execute)
       clearLog()
       setWizardStep(3 as WizardStep)
-      addToast(t('Task created, execution started'), 'success')
 
       // Start execution
       const startResult = await api.ralphStart(spaceId, task.id)
       if (!startResult.success) {
-        setError(startResult.error || t('Failed to start task'))
+        addToast(startResult.error || t('Failed to start task'), 'error')
+      } else {
+        addToast(t('Task created, execution started'), 'success')
       }
     } catch (err) {
       setError((err as Error).message)

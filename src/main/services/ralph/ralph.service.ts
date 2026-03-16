@@ -31,14 +31,37 @@ import { getAllSkills, ensureSkillsInitialized } from '../skill'
 // State Management
 // ============================================
 
-// Current active task (only one task can run at a time)
-let currentTask: RalphTask | null = null
+interface TaskRuntimeState {
+  task: RalphTask
+  abortController: AbortController | null
+}
+
+// Runtime state is isolated per task so multiple tasks can execute concurrently.
+const taskRuntimeStates = new Map<string, TaskRuntimeState>()
+
+// Tracks the last task loaded into memory for APIs that still operate on "current task".
+let currentTaskId: string | null = null
 
 // Main window reference for IPC
 let mainWindow: BrowserWindow | null = null
 
-// Task abort controller
-let taskAbortController: AbortController | null = null
+function getTaskRuntimeState(taskId: string): TaskRuntimeState | undefined {
+  return taskRuntimeStates.get(taskId)
+}
+
+function getCurrentTaskRuntimeState(): TaskRuntimeState | undefined {
+  return currentTaskId ? taskRuntimeStates.get(currentTaskId) : undefined
+}
+
+function upsertTaskRuntimeState(task: RalphTask): TaskRuntimeState {
+  const nextState: TaskRuntimeState = {
+    task,
+    abortController: taskRuntimeStates.get(task.id)?.abortController ?? null
+  }
+  taskRuntimeStates.set(task.id, nextState)
+  currentTaskId = task.id
+  return nextState
+}
 
 /**
  * Set the main window reference for IPC events
@@ -131,53 +154,75 @@ export async function createTask(config: CreateTaskConfig): Promise<RalphTask> {
  * Start executing a Ralph task
  */
 export async function startTask(taskId: string): Promise<void> {
-  if (currentTask && currentTask.status === 'running') {
-    throw new Error('Another task is already running')
-  }
-
-  // For now, we need the task to be created first
-  // In a full implementation, we might load from storage
-  if (!currentTask || currentTask.id !== taskId) {
+  const runtimeState = getTaskRuntimeState(taskId)
+  const task = runtimeState?.task
+  if (!task) {
     throw new Error(`Task ${taskId} not found`)
   }
 
-  currentTask.status = 'running'
-  currentTask.startedAt = new Date().toISOString()
-  taskAbortController = new AbortController()
+  if (task.status === 'running') {
+    throw new Error(`Task ${taskId} is already running`)
+  }
 
-  broadcastTaskUpdate(currentTask)
+  task.status = 'running'
+  task.startedAt = new Date().toISOString()
+  task.completedAt = undefined
+  const abortController = new AbortController()
+  runtimeState.abortController = abortController
+  currentTaskId = taskId
+
+  broadcastTaskUpdate(task)
 
   // Start the loop in the background
-  runLoop(currentTask).catch((error) => {
-    console.error(`[Ralph] Loop error:`, error)
-    if (currentTask) {
-      currentTask.status = 'failed'
-      broadcastTaskUpdate(currentTask)
-    }
-  })
+  runLoop(task, abortController)
+    .catch((error) => {
+      if (abortController.signal.aborted) {
+        return
+      }
+
+      console.error(`[Ralph] Loop error for task ${taskId}:`, error)
+      task.status = 'failed'
+      broadcastTaskUpdate(task)
+    })
+    .finally(() => {
+      const latestState = getTaskRuntimeState(taskId)
+      if (latestState?.abortController === abortController) {
+        latestState.abortController = null
+      }
+    })
 }
 
 /**
  * Stop the current running task
  */
 export async function stopTask(taskId: string): Promise<void> {
-  if (!currentTask || currentTask.id !== taskId) {
-    throw new Error(`Task ${taskId} not found or not running`)
+  const runtimeState = getTaskRuntimeState(taskId)
+  const task = runtimeState?.task
+  if (!task) {
+    throw new Error(`Task ${taskId} not found`)
   }
 
-  if (taskAbortController) {
-    taskAbortController.abort()
+  if (task.status !== 'running') {
+    throw new Error(`Task ${taskId} is not running`)
+  }
+
+  if (runtimeState.abortController) {
+    runtimeState.abortController.abort()
   }
 
   // Stop any executing story
-  const runningStory = currentTask.stories.find((s) => s.status === 'running')
+  const runningStory = task.stories.find((s) => s.status === 'running')
   if (runningStory) {
-    await stopStoryExecution(runningStory.id)
+    await stopStoryExecution(task.id, runningStory.id)
     runningStory.status = 'pending' // Reset to pending, not failed
+    runningStory.startedAt = undefined
+    runningStory.completedAt = undefined
+    runningStory.duration = undefined
   }
 
-  currentTask.status = 'paused'
-  broadcastTaskUpdate(currentTask)
+  task.currentStoryIndex = -1
+  task.status = 'paused'
+  broadcastTaskUpdate(task)
 
   console.log(`[Ralph] Task stopped: ${taskId}`)
 }
@@ -186,24 +231,21 @@ export async function stopTask(taskId: string): Promise<void> {
  * Get a task by ID
  */
 export async function getTask(taskId: string): Promise<RalphTask | null> {
-  if (currentTask && currentTask.id === taskId) {
-    return currentTask
-  }
-  return null
+  return getTaskRuntimeState(taskId)?.task ?? null
 }
 
 /**
  * Get the current task (if any)
  */
 export function getCurrentTask(): RalphTask | null {
-  return currentTask
+  return getCurrentTaskRuntimeState()?.task ?? null
 }
 
 /**
  * Set the current task (used after creation)
  */
 export function setCurrentTask(task: RalphTask): void {
-  currentTask = task
+  upsertTaskRuntimeState(task)
 }
 
 // ============================================
@@ -213,7 +255,7 @@ export function setCurrentTask(task: RalphTask): void {
 /**
  * Main execution loop - supports step retry and loop execution
  */
-async function runLoop(task: RalphTask): Promise<void> {
+async function runLoop(task: RalphTask, abortController: AbortController): Promise<void> {
   console.log(`[Ralph] Starting loop for task ${task.id}`)
 
   const stepRetry = task.stepRetryConfig || { onFailure: 'skip' as const, maxRetries: 0 }
@@ -242,7 +284,7 @@ async function runLoop(task: RalphTask): Promise<void> {
       }
 
       // Check for abort
-      if (taskAbortController?.signal.aborted) {
+      if (abortController.signal.aborted) {
         console.log(`[Ralph] Task aborted`)
         return
       }
@@ -256,11 +298,11 @@ async function runLoop(task: RalphTask): Promise<void> {
       }
 
       // Execute story with retry logic
-      await executeStoryWithRetry(task, story, stepRetry)
+      await executeStoryWithRetry(task, story, stepRetry, abortController)
     }
 
     // Check abort between loop cycles
-    if (taskAbortController?.signal.aborted) {
+    if (abortController.signal.aborted) {
       console.log(`[Ralph] Task aborted between loops`)
       return
     }
@@ -283,7 +325,8 @@ async function runLoop(task: RalphTask): Promise<void> {
 async function executeStoryWithRetry(
   task: RalphTask,
   story: UserStory,
-  retryConfig: { onFailure: string; maxRetries: number }
+  retryConfig: { onFailure: string; maxRetries: number },
+  abortController: AbortController
 ): Promise<void> {
   const maxAttempts = retryConfig.onFailure === 'retry' ? (retryConfig.maxRetries + 1) : 1
 
@@ -297,7 +340,7 @@ async function executeStoryWithRetry(
     }
 
     // Check for abort
-    if (taskAbortController?.signal.aborted) {
+    if (abortController.signal.aborted) {
       return
     }
 
@@ -371,6 +414,15 @@ async function executeStoryWithRetry(
 
       return // Done with this story (success or final failure)
     } catch (error) {
+      if (abortController.signal.aborted) {
+        story.status = 'pending'
+        story.startedAt = undefined
+        story.completedAt = undefined
+        story.duration = undefined
+        broadcastTaskUpdate(task)
+        return
+      }
+
       const err = error as Error
       console.error(`[Ralph] Story ${story.id} error:`, err.message)
 
@@ -762,6 +814,7 @@ export async function importFromPrdFile(filePath: string): Promise<{
  * Add a story to the current task
  */
 export function addStoryToTask(story: Omit<UserStory, 'id' | 'status'>): UserStory | null {
+  const currentTask = getCurrentTask()
   if (!currentTask) return null
 
   const newStory: UserStory = {
@@ -780,6 +833,7 @@ export function addStoryToTask(story: Omit<UserStory, 'id' | 'status'>): UserSto
  * Update a story in the current task
  */
 export function updateStoryInTask(storyId: string, updates: Partial<UserStory>): boolean {
+  const currentTask = getCurrentTask()
   if (!currentTask) return false
 
   const storyIndex = currentTask.stories.findIndex((s) => s.id === storyId)
@@ -798,6 +852,7 @@ export function updateStoryInTask(storyId: string, updates: Partial<UserStory>):
  * Remove a story from the current task
  */
 export function removeStoryFromTask(storyId: string): boolean {
+  const currentTask = getCurrentTask()
   if (!currentTask) return false
 
   const storyIndex = currentTask.stories.findIndex((s) => s.id === storyId)
@@ -818,6 +873,7 @@ export function removeStoryFromTask(storyId: string): boolean {
  * Reorder stories in the current task
  */
 export function reorderStoriesInTask(fromIndex: number, toIndex: number): boolean {
+  const currentTask = getCurrentTask()
   if (!currentTask) return false
   if (fromIndex < 0 || fromIndex >= currentTask.stories.length) return false
   if (toIndex < 0 || toIndex >= currentTask.stories.length) return false
@@ -838,9 +894,9 @@ export function reorderStoriesInTask(fromIndex: number, toIndex: number): boolea
  * Reset the service state (for testing)
  */
 export function resetState(): void {
-  if (taskAbortController) {
-    taskAbortController.abort()
+  for (const state of taskRuntimeStates.values()) {
+    state.abortController?.abort()
   }
-  currentTask = null
-  taskAbortController = null
+  taskRuntimeStates.clear()
+  currentTaskId = null
 }

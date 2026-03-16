@@ -135,6 +135,10 @@ describe('Request Queue', () => {
   })
 
   describe('withRequestQueue', () => {
+    afterEach(() => {
+      delete process.env.HALO_OPENAI_MAX_CONCURRENT_REQUESTS
+    })
+
     it('should execute function and return result', async () => {
       const result = await withRequestQueue('test-key', async () => {
         return 42
@@ -143,6 +147,7 @@ describe('Request Queue', () => {
     })
 
     it('should serialize requests with same key', async () => {
+      process.env.HALO_OPENAI_MAX_CONCURRENT_REQUESTS = '1'
       const order: number[] = []
 
       const promise1 = withRequestQueue('same-key', async () => {
@@ -163,6 +168,32 @@ describe('Request Queue', () => {
       expect(result2).toBe('second')
       // Second request should wait for first to complete
       expect(order).toEqual([1, 2, 3])
+    })
+
+    it('should allow limited parallel requests with same key', async () => {
+      process.env.HALO_OPENAI_MAX_CONCURRENT_REQUESTS = '2'
+      const order: string[] = []
+
+      const promise1 = withRequestQueue('same-key', async () => {
+        order.push('a-start')
+        await new Promise((resolve) => setTimeout(resolve, 10))
+        order.push('a-end')
+        return 'a'
+      })
+
+      const promise2 = withRequestQueue('same-key', async () => {
+        order.push('b-start')
+        await new Promise((resolve) => setTimeout(resolve, 5))
+        order.push('b-end')
+        return 'b'
+      })
+
+      const [result1, result2] = await Promise.all([promise1, promise2])
+
+      expect(result1).toBe('a')
+      expect(result2).toBe('b')
+      expect(order.indexOf('a-start')).toBeLessThan(2)
+      expect(order.indexOf('b-start')).toBeLessThan(2)
     })
 
     it('should allow parallel requests with different keys', async () => {

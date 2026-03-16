@@ -783,12 +783,23 @@ async function runClaudeSearch(args: {
 // Provider resolution — auto-detects from aiSources
 // ---------------------------------------------------------------------------
 
-function resolveSearchProvider(search: ReturnType<typeof getProviderRuntime>['web']['search']): {
+function resolveSearchProvider(
+  search: ReturnType<typeof getProviderRuntime>['web']['search'],
+  explicitProvider?: unknown
+): {
   provider: WebSearchProvider
   apiKey?: string
 } {
-  // If user explicitly set a specific provider, honor it
-  if (search.provider !== 'duckduckgo') {
+  // If user explicitly set a provider in config, honor it exactly.
+  const explicitlyConfiguredProvider = typeof explicitProvider === 'string'
+    ? explicitProvider as WebSearchProvider
+    : undefined
+
+  if (explicitlyConfiguredProvider) {
+    if (explicitlyConfiguredProvider === 'duckduckgo') {
+      return { provider: 'duckduckgo' }
+    }
+
     const braveKey = normalizeApiKey(search.apiKey || process.env.BRAVE_API_KEY)
     const perplexityKey = normalizeApiKey(search.perplexity.apiKey || process.env.PERPLEXITY_API_KEY)
     const kimiKey = normalizeApiKey(search.kimi.apiKey || process.env.KIMI_API_KEY || process.env.MOONSHOT_API_KEY || getAiSourceApiKey('kimi'))
@@ -807,9 +818,9 @@ function resolveSearchProvider(search: ReturnType<typeof getProviderRuntime>['we
       claude: claudeKey
     }
 
-    const key = keyMap[search.provider]
+    const key = keyMap[explicitlyConfiguredProvider]
     if (key) {
-      return { provider: search.provider, apiKey: key }
+      return { provider: explicitlyConfiguredProvider, apiKey: key }
     }
     // Explicit provider but no key → fall through to auto-detect
   }
@@ -852,6 +863,7 @@ export async function executeWebSearch(args: {
   freshness?: string
   domainFilter?: string[]
 }): Promise<SearchPayload> {
+  const config = getConfig()
   const runtime = getProviderRuntime()
   const { search } = runtime.web
 
@@ -859,7 +871,8 @@ export async function executeWebSearch(args: {
     throw new Error('Web search is disabled in settings.')
   }
 
-  const { provider, apiKey } = resolveSearchProvider(search)
+  const explicitProvider = (config.tools as any)?.web?.search?.provider
+  const { provider, apiKey } = resolveSearchProvider(search, explicitProvider)
 
   const count = Math.max(1, Math.min(10, Math.floor(args.count || search.maxResults)))
   const country = args.country?.trim().split(/[-_]/)[0].slice(0, 2).toUpperCase() || undefined

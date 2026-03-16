@@ -206,6 +206,50 @@ describe('web-tools/search', () => {
     ])
   })
 
+  it('honors explicit DuckDuckGo provider even when aiSources has MiniMax configured', async () => {
+    mocks.getConfig.mockReturnValue({
+      tools: {
+        web: {
+          search: {
+            enabled: true,
+            provider: 'duckduckgo',
+            timeoutSeconds: 5,
+            cacheTtlMinutes: 15,
+            maxResults: 5
+          },
+          fetch: {
+            enabled: true
+          }
+        }
+      },
+      aiSources: {
+        current: 'minimax',
+        minimax: { apiKey: 'minimax-test-key', apiUrl: 'https://api.minimax.chat', model: 'MiniMax-Text-01' }
+      }
+    })
+
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(`
+        <html>
+          <body>
+            <a class="result__a" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fexample.com%2Fduck">Duck result</a>
+            <div class="result__snippet">Duck snippet</div>
+          </body>
+        </html>
+      `, {
+        status: 200,
+        headers: { 'content-type': 'text/html' }
+      })
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await executeWebSearch({ query: 'parallel search' })
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(String(fetchMock.mock.calls[0][0])).toContain('html.duckduckgo.com')
+    expect(result.provider).toBe('duckduckgo')
+  })
+
   it('falls back to DuckDuckGo HTML when an API provider is selected without a key', async () => {
     mocks.getConfig.mockReturnValue({
       tools: {

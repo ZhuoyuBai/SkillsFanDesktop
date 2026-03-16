@@ -47,8 +47,13 @@ export function registerRalphHandlers(window: BrowserWindow | null): void {
   // Start a task
   ipcMain.handle('ralph:start', async (_event, spaceId: string | null, taskId: string) => {
     try {
-      // If spaceId is provided, load from Loop Task persistence
-      if (spaceId) {
+      const existingTask = await getTask(taskId)
+      if (existingTask) {
+        setCurrentTask(existingTask)
+      }
+
+      // If spaceId is provided and runtime state doesn't exist yet, load from Loop Task persistence
+      if (spaceId && !existingTask) {
         const loopTask = getLoopTask(spaceId, taskId)
         if (!loopTask) {
           return { success: false, error: `Task ${taskId} not found in space ${spaceId}` }

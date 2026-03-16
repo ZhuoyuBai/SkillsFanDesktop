@@ -26,16 +26,18 @@ export function registerSkillHandlers(): void {
 
   ipcHandle('skill:get-dir', () => getSkillsDir())
 
-  ipcHandle('skill:select-archive', () => selectSkillArchive())
+  // These handlers return their own { success, data?, error?, conflict? } structure,
+  // so use ipcMain.handle directly to avoid double-wrapping by ipcHandle
+  ipcMain.handle('skill:select-archive', () => selectSkillArchive())
 
-  ipcHandle('skill:install',
+  ipcMain.handle('skill:install',
     (_e, archivePath: string, conflictResolution?: 'replace' | 'rename' | 'cancel') =>
       installSkill(archivePath, conflictResolution)
   )
 
-  ipcHandle('skill:delete', (_e, skillName: string) => deleteSkill(skillName))
+  ipcMain.handle('skill:delete', (_e, skillName: string) => deleteSkill(skillName))
 
-  ipcHandle('skill:open-folder', (_e, skillName: string) => openSkillFolder(skillName))
+  ipcMain.handle('skill:open-folder', (_e, skillName: string) => openSkillFolder(skillName))
 
   ipcHandle('skill:get-content', (_e, skillName: string) => {
     const skill = getSkill(skillName)

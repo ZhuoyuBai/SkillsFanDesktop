@@ -11,7 +11,9 @@ import type { NormalizedInboundMessage, NormalizedOutboundEvent } from '@shared/
 import type { FeishuConfig, FeishuSessionMapping } from '@shared/types/feishu'
 import type { FeishuCardLocale } from '../../feishu'
 import type { ElectronChannel } from './electron.channel'
+import { existsSync } from 'fs'
 import { app } from 'electron'
+import { normalizeLocalFilePath } from '../../local-tools/path-utils'
 import { getConfig, saveConfig, getActiveSpaceId } from '../../config.service'
 import { createConversation, getConversation, updateConversation } from '../../conversation.service'
 import {
@@ -38,6 +40,163 @@ import { summarizeToolCall, upsertToolSummary } from '../../feishu/tool-status'
 import { parseFeishuCardActionValue } from '../../feishu/card-action'
 import { getChannelManager } from '../channel-manager'
 
+interface ConversationThought {
+  type?: string
+  toolOutput?: string
+}
+
+interface ConversationImageAttachment {
+  type?: string
+  mediaType?: string
+  data?: string
+}
+
+interface ConversationMessage {
+  role?: string
+  content?: string
+  thoughts?: ConversationThought[]
+  images?: ConversationImageAttachment[]
+}
+
+interface ConversationSnapshot {
+  messages?: ConversationMessage[]
+}
+
+interface FeishuReplyImage {
+  dedupeKey: string
+  buffer?: Buffer
+  filePath?: string
+}
+
+const LOCAL_IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|bmp|tiff?)$/i
+
+function decodeBase64Image(data: string): Buffer | null {
+  const normalized = data
+    .replace(/^data:[^;]+;base64,/, '')
+    .replace(/\s+/g, '')
+
+  if (!normalized) {
+    return null
+  }
+
+  const buffer = Buffer.from(normalized, 'base64')
+  return buffer.length > 0 ? buffer : null
+}
+
+function normalizeImageFileCandidate(candidate: string): string | null {
+  const normalized = normalizeLocalFilePath(candidate)
+  if (!normalized || !LOCAL_IMAGE_EXT_RE.test(normalized)) {
+    return null
+  }
+
+  return existsSync(normalized) ? normalized : null
+}
+
+function extractLocalImagePaths(text: string): string[] {
+  if (!text) return []
+
+  const matches = new Set<string>()
+  const addCandidate = (candidate: string): void => {
+    const normalized = normalizeImageFileCandidate(candidate)
+    if (normalized) {
+      matches.add(normalized)
+    }
+  }
+
+  for (const match of text.matchAll(/`([^`\n]+)`/g)) {
+    addCandidate(match[1])
+  }
+
+  for (const match of text.matchAll(/(?:file:\/\/[^\s`]+?\.(?:png|jpe?g|gif|webp|bmp|tiff?)|~\/[^\s`]+?\.(?:png|jpe?g|gif|webp|bmp|tiff?)|\/[^\s`]+?\.(?:png|jpe?g|gif|webp|bmp|tiff?))/gi)) {
+    addCandidate(match[0])
+  }
+
+  return [...matches]
+}
+
+function extractReplyImagesFromMessage(message: ConversationMessage | undefined): FeishuReplyImage[] {
+  if (!message) return []
+
+  const images: FeishuReplyImage[] = []
+  const seen = new Set<string>()
+  const pushBuffer = (mediaType: string | undefined, data: string | undefined): void => {
+    if (!mediaType?.startsWith('image/') || !data) return
+
+    const buffer = decodeBase64Image(data)
+    if (!buffer) return
+
+    const dedupeKey = `buffer:${mediaType}:${data.slice(0, 128)}`
+    if (seen.has(dedupeKey)) return
+    seen.add(dedupeKey)
+    images.push({ dedupeKey, buffer })
+  }
+
+  const pushFilePath = (filePath: string | undefined): void => {
+    if (!filePath) return
+
+    const normalized = normalizeImageFileCandidate(filePath)
+    if (!normalized) return
+
+    const dedupeKey = `file:${normalized}`
+    if (seen.has(dedupeKey)) return
+    seen.add(dedupeKey)
+    images.push({ dedupeKey, filePath: normalized })
+  }
+
+  for (const image of message.images || []) {
+    if (image.type === 'image') {
+      pushBuffer(image.mediaType, image.data)
+    }
+  }
+
+  for (const thought of message.thoughts || []) {
+    const toolOutput = thought.toolOutput
+    if (!toolOutput) continue
+
+    for (const filePath of extractLocalImagePaths(toolOutput)) {
+      pushFilePath(filePath)
+    }
+
+    try {
+      const parsed = JSON.parse(toolOutput) as Array<{
+        type?: string
+        text?: string
+        file_path?: string
+        source?: {
+          type?: string
+          data?: string
+          media_type?: string
+        }
+      }>
+
+      if (!Array.isArray(parsed)) continue
+
+      for (const block of parsed) {
+        if (block.type === 'image') {
+          if (block.source?.type === 'base64') {
+            pushBuffer(block.source.media_type, block.source.data)
+          }
+          pushFilePath(block.file_path)
+        }
+
+        if (typeof block.text === 'string') {
+          for (const filePath of extractLocalImagePaths(block.text)) {
+            pushFilePath(filePath)
+          }
+        }
+      }
+    } catch {
+      // Ignore non-JSON tool output.
+    }
+  }
+
+  for (const filePath of extractLocalImagePaths(message.content || '')) {
+    pushFilePath(filePath)
+  }
+
+  return images
+}
+
 export class FeishuChannel implements Channel {
   readonly id = 'feishu'
   readonly name = 'Feishu Bot'
@@ -55,6 +214,8 @@ export class FeishuChannel implements Channel {
   private typingIntervals = new Map<string, ReturnType<typeof setInterval>>()
   /** Whether we have already sent final content/error for a conversation */
   private deliveredOutputs = new Set<string>()
+  /** Whether we have already sent reply images for a conversation */
+  private deliveredReplyImages = new Set<string>()
   /** Track tool call IDs that already triggered an approval card, to prevent duplicate notifications */
   private approvedToolCalls = new Set<string>()
   /** Track approval card message IDs by tool call ID so card updates do not depend on callback payload shape */
@@ -201,6 +362,7 @@ export class FeishuChannel implements Channel {
     this.messageBuffers.clear()
     this.activeTools.clear()
     this.approvalCards.clear()
+    this.deliveredReplyImages.clear()
 
     await this.botService.stop()
     this.messageHandler = null
@@ -640,6 +802,7 @@ export class FeishuChannel implements Channel {
         // Reset message buffer
         this.messageBuffers.set(convId, '')
         this.deliveredOutputs.delete(convId)
+        this.deliveredReplyImages.delete(convId)
         this.approvedToolCalls.clear()
         this.activeTools.set(convId, [])
         break
@@ -769,16 +932,34 @@ export class FeishuChannel implements Channel {
       case 'agent:complete': {
         // Some failure paths only emit complete without agent:message.
         // Backfill with the latest assistant content so Feishu users can see the actual reason.
+        const conversation = getConversation(event.spaceId, convId) as ConversationSnapshot | null
+        const lastAssistant = conversation?.messages?.slice().reverse().find((msg) => msg.role === 'assistant')
+
         if (!this.deliveredOutputs.has(convId)) {
-          const conversation = getConversation(event.spaceId, convId) as { messages?: Array<{ role?: string; content?: string }> } | null
-          const lastAssistant = conversation?.messages?.slice().reverse().find((msg) => msg.role === 'assistant')
           const fallbackText = (lastAssistant?.content || '').trim()
           if (fallbackText) {
             await this.sendFormattedMessage(chatId, fallbackText)
             this.deliveredOutputs.add(convId)
           }
         }
+
+        if (!this.deliveredReplyImages.has(convId)) {
+          const replyImages = extractReplyImagesFromMessage(lastAssistant)
+          if (replyImages.length > 0) {
+            for (const image of replyImages) {
+              try {
+                const imageKey = await this.botService.uploadImage(image.buffer || image.filePath!)
+                await this.botService.sendImage(chatId, imageKey)
+              } catch (error) {
+                console.warn('[FeishuChannel] Failed to send reply image to Feishu:', error)
+              }
+            }
+          }
+          this.deliveredReplyImages.add(convId)
+        }
+
         this.activeTools.delete(convId)
+        this.deliveredReplyImages.delete(convId)
         await this.clearThinkingCard(convId)
         this.deliveredOutputs.delete(convId)
         break
