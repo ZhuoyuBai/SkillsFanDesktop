@@ -48,6 +48,8 @@ vi.mock('electron', () => {
         if (name === 'userData') return path.join(dir, '.halo')
         return dir
       },
+      getAppPath: () => globalThis.__HALO_TEST_DIR__ || '/tmp/halo-test-fallback',
+      isPackaged: false,
       setLoginItemSettings: vi.fn(),
       getLoginItemSettings: vi.fn(() => ({ openAtLogin: false })),
       getName: vi.fn(() => 'Halo'),

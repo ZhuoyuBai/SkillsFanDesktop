@@ -30,6 +30,7 @@ import {
   getHeadlessElectronPath,
   getWorkingDir,
   getApiCredentials,
+  getApiCredentialsForSource,
   getEnabledMcpServers,
   sendToRenderer,
   setMainWindow
@@ -70,6 +71,7 @@ import {
 } from '../../../shared/utils/openai-models'
 import { isDuplicateActiveToolUse } from '../../../shared/utils/thought-dedupe'
 import { stripLeadingSetModelStatus } from '../../../shared/utils/sdk-status'
+import { resolveAccessibleAiSource } from '../ai-sources/hosted-ai-availability'
 
 function getRuntimeModelDisplayName(config: Record<string, any>, modelId: string): string {
   const aiSources = config.aiSources || {}
@@ -282,38 +284,22 @@ async function sendMessageInternal(
 
   // Get API credentials based on current aiSources configuration
   let credentials = await getApiCredentials(config)
+  const aiSources = ((config as any).aiSources || {}) as Record<string, any>
+  const effectiveModelSource = request.modelSource
+    ? resolveAccessibleAiSource(aiSources as any, request.modelSource) || request.modelSource
+    : undefined
 
   // Allow request-level source/provider override (used by Loop Tasks for cross-provider model switching)
   if (request.modelSource) {
-    const aiSources = (config as any).aiSources || {}
-    const currentSource = aiSources.current || 'custom'
-
-    if (request.modelSource !== currentSource) {
-      const targetConfig = aiSources[request.modelSource]
-      if (targetConfig) {
-        const isOAuth = targetConfig && typeof targetConfig === 'object' && 'loggedIn' in targetConfig
-        if (!isOAuth && targetConfig.apiKey) {
-          // Custom API provider - construct credentials directly
-          credentials = {
-            baseUrl: targetConfig.apiUrl || 'https://api.anthropic.com',
-            apiKey: targetConfig.apiKey,
-            model: request.model || targetConfig.model || 'claude-opus-4-5-20251101',
-            provider: targetConfig.provider === 'openai' ? 'openai' : 'anthropic',
-            customHeaders: targetConfig.customHeaders,
-            apiType: targetConfig.apiType
-          }
-          console.log(`[Agent] Source override: ${request.modelSource} (custom API)`)
-        }
-        // For OAuth targets different from current, model override below handles it
-      }
-    }
+    credentials = await getApiCredentialsForSource(config, request.modelSource, request.model)
+    console.log(`[Agent] Source override: ${request.modelSource}${effectiveModelSource && effectiveModelSource !== request.modelSource ? ` -> ${effectiveModelSource}` : ''}`)
   }
 
   // Allow request-level model override (used by Loop Tasks)
   if (request.model) {
     credentials.model = request.model
   }
-  console.log(`[Agent] sendMessage using: ${credentials.provider}, model: ${credentials.model}${request.model ? ' (task override)' : ''}${request.modelSource ? ` source: ${request.modelSource}` : ''}`)
+  console.log(`[Agent] sendMessage using: ${credentials.provider}, model: ${credentials.model}${request.model ? ' (task override)' : ''}${effectiveModelSource ? ` source: ${effectiveModelSource}` : ''}`)
 
   const directRuntimeModelReply = !internalMessage &&
     !ralphMode?.enabled &&
@@ -847,9 +833,10 @@ async function processMessageStream(
   let finalAttachments = attachments
   const hasAnyImages = (images && images.length > 0) || (attachments && attachments.some(a => a.type === 'image'))
   if (hasAnyImages) {
-    sendToRenderer('agent:message', spaceId, conversationId, {
+    sendToRenderer('agent:status', spaceId, conversationId, {
       type: 'status',
-      content: 'Analyzing images...'
+      message: 'Analyzing images...',
+      subtype: 'image_preprocess'
     })
     const preprocessResult = await preprocessImages(messageWithContext, displayModel, images, attachments)
     if (preprocessResult.preprocessed) {
@@ -857,10 +844,15 @@ async function processMessageStream(
       finalImages = preprocessResult.filteredImages
       finalAttachments = preprocessResult.filteredAttachments
       if (preprocessResult.error) {
-        sendToRenderer('agent:message', spaceId, conversationId, {
-          type: 'warning',
-          content: preprocessResult.error
-        })
+        const warningThought: Thought = {
+          id: `thought-image-preprocess-${Date.now()}`,
+          type: 'error',
+          content: preprocessResult.error,
+          timestamp: new Date().toISOString(),
+          isError: true
+        }
+        sessionState.thoughts.push(warningThought)
+        sendToRenderer('agent:thought', spaceId, conversationId, { thought: warningThought })
       }
     }
   }

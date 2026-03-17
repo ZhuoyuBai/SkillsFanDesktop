@@ -301,10 +301,16 @@ export default function App() {
     const unsubSkillsFanLogin = api.onSkillsFanLoginSuccess(async () => {
       // Update global login state immediately
       useAppStore.getState().setSkillsfanLoggedIn(true)
+      const hostedAiEnabled = useAppStore.getState().productFeatures.skillsfanHostedAiEnabled
 
       const currentView = useAppStore.getState().view
       if (currentView === 'setup') {
         logger.debug('[App] SkillsFan login success, but SetupFlow is handling it')
+        return
+      }
+
+      if (!hostedAiEnabled) {
+        logger.debug('[App] SkillsFan login success, hosted proxy AI disabled, skipping model hydration')
         return
       }
 

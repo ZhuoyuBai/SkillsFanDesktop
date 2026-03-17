@@ -13,6 +13,10 @@ import { ipcHandle } from './utils'
 
 export function registerConfigHandlers(): void {
   ipcHandle('config:get', () => getConfigAsync())
+  ipcHandle('config:get-product-features', async () => {
+    const { getProductFeatures } = await import('../controllers/config.controller')
+    return getProductFeatures()
+  })
 
   // Save configuration
   ipcMain.handle('config:set', async (_event, updates: Record<string, unknown>) => {

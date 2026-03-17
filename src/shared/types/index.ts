@@ -19,3 +19,6 @@ export * from './feishu'
 
 // Web tool config types
 export * from './web-tools'
+
+// Product feature flags
+export * from './product-features'

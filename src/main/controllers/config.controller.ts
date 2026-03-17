@@ -8,6 +8,7 @@ import {
   saveConfig as serviceSaveConfig,
   validateApiConnection as serviceValidateApiConnection
 } from '../services/config.service'
+import { getProductFeatures as serviceGetProductFeatures } from '../services/ai-sources/auth-loader'
 
 export interface ControllerResponse<T = unknown> {
   success: boolean
@@ -22,6 +23,18 @@ export function getConfig(): ControllerResponse {
   try {
     const config = serviceGetConfig()
     return { success: true, data: config }
+  } catch (error: unknown) {
+    const err = error as Error
+    return { success: false, error: err.message }
+  }
+}
+
+/**
+ * Get product feature flags exposed to the renderer.
+ */
+export function getProductFeatures(): ControllerResponse {
+  try {
+    return { success: true, data: serviceGetProductFeatures() }
   } catch (error: unknown) {
     const err = error as Error
     return { success: false, error: err.message }

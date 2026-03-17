@@ -5,6 +5,7 @@
 import { useState, useEffect } from 'react'
 import { api } from '../../api'
 import { useTranslation } from '../../i18n'
+import { useAppStore } from '../../stores/app.store'
 import { Loader2, LogOut, User, Gem, RefreshCw } from 'lucide-react'
 import { HaloLogo } from '../brand/HaloLogo'
 import { getSkillsFanBaseUrl } from '../../utils/region'
@@ -12,6 +13,7 @@ import type { SkillsFanUser, SkillsFanAuthState } from '../../../shared/types/sk
 
 export function SkillsFanAccountSection() {
   const { t } = useTranslation()
+  const hostedAiEnabled = useAppStore((s) => s.productFeatures.skillsfanHostedAiEnabled)
   const [authState, setAuthState] = useState<SkillsFanAuthState | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isLoggingIn, setIsLoggingIn] = useState(false)
@@ -67,10 +69,10 @@ export function SkillsFanAccountSection() {
         })
         setAuthState(state)
         // Load cached credits immediately, then refresh in background
-        if (state.isLoggedIn && state.lastKnownCredits !== undefined) {
+        if (hostedAiEnabled && state.isLoggedIn && state.lastKnownCredits !== undefined) {
           setCredits(state.lastKnownCredits)
         }
-        if (state.isLoggedIn) {
+        if (hostedAiEnabled && state.isLoggedIn) {
           api.skillsfanGetCredits().then((res) => {
             if (res.success && res.data !== undefined) {
               setCredits(res.data as number)
@@ -124,7 +126,7 @@ export function SkillsFanAccountSection() {
   }
 
   const handleRefreshCredits = async () => {
-    if (creditsLoading) return
+    if (!hostedAiEnabled || creditsLoading) return
     setCreditsLoading(true)
     try {
       const res = await api.skillsfanRefreshCredits()
@@ -194,8 +196,7 @@ export function SkillsFanAccountSection() {
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <h4 className="font-medium truncate">{authState.user.name}</h4>
-                {/* Plan Badge */}
-                {(() => {
+                {hostedAiEnabled && (() => {
                   const planInfo = getPlanDisplay(authState.user.plan)
                   return (
                     <span className={`px-2 py-0.5 text-xs rounded-full ${planInfo.className}`}>
@@ -208,73 +209,74 @@ export function SkillsFanAccountSection() {
             </div>
           </div>
 
-          {/* Membership & Credits */}
-          <div className="bg-secondary/50 rounded-lg p-4 space-y-3">
-            <h4 className="text-sm font-medium text-muted-foreground">{t('Membership & Credits')}</h4>
-            <div className="grid grid-cols-2 gap-4">
-              {/* Left: Plan info */}
-              <div>
-                <div className="text-xs text-muted-foreground">{t('Current Plan')}</div>
-                <div className="text-sm font-medium mt-1">
-                  {(() => {
-                    const planInfo = getPlanDisplay(authState.user.plan)
-                    return planInfo.planLabel
-                  })()}
-                </div>
-                {authState.user.planExpiresAt && (
-                  <div className="text-xs text-muted-foreground mt-1">
-                    {t('Expires')}: {formatExpiry(authState.user.planExpiresAt)}
+          {hostedAiEnabled && (
+            <>
+              {/* Hosted AI mode: keep membership and credits UI available behind feature flag. */}
+              <div className="bg-secondary/50 rounded-lg p-4 space-y-3">
+                <h4 className="text-sm font-medium text-muted-foreground">{t('Membership & Credits')}</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <div className="text-xs text-muted-foreground">{t('Current Plan')}</div>
+                    <div className="text-sm font-medium mt-1">
+                      {(() => {
+                        const planInfo = getPlanDisplay(authState.user.plan)
+                        return planInfo.planLabel
+                      })()}
+                    </div>
+                    {authState.user.planExpiresAt && (
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {t('Expires')}: {formatExpiry(authState.user.planExpiresAt)}
+                      </div>
+                    )}
                   </div>
-                )}
+                  <div>
+                    <div className="text-xs text-muted-foreground">{t('Credits')}</div>
+                    <div className="flex items-center gap-1.5 mt-1">
+                      <Gem className="w-4 h-4 text-primary/80" />
+                      <span className="text-sm font-medium tabular-nums">
+                        {credits !== null ? credits.toLocaleString() : '--'}
+                      </span>
+                      <button
+                        onClick={handleRefreshCredits}
+                        disabled={creditsLoading}
+                        className="ml-1 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${creditsLoading ? 'animate-spin' : ''}`} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
-              {/* Right: Credits */}
-              <div>
-                <div className="text-xs text-muted-foreground">{t('Credits')}</div>
-                <div className="flex items-center gap-1.5 mt-1">
-                  <Gem className="w-4 h-4 text-primary/80" />
-                  <span className="text-sm font-medium tabular-nums">
-                    {credits !== null ? credits.toLocaleString() : '--'}
-                  </span>
+
+              {authState.user.plan === 'free' ? (
+                <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
+                  <p className="text-sm text-muted-foreground mb-3">
+                    {t('Upgrade to Pro for more credits and features')}
+                  </p>
                   <button
-                    onClick={handleRefreshCredits}
-                    disabled={creditsLoading}
-                    className="ml-1 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+                    onClick={handleOpenPricing}
+                    className="w-full px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors text-sm font-medium"
                   >
-                    <RefreshCw className={`w-3.5 h-3.5 ${creditsLoading ? 'animate-spin' : ''}`} />
+                    {t('Upgrade to Pro')}
                   </button>
                 </div>
-              </div>
-            </div>
-          </div>
-
-          {/* CTA: Upgrade / Renew */}
-          {authState.user.plan === 'free' ? (
-            <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
-              <p className="text-sm text-muted-foreground mb-3">
-                {t('Upgrade to Pro for more credits and features')}
-              </p>
-              <button
-                onClick={handleOpenPricing}
-                className="w-full px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors text-sm font-medium"
-              >
-                {t('Upgrade to Pro')}
-              </button>
-            </div>
-          ) : (
-            <div className="flex gap-3">
-              <button
-                onClick={handleOpenPricing}
-                className="flex-1 px-4 py-2 bg-secondary hover:bg-secondary/80 rounded-lg transition-colors text-sm"
-              >
-                {t('Renew')}
-              </button>
-              <button
-                onClick={handleOpenPricing}
-                className="flex-1 px-4 py-2 bg-secondary hover:bg-secondary/80 rounded-lg transition-colors text-sm"
-              >
-                {t('Buy Credits')}
-              </button>
-            </div>
+              ) : (
+                <div className="flex gap-3">
+                  <button
+                    onClick={handleOpenPricing}
+                    className="flex-1 px-4 py-2 bg-secondary hover:bg-secondary/80 rounded-lg transition-colors text-sm"
+                  >
+                    {t('Renew')}
+                  </button>
+                  <button
+                    onClick={handleOpenPricing}
+                    className="flex-1 px-4 py-2 bg-secondary hover:bg-secondary/80 rounded-lg transition-colors text-sm"
+                  >
+                    {t('Buy Credits')}
+                  </button>
+                </div>
+              )}
+            </>
           )}
 
           {/* Actions */}

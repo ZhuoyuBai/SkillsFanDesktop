@@ -10,6 +10,7 @@
 
 import { getAccessToken, updateCreditsInAuthState } from './auth.service'
 import { SKILLSFAN_BASE_URL } from './constants'
+import { isSkillsFanHostedAiEnabled } from '../ai-sources/hosted-ai-availability'
 
 // ============================================================================
 // Cache
@@ -43,6 +44,10 @@ export function seedCreditsCache(credits: number, fetchedAt?: number): void {
  * Fetch credits from the website API (bypasses cache)
  */
 export async function fetchCredits(): Promise<number | null> {
+  if (!isSkillsFanHostedAiEnabled()) {
+    return null
+  }
+
   const token = await getAccessToken()
   if (!token) return null
 
@@ -83,6 +88,10 @@ export async function fetchCredits(): Promise<number | null> {
  * Get credits (returns cached if fresh, otherwise fetches)
  */
 export async function getCredits(): Promise<number | null> {
+  if (!isSkillsFanHostedAiEnabled()) {
+    return null
+  }
+
   if (cachedCredits && Date.now() - cachedCredits.fetchedAt < CACHE_DURATION_MS) {
     return cachedCredits.remainingCredits
   }

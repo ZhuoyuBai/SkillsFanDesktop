@@ -14,6 +14,18 @@ export interface SkillsFanProviderMeta {
   ownedBy?: string[]
 }
 
+export const SKILLSFAN_HOSTED_PROVIDER_TYPES = [
+  'skillsfan-credits',
+  'glm',
+  'minimax-oauth'
+] as const
+
+export type SkillsFanHostedProviderType = typeof SKILLSFAN_HOSTED_PROVIDER_TYPES[number]
+
+export function isSkillsFanHostedProviderType(type: string | undefined | null): type is SkillsFanHostedProviderType {
+  return !!type && SKILLSFAN_HOSTED_PROVIDER_TYPES.includes(type as SkillsFanHostedProviderType)
+}
+
 export const SKILLSFAN_PROVIDER_META: Record<string, SkillsFanProviderMeta> = {
   'glm': { displayName: 'GLM-5', defaultModel: 'glm-5', ownedBy: ['zhipu'] },
   'minimax-oauth': { displayName: 'MiniMax', defaultModel: 'MiniMax-M2.1', ownedBy: ['minimax'] },

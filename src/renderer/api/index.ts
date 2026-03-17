@@ -106,6 +106,13 @@ export const api = {
     return httpRequest('GET', '/api/config')
   },
 
+  getProductFeatures: async (): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.skillsfan.getProductFeatures()
+    }
+    return httpRequest('GET', '/api/config/product-features')
+  },
+
   setConfig: async (updates: Record<string, unknown>): Promise<ApiResponse> => {
     if (isElectron()) {
       return window.skillsfan.setConfig(updates)

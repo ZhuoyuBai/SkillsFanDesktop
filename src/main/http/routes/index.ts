@@ -57,6 +57,11 @@ export function registerApiRoutes(app: Express, mainWindow: BrowserWindow | null
     res.json(result)
   })
 
+  app.get('/api/config/product-features', async (_req: Request, res: Response) => {
+    const result = configController.getProductFeatures()
+    res.json(result)
+  })
+
   app.post('/api/config', async (req: Request, res: Response) => {
     const result = configController.setConfig(req.body)
     res.json(result)

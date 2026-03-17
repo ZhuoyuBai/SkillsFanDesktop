@@ -14,6 +14,7 @@
 
 import { getConfig } from '../config.service'
 import { getAISourceManager } from '../ai-sources'
+import { isAiSourceHiddenByProductFeatures } from '../ai-sources/hosted-ai-availability'
 import { isNoVisionModel } from '../../../shared/utils/vision-models'
 import type { ImageAttachment, Attachment } from './types'
 import type { AISourcesConfig, BackendRequestConfig, OAuthSourceConfig, CustomSourceConfig } from '../../../shared/types'
@@ -60,18 +61,23 @@ function findVisionModel(): VisionModelInfo | null {
 
   // 1. Check explicit imageModel config
   if (config.imageModel?.source && config.imageModel?.model) {
-    const backendConfig = getBackendConfigForSource(aiSources, config.imageModel.source)
+    const imageModelSource = isAiSourceHiddenByProductFeatures(config.imageModel.source)
+      ? null
+      : config.imageModel.source
+    const backendConfig = imageModelSource ? getBackendConfigForSource(aiSources, imageModelSource) : null
     if (backendConfig) {
       return {
         backendConfig: { ...backendConfig, model: config.imageModel.model },
-        sourceKey: config.imageModel.source,
+        sourceKey: imageModelSource!,
         modelId: config.imageModel.model
       }
     }
   }
 
   // 2. Check skillsfan-credits
-  const creditsConfig = aiSources['skillsfan-credits'] as OAuthSourceConfig | undefined
+  const creditsConfig = isAiSourceHiddenByProductFeatures('skillsfan-credits')
+    ? undefined
+    : aiSources['skillsfan-credits'] as OAuthSourceConfig | undefined
   if (creditsConfig && typeof creditsConfig === 'object' && creditsConfig.loggedIn) {
     const visionModel = findVisionModelInList(creditsConfig.availableModels)
     if (visionModel) {
@@ -106,6 +112,7 @@ function findVisionModel(): VisionModelInfo | null {
   // 4. Check other configured OAuth providers
   for (const key of Object.keys(aiSources)) {
     if (key === 'current' || key === 'custom' || key === 'skillsfan-credits') continue
+    if (isAiSourceHiddenByProductFeatures(key)) continue
     const sourceConfig = aiSources[key]
     if (!sourceConfig || typeof sourceConfig !== 'object') continue
 

@@ -14,6 +14,7 @@ import type { SkillsFanAuthState } from '../../../shared/types/skillsfan'
 
 export function CreditsDisplay() {
   const config = useAppStore((s) => s.config)
+  const hostedAiEnabled = useAppStore((s) => s.productFeatures.skillsfanHostedAiEnabled)
   const [credits, setCredits] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
@@ -21,7 +22,7 @@ export function CreditsDisplay() {
 
   const currentSource = config?.aiSources?.current
   // All providers that consume SkillsFan credits via proxy
-  const isCreditsProvider = new Set(['skillsfan-credits', 'glm', 'minimax-oauth']).has(currentSource || '')
+  const isCreditsProvider = hostedAiEnabled && new Set(['skillsfan-credits', 'glm', 'minimax-oauth']).has(currentSource || '')
 
   // On first mount, load cached credits from auth state for instant display
   useEffect(() => {

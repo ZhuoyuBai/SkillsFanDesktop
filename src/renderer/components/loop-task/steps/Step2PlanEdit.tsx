@@ -26,12 +26,14 @@ import {
 } from 'lucide-react'
 import { ConfirmDialog } from '../../ui/ConfirmDialog'
 import { useLoopTaskStore } from '../../../stores/loop-task.store'
+import { useAppStore } from '../../../stores/app.store'
 import { useToastStore } from '../../../stores/toast.store'
 import { api } from '../../../api'
 import { cn } from '../../../lib/utils'
 import { getModelLogo } from '../../layout/ModelSelector'
 import { useModelProviders } from '../../../hooks/useModelProviders'
 import { SchedulePicker } from '../schedule'
+import { isSkillsFanHostedProviderType } from '../../../../shared/constants/providers'
 import type { OAuthProviderInfo, CustomProviderInfo } from '../../../hooks/useModelProviders'
 import type { UserStory, WizardStep, TaskSchedule, StepRetryConfig, LoopConfig } from '../../../../shared/types/loop-task'
 import { calculateMaxIterations } from '../../../../shared/types/loop-task'
@@ -594,6 +596,7 @@ function InlineStoryCard({
   defaultModelName
 }: InlineStoryCardProps) {
   const { t } = useTranslation()
+  const hostedAiEnabled = useAppStore((s) => s.productFeatures.skillsfanHostedAiEnabled)
   const [showModelDropdown, setShowModelDropdown] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [newCriterion, setNewCriterion] = useState('')
@@ -612,8 +615,10 @@ function InlineStoryCard({
   }, [showModelDropdown])
 
   const hasCustomModel = !!(story.model || story.modelSource)
+  const storyModelHiddenByProduct = !hostedAiEnabled && isSkillsFanHostedProviderType(story.modelSource)
 
   const getStoryModelLogo = (): string | null => {
+    if (storyModelHiddenByProduct) return null
     if (!hasCustomModel) return defaultModelLogo
     for (const provider of loggedInOAuthProviders) {
       if (provider.type === story.modelSource) {
@@ -626,6 +631,7 @@ function InlineStoryCard({
   }
 
   const getStoryModelName = (): string => {
+    if (storyModelHiddenByProduct) return t('Please add a model first')
     if (!hasCustomModel) return defaultModelName
     for (const provider of loggedInOAuthProviders) {
       if (provider.type === story.modelSource && provider.config?.modelNames?.[story.model || '']) {

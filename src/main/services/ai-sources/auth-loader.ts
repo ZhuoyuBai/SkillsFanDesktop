@@ -14,7 +14,8 @@ import { pathToFileURL } from 'url'
 import { existsSync, readFileSync } from 'fs'
 import { app } from 'electron'
 import type { AISourceProvider, OAuthAISourceProvider } from '../../../shared/interfaces'
-import type { AISourceType } from '../../../shared/types'
+import type { AISourceType, ProductFeatures } from '../../../shared/types'
+import { isSkillsFanHostedProviderType } from '../../../shared/constants/providers'
 
 // ============================================================================
 // Types
@@ -55,6 +56,7 @@ export interface AuthProviderConfig {
 export interface ProductConfig {
   name: string
   version: string
+  features?: ProductFeatures
   authProviders: AuthProviderConfig[]
 }
 
@@ -74,6 +76,20 @@ export interface LoadedProvider {
 let productConfig: ProductConfig | null = null
 let productConfigPath: string | null = null
 
+export function normalizeProductFeatures(features?: ProductFeatures): Required<ProductFeatures> {
+  return {
+    skillsfanHostedAiEnabled: features?.skillsfanHostedAiEnabled !== false
+  }
+}
+
+function isProviderEnabledByProductFeatures(providerType: AISourceType, features?: ProductFeatures): boolean {
+  if (normalizeProductFeatures(features).skillsfanHostedAiEnabled) {
+    return true
+  }
+
+  return !isSkillsFanHostedProviderType(providerType)
+}
+
 /**
  * Get the path to product.json
  */
@@ -82,15 +98,16 @@ function getProductConfigPath(): string {
 
   // In development, product.json is in project root
   // In production, it's inside app.asar
-  const isDev = !app.isPackaged
+  const isDev = app.isPackaged !== true
+  const appPath = typeof app.getAppPath === 'function' ? app.getAppPath() : process.cwd()
 
   if (isDev) {
     // Development: project root (app.getAppPath() returns project root in dev)
-    productConfigPath = join(app.getAppPath(), 'product.json')
+    productConfigPath = join(appPath, 'product.json')
   } else {
     // Production: inside app.asar (app.getAppPath() returns app.asar path)
     // Electron automatically handles app.asar paths
-    productConfigPath = join(app.getAppPath(), 'product.json')
+    productConfigPath = join(appPath, 'product.json')
   }
 
   return productConfigPath
@@ -109,6 +126,7 @@ export function loadProductConfig(): ProductConfig {
       // Use readFileSync + JSON.parse (works reliably in both CJS and ESM)
       const content = readFileSync(configPath, 'utf-8')
       productConfig = JSON.parse(content) as ProductConfig
+      productConfig.features = normalizeProductFeatures(productConfig.features)
       console.log('[AuthLoader] Loaded product.json from:', configPath)
       console.log('[AuthLoader] Auth providers configured:', productConfig.authProviders.map(p => p.type).join(', '))
     } else {
@@ -130,6 +148,7 @@ function getDefaultProductConfig(): ProductConfig {
   return {
     name: 'Halo',
     version: '1.0.0',
+    features: normalizeProductFeatures(),
     authProviders: [
       {
         type: 'openai-codex',
@@ -235,7 +254,7 @@ export async function loadAuthProvidersAsync(): Promise<LoadedProvider[]> {
   const loadedProviders: LoadedProvider[] = []
 
   for (const providerConfig of config.authProviders) {
-    if (!providerConfig.enabled) {
+    if (!providerConfig.enabled || !isProviderEnabledByProductFeatures(providerConfig.type, config.features)) {
       console.log(`[AuthLoader] Skipping disabled provider: ${providerConfig.type}`)
       continue
     }
@@ -273,7 +292,7 @@ export async function loadAuthProvidersAsync(): Promise<LoadedProvider[]> {
 export function loadAuthProviders(): LoadedProvider[] {
   const config = loadProductConfig()
   return config.authProviders
-    .filter(p => p.enabled)
+    .filter(p => p.enabled && isProviderEnabledByProductFeatures(p.type, config.features))
     .map(providerConfig => ({
       config: providerConfig,
       provider: null,
@@ -287,7 +306,12 @@ export function loadAuthProviders(): LoadedProvider[] {
  */
 export function getEnabledAuthProviderConfigs(): AuthProviderConfig[] {
   const config = loadProductConfig()
-  return config.authProviders.filter(p => p.enabled)
+  return config.authProviders.filter(p => p.enabled && isProviderEnabledByProductFeatures(p.type, config.features))
+}
+
+export function getProductFeatures(): Required<ProductFeatures> {
+  const config = loadProductConfig()
+  return normalizeProductFeatures(config.features)
 }
 
 /**

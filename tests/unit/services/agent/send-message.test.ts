@@ -244,4 +244,82 @@ describe('send-message', () => {
     expect(mocks.sendToRenderer.mock.calls.some(([eventName]) => eventName === 'agent:complete')).toBe(true)
     expect(mocks.sendToRenderer.mock.calls.some(([eventName]) => eventName === 'agent:error')).toBe(false)
   })
+
+  it('surfaces image preprocessing failures through status and persistent thoughts', async () => {
+    const imageRequest = {
+      ...request,
+      images: [{
+        id: 'img-1',
+        type: 'image' as const,
+        mediaType: 'image/png' as const,
+        data: 'abc123',
+        name: 'screenshot.png',
+        size: 123
+      }]
+    }
+
+    mocks.enqueue.mockImplementationOnce(async (_conversationId: string, run: () => Promise<void>) => run())
+    mocks.preprocessImages.mockResolvedValueOnce({
+      preprocessed: true,
+      enhancedMessage: 'hello',
+      filteredImages: [],
+      filteredAttachments: [],
+      error: 'No vision model available. Please configure a vision-capable AI source.'
+    })
+    mocks.getOrCreateV2Session.mockResolvedValue({
+      setPermissionMode: vi.fn(async () => {}),
+      send: vi.fn(),
+      stream: async function* () {
+        yield { type: 'result' }
+      }
+    })
+
+    await expect(sendMessage(null, imageRequest)).resolves.toBeUndefined()
+
+    expect(mocks.sendToRenderer).toHaveBeenCalledWith(
+      'agent:status',
+      'space-1',
+      'conv-1',
+      expect.objectContaining({
+        type: 'status',
+        message: 'Analyzing images...'
+      })
+    )
+    expect(mocks.sendToRenderer).toHaveBeenCalledWith(
+      'agent:thought',
+      'space-1',
+      'conv-1',
+      expect.objectContaining({
+        thought: expect.objectContaining({
+          type: 'error',
+          content: 'No vision model available. Please configure a vision-capable AI source.',
+          isError: true
+        })
+      })
+    )
+    expect(mocks.sendToRenderer).not.toHaveBeenCalledWith(
+      'agent:message',
+      'space-1',
+      'conv-1',
+      expect.objectContaining({ type: 'status' })
+    )
+    expect(mocks.sendToRenderer).not.toHaveBeenCalledWith(
+      'agent:message',
+      'space-1',
+      'conv-1',
+      expect.objectContaining({ type: 'warning' })
+    )
+    expect(mocks.updateLastMessage).toHaveBeenCalledWith(
+      'space-1',
+      'conv-1',
+      expect.objectContaining({
+        thoughts: expect.arrayContaining([
+          expect.objectContaining({
+            type: 'error',
+            content: 'No vision model available. Please configure a vision-capable AI source.'
+          })
+        ])
+      })
+    )
+  })
 })

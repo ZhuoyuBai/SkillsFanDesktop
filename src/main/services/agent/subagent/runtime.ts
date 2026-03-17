@@ -22,6 +22,7 @@ import type {
   SubagentRunStatus,
   SubagentSpawnParams
 } from './types'
+import { getApiCredentialsForSource } from '../helpers'
 
 const DEFAULT_SUBAGENT_TIMEOUT_MS = 10 * 60 * 1000
 const MAX_SUBAGENT_TIMEOUT_MS = 30 * 60 * 1000
@@ -609,28 +610,9 @@ async function resolveSubagentCredentials(
   modelSource?: string
 ): Promise<ApiCredentials> {
   const config = getConfig()
-  let credentials = await getApiCredentials(config)
-
-  if (modelSource) {
-    const aiSources = (config as any).aiSources || {}
-    const currentSource = aiSources.current || 'custom'
-    if (modelSource !== currentSource) {
-      const targetConfig = aiSources[modelSource]
-      if (targetConfig) {
-        const isOAuth = targetConfig && typeof targetConfig === 'object' && 'loggedIn' in targetConfig
-        if (!isOAuth && targetConfig.apiKey) {
-          credentials = {
-            baseUrl: targetConfig.apiUrl || 'https://api.anthropic.com',
-            apiKey: targetConfig.apiKey,
-            model: model || targetConfig.model || 'claude-opus-4-5-20251101',
-            provider: targetConfig.provider === 'openai' ? 'openai' : 'anthropic',
-            customHeaders: targetConfig.customHeaders,
-            apiType: targetConfig.apiType
-          }
-        }
-      }
-    }
-  }
+  let credentials = modelSource
+    ? await getApiCredentialsForSource(config, modelSource, model)
+    : await getApiCredentials(config)
 
   if (model) {
     credentials.model = model

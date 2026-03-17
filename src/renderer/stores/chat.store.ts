@@ -29,6 +29,7 @@ import { useToastStore } from './toast.store'
 import i18n from '../i18n'
 import { logger } from '../lib/logger'
 import type { ThinkingEffort } from '../../shared/utils/openai-models'
+import { isSkillsFanHostedProviderType } from '../../shared/constants/providers'
 import {
   shouldSuppressSetModelStatus,
   stripLeadingSetModelStatus
@@ -841,15 +842,17 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const currentSourceConfig = currentAiSource ? (appConfig?.aiSources as Record<string, any>)?.[currentAiSource] : undefined
     // Use real SkillsFan login state from store, not persisted config field
     const sfLoggedIn = useAppStore.getState().skillsfanLoggedIn
+    const hostedAiEnabled = useAppStore.getState().productFeatures.skillsfanHostedAiEnabled
     const isOAuthSource = currentSourceConfig && typeof currentSourceConfig === 'object' && 'loggedIn' in currentSourceConfig
     const isCustomApiSource = currentSourceConfig && typeof currentSourceConfig === 'object' && 'apiKey' in currentSourceConfig && currentSourceConfig.apiKey
-    const isCurrentSourceAvailable = isCustomApiSource || (
+    const isCurrentSourceHiddenByProduct = !hostedAiEnabled && isSkillsFanHostedProviderType(currentAiSource)
+    const isCurrentSourceAvailable = !isCurrentSourceHiddenByProduct && (isCustomApiSource || (
       isOAuthSource && (
         currentAiSource === 'skillsfan-credits'
           ? sfLoggedIn
           : currentSourceConfig.loggedIn === true
       )
-    )
+    ))
 
     if (!appConfig || (!isCurrentSourceAvailable && !currentAiSource)) {
       logger.error('[ChatStore] No AI source configured')
@@ -1310,7 +1313,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     // Show credits error dialog for 402 (insufficient credits)
     // Skip for usage limit errors from third-party providers (e.g., OpenAI Codex)
-    if (errorCode === 402 && !error.includes('Usage limit reached')) {
+    const hostedAiEnabled = useAppStore.getState().productFeatures.skillsfanHostedAiEnabled
+    if (hostedAiEnabled && errorCode === 402 && !error.includes('Usage limit reached')) {
       set({ showCreditsError: true })
     }
 

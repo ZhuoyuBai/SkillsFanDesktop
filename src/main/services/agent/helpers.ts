@@ -12,9 +12,11 @@ import { existsSync, mkdirSync, symlinkSync, unlinkSync, lstatSync, readlinkSync
 import { getConfig, getTempSpacePath } from '../config.service'
 import { getSpace } from '../space.service'
 import { getAISourceManager } from '../ai-sources'
+import { resolveAccessibleAiSource } from '../ai-sources/hosted-ai-availability'
 import { getChannelManager, createOutboundEvent } from '../channel'
 import type { ElectronChannel } from '../channel'
 import type { ApiCredentials, MainWindowRef } from './types'
+import type { AISourcesConfig } from '../../../shared/types'
 
 // ============================================
 // Headless Electron Path Management
@@ -256,6 +258,79 @@ export async function getApiCredentials(config: ReturnType<typeof getConfig>): P
     customHeaders: backendConfig.headers,
     apiType: backendConfig.apiType
   }
+}
+
+export async function getApiCredentialsForSource(
+  config: ReturnType<typeof getConfig>,
+  source: string,
+  modelOverride?: string
+): Promise<ApiCredentials> {
+  const manager = getAISourceManager()
+  await manager.ensureInitialized()
+
+  const aiSources = ((config as any).aiSources || { current: 'custom' }) as AISourcesConfig
+  const targetSource = resolveAccessibleAiSource(aiSources, source) || source
+  const targetConfig = (aiSources as Record<string, any>)[targetSource]
+
+  if (targetSource === (aiSources.current || 'custom')) {
+    const credentials = await getApiCredentials(config)
+    if (modelOverride) {
+      credentials.model = modelOverride
+    }
+    return credentials
+  }
+
+  if (targetSource === 'custom' && aiSources.custom?.apiKey) {
+    const baseUrl = (aiSources.custom.apiUrl || 'https://api.anthropic.com').replace(/\/$/, '')
+    const provider = aiSources.custom.provider === 'openai' ? 'openai' : 'anthropic'
+    return {
+      baseUrl,
+      apiKey: aiSources.custom.apiKey,
+      model: modelOverride || aiSources.custom.model || 'claude-opus-4-5-20251101',
+      provider,
+      nativeAnthropicServerTools: provider === 'anthropic' && isNativeAnthropicBaseUrl(baseUrl),
+      apiType: provider === 'openai' ? inferOpenAIWireApi(baseUrl) : undefined
+    }
+  }
+
+  if (targetConfig && typeof targetConfig === 'object' && 'apiKey' in targetConfig && targetConfig.apiKey) {
+    const baseUrl = (targetConfig.apiUrl || 'https://api.anthropic.com').replace(/\/$/, '')
+    const provider = targetConfig.provider === 'openai' ? 'openai' : 'anthropic'
+    return {
+      baseUrl,
+      apiKey: targetConfig.apiKey,
+      model: modelOverride || targetConfig.model || 'claude-opus-4-5-20251101',
+      provider,
+      nativeAnthropicServerTools: provider === 'anthropic' && isNativeAnthropicBaseUrl(baseUrl),
+      customHeaders: targetConfig.customHeaders,
+      apiType: targetConfig.apiType || (provider === 'openai' ? inferOpenAIWireApi(baseUrl) : undefined)
+    }
+  }
+
+  const provider = manager.getProvider(targetSource)
+  if (provider) {
+    const tokenResult = await manager.ensureValidToken(targetSource)
+    if (!tokenResult.success) {
+      throw new Error(tokenResult.error || 'OAuth token expired or invalid. Please login again.')
+    }
+
+    const backendConfig = provider.getBackendConfig(aiSources)
+    if (!backendConfig) {
+      throw new Error(`No AI source configured for ${targetSource}. Please configure a model first.`)
+    }
+
+    return {
+      baseUrl: backendConfig.url,
+      apiKey: backendConfig.key,
+      model: modelOverride || backendConfig.model || 'claude-opus-4-5-20251101',
+      provider: 'oauth',
+      nativeAnthropicServerTools: false,
+      customHeaders: backendConfig.headers,
+      apiType: backendConfig.apiType
+    }
+  }
+
+  throw new Error(`No AI source configured for ${targetSource}. Please configure a model first.`)
 }
 
 export function isNativeAnthropicBaseUrl(apiUrl: string): boolean {

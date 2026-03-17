@@ -2,6 +2,9 @@
   "$schema": "./product.schema.json",
   "name": "SkillsFan",
   "version": "1.0.0",
+  "features": {
+    "skillsfanHostedAiEnabled": false
+  },
   "authProviders": [
     {
       "type": "openai-codex",

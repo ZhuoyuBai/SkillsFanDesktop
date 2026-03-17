@@ -18,6 +18,7 @@ export interface SkillsFanAPI {
 
   // Config
   getConfig: () => Promise<IpcResponse>
+  getProductFeatures: () => Promise<IpcResponse>
   setConfig: (updates: Record<string, unknown>) => Promise<IpcResponse>
   validateApi: (apiKey: string, apiUrl: string, provider: string) => Promise<IpcResponse>
   refreshAISourcesConfig: () => Promise<IpcResponse>
@@ -484,6 +485,7 @@ const api: SkillsFanAPI = {
 
   // Config
   getConfig: () => ipcRenderer.invoke('config:get'),
+  getProductFeatures: () => ipcRenderer.invoke('config:get-product-features'),
   setConfig: (updates) => ipcRenderer.invoke('config:set', updates),
   validateApi: (apiKey, apiUrl, provider) =>
     ipcRenderer.invoke('config:validate-api', apiKey, apiUrl, provider),

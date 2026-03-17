@@ -64,6 +64,7 @@ export function SpacePage() {
   const { t } = useTranslation()
   const platform = usePlatform()
   const { setView, mockBashMode, gitBashInstallProgress, startGitBashInstall } = useAppStore()
+  const hostedAiEnabled = useAppStore((s) => s.productFeatures.skillsfanHostedAiEnabled)
   const { currentSpace, refreshCurrentSpace, openSpaceFolder } = useSpaceStore()
   const {
     currentSpaceId,
@@ -729,10 +730,12 @@ export function SpacePage() {
       )}
 
       {/* Credits Error Dialog */}
-      <CreditsErrorDialog
-        isOpen={showCreditsError}
-        onClose={() => setShowCreditsError(false)}
-      />
+      {hostedAiEnabled && (
+        <CreditsErrorDialog
+          isOpen={showCreditsError}
+          onClose={() => setShowCreditsError(false)}
+        />
+      )}
     </div>
   )
 }

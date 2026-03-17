@@ -15,6 +15,7 @@ import {
   ensureValidToken,
   getAccessToken
 } from '../services/skillsfan/auth.service'
+import { isSkillsFanHostedAiEnabled } from '../services/ai-sources/hosted-ai-availability'
 
 /**
  * Register SkillsFan authentication IPC handlers
@@ -66,6 +67,9 @@ export function registerSkillsFanAuthHandlers(): void {
 
   // Get credits balance (cached)
   ipcMain.handle('skillsfan:get-credits', async () => {
+    if (!isSkillsFanHostedAiEnabled()) {
+      return { success: false, data: null }
+    }
     const { getCredits } = await import('../services/skillsfan/credits.service')
     const credits = await getCredits()
     return { success: credits !== null, data: credits }
@@ -73,6 +77,9 @@ export function registerSkillsFanAuthHandlers(): void {
 
   // Force refresh credits balance
   ipcMain.handle('skillsfan:refresh-credits', async () => {
+    if (!isSkillsFanHostedAiEnabled()) {
+      return { success: false, data: null }
+    }
     const { fetchCredits } = await import('../services/skillsfan/credits.service')
     const credits = await fetchCredits()
     return { success: credits !== null, data: credits }

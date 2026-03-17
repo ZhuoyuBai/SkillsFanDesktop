@@ -34,6 +34,7 @@ import { getGitHubCopilotProvider } from './providers/github-copilot.provider'
 import { getOpenAICodexProvider } from './providers/openai-codex.provider'
 import { createAllSkillsFanProviders, getOAuthToCustomFallbackMap } from './providers/skillsfan-providers'
 import { loadAuthProvidersAsync, isOAuthProvider as isOAuthProviderCheck, type LoadedProvider } from './auth-loader'
+import { isSkillsFanHostedAiEnabled } from './hosted-ai-availability'
 import { decryptString, decryptTokens } from '../secure-storage.service'
 
 /**
@@ -69,9 +70,12 @@ class AISourceManager {
     this.registerProvider(getCustomProvider())
     this.registerProvider(getGitHubCopilotProvider())
     this.registerProvider(getOpenAICodexProvider())
-    // Register all SkillsFan-proxied providers (GLM, MiniMax, SkillsFan Credits, etc.)
-    for (const provider of createAllSkillsFanProviders()) {
-      this.registerProvider(provider)
+    // Keep hosted proxy provider implementations in the codebase, but hide them
+    // entirely in buyout builds where SkillsFan-hosted AI is disabled.
+    if (isSkillsFanHostedAiEnabled()) {
+      for (const provider of createAllSkillsFanProviders()) {
+        this.registerProvider(provider)
+      }
     }
 
     // Start async initialization (optional providers + dynamic loading)

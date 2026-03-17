@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next'
 import { useAppStore } from '../stores/app.store'
 import { api } from '../api'
 import { getCurrentLanguage } from '../i18n'
+import { isSkillsFanHostedProviderType } from '../../shared/constants/providers'
 import {
   PROVIDER_NAMES,
   getProviderLogoById,
@@ -76,9 +77,10 @@ export function useModelProviders(options: UseModelProvidersOptions = {}): UseMo
   const { selectedModelId = '', selectedModelSource = '' } = options
   const { t } = useTranslation()
   const config = useAppStore((s) => s.config)
+  const hostedAiEnabled = useAppStore((s) => s.productFeatures.skillsfanHostedAiEnabled)
   const [authProviders, setAuthProviders] = useState<AuthProviderConfig[]>([])
 
-  const isSkillsFanCredits = config?.aiSources?.current === 'skillsfan-credits'
+  const isSkillsFanCredits = hostedAiEnabled && config?.aiSources?.current === 'skillsfan-credits'
 
   // Load auth providers once on mount
   useEffect(() => {
@@ -110,6 +112,7 @@ export function useModelProviders(options: UseModelProvidersOptions = {}): UseMo
 
   const providerMetaByType = new Map(
     authProviders
+      .filter(provider => hostedAiEnabled || !isSkillsFanHostedProviderType(provider.type))
       .filter(p => p.type !== 'custom')
       .map(provider => [provider.type, provider])
   )
@@ -117,6 +120,7 @@ export function useModelProviders(options: UseModelProvidersOptions = {}): UseMo
     ...Array.from(providerMetaByType.keys()),
     ...Object.keys(aiSources).filter(key => {
       if (key === 'current' || key === 'oauth' || key === 'custom') return false
+      if (!hostedAiEnabled && isSkillsFanHostedProviderType(key)) return false
       return isOAuthProviderConfig((aiSources as Record<string, unknown>)[key])
     })
   ]))
@@ -139,8 +143,14 @@ export function useModelProviders(options: UseModelProvidersOptions = {}): UseMo
     })
     .filter(p => p.isLoggedIn)
 
+  const selectedSourceHidden = !hostedAiEnabled && isSkillsFanHostedProviderType(selectedModelSource)
+
   // Resolve display name for the selected model
   const getModelDisplayNameFn = (): string => {
+    if (selectedSourceHidden) {
+      return t('Please add a model first')
+    }
+
     if (!selectedModelId && !selectedModelSource) {
       const currentSource = aiSources.current || 'custom'
       const currentConfig = (aiSources as Record<string, any>)[currentSource]
@@ -165,6 +175,10 @@ export function useModelProviders(options: UseModelProvidersOptions = {}): UseMo
 
   // Resolve logo for the selected model
   const getModelLogoFn = (): string | null => {
+    if (selectedSourceHidden) {
+      return null
+    }
+
     if (selectedModelSource) {
       for (const provider of loggedInOAuthProviders) {
         if (provider.type === selectedModelSource) {

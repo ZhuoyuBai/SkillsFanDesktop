@@ -19,6 +19,7 @@ import {
 } from '../../types'
 import { useTranslation, getCurrentLanguage } from '../../i18n'
 import { SKILLSFAN_PROVIDER_META } from '../../../shared/constants/providers'
+import { isSkillsFanHostedProviderType } from '../../../shared/constants/providers'
 import {
   normalizeThinkingEffortForModel,
   type ThinkingEffort
@@ -171,8 +172,18 @@ interface ModelSelectorProps {
 
 export function ModelSelector({ variant = 'header', iconOnly = false, disabled = false, onDisabledClick, popoverUp = false }: ModelSelectorProps = {}) {
   const { t } = useTranslation()
-  const { config, setConfig, setView, publicModels, authProviders: storeAuthProviders, setPublicModels, skillsfanLoggedIn } = useAppStore()
+  const {
+    config,
+    setConfig,
+    setView,
+    publicModels,
+    authProviders: storeAuthProviders,
+    setPublicModels,
+    skillsfanLoggedIn,
+    productFeatures
+  } = useAppStore()
   const authProviders = storeAuthProviders as AuthProviderConfig[]
+  const hostedAiEnabled = productFeatures.skillsfanHostedAiEnabled
   const [isOpen, setIsOpen] = useState(false)
   const [isDropdownScrolling, setIsDropdownScrolling] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -270,6 +281,7 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
   // Get all OAuth providers - show regardless of SkillsFan login status
   const providerMetaByType = new Map(
     authProviders
+      .filter(provider => hostedAiEnabled || !isSkillsFanHostedProviderType(provider.type))
       .filter(p => p.type !== 'custom')
       .map(provider => [provider.type, provider])
   )
@@ -277,6 +289,7 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
     ...Array.from(providerMetaByType.keys()),
     ...Object.keys(aiSources).filter(key => {
       if (key === 'current' || key === 'oauth' || key === 'custom') return false
+      if (!hostedAiEnabled && isSkillsFanHostedProviderType(key)) return false
       return isOAuthProviderConfig((aiSources as Record<string, unknown>)[key])
     })
   ]))
@@ -303,13 +316,16 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
   // If logged out and current source is an OAuth provider (has 'loggedIn' field), treat as unconfigured
   const currentSourceObj = (aiSources as Record<string, any>)[currentSource]
   const isOAuthSource = currentSourceObj && typeof currentSourceObj === 'object' && 'loggedIn' in currentSourceObj
-  const isSkillsFanCreditsSource = currentSource === 'skillsfan-credits'
+  const currentSourceHiddenByProduct = !hostedAiEnabled && isSkillsFanHostedProviderType(currentSource)
+  const isSkillsFanCreditsSource = hostedAiEnabled && currentSource === 'skillsfan-credits'
   const rawModelName = getCurrentModelName(config)
-  const isCurrentConfigured = isSkillsFanCreditsSource
+  const isCurrentConfigured = currentSourceHiddenByProduct
+    ? false
+    : isSkillsFanCreditsSource
     ? skillsfanLoggedIn
     : isSourceConfigured(aiSources, currentSource)
   let currentModelName = rawModelName
-  if (!isCurrentConfigured || rawModelName === 'No model') {
+  if (currentSourceHiddenByProduct || !isCurrentConfigured || rawModelName === 'No model') {
     currentModelName = t('model.addModel')
   } else if (variant === 'header' && isOAuthSource && currentSourceObj?.loggedIn) {
     currentModelName = `${rawModelName} (${t('Subscription')})`
@@ -450,7 +466,7 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
     return 'skillsfan-credits'
   }
   const currentSourcePublicModels = (() => {
-    if (!skillsfanLoggedIn || publicModels.length === 0) return []
+    if (!hostedAiEnabled || !skillsfanLoggedIn || publicModels.length === 0) return []
     if (!(currentSource in SKILLSFAN_PROVIDER_META)) return []
 
     return publicModels.filter((model) => {
@@ -482,6 +498,7 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
     currentPublicModel?.name ||
     ''
   const currentProviderLogo = isCurrentConfigured
+    && !currentSourceHiddenByProduct
     ? (currentPublicModel
         ? getModelLogo(
             currentPublicModel.id,
@@ -505,7 +522,7 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
   })
 
   const builtInModelOptions = (() => {
-    if (!skillsfanLoggedIn || publicModels.length === 0) return []
+    if (!hostedAiEnabled || !skillsfanLoggedIn || publicModels.length === 0) return []
 
     return publicModels
       .filter((model) => {
@@ -575,6 +592,7 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
   })()
 
   const currentSourceFallbackOptions = (() => {
+    if (!hostedAiEnabled) return []
     if (builtInModelOptions.length > 0 || customModelOptions.length > 0) return []
 
     return currentSourcePublicModels.map((model) => {

@@ -7,6 +7,7 @@
  */
 
 import { SKILLSFAN_BASE_URL } from './constants'
+import { isSkillsFanHostedAiEnabled } from '../ai-sources/hosted-ai-availability'
 
 // ============================================================================
 // Types
@@ -35,6 +36,12 @@ const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
  * Results are cached for 5 minutes.
  */
 export async function fetchPublicModels(): Promise<PublicModel[]> {
+  if (!isSkillsFanHostedAiEnabled()) {
+    cachedModels = []
+    cacheTimestamp = Date.now()
+    return []
+  }
+
   const now = Date.now()
   if (cachedModels && now - cacheTimestamp < CACHE_TTL) {
     return cachedModels

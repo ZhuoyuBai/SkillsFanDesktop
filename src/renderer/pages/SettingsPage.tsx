@@ -1799,7 +1799,7 @@ export function SettingsPage() {
                 </div>
 
                 {/* Memory Management */}
-                <div className={`pt-4 border-t border-border transition-opacity ${(config?.memory?.enabled ?? true) ? '' : 'opacity-50 pointer-events-none'}`}>
+                <div className="pt-4 border-t border-border">
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
                       <p className="font-medium">{t('Memory Management')}</p>
@@ -1817,7 +1817,7 @@ export function SettingsPage() {
                 </div>
 
                 {/* Clear Memory Button */}
-                <div className={`pt-4 border-t border-border transition-opacity ${(config?.memory?.enabled ?? true) ? '' : 'opacity-50 pointer-events-none'}`}>
+                <div className="pt-4 border-t border-border">
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
                       <p className="font-medium">{t('Clear Memory')}</p>

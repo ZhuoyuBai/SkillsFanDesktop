@@ -9,6 +9,11 @@ import { chmodSync, existsSync, mkdirSync } from 'fs'
 import { chmod as chmodAsync } from 'fs/promises'
 import { EventEmitter } from 'events'
 import { atomicWriteJsonSync, atomicWriteJson, safeReadJsonSync, safeReadJson, cleanupTmpFiles } from '../utils/atomic-write'
+import {
+  getFallbackVisibleAiSource,
+  isAiSourceHiddenByProductFeatures,
+  isSkillsFanHostedAiEnabled
+} from './ai-sources/hosted-ai-availability'
 
 // Import analytics config type
 import type { AnalyticsConfig } from './analytics/types'
@@ -310,7 +315,7 @@ function normalizeAiSources(parsed: Record<string, any>): AISourcesConfig {
   }
 
   if (!aiSources.current) {
-    aiSources.current = 'glm'
+    aiSources.current = isSkillsFanHostedAiEnabled() ? 'glm' : 'custom'
   }
 
   const legacyApi = parsed?.api
@@ -377,7 +382,40 @@ function normalizeAiSources(parsed: Record<string, any>): AISourcesConfig {
     }
   }
 
+  if (isAiSourceHiddenByProductFeatures(aiSources.current)) {
+    aiSources.current = getFallbackVisibleAiSource(aiSources)
+  }
+
   return aiSources
+}
+
+function getConfiguredModelForSource(aiSources: AISourcesConfig, source: string): string | undefined {
+  if (source === 'custom') {
+    return aiSources.custom?.model || undefined
+  }
+
+  const sourceConfig = aiSources[source] as Record<string, unknown> | undefined
+  return typeof sourceConfig?.model === 'string' && sourceConfig.model
+    ? sourceConfig.model
+    : undefined
+}
+
+function normalizeImageModel(
+  imageModel: HaloConfig['imageModel'] | undefined,
+  aiSources: AISourcesConfig
+): HaloConfig['imageModel'] | undefined {
+  if (!imageModel?.source || !isAiSourceHiddenByProductFeatures(imageModel.source)) {
+    return imageModel
+  }
+
+  const fallbackSource = getFallbackVisibleAiSource(aiSources)
+  const fallbackModel = getConfiguredModelForSource(aiSources, fallbackSource)
+
+  return {
+    ...imageModel,
+    source: fallbackSource,
+    model: fallbackModel || imageModel.model
+  }
 }
 
 function getAiSourcesSignature(aiSources?: AISourcesConfig): string {
@@ -452,7 +490,8 @@ function mergeConfigWithDefaults(parsed: Record<string, any>): HaloConfig {
     // memory: merge with defaults
     memory: { ...DEFAULT_CONFIG.memory, ...parsed.memory },
     browserAutomation: { ...DEFAULT_CONFIG.browserAutomation, ...parsed.browserAutomation },
-    tools: normalizeWebToolsConfig(parsed.tools)
+    tools: normalizeWebToolsConfig(parsed.tools),
+    imageModel: normalizeImageModel(parsed.imageModel, aiSources)
   }
 }
 
@@ -576,7 +615,7 @@ export async function initializeApp(): Promise<void> {
   // Create default config if it doesn't exist
   const configPath = getConfigPath()
   if (!existsSync(configPath)) {
-    atomicWriteJsonSync(configPath, DEFAULT_CONFIG, { backup: true })
+    atomicWriteJsonSync(configPath, mergeConfigWithDefaults({}), { backup: true })
   }
   ensureConfigFilePermissions(configPath)
 }
@@ -586,16 +625,16 @@ export function getConfig(): HaloConfig {
   const configPath = getConfigPath()
 
   if (!existsSync(configPath)) {
-    return DEFAULT_CONFIG
+    return mergeConfigWithDefaults({})
   }
 
   try {
     const parsed = safeReadJsonSync(configPath, null as any)
-    if (!parsed) return DEFAULT_CONFIG
+    if (!parsed) return mergeConfigWithDefaults({})
     return mergeConfigWithDefaults(parsed)
   } catch (error) {
     console.error('Failed to read config:', error)
-    return DEFAULT_CONFIG
+    return mergeConfigWithDefaults({})
   }
 }
 
@@ -604,16 +643,16 @@ export async function getConfigAsync(): Promise<HaloConfig> {
   const configPath = getConfigPath()
 
   if (!existsSync(configPath)) {
-    return DEFAULT_CONFIG
+    return mergeConfigWithDefaults({})
   }
 
   try {
     const parsed = await safeReadJson(configPath, null as any)
-    if (!parsed) return DEFAULT_CONFIG
+    if (!parsed) return mergeConfigWithDefaults({})
     return mergeConfigWithDefaults(parsed)
   } catch (error) {
     console.error('Failed to read config (async):', error)
-    return DEFAULT_CONFIG
+    return mergeConfigWithDefaults({})
   }
 }
 

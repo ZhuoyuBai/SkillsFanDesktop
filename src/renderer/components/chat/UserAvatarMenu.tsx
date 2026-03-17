@@ -17,7 +17,8 @@ interface UserAvatarMenuProps {
 
 export function UserAvatarMenu({ collapsed = false }: UserAvatarMenuProps) {
   const { t } = useTranslation()
-  const { setView, openSettingsWithSection } = useAppStore()
+  const { setView, openSettingsWithSection, productFeatures } = useAppStore()
+  const hostedAiEnabled = productFeatures.skillsfanHostedAiEnabled
 
   const [authState, setAuthState] = useState<SkillsFanAuthState | null>(null)
   const [credits, setCredits] = useState<number | null>(null)
@@ -175,7 +176,7 @@ export function UserAvatarMenu({ collapsed = false }: UserAvatarMenuProps) {
           </button>
 
           {/* Credits - only show when logged in */}
-          {isLoggedIn && credits !== null && (
+          {hostedAiEnabled && isLoggedIn && credits !== null && (
             <>
               <div className="border-t border-border/50" />
               <div className="flex items-center gap-3 px-3 py-2.5 cursor-default">
