@@ -77,8 +77,6 @@ describe('Config Service', () => {
       expect(config.api.apiUrl).toBe('https://api.anthropic.com')
       expect(config.permissions.commandExecution).toBe('ask')
       expect(config.appearance.theme).toBe('light')
-      expect(config.tools?.web.search.provider).toBe('duckduckgo')
-      expect(config.tools?.web.fetch.enabled).toBe(true)
       expect(config.isFirstLaunch).toBe(true)
     })
 
@@ -158,40 +156,6 @@ describe('Config Service', () => {
       expect(config.mcpServers).toEqual({ server2: { command: 'cmd2' } })
     })
 
-    it('should normalize and deep merge local web tools config', () => {
-      saveConfig({
-        tools: {
-          web: {
-            search: {
-              provider: 'perplexity',
-              perplexity: { apiKey: 'pplx-key' }
-            },
-            fetch: {
-              enabled: false
-            }
-          }
-        }
-      } as any)
-
-      saveConfig({
-        tools: {
-          web: {
-            search: {
-              kimi: {
-                model: 'moonshot-v1-32k'
-              }
-            }
-          }
-        }
-      } as any)
-
-      const config = getConfig()
-      expect(config.tools?.web.search.provider).toBe('perplexity')
-      expect(config.tools?.web.search.perplexity?.apiKey).toBe('pplx-key')
-      expect(config.tools?.web.search.kimi?.model).toBe('moonshot-v1-32k')
-      expect(config.tools?.web.fetch.enabled).toBe(false)
-      expect(config.tools?.web.fetch.maxChars).toBeGreaterThan(0)
-    })
   })
 
   describe('change notifications', () => {

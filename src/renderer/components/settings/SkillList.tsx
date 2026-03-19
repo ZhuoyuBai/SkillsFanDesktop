@@ -1,24 +1,29 @@
 /**
  * Skill List Component
- * Left sidebar (folder tree, native file-explorer style) + right preview layout
+ * Grid layout with colorful icons for each skill card
  * Sources: SkillsFan, Claude commands (project/global), Claude skills, Agent skills
  */
 
 import { useState, useEffect, useCallback } from 'react'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
 import {
   Package,
   RefreshCw,
   FolderOpen,
-  Folder,
   Plus,
   Upload,
   Trash2,
   Compass,
-  FileText,
-  List,
-  LayoutGrid
+  Sparkles,
+  Zap,
+  Flame,
+  Star,
+  Heart,
+  Gem,
+  Rocket,
+  Wand2,
+  Palette,
+  Crown,
+  type LucideIcon
 } from 'lucide-react'
 import { api } from '../../api'
 import { useTranslation } from '../../i18n'
@@ -44,27 +49,6 @@ interface SkillInfo {
   fileContents: Record<string, string>
 }
 
-type SkillViewMode = 'list' | 'grid'
-
-const SKILL_VIEW_MODE_KEY = 'halo:skill-view-mode'
-
-function getInitialSkillViewMode(): SkillViewMode {
-  if (typeof window === 'undefined') return 'list'
-  const stored = localStorage.getItem(SKILL_VIEW_MODE_KEY)
-  return stored === 'list' || stored === 'grid' ? stored : 'list'
-}
-
-function getSourceLabel(kind: SkillSource['kind']): string {
-  const labels: Record<SkillSource['kind'], string> = {
-    skillsfan: 'SkillsFan',
-    'project-commands': 'Project',
-    'global-commands': 'Global',
-    'claude-skills': 'Claude Skills',
-    'agents-skills': 'Agent Skills'
-  }
-  return labels[kind] || kind
-}
-
 // Shorten path for display
 function shortenPath(p: string): string {
   const normalized = p.replace(/\\/g, '/')
@@ -74,30 +58,40 @@ function shortenPath(p: string): string {
     .replace(/^[A-Za-z]:\/Users\/[^/]+/, '~')
 }
 
-function getPathBaseName(p: string): string {
-  const normalized = p.replace(/\\/g, '/').replace(/\/+$/, '')
-  return normalized.split('/').pop() || p
-}
+// Icon pool and color palette for skill cards
+const SKILL_ICONS: LucideIcon[] = [
+  Sparkles, Zap, Flame, Star, Heart, Gem, Rocket, Wand2, Palette, Crown
+]
 
-// Get the folder/file label for the left sidebar
-function getFolderLabel(skill: SkillInfo): string {
-  if (skill.source.kind === 'project-commands' || skill.source.kind === 'global-commands') {
-    return getPathBaseName(skill.location) || skill.name
+const SKILL_ICON_COLORS = [
+  'from-orange-400 to-rose-500',
+  'from-violet-500 to-purple-600',
+  'from-sky-400 to-blue-500',
+  'from-emerald-400 to-teal-500',
+  'from-pink-400 to-rose-500',
+  'from-amber-400 to-orange-500',
+  'from-indigo-400 to-violet-500',
+  'from-cyan-400 to-sky-500',
+  'from-fuchsia-400 to-pink-500',
+  'from-lime-400 to-emerald-500',
+]
+
+function hashString(str: string): number {
+  let hash = 0
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i)
+    hash = ((hash << 5) - hash) + char
+    hash |= 0
   }
-  return skill.name || getPathBaseName(skill.baseDir)
+  return Math.abs(hash)
 }
 
-function getCommandFileName(skill: SkillInfo): string {
-  return getPathBaseName(skill.location) || skill.name
-}
-
-function getSkillHeaderTitle(skill: SkillInfo): string {
-  return getFolderLabel(skill)
-}
-
-// Check if skill is a single-file command (no expandable folder)
-function isCommandSkill(skill: SkillInfo): boolean {
-  return skill.source.kind === 'project-commands' || skill.source.kind === 'global-commands'
+function getSkillIcon(name: string): { Icon: LucideIcon; gradient: string } {
+  const hash = hashString(name)
+  return {
+    Icon: SKILL_ICONS[hash % SKILL_ICONS.length],
+    gradient: SKILL_ICON_COLORS[hash % SKILL_ICON_COLORS.length],
+  }
 }
 
 function SkillCard({ skill, onOpenFolder, onDelete, t }: {
@@ -106,26 +100,30 @@ function SkillCard({ skill, onOpenFolder, onDelete, t }: {
   onDelete: (skill: SkillInfo) => void
   t: (key: string) => string
 }) {
+  const { Icon, gradient } = getSkillIcon(skill.name)
+
   return (
     <div className="border border-border/60 rounded-xl p-5 hover:bg-secondary/30 hover:shadow-sm transition-all flex flex-col justify-between group">
       <div>
-        <h4 className="text-base font-semibold text-foreground truncate" title={skill.displayName || skill.name}>
-          {skill.displayName || skill.name}
-        </h4>
+        <div className="flex items-center gap-3">
+          <div className={`w-9 h-9 rounded-lg bg-gradient-to-br ${gradient} flex items-center justify-center flex-shrink-0`}>
+            <Icon className="w-4.5 h-4.5 text-white" strokeWidth={2} />
+          </div>
+          <h4 className="text-base font-semibold text-foreground truncate" title={skill.displayName || skill.name}>
+            {skill.displayName || skill.name}
+          </h4>
+        </div>
         {skill.description ? (
-          <p className="text-xs text-muted-foreground mt-1.5 line-clamp-3" title={skill.description}>
+          <p className="text-xs text-muted-foreground mt-2 line-clamp-3" title={skill.description}>
             {skill.description}
           </p>
         ) : (
-          <p className="text-xs text-muted-foreground/50 mt-1.5 italic">
+          <p className="text-xs text-muted-foreground/50 mt-2 italic">
             {t('No description')}
           </p>
         )}
       </div>
-      <div className="flex items-center justify-between mt-3">
-        <span className="text-[10px] text-muted-foreground/70 bg-secondary/50 px-1.5 py-0.5 rounded">
-          {getSourceLabel(skill.source.kind)}
-        </span>
+      <div className="flex items-center justify-end mt-3">
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <button
             onClick={() => onOpenFolder(skill.name)}
@@ -157,13 +155,6 @@ export function SkillList() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // Folder tree state
-  const [expandedSkills, setExpandedSkills] = useState<Set<string>>(new Set())
-
-  // Selection & preview state
-  const [selectedFile, setSelectedFile] = useState<{ skillName: string; fileName: string } | null>(null)
-  const [fileContent, setFileContent] = useState<string>('')
-
   // Installation flow state
   const [isInstalling, setIsInstalling] = useState(false)
   const [conflictInfo, setConflictInfo] = useState<{
@@ -183,31 +174,12 @@ export function SkillList() {
     message: string
     type: 'success' | 'error'
   } | null>(null)
-  const [viewMode, setViewMode] = useState<SkillViewMode>(getInitialSkillViewMode)
-
-  // Derived state
-  const selectedSkill = selectedFile
-    ? skills.find(s => s.name === selectedFile.skillName) || null
-    : null
 
   // Load skills on mount
   useEffect(() => {
     loadSkills()
     loadSkillsDir()
   }, [])
-
-  // Auto-expand first skill when list loads
-  useEffect(() => {
-    if (skills.length > 0 && !selectedFile) {
-      const first = skills[0]
-      if (isCommandSkill(first)) {
-        const fileName = getCommandFileName(first)
-        selectFile(first.name, fileName)
-      } else {
-        handleFolderClick(first)
-      }
-    }
-  }, [skills])
 
   // Auto-hide toast after 3 seconds
   useEffect(() => {
@@ -216,39 +188,6 @@ export function SkillList() {
       return () => clearTimeout(timer)
     }
   }, [toast])
-
-  const selectFile = useCallback((skillName: string, fileName: string) => {
-    setSelectedFile({ skillName, fileName })
-    const skill = skills.find(s => s.name === skillName)
-    setFileContent(skill?.fileContents?.[fileName] ?? '')
-  }, [skills])
-
-  const handleFolderClick = useCallback((skill: SkillInfo) => {
-    if (isCommandSkill(skill)) {
-      // Command: directly select and preview
-      const fileName = getCommandFileName(skill)
-      selectFile(skill.name, fileName)
-      return
-    }
-
-    // Toggle expand
-    setExpandedSkills(prev => {
-      const next = new Set(prev)
-      if (next.has(skill.name)) {
-        next.delete(skill.name)
-      } else {
-        next.add(skill.name)
-      }
-      return next
-    })
-
-    // Auto-select SKILL.md or first file if not already in this skill
-    const files = skill.files ?? []
-    const defaultFile = files.includes('SKILL.md') ? 'SKILL.md' : files[0]
-    if (defaultFile && (!selectedFile || selectedFile.skillName !== skill.name)) {
-      selectFile(skill.name, defaultFile)
-    }
-  }, [selectedFile, selectFile])
 
   const loadSkills = async () => {
     try {
@@ -297,11 +236,7 @@ export function SkillList() {
 
       if (installResult.success) {
         setIsInstalling(false)
-        setExpandedSkills(new Set())
         await loadSkills()
-        if (installResult.data?.skillName) {
-          // Will auto-select via useEffect
-        }
         setToast({ message: t('Skill installed successfully'), type: 'success' })
       } else if (installResult.conflict) {
         setConflictInfo({
@@ -332,7 +267,6 @@ export function SkillList() {
       const result = await api.installSkill(archivePath, resolution)
 
       if (result.success) {
-        setExpandedSkills(new Set())
         await loadSkills()
         const message =
           resolution === 'rename'
@@ -378,29 +312,6 @@ export function SkillList() {
       const result = await api.deleteSkill(skillName)
 
       if (result.success) {
-        setExpandedSkills(prev => {
-          const next = new Set(prev)
-          next.delete(skillName)
-          return next
-        })
-
-        const remaining = skills.filter(s => s.name !== skillName)
-        if (remaining.length > 0) {
-          const first = remaining[0]
-          if (isCommandSkill(first)) {
-            const fileName = getCommandFileName(first)
-            selectFile(first.name, fileName)
-          } else {
-            const files = first.files ?? []
-            const defaultFile = files.includes('SKILL.md') ? 'SKILL.md' : files[0]
-            if (defaultFile) selectFile(first.name, defaultFile)
-            setExpandedSkills(new Set([first.name]))
-          }
-        } else {
-          setSelectedFile(null)
-          setFileContent('')
-        }
-
         await loadSkills()
         setToast({ message: t('Skill deleted successfully'), type: 'success' })
       } else {
@@ -412,7 +323,6 @@ export function SkillList() {
   }
 
   const shortSkillsDir = skillsDir ? shortenPath(skillsDir) : ''
-  const isMarkdownFile = (fileName: string) => fileName.endsWith('.md')
 
   return (
     <div className="space-y-4">
@@ -460,38 +370,6 @@ export function SkillList() {
               </>
             )}
           </button>
-
-          <div className="flex items-center bg-secondary/50 rounded-md p-0.5">
-            <button
-              onClick={() => {
-                setViewMode('list')
-                localStorage.setItem(SKILL_VIEW_MODE_KEY, 'list')
-              }}
-              className={`p-1.5 rounded transition-colors ${
-                viewMode === 'list'
-                  ? 'bg-background text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-              title={t('List view')}
-            >
-              <List className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={() => {
-                setViewMode('grid')
-                localStorage.setItem(SKILL_VIEW_MODE_KEY, 'grid')
-              }}
-              className={`p-1.5 rounded transition-colors ${
-                viewMode === 'grid'
-                  ? 'bg-background text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-              title={t('Grid view')}
-            >
-              <LayoutGrid className="w-3.5 h-3.5" />
-            </button>
-          </div>
-
         </div>
       </div>
 
@@ -530,142 +408,6 @@ export function SkillList() {
           <p className="text-xs text-muted-foreground/70 mt-2">
             {t('Add skills to the skills directory to see them here')}
           </p>
-        </div>
-      ) : viewMode === 'list' ? (
-        /* Left-right split layout */
-        <div className="flex border border-border rounded-lg overflow-hidden h-[420px]">
-          {/* Left sidebar - folder tree (native file explorer style) */}
-          <div className="w-[220px] border-r border-border overflow-y-auto flex-shrink-0">
-            {skills.map((skill) => {
-              const folderLabel = getFolderLabel(skill)
-              const isCommand = isCommandSkill(skill)
-              const isExpanded = expandedSkills.has(skill.name)
-              const isSkillSelected = selectedFile?.skillName === skill.name
-
-              return (
-                <div key={`${skill.source?.kind || 'unknown'}-${skill.name}`}>
-                  {/* Folder / file row */}
-                  <button
-                    onClick={() => handleFolderClick(skill)}
-                    className={`
-                      w-full text-left flex items-center gap-2 px-3 py-2
-                      transition-colors text-sm
-                      ${isSkillSelected && isCommand
-                        ? 'bg-primary/10 text-foreground'
-                        : 'hover:bg-secondary/60 text-muted-foreground'
-                      }
-                    `}
-                  >
-                    {isCommand ? (
-                      <FileText className="w-4 h-4 flex-shrink-0 text-muted-foreground/70" />
-                    ) : isExpanded ? (
-                      <FolderOpen className="w-4 h-4 flex-shrink-0 text-yellow-500/80" />
-                    ) : (
-                      <Folder className="w-4 h-4 flex-shrink-0 text-yellow-500/80" />
-                    )}
-                    <span className="truncate">{folderLabel}</span>
-                  </button>
-
-                  {/* Expanded file list */}
-                  {!isCommand && isExpanded && (skill.files ?? []).length > 0 && (
-                    <div>
-                      {(skill.files ?? []).map((fileName) => {
-                        const isFileSelected =
-                          selectedFile?.skillName === skill.name &&
-                          selectedFile?.fileName === fileName
-                        return (
-                          <button
-                            key={fileName}
-                            onClick={() => selectFile(skill.name, fileName)}
-                            className={`
-                              w-full text-left flex items-center gap-2 pl-7 pr-3 py-1.5
-                              transition-colors text-xs
-                              ${isFileSelected
-                                ? 'bg-primary/10 text-foreground'
-                                : 'hover:bg-secondary/60 text-muted-foreground'
-                              }
-                            `}
-                          >
-                            <FileText className="w-3.5 h-3.5 flex-shrink-0 text-muted-foreground/50" />
-                            <span className="truncate">{fileName}</span>
-                          </button>
-                        )
-                      })}
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-
-          {/* Right panel - preview */}
-          <div className="flex-1 flex flex-col overflow-hidden">
-            {selectedSkill && selectedFile ? (
-              <>
-                {/* Title bar */}
-                <div className="px-5 pt-4 pb-2 flex-shrink-0">
-                  <h4
-                    className="text-sm font-medium text-foreground truncate"
-                    title={getSkillHeaderTitle(selectedSkill)}
-                  >
-                    {getSkillHeaderTitle(selectedSkill)}
-                  </h4>
-                  {selectedFile.fileName !== 'SKILL.md' && !isCommandSkill(selectedSkill) && (
-                    <p className="text-xs text-muted-foreground/60 mt-0.5">
-                      {selectedFile.fileName}
-                    </p>
-                  )}
-                </div>
-
-                {/* File content */}
-                <div className="flex-1 overflow-y-auto px-5 pb-4">
-                  {isMarkdownFile(selectedFile.fileName) ? (
-                    <div className="prose prose-sm dark:prose-invert max-w-none prose-headings:text-foreground prose-p:text-muted-foreground prose-li:text-muted-foreground prose-strong:text-foreground prose-code:text-foreground prose-code:bg-secondary/50 prose-code:px-1 prose-code:py-0.5 prose-code:rounded">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                        {fileContent}
-                      </ReactMarkdown>
-                    </div>
-                  ) : (
-                    <pre className="text-xs text-muted-foreground font-mono whitespace-pre-wrap break-all">
-                      {fileContent}
-                    </pre>
-                  )}
-                </div>
-
-                {/* Bottom bar - path + actions */}
-                <div className="border-t border-border px-4 py-3 flex items-center justify-between bg-card/50 flex-shrink-0">
-                  <span className="text-xs text-muted-foreground/70 font-mono truncate mr-4">
-                    {shortenPath(selectedSkill.baseDir)}
-                  </span>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <button
-                      onClick={() => handleOpenFolder(selectedSkill.name)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/60 rounded-lg transition-colors"
-                      title={t('Open Folder')}
-                    >
-                      <FolderOpen className="w-3.5 h-3.5" />
-                      {t('Open Folder')}
-                    </button>
-                    {selectedSkill.source?.kind === 'skillsfan' && (
-                      <button
-                        onClick={() => handleDeleteClick(selectedSkill)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-destructive/80 hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
-                        title={t('Delete skill')}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        {t('Delete')}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </>
-            ) : (
-              <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-                <Package className="w-10 h-10 mb-3 opacity-30" />
-                <p className="text-sm">{t('Select a skill to view details')}</p>
-              </div>
-            )}
-          </div>
         </div>
       ) : (
         <div className="grid grid-cols-3 gap-4 max-h-[420px] overflow-y-auto">

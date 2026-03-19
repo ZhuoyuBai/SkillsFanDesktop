@@ -65,7 +65,7 @@ export const AVAILABLE_MODELS: ModelOption[] = [
   }
 ]
 
-export const DEFAULT_MODEL = 'glm-5'
+export const DEFAULT_MODEL = 'GLM-5-Turbo'
 
 // ============================================================================
 // Provider Configuration Types
@@ -108,12 +108,46 @@ export interface OAuthSourceConfig extends AISourceBaseConfig {
 }
 
 /**
+ * Single API key configuration entry (used in multi-config list)
+ */
+export interface ApiKeyConfig {
+  provider: ApiProvider
+  apiKey: string
+  apiUrl: string
+  model: string
+  label?: string
+}
+
+/**
  * Custom API source configuration
+ * Top-level fields (provider, apiKey, apiUrl, model) always mirror the active config
+ * from configs[activeConfigIndex] for backward compatibility.
  */
 export interface CustomSourceConfig extends AISourceBaseConfig {
   provider: ApiProvider
   apiKey: string
   apiUrl: string
+  configs?: ApiKeyConfig[]
+  activeConfigIndex?: number
+}
+
+/**
+ * Sync top-level fields from the active config in configs array.
+ * Ensures backward compatibility - callers reading top-level fields
+ * always get the active configuration.
+ */
+export function syncTopLevelFromActive(config: CustomSourceConfig): CustomSourceConfig {
+  if (!config.configs?.length) return config
+  const idx = config.activeConfigIndex ?? 0
+  const active = config.configs[idx]
+  if (!active) return config
+  return {
+    ...config,
+    provider: active.provider,
+    apiKey: active.apiKey,
+    apiUrl: active.apiUrl,
+    model: active.model
+  }
 }
 
 /**

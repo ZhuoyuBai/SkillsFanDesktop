@@ -259,6 +259,7 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
   // Get all configured custom API providers (zhipu, kimi, deepseek, etc.)
   // These are stored as aiSources[providerId] with apiKey field
   // Exclude 'custom' key - it's legacy and should not be shown as a separate option
+  // Flatten configs[] arrays into individual entries for multi-config support
   const configuredCustomProviders = Object.keys(aiSources)
     .filter(key => {
       if (key === 'current' || key === 'oauth' || key === 'custom') return false
@@ -266,16 +267,41 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
       // Check if it's a custom API config (has apiKey but not loggedIn)
       return source && typeof source === 'object' && 'apiKey' in source && source.apiKey && !('loggedIn' in source)
     })
-    .map(key => {
+    .flatMap(key => {
       const source = (aiSources as Record<string, any>)[key]
-      return {
-        id: key,
-        name: PROVIDER_NAMES[key] || key,
-        logo: getProviderLogoById(key),
-        model: source.model || '',
-        apiUrl: source.apiUrl || '',
-        config: source
+      const configs = source.configs as Array<{ provider: string; apiKey: string; apiUrl: string; model: string; label?: string }> | undefined
+      const activeConfigIndex = source.activeConfigIndex ?? 0
+      const providerName = PROVIDER_NAMES[key] || key
+      const logo = getProviderLogoById(key)
+
+      // If has multi-configs, generate one entry per config
+      if (configs && configs.length > 1) {
+        return configs.map((cfg, idx) => ({
+          id: key,
+          configIndex: idx,
+          name: providerName,
+          logo,
+          model: cfg.model || '',
+          label: cfg.label || cfg.model || '',
+          apiUrl: cfg.apiUrl || '',
+          config: source,
+          isActiveConfig: idx === activeConfigIndex
+        }))
       }
+
+      // Single or no configs - show as before
+      const singleLabel = configs?.[0]?.label || ''
+      return [{
+        id: key,
+        configIndex: 0,
+        name: providerName,
+        logo,
+        model: source.model || '',
+        label: singleLabel,
+        apiUrl: source.apiUrl || '',
+        config: source,
+        isActiveConfig: true
+      }]
     })
 
   // Get all OAuth providers - show regardless of SkillsFan login status
@@ -411,6 +437,46 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
     setIsOpen(false)
   }
 
+  // Handle selecting a specific config within a provider (multi-config support)
+  const handleSelectProviderConfig = async (providerId: string, configIndex: number) => {
+    const providerConfig = (aiSources as Record<string, any>)[providerId]
+    if (!providerConfig?.configs) {
+      // Fallback to simple provider switch
+      return handleSelectProvider(providerId)
+    }
+
+    const targetCfg = providerConfig.configs[configIndex]
+    if (!targetCfg) return
+
+    const updatedProvider = {
+      ...providerConfig,
+      activeConfigIndex: configIndex,
+      provider: targetCfg.provider,
+      apiKey: targetCfg.apiKey,
+      apiUrl: targetCfg.apiUrl,
+      model: targetCfg.model
+    }
+
+    const newAiSources = {
+      ...aiSources,
+      current: providerId,
+      [providerId]: updatedProvider
+    } as Record<string, any>
+
+    const newConfig = {
+      ...config,
+      thinkingEffort: normalizeThinkingEffortForModel(
+        targetCfg.model,
+        (config.thinkingEffort as ThinkingEffort | undefined) ?? 'off'
+      ),
+      aiSources: newAiSources
+    }
+
+    await api.setConfig(newConfig)
+    setConfig(newConfig as HaloConfig)
+    setIsOpen(false)
+  }
+
   // Handle add source - navigate to settings
   const handleAddSource = () => {
     setIsOpen(false)
@@ -445,7 +511,7 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
   const styles = styleConfig[variant]
 
   // Get current provider logo - always try model ID matching first
-  const currentProviderConfig = configuredCustomProviders.find(p => p.id === currentSource)
+  const currentProviderConfig = configuredCustomProviders.find(p => p.id === currentSource && p.isActiveConfig)
   const currentOAuthProvider = allOAuthProviders.find(
     provider => provider.type === currentSource && provider.isLoggedIn && provider.config
   )
@@ -577,14 +643,17 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
 
     configuredCustomProviders.forEach((provider) => {
       const modelId = provider.model || provider.name
+      // Show label (model name) if available, otherwise fall back to model ID
+      const displayName = provider.label || provider.model || provider.name
+      const isSelected = currentSource === provider.id && provider.isActiveConfig
       options.push({
-        key: `custom-provider:${provider.id}`,
-        modelName: provider.model || provider.name,
-        isSelected: currentSource === provider.id,
+        key: `custom-provider:${provider.id}:${provider.configIndex}`,
+        modelName: displayName,
+        isSelected,
         logo: provider.logo ||
           (provider.apiUrl ? getProviderLogo(provider.apiUrl) : null) ||
           getModelLogo(modelId, provider.model || provider.name, provider.id),
-        onSelect: () => handleSelectProvider(provider.id)
+        onSelect: () => handleSelectProviderConfig(provider.id, provider.configIndex)
       })
     })
 

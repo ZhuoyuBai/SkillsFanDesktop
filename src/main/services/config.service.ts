@@ -17,8 +17,7 @@ import {
 
 // Import analytics config type
 import type { AnalyticsConfig } from './analytics/types'
-import type { AISourcesConfig, CustomSourceConfig, WebToolsConfig } from '../../shared/types'
-import { DEFAULT_WEB_TOOLS_CONFIG, normalizeWebToolsConfig } from './web-tools/config'
+import type { AISourcesConfig, CustomSourceConfig } from '../../shared/types'
 
 // ============================================================================
 // Config Change Notification (EventEmitter Pattern)
@@ -129,11 +128,6 @@ interface HaloConfig {
   browserAutomation?: {
     mode: 'ai-browser' | 'system-browser'
   }
-  // Vision model for image preprocessing (used when primary model doesn't support vision)
-  imageModel?: {
-    source: string  // AI source key, e.g. 'custom', 'skillsfan-credits'
-    model: string   // Model ID, e.g. 'claude-haiku-4-5-20251001'
-  }
   // Custom instructions appended to system prompt
   customInstructions?: {
     enabled: boolean
@@ -144,8 +138,6 @@ interface HaloConfig {
     autoCompact?: boolean     // Proactive compaction prompts, default true
     compactThreshold?: number // Context usage ratio to trigger (0-1), default 0.75
   }
-  // Local web tool settings (search/fetch provider configuration)
-  tools?: WebToolsConfig
   // Feishu bot integration (remote control via chat)
   feishu?: {
     enabled: boolean
@@ -221,8 +213,8 @@ export function getSpacesDir(): string {
   return join(getHaloDir(), 'spaces')
 }
 
-// Default model (GLM-5)
-const DEFAULT_MODEL = 'glm-5'
+// Default model (GLM-5-Turbo)
+const DEFAULT_MODEL = 'GLM-5-Turbo'
 
 // Default configuration
 const DEFAULT_CONFIG: HaloConfig = {
@@ -270,8 +262,7 @@ const DEFAULT_CONFIG: HaloConfig = {
   customInstructions: {
     enabled: false,
     content: ''
-  },
-  tools: DEFAULT_WEB_TOOLS_CONFIG
+  }
 }
 
 // Active space tracker (in-memory, not persisted)
@@ -386,36 +377,27 @@ function normalizeAiSources(parsed: Record<string, any>): AISourcesConfig {
     aiSources.current = getFallbackVisibleAiSource(aiSources)
   }
 
+  // Migrate single custom API configs to configs[] array format
+  for (const key of Object.keys(aiSources)) {
+    if (key === 'current' || key === 'custom' || key === 'oauth') continue
+    const source = aiSources[key]
+    if (!source || typeof source !== 'object') continue
+    if ('loggedIn' in source) continue // Skip OAuth providers
+    if (!('apiKey' in source) || !(source as any).apiKey) continue
+    const custom = source as CustomSourceConfig
+    if (custom.configs && custom.configs.length > 0) continue // Already migrated
+    // Create configs array from top-level fields
+    custom.configs = [{
+      provider: custom.provider,
+      apiKey: custom.apiKey,
+      apiUrl: custom.apiUrl,
+      model: custom.model,
+      label: custom.model || undefined
+    }]
+    custom.activeConfigIndex = 0
+  }
+
   return aiSources
-}
-
-function getConfiguredModelForSource(aiSources: AISourcesConfig, source: string): string | undefined {
-  if (source === 'custom') {
-    return aiSources.custom?.model || undefined
-  }
-
-  const sourceConfig = aiSources[source] as Record<string, unknown> | undefined
-  return typeof sourceConfig?.model === 'string' && sourceConfig.model
-    ? sourceConfig.model
-    : undefined
-}
-
-function normalizeImageModel(
-  imageModel: HaloConfig['imageModel'] | undefined,
-  aiSources: AISourcesConfig
-): HaloConfig['imageModel'] | undefined {
-  if (!imageModel?.source || !isAiSourceHiddenByProductFeatures(imageModel.source)) {
-    return imageModel
-  }
-
-  const fallbackSource = getFallbackVisibleAiSource(aiSources)
-  const fallbackModel = getConfiguredModelForSource(aiSources, fallbackSource)
-
-  return {
-    ...imageModel,
-    source: fallbackSource,
-    model: fallbackModel || imageModel.model
-  }
 }
 
 function getAiSourcesSignature(aiSources?: AISourcesConfig): string {
@@ -489,9 +471,7 @@ function mergeConfigWithDefaults(parsed: Record<string, any>): HaloConfig {
     spaces: { ...DEFAULT_CONFIG.spaces, ...parsed.spaces },
     // memory: merge with defaults
     memory: { ...DEFAULT_CONFIG.memory, ...parsed.memory },
-    browserAutomation: { ...DEFAULT_CONFIG.browserAutomation, ...parsed.browserAutomation },
-    tools: normalizeWebToolsConfig(parsed.tools),
-    imageModel: normalizeImageModel(parsed.imageModel, aiSources)
+    browserAutomation: { ...DEFAULT_CONFIG.browserAutomation, ...parsed.browserAutomation }
   }
 }
 
@@ -536,24 +516,6 @@ function applyConfigUpdates(currentConfig: HaloConfig, config: Partial<HaloConfi
   }
   if (config.browserAutomation) {
     newConfig.browserAutomation = { ...currentConfig.browserAutomation, ...config.browserAutomation }
-  }
-  if (config.tools) {
-    newConfig.tools = normalizeWebToolsConfig({
-      ...currentConfig.tools,
-      ...config.tools,
-      web: {
-        ...currentConfig.tools?.web,
-        ...config.tools.web,
-        search: {
-          ...currentConfig.tools?.web?.search,
-          ...config.tools.web?.search
-        },
-        fetch: {
-          ...currentConfig.tools?.web?.fetch,
-          ...config.tools.web?.fetch
-        }
-      }
-    })
   }
 
   return newConfig

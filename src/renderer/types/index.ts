@@ -3,7 +3,6 @@
 // ============================================
 
 import type { ThinkingEffort } from '../../shared/utils/openai-models'
-import type { WebToolsConfig } from '../../shared/types'
 
 // API Provider Configuration
 export type ApiProvider = 'anthropic' | 'openai';
@@ -112,12 +111,39 @@ export interface OAuthSourceConfig {
   tokenExpires?: number;
 }
 
-// Custom API source configuration (same as existing ApiConfig)
+// Single API key configuration entry (used in multi-config list)
+export interface ApiKeyConfig {
+  provider: ApiProvider;
+  apiKey: string;
+  apiUrl: string;
+  model: string;
+  label?: string;
+}
+
+// Custom API source configuration
+// Top-level fields always mirror the active config from configs[activeConfigIndex]
 export interface CustomSourceConfig {
   provider: ApiProvider;
   apiKey: string;
   apiUrl: string;
   model: string;
+  configs?: ApiKeyConfig[];
+  activeConfigIndex?: number;
+}
+
+// Sync top-level fields from the active config in configs array
+export function syncTopLevelFromActive(config: CustomSourceConfig): CustomSourceConfig {
+  if (!config.configs?.length) return config;
+  const idx = config.activeConfigIndex ?? 0;
+  const active = config.configs[idx];
+  if (!active) return config;
+  return {
+    ...config,
+    provider: active.provider,
+    apiKey: active.apiKey,
+    apiUrl: active.apiUrl,
+    model: active.model,
+  };
 }
 
 // AI Sources - manages multiple login sources
@@ -206,7 +232,6 @@ export interface HaloConfig {
   memory?: MemoryConfig;  // Cross-conversation memory settings
   browserAutomation?: BrowserAutomationConfig;  // Browser automation mode preference
   thinkingEffort?: ThinkingEffort;  // Default thinking effort level
-  tools?: WebToolsConfig;  // Local web search/fetch tool settings
   customInstructions?: {  // Global custom instructions appended to system prompt
     enabled: boolean;
     content: string;
@@ -698,6 +723,15 @@ export function getCurrentModelName(config: HaloConfig): string {
   // Check dynamic provider (from config)
   const dynamicConfig = aiSources[aiSources.current] as OAuthSourceConfig | undefined;
   if (dynamicConfig && typeof dynamicConfig === 'object' && 'model' in dynamicConfig) {
+    // For custom API providers with configs[], use the active config's label
+    if ('configs' in dynamicConfig) {
+      const customCfg = dynamicConfig as unknown as import('../../shared/types/ai-sources').CustomSourceConfig;
+      if (customCfg.configs?.length) {
+        const activeIdx = customCfg.activeConfigIndex ?? 0;
+        const activeCfg = customCfg.configs[activeIdx];
+        if (activeCfg?.label) return activeCfg.label;
+      }
+    }
     const modelId = dynamicConfig.model;
     // Use modelNames mapping if available, otherwise fall back to model ID
     const displayName = dynamicConfig.modelNames?.[modelId] || modelId;

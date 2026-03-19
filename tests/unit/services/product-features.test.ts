@@ -92,7 +92,5 @@ describe('Product feature flags', () => {
     const config = getConfig()
     expect(config.aiSources?.current).toBe('openai')
     expect((config.aiSources as Record<string, any>)['skillsfan-credits']).toBeDefined()
-    expect(config.imageModel?.source).toBe('openai')
-    expect(config.imageModel?.model).toBe('gpt-4o-mini')
   })
 })

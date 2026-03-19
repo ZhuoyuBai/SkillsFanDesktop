@@ -600,6 +600,19 @@ class AISourceManager {
             apiKey: decryptString(apiKey)
           }
         }
+        // Also decrypt apiKeys inside configs[] array
+        const configs = (providerConfig as any).configs
+        if (Array.isArray(configs)) {
+          const decryptedConfigs = configs.map((cfg: any) => {
+            if (typeof cfg.apiKey === 'string' && cfg.apiKey.startsWith('enc:')) {
+              needsMigration = true
+              return { ...cfg, apiKey: decryptString(cfg.apiKey) }
+            }
+            return cfg
+          })
+          const pc = (result as any)[key] || { ...providerConfig }
+          ;(result as any)[key] = { ...pc, configs: decryptedConfigs }
+        }
       }
 
       // Case 2: OAuth configs (accessToken / refreshToken)

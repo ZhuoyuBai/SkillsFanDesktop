@@ -7,8 +7,8 @@ import { useAppStore } from '../stores/app.store'
 import { useSpaceStore } from '../stores/space.store'
 import { useUpdaterStore } from '../stores/updater.store'
 import { api } from '../api'
-import type { HaloConfig, ThemeMode, McpServersConfig, AISourceType, OAuthSourceConfig, ApiProvider, CustomSourceConfig } from '../types'
-import { AVAILABLE_MODELS, DEFAULT_CONFIG, DEFAULT_MODEL } from '../types'
+import type { HaloConfig, ThemeMode, McpServersConfig, AISourceType, OAuthSourceConfig, ApiProvider, CustomSourceConfig, ApiKeyConfig } from '../types'
+import { AVAILABLE_MODELS, DEFAULT_CONFIG, DEFAULT_MODEL, syncTopLevelFromActive } from '../types'
 import { Select } from '../components/ui/Select'
 import { Switch } from '../components/ui/Switch'
 
@@ -27,7 +27,7 @@ interface AuthProviderConfig {
   recommended: boolean
   enabled: boolean
 }
-import { CheckCircle2, XCircle, Eye, EyeOff } from '../components/icons/ToolIcons'
+import { CheckCircle2, XCircle } from '../components/icons/ToolIcons'
 import { McpServerList } from '../components/settings/McpServerList'
 import { SkillList } from '../components/settings/SkillList'
 import { SkillsFanAccountSection } from '../components/settings/SkillsFanAccountSection'
@@ -35,9 +35,9 @@ import { SpaceManagementSection } from '../components/settings/SpaceManagementSe
 import { ResetSection } from '../components/settings/ResetSection'
 import { ScheduledTasksSection } from '../components/settings/ScheduledTasksSection'
 import { FeishuSettings } from '../components/settings/FeishuSettings'
+import { ApiConfigDialog } from '../components/settings/ApiConfigDialog'
 import { useTranslation, setLanguage, getCurrentLanguage, SUPPORTED_LOCALES, type LocaleCode } from '../i18n'
-import { isNoVisionModel } from '../../shared/utils/vision-models'
-import { Loader2, LogOut, Plus, Check, Globe, Key, MessageSquare, Bot, Palette, Server, Settings as SettingsIcon, Wifi, ExternalLink, X, Package, User, Layers, Lock, SlidersHorizontal, Clock, ArrowLeft, Database, type LucideIcon } from 'lucide-react'
+import { Loader2, LogOut, Plus, Check, Globe, Key, MessageSquare, Bot, Palette, Server, Settings as SettingsIcon, Wifi, X, Package, User, Layers, Lock, SlidersHorizontal, Clock, ArrowLeft, Database, Pencil, Trash2, type LucideIcon } from 'lucide-react'
 import { usePlatform } from '../components/layout/Header'
 import { isElectron } from '../api/transport'
 import { useToastStore } from '../stores/toast.store'
@@ -72,7 +72,7 @@ const PROVIDER_PRESETS: ProviderPreset[] = [
     name: 'Zhipu GLM',
     nameKey: 'Zhipu GLM',
     apiUrl: 'https://open.bigmodel.cn/api/anthropic',
-    defaultModel: 'GLM-5',
+    defaultModel: 'GLM-5-Turbo',
     logo: zhipuLogo,
     apiType: 'anthropic',
     docsUrl: 'https://open.bigmodel.cn/usercenter/apikeys',
@@ -83,7 +83,7 @@ const PROVIDER_PRESETS: ProviderPreset[] = [
     name: 'MiniMax',
     nameKey: 'MiniMax',
     apiUrl: 'https://api.minimaxi.com/anthropic',
-    defaultModel: 'MiniMax-M2.1',
+    defaultModel: 'MiniMax-2.7',
     logo: minimaxLogo,
     apiType: 'anthropic',
     docsUrl: 'https://platform.minimaxi.com/user-center/basic-information/interface-key',
@@ -221,20 +221,6 @@ function resolveProviderFormValues(config: HaloConfig | undefined, providerId: s
   }
 }
 
-function resolveWebToolsFormValues(config: HaloConfig | undefined): {
-  searchEnabled: boolean
-  braveApiKey: string
-  perplexityApiKey: string
-} {
-  const search = config?.tools?.web?.search
-
-  return {
-    searchEnabled: search?.enabled !== false,
-    braveApiKey: search?.apiKey || '',
-    perplexityApiKey: search?.perplexity?.apiKey || ''
-  }
-}
-
 /**
  * Get localized text based on current language
  */
@@ -304,6 +290,18 @@ export function SettingsPage() {
   const [currentSource, setCurrentSource] = useState<AISourceType>(config?.aiSources?.current || 'custom')
   const [showCustomApiForm, setShowCustomApiForm] = useState(false)
 
+  // Multi-config editing state (via modal dialog)
+  const [showApiConfigDialog, setShowApiConfigDialog] = useState(false)
+  const [dialogEditingConfig, setDialogEditingConfig] = useState<ApiKeyConfig | null>(null)
+  const [dialogEditingProviderId, setDialogEditingProviderId] = useState<string | null>(null)
+  const [dialogEditingIndex, setDialogEditingIndex] = useState<number | null>(null)
+
+  // Legacy state kept for backward compat with other code paths
+  const [editingConfigIndex, setEditingConfigIndex] = useState<number | null>(null)
+  const [showConfigForm, setShowConfigForm] = useState(false)
+  const [showAddingFlow, setShowAddingFlow] = useState(false)
+  const [configLabel, setConfigLabel] = useState('')
+
   // Selected provider in the grid - initialize from current source/config
   const [selectedProviderId, setSelectedProviderId] = useState<string>(() => resolveInitialSelectedProviderId(config))
   const initialProviderFormValues = resolveProviderFormValues(config, selectedProviderId)
@@ -365,12 +363,6 @@ export function SettingsPage() {
   const [isSavingMemory, setIsSavingMemory] = useState(false)
   const [isLoadingMemory, setIsLoadingMemory] = useState(false)
   const [customInstructionsContent, setCustomInstructionsContent] = useState(config?.customInstructions?.content || '')
-  const initialWebToolsValues = resolveWebToolsFormValues(config)
-  const [webSearchEnabled, setWebSearchEnabled] = useState(initialWebToolsValues.searchEnabled)
-  const [webSearchBraveApiKey, setWebSearchBraveApiKey] = useState(initialWebToolsValues.braveApiKey)
-  const [webSearchPerplexityApiKey, setWebSearchPerplexityApiKey] = useState(initialWebToolsValues.perplexityApiKey)
-  const [showWebSearchKeys, setShowWebSearchKeys] = useState(false)
-  const [isSavingWebTools, setIsSavingWebTools] = useState(false)
 
   // API Key visibility state
   const [showApiKey, setShowApiKey] = useState(false)
@@ -476,13 +468,6 @@ export function SettingsPage() {
   useEffect(() => {
     loadSystemSettings()
   }, [])
-
-  useEffect(() => {
-    const values = resolveWebToolsFormValues(config)
-    setWebSearchEnabled(values.searchEnabled)
-    setWebSearchBraveApiKey(values.braveApiKey)
-    setWebSearchPerplexityApiKey(values.perplexityApiKey)
-  }, [config?.tools])
 
   const loadSystemSettings = async () => {
     try {
@@ -685,68 +670,6 @@ export function SettingsPage() {
     }
   }
 
-  const handleWebToolsEnabledChange = async (enabled: boolean) => {
-    setWebSearchEnabled(enabled)
-
-    const toolsConfig = {
-      web: {
-        search: {
-          ...(config?.tools?.web?.search || {}),
-          enabled,
-          apiKey: webSearchBraveApiKey,
-          perplexity: {
-            ...(config?.tools?.web?.search?.perplexity || {}),
-            apiKey: webSearchPerplexityApiKey
-          }
-        },
-        fetch: {
-          ...(config?.tools?.web?.fetch || {}),
-          enabled
-        }
-      }
-    }
-
-    try {
-      await api.setConfig({ tools: toolsConfig })
-      setConfig({ ...(config ?? DEFAULT_CONFIG), tools: toolsConfig } as HaloConfig)
-    } catch (error) {
-      console.error('[Settings] Failed to update web tools config:', error)
-    }
-  }
-
-  const handleSaveWebToolsConfig = async () => {
-    setIsSavingWebTools(true)
-
-    const toolsConfig = {
-      web: {
-        search: {
-          ...(config?.tools?.web?.search || {}),
-          enabled: webSearchEnabled,
-          apiKey: webSearchBraveApiKey,
-          perplexity: {
-            ...(config?.tools?.web?.search?.perplexity || {}),
-            apiKey: webSearchPerplexityApiKey
-          }
-        },
-        fetch: {
-          ...(config?.tools?.web?.fetch || {}),
-          enabled: webSearchEnabled
-        }
-      }
-    }
-
-    try {
-      await api.setConfig({ tools: toolsConfig })
-      setConfig({ ...(config ?? DEFAULT_CONFIG), tools: toolsConfig } as HaloConfig)
-      addToast(t('Saved'), 'success')
-    } catch (error) {
-      console.error('[Settings] Failed to save web tools config:', error)
-      addToast(t('Save failed'), 'error')
-    } finally {
-      setIsSavingWebTools(false)
-    }
-  }
-
   // Handle clear memory
   const handleClearMemory = async () => {
     setIsClearingMemory(true)
@@ -813,64 +736,6 @@ export function SettingsPage() {
       setIsSavingMemory(false)
     }
   }
-
-  // Handle imageModel change
-  const handleImageModelChange = async (value: string) => {
-    try {
-      if (value === 'auto') {
-        await api.setConfig({ imageModel: undefined } as any)
-        setConfig({ ...config!, imageModel: undefined } as any)
-      } else {
-        const [source, ...modelParts] = value.split('/')
-        const model = modelParts.join('/')
-        const imageModel = { source, model }
-        await api.setConfig({ imageModel } as any)
-        setConfig({ ...config!, imageModel } as any)
-      }
-    } catch (error) {
-      console.error('[Settings] Failed to update imageModel:', error)
-    }
-  }
-
-  // Build imageModel options from configured AI sources
-  const imageModelOptions = (() => {
-    const options: Array<{ value: string; label: string }> = [
-      { value: 'auto', label: t('Auto (detect from configured sources)') }
-    ]
-    const aiSources = config?.aiSources
-    if (!aiSources) return options
-
-    for (const key of Object.keys(aiSources)) {
-      if (key === 'current') continue
-      const src = aiSources[key]
-      if (!src || typeof src !== 'object') continue
-
-      // OAuth provider with available models
-      if ('loggedIn' in src && (src as OAuthSourceConfig).loggedIn) {
-        const oauthSrc = src as OAuthSourceConfig
-        for (const modelId of (oauthSrc.availableModels || [])) {
-          if (!isNoVisionModel(modelId)) {
-            const displayName = oauthSrc.modelNames?.[modelId] || modelId
-            options.push({ value: `${key}/${modelId}`, label: `${key}: ${displayName}` })
-          }
-        }
-      }
-
-      // Custom API provider
-      if ('apiKey' in src && (src as CustomSourceConfig).apiKey) {
-        const customSrc = src as CustomSourceConfig
-        const modelId = customSrc.model || ''
-        if (modelId && !isNoVisionModel(modelId)) {
-          options.push({ value: `${key}/${modelId}`, label: `${key}: ${modelId}` })
-        }
-      }
-    }
-    return options
-  })()
-
-  const currentImageModelValue = config?.imageModel
-    ? `${(config.imageModel as any).source}/${(config.imageModel as any).model}`
-    : 'auto'
 
   // Handle custom instructions change
   const handleCustomInstructionsToggle = async (enabled: boolean) => {
@@ -1003,28 +868,53 @@ export function SettingsPage() {
     setConfig({ ...config, ...newConfig } as HaloConfig)
   }
 
-  // Handle save Custom API - use provider ID as storage key to support multiple APIs
+  // Handle save Custom API - saves to configs[] array
   const handleSaveCustomApi = async () => {
     setIsValidating(true)
     setValidationResult(null)
 
     try {
-      // Use provider ID as the storage key (e.g., 'zhipu', 'deepseek', 'openai', 'claude', 'custom')
       const storageKey = selectedProviderId
+      const existingConfig = (config?.aiSources?.[storageKey] as CustomSourceConfig | undefined)
+      const existingConfigs: ApiKeyConfig[] = existingConfig?.configs || []
 
-      const providerConfig = {
+      const newEntry: ApiKeyConfig = {
         provider,
         apiKey,
         apiUrl,
-        model
+        model,
+        label: configLabel || model || undefined
       }
 
+      let updatedConfigs: ApiKeyConfig[]
+      let newActiveIndex: number
+
+      if (editingConfigIndex !== null && editingConfigIndex < existingConfigs.length) {
+        // Editing existing config
+        updatedConfigs = [...existingConfigs]
+        updatedConfigs[editingConfigIndex] = newEntry
+        newActiveIndex = editingConfigIndex
+      } else {
+        // Adding new config
+        updatedConfigs = [...existingConfigs, newEntry]
+        newActiveIndex = updatedConfigs.length - 1
+      }
+
+      const providerConfig: CustomSourceConfig = syncTopLevelFromActive({
+        provider: newEntry.provider,
+        apiKey: newEntry.apiKey,
+        apiUrl: newEntry.apiUrl,
+        model: newEntry.model,
+        configs: updatedConfigs,
+        activeConfigIndex: newActiveIndex
+      })
+
       const updates = {
-        ...(storageKey === 'custom' ? { api: providerConfig } : {}),
+        ...(storageKey === 'custom' ? { api: { provider: providerConfig.provider, apiKey: providerConfig.apiKey, apiUrl: providerConfig.apiUrl, model: providerConfig.model } } : {}),
         aiSources: {
           ...config?.aiSources,
           current: storageKey as AISourceType,
-          [storageKey]: providerConfig  // Store under provider ID key
+          [storageKey]: providerConfig
         }
       }
       await api.setConfig(updates)
@@ -1032,11 +922,159 @@ export function SettingsPage() {
       setCurrentSource(storageKey as AISourceType)
       setValidationResult({ valid: true, message: t('Saved') })
       setShowCustomApiForm(false)
-      goBack()  // Close the modal immediately after successful save
+      setShowConfigForm(false)
+      setShowAddingFlow(false)
+      setEditingConfigIndex(null)
+      setConfigLabel('')
     } catch (error) {
       setValidationResult({ valid: false, message: t('Save failed') })
     } finally {
       setIsValidating(false)
+    }
+  }
+
+  // Handle delete a config entry
+  const handleDeleteConfig = async (providerId: string, index: number) => {
+    const existingConfig = (config?.aiSources?.[providerId] as CustomSourceConfig | undefined)
+    if (!existingConfig?.configs) return
+
+    const updatedConfigs = existingConfig.configs.filter((_, i) => i !== index)
+
+    if (updatedConfigs.length === 0) {
+      // No configs left - remove the provider key entirely
+      const newAiSources = { ...config?.aiSources }
+      delete newAiSources[providerId]
+      // If this was the current source, switch to another configured provider
+      if (newAiSources.current === providerId) {
+        const otherProvider = Object.keys(newAiSources).find(k => {
+          if (k === 'current' || k === 'oauth') return false
+          const s = newAiSources[k]
+          return s && typeof s === 'object' && 'apiKey' in s && (s as any).apiKey
+        })
+        newAiSources.current = (otherProvider || 'custom') as AISourceType
+      }
+      const updates = { aiSources: newAiSources }
+      await api.setConfig(updates)
+      setConfig({ ...config, ...updates } as HaloConfig)
+      setCurrentSource(newAiSources.current)
+      return
+    }
+
+    // Adjust activeConfigIndex if needed
+    let newActiveIndex = existingConfig.activeConfigIndex ?? 0
+    if (index === newActiveIndex) {
+      newActiveIndex = 0
+    } else if (index < newActiveIndex) {
+      newActiveIndex = newActiveIndex - 1
+    }
+
+    const providerConfig = syncTopLevelFromActive({
+      ...existingConfig,
+      configs: updatedConfigs,
+      activeConfigIndex: newActiveIndex
+    })
+
+    const updates = {
+      aiSources: {
+        ...config?.aiSources,
+        [providerId]: providerConfig
+      }
+    }
+    await api.setConfig(updates)
+    setConfig({ ...config, ...updates } as HaloConfig)
+  }
+
+  // Handle switching active config within a provider
+  const handleSwitchConfig = async (providerId: string, index: number) => {
+    const existingConfig = (config?.aiSources?.[providerId] as CustomSourceConfig | undefined)
+    if (!existingConfig?.configs) return
+
+    const providerConfig = syncTopLevelFromActive({
+      ...existingConfig,
+      activeConfigIndex: index
+    })
+
+    const updates = {
+      aiSources: {
+        ...config?.aiSources,
+        current: providerId as AISourceType,
+        [providerId]: providerConfig
+      }
+    }
+    await api.setConfig(updates)
+    setConfig({ ...config, ...updates } as HaloConfig)
+    setCurrentSource(providerId as AISourceType)
+  }
+
+  // Start editing an existing config
+  const handleStartEdit = (index: number, cfg: ApiKeyConfig) => {
+    setEditingConfigIndex(index)
+    setApiKey(cfg.apiKey)
+    setApiUrl(cfg.apiUrl)
+    setModel(cfg.model)
+    setProvider(cfg.provider)
+    setConfigLabel(cfg.label || '')
+    setUseCustomModel(!AVAILABLE_MODELS.some(m => m.id === cfg.model))
+    setShowConfigForm(true)
+    setValidationResult(null)
+  }
+
+  // Start adding a new config
+  const handleStartAdd = () => {
+    const preset = PROVIDER_PRESETS.find(p => p.id === selectedProviderId)
+    setEditingConfigIndex(null)
+    setApiKey('')
+    setApiUrl(preset?.apiUrl || '')
+    setModel(preset?.defaultModel || '')
+    setProvider(preset?.apiType === 'openai' ? 'openai' : 'anthropic')
+    setConfigLabel('')
+    setUseCustomModel(false)
+    setShowConfigForm(true)
+    setValidationResult(null)
+  }
+
+  // Handle save from ApiConfigDialog
+  const handleDialogSave = async (providerId: string, newEntry: ApiKeyConfig, editIndex: number | null): Promise<{ valid: boolean; message?: string }> => {
+    try {
+      const storageKey = providerId
+      const existingConfig = (config?.aiSources?.[storageKey] as CustomSourceConfig | undefined)
+      const existingConfigs: ApiKeyConfig[] = existingConfig?.configs || []
+
+      let updatedConfigs: ApiKeyConfig[]
+      let newActiveIndex: number
+
+      if (editIndex !== null && editIndex < existingConfigs.length) {
+        updatedConfigs = [...existingConfigs]
+        updatedConfigs[editIndex] = newEntry
+        newActiveIndex = editIndex
+      } else {
+        updatedConfigs = [...existingConfigs, newEntry]
+        newActiveIndex = updatedConfigs.length - 1
+      }
+
+      const providerConfig: CustomSourceConfig = syncTopLevelFromActive({
+        provider: newEntry.provider,
+        apiKey: newEntry.apiKey,
+        apiUrl: newEntry.apiUrl,
+        model: newEntry.model,
+        configs: updatedConfigs,
+        activeConfigIndex: newActiveIndex
+      })
+
+      const updates = {
+        ...(storageKey === 'custom' ? { api: { provider: providerConfig.provider, apiKey: providerConfig.apiKey, apiUrl: providerConfig.apiUrl, model: providerConfig.model } } : {}),
+        aiSources: {
+          ...config?.aiSources,
+          current: storageKey as AISourceType,
+          [storageKey]: providerConfig
+        }
+      }
+      await api.setConfig(updates)
+      setConfig({ ...config, ...updates } as HaloConfig)
+      setCurrentSource(storageKey as AISourceType)
+      return { valid: true, message: t('Saved') }
+    } catch {
+      return { valid: false, message: t('Save failed') }
     }
   }
 
@@ -1234,224 +1272,133 @@ export function SettingsPage() {
               </div>
             )}
 
-            {/* Provider Grid */}
-            <div>
-              <h3 className="text-sm text-muted-foreground mb-4">{t('Select AI Provider')}</h3>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                {PROVIDER_PRESETS.map((preset) => {
-                  const isSelected = selectedProviderId === preset.id
-                  return (
-                    <button
-                      key={preset.id}
-                      type="button"
-                      onClick={() => {
-                        setSelectedProviderId(preset.id)
-                        const values = resolveProviderFormValues(config, preset.id)
-                        setApiKey(values.apiKey)
-                        setApiUrl(values.apiUrl)
-                        setModel(values.model)
-                        setProvider(values.provider)
-                        setUseCustomModel(!AVAILABLE_MODELS.some(m => m.id === values.model))
-                      }}
-                      className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
-                        isSelected
-                          ? 'border-primary bg-primary/5'
-                          : 'border-border hover:border-primary/50 hover:bg-primary/5'
-                      }`}
-                    >
-                      {/* Logo or Icon */}
-                      <div className="w-10 h-10 rounded-lg flex items-center justify-center overflow-hidden">
-                        {preset.logo ? (
-                          <img src={preset.logo} alt={preset.name} className="w-full h-full object-cover rounded-lg" />
-                        ) : (
-                          <div className="w-full h-full bg-muted/50 flex items-center justify-center rounded-lg">
-                            <SettingsIcon className="w-5 h-5 text-muted-foreground" />
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Name */}
-                      <span className={`text-sm font-medium ${isSelected ? 'text-primary' : 'text-muted-foreground'}`}>
-                        {preset.isCustom ? t(preset.nameKey) : preset.name}
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-
-            {/* API Configuration Form */}
+            {/* Unified Model Config List (across all providers) */}
             {(() => {
-              const currentPreset = PROVIDER_PRESETS.find(p => p.id === selectedProviderId)
-              if (!currentPreset) return null
+              // Build a flat list of all configured models across all providers
+              const allConfigs: Array<{
+                providerId: string
+                configIndex: number
+                config: ApiKeyConfig
+                preset: typeof PROVIDER_PRESETS[0]
+                isActive: boolean
+              }> = []
+
+              for (const preset of PROVIDER_PRESETS) {
+                const source = config?.aiSources?.[preset.id] as CustomSourceConfig | undefined
+                if (!source?.configs?.length) continue
+                const activeIdx = source.activeConfigIndex ?? 0
+                const isCurrentProvider = currentSource === preset.id
+                source.configs.forEach((cfg, idx) => {
+                  allConfigs.push({
+                    providerId: preset.id,
+                    configIndex: idx,
+                    config: cfg,
+                    preset,
+                    isActive: isCurrentProvider && idx === activeIdx
+                  })
+                })
+              }
 
               return (
-                <div className="bg-card rounded-xl border border-border p-5 space-y-5">
-                  {/* Header */}
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg flex items-center justify-center overflow-hidden">
-                      {currentPreset.logo ? (
-                        <img src={currentPreset.logo} alt={currentPreset.name} className="w-full h-full object-cover rounded-lg" />
-                      ) : (
-                        <div className="w-full h-full bg-muted/50 flex items-center justify-center rounded-lg">
-                          <SettingsIcon className="w-5 h-5 text-muted-foreground" />
-                        </div>
-                      )}
-                    </div>
+                <div className="space-y-4">
+                  {/* Config list - no API key shown */}
+                  {allConfigs.length > 0 && (
                     <div>
-                      <h3 className="font-medium">{currentPreset.isCustom ? t('Custom') : currentPreset.name}</h3>
-                      <p className="text-xs text-muted-foreground">{t('Configure API')}</p>
-                    </div>
-                  </div>
+                      <h3 className="text-sm text-muted-foreground mb-3">{t('Configured Models')}</h3>
+                      <div className="space-y-2">
+                        {allConfigs.map((item) => (
+                          <div
+                            key={`${item.providerId}:${item.configIndex}`}
+                            className={`flex items-center gap-3 p-3 rounded-lg border transition-all cursor-pointer ${
+                              item.isActive
+                                ? 'border-primary bg-primary/5'
+                                : 'border-border hover:border-primary/50'
+                            }`}
+                            onClick={() => handleSwitchConfig(item.providerId, item.configIndex)}
+                          >
+                            {/* Provider logo */}
+                            <div className="w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0">
+                              {item.preset.logo ? (
+                                <img src={item.preset.logo} alt={item.preset.name} className="w-full h-full object-cover rounded-lg" />
+                              ) : (
+                                <div className="w-full h-full bg-muted/50 flex items-center justify-center rounded-lg">
+                                  <Key className="w-4 h-4 text-muted-foreground" />
+                                </div>
+                              )}
+                            </div>
 
-                  {/* API Key */}
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <label className="text-sm text-muted-foreground">API Key</label>
-                      {currentPreset.docsUrl && (
-                        <a
-                          href={currentPreset.docsUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs text-primary hover:underline flex items-center gap-1"
-                        >
-                          <ExternalLink className="w-3 h-3" />
-                          {t('Get API Key')}
-                        </a>
-                      )}
-                    </div>
-                    <div className="relative">
-                      <input
-                        type={showApiKey ? 'text' : 'password'}
-                        value={apiKey}
-                        onChange={(e) => setApiKey(e.target.value)}
-                        placeholder={currentPreset.apiType === 'openai' ? 'sk-xxxxxxxxxxxxx' : 'sk-ant-xxxxxxxxxxxxx'}
-                        className="w-full px-3 py-2 pr-10 text-sm bg-input rounded-lg border border-border focus:outline-none transition-colors"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowApiKey(!showApiKey)}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground transition-colors"
-                      >
-                        {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                    </div>
-                  </div>
+                            {/* Active indicator */}
+                            <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                              item.isActive ? 'bg-primary' : 'bg-border'
+                            }`} />
 
-                  {/* API URL */}
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <label className="text-sm text-muted-foreground">{t('API URL')}</label>
-                      {currentPreset.apiDocsUrl && (
-                        <a
-                          href={currentPreset.apiDocsUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs text-primary hover:underline flex items-center gap-1"
-                        >
-                          <ExternalLink className="w-3 h-3" />
-                          {t('API Documentation')}
-                        </a>
-                      )}
+                            {/* Config info - only label/model, no API key */}
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-medium truncate">
+                                {item.config.label || `${item.preset.isCustom ? t('Custom') : item.preset.name} - ${item.config.model}` || t('Untitled')}
+                              </div>
+                              {item.config.label && item.config.model && (
+                                <div className="text-xs text-muted-foreground truncate">
+                                  {item.config.model}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Actions */}
+                            <div className="flex items-center gap-1 flex-shrink-0" onClick={e => e.stopPropagation()}>
+                              <button
+                                onClick={() => {
+                                  setDialogEditingProviderId(item.providerId)
+                                  setDialogEditingConfig(item.config)
+                                  setDialogEditingIndex(item.configIndex)
+                                  setShowApiConfigDialog(true)
+                                }}
+                                className="p-1.5 text-muted-foreground hover:text-foreground rounded-md hover:bg-secondary transition-colors"
+                                title={t('Edit')}
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteConfig(item.providerId, item.configIndex)}
+                                className="p-1.5 text-muted-foreground hover:text-destructive rounded-md hover:bg-destructive/10 transition-colors"
+                                title={t('Delete')}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                    <input
-                      type="text"
-                      value={apiUrl}
-                      onChange={(e) => setApiUrl(e.target.value)}
-                      placeholder={currentPreset.apiUrl || 'https://...'}
-                      className="w-full px-3 py-2 text-sm bg-input rounded-lg border border-border focus:outline-none transition-colors"
-                    />
-                    {!currentPreset.isCustom && (
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {t('Default URL is pre-filled, you can modify it')}
-                      </p>
-                    )}
-                  </div>
+                  )}
 
-                  {/* Model */}
-                  <div>
-                    <label className="block text-sm text-muted-foreground mb-2">{t('Model')}</label>
-                    {selectedProviderId === 'claude' ? (
-                      <>
-                        {useCustomModel ? (
-                          <input
-                            type="text"
-                            value={model}
-                            onChange={(e) => setModel(e.target.value)}
-                            placeholder="claude-sonnet-4-5-20250929"
-                            className="w-full px-3 py-2 text-sm bg-input rounded-lg border border-border focus:outline-none transition-colors"
-                          />
-                        ) : (
-                          <Select
-                            value={model}
-                            onChange={setModel}
-                            options={AVAILABLE_MODELS.map((m) => ({ value: m.id, label: m.name }))}
-                          />
-                        )}
-                        <div className="mt-1 flex items-center justify-between gap-4">
-                          <span className="text-xs text-muted-foreground">
-                            {useCustomModel
-                              ? t('Enter official Claude model name')
-                              : t(AVAILABLE_MODELS.find((m) => m.id === model)?.description || '')}
-                          </span>
-                          <label className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer whitespace-nowrap shrink-0">
-                            <span className={`inline-flex items-center justify-center w-4 h-4 rounded border transition-colors ${
-                              useCustomModel ? 'bg-primary border-primary' : 'border-border bg-input'
-                            }`}>
-                              {useCustomModel && <Check className="w-3 h-3 text-primary-foreground" />}
-                            </span>
-                            <input
-                              type="checkbox"
-                              checked={useCustomModel}
-                              onChange={(e) => {
-                                setUseCustomModel(e.target.checked)
-                                if (!e.target.checked && !AVAILABLE_MODELS.some(m => m.id === model)) {
-                                  setModel(DEFAULT_MODEL)
-                                }
-                              }}
-                              className="sr-only"
-                            />
-                            {t('Custom')}
-                          </label>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <input
-                          type="text"
-                          value={model}
-                          onChange={(e) => setModel(e.target.value)}
-                          placeholder={currentPreset.defaultModel || 'model-name'}
-                          className="w-full px-3 py-2 text-sm bg-input rounded-lg border border-border focus:outline-none transition-colors"
-                        />
-                        {!currentPreset.isCustom && (
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            {t('Default model is pre-filled, you can modify it')}
-                          </p>
-                        )}
-                      </>
-                    )}
-                  </div>
-
-                  {/* Save Button */}
-                  <div className="flex items-center gap-3 pt-2">
-                    <button
-                      onClick={handleSaveCustomApi}
-                      disabled={isValidating || !apiKey}
-                      className="px-6 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50"
-                    >
-                      {isValidating ? t('Saving...') : t('Save')}
-                    </button>
-                    {validationResult && (
-                      <span className={`text-xs flex items-center gap-1 ${validationResult.valid ? 'text-green-500' : 'text-red-500'}`}>
-                        {validationResult.valid ? <CheckCircle2 className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
-                        {validationResult.message}
-                      </span>
-                    )}
-                  </div>
+                  {/* Add button */}
+                  <button
+                    onClick={() => {
+                      setDialogEditingConfig(null)
+                      setDialogEditingProviderId(null)
+                      setDialogEditingIndex(null)
+                      setShowApiConfigDialog(true)
+                    }}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 text-sm text-muted-foreground hover:text-foreground border border-dashed border-border hover:border-primary/50 rounded-lg transition-colors"
+                  >
+                    <Plus className="w-4 h-4" />
+                    {t('Add Configuration')}
+                  </button>
                 </div>
               )
             })()}
+
+            {/* Api Config Dialog (Modal) */}
+            <ApiConfigDialog
+              isOpen={showApiConfigDialog}
+              onClose={() => setShowApiConfigDialog(false)}
+              onSave={handleDialogSave}
+              providerPresets={PROVIDER_PRESETS}
+              editingConfig={dialogEditingConfig}
+              editingProviderId={dialogEditingProviderId}
+              editingIndex={dialogEditingIndex}
+            />
           </section>
           )}
 
@@ -1667,21 +1614,6 @@ export function SettingsPage() {
                   </div>
                 </div>
 
-                {/* Image Understanding Model */}
-                <div className="pt-4 border-t border-border">
-                  <div className="flex-1 mb-2">
-                    <p className="font-medium">{t('Image Understanding Model')}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {t('When the active model does not support vision, this model will be used to describe images as text')}
-                    </p>
-                  </div>
-                  <Select<string>
-                    value={currentImageModelValue}
-                    onChange={handleImageModelChange}
-                    options={imageModelOptions}
-                  />
-                </div>
-
                 {/* Custom Instructions */}
                 <div className="pt-4 border-t border-border">
                   <div className="flex items-center justify-between">
@@ -1704,97 +1636,6 @@ export function SettingsPage() {
                     <p className="text-xs text-muted-foreground mt-1">
                       {t('Changes take effect in the next new conversation')}
                     </p>
-                  </div>
-                </div>
-
-                {/* Local Web Tools */}
-                <div className="pt-4 border-t border-border space-y-4">
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex-1">
-                      <p className="font-medium">{t('Web Tools')}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {t('Enable web search and page fetching. Automatically uses your AI model\'s built-in search when available.')}
-                      </p>
-                    </div>
-                    <Switch checked={webSearchEnabled} onChange={handleWebToolsEnabledChange} />
-                  </div>
-
-                  <div className={`space-y-4 transition-opacity ${webSearchEnabled ? '' : 'opacity-50 pointer-events-none'}`}>
-                    <p className="text-xs text-muted-foreground">
-                      {t('Supported models: Kimi, GLM, MiniMax, Claude, GPT. DeepSeek not supported. Falls back to DuckDuckGo otherwise.')}
-                    </p>
-
-                    <div className="rounded-lg border border-border bg-secondary/20">
-                      <button
-                        type="button"
-                        onClick={() => setShowWebSearchKeys((value) => !value)}
-                        className="w-full px-4 py-3 flex items-center justify-between text-left"
-                      >
-                        <div>
-                          <p className="text-sm font-medium">{t('Standalone Search API Keys (Advanced)')}</p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {t('Only needed when your model has no built-in search. Use Brave or Perplexity as an alternative.')}
-                          </p>
-                        </div>
-                        {showWebSearchKeys ? <EyeOff className="w-4 h-4 text-muted-foreground" /> : <Eye className="w-4 h-4 text-muted-foreground" />}
-                      </button>
-
-                      <div className={`px-4 pb-4 space-y-3 ${showWebSearchKeys ? '' : 'hidden'}`}>
-                        <div>
-                          <div className="flex items-center justify-between mb-2">
-                            <label className="text-sm text-muted-foreground">{t('Brave Search API Key')}</label>
-                            <a
-                              href="https://brave.com/search/api/"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-xs text-primary hover:underline flex items-center gap-1"
-                            >
-                              <ExternalLink className="w-3 h-3" />
-                              {t('Get API Key')}
-                            </a>
-                          </div>
-                          <input
-                            type={showWebSearchKeys ? 'text' : 'password'}
-                            value={webSearchBraveApiKey}
-                            onChange={(e) => setWebSearchBraveApiKey(e.target.value)}
-                            placeholder="BSA..."
-                            className="w-full px-3 py-2 text-sm bg-input rounded-lg border border-border focus:outline-none transition-colors"
-                          />
-                        </div>
-
-                        <div>
-                          <div className="flex items-center justify-between mb-2">
-                            <label className="text-sm text-muted-foreground">{t('Perplexity Search API Key')}</label>
-                            <a
-                              href="https://www.perplexity.ai/settings/api"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-xs text-primary hover:underline flex items-center gap-1"
-                            >
-                              <ExternalLink className="w-3 h-3" />
-                              {t('Get API Key')}
-                            </a>
-                          </div>
-                          <input
-                            type={showWebSearchKeys ? 'text' : 'password'}
-                            value={webSearchPerplexityApiKey}
-                            onChange={(e) => setWebSearchPerplexityApiKey(e.target.value)}
-                            placeholder="pplx-..."
-                            className="w-full px-3 py-2 text-sm bg-input rounded-lg border border-border focus:outline-none transition-colors"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex justify-end">
-                      <button
-                        onClick={handleSaveWebToolsConfig}
-                        disabled={isSavingWebTools}
-                        className="px-5 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50"
-                      >
-                        {isSavingWebTools ? t('Saving...') : t('Save')}
-                      </button>
-                    </div>
                   </div>
                 </div>
 

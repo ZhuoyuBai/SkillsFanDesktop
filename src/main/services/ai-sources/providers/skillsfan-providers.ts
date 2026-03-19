@@ -17,14 +17,14 @@ export const SKILLSFAN_PROXY_CONFIGS: SkillsFanProxyConfig[] = [
   {
     type: 'glm',
     displayName: 'GLM-5',
-    defaultModel: 'glm-5',
+    defaultModel: 'GLM-5-Turbo',
     modelFilter: (m) => m.owned_by === 'zhipu' || m.id.toLowerCase().includes('glm'),
     customApiFallback: 'zhipu',
   },
   {
     type: 'minimax-oauth',
     displayName: 'MiniMax',
-    defaultModel: 'MiniMax-M2.1',
+    defaultModel: 'MiniMax-2.7',
     modelFilter: (m) => m.owned_by === 'minimax' || m.id.toLowerCase().includes('minimax'),
     customApiFallback: 'minimax',
   },

@@ -40,7 +40,7 @@ const PROVIDER_PRESETS: ProviderPreset[] = [
     name: 'Zhipu GLM',
     nameKey: 'Zhipu GLM',
     apiUrl: 'https://open.bigmodel.cn/api/anthropic',
-    defaultModel: 'GLM-5',
+    defaultModel: 'GLM-5-Turbo',
     logo: zhipuLogo,
     apiType: 'anthropic',
     docsUrl: 'https://open.bigmodel.cn/usercenter/apikeys',
@@ -51,7 +51,7 @@ const PROVIDER_PRESETS: ProviderPreset[] = [
     name: 'MiniMax',
     nameKey: 'MiniMax',
     apiUrl: 'https://api.minimaxi.com/anthropic',
-    defaultModel: 'MiniMax-M2.1',
+    defaultModel: 'MiniMax-2.7',
     logo: minimaxLogo,
     apiType: 'anthropic',
     docsUrl: 'https://platform.minimaxi.com/user-center/basic-information/interface-key',
@@ -145,7 +145,7 @@ export function ApiSetup({ onBack, showBack = false, initialProviderId }: ApiSet
     if (currentPreset?.isCustom) {
       return ''
     }
-    return currentPreset?.defaultModel || DEFAULT_MODEL
+    return ''
   })
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)

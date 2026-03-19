@@ -15,7 +15,6 @@ const mocks = vi.hoisted(() => ({
   unregisterActiveSession: vi.fn(),
   parseSDKMessage: vi.fn(),
   buildMessageContent: vi.fn(),
-  preprocessImages: vi.fn(),
   getEnabledExtensions: vi.fn(),
   runBeforeSendMessageHooks: vi.fn(),
   runHook: vi.fn(),
@@ -100,8 +99,8 @@ vi.mock('../../../../src/main/services/agent/message-utils', () => ({
   extractResultUsage: vi.fn(() => null)
 }))
 
-vi.mock('../../../../src/main/services/agent/image-preprocess', () => ({
-  preprocessImages: mocks.preprocessImages
+vi.mock('../../../../src/shared/utils/vision-models', () => ({
+  isNoVisionModel: vi.fn(() => false)
 }))
 
 vi.mock('../../../../src/main/services/extension', () => ({
@@ -141,13 +140,6 @@ describe('send-message', () => {
     mocks.getStatus.mockReturnValue({ running: false, queued: 0 })
     mocks.enqueue.mockResolvedValue(undefined)
     mocks.buildMessageContent.mockReturnValue('hello')
-    mocks.preprocessImages.mockResolvedValue({
-      preprocessed: false,
-      enhancedMessage: 'hello',
-      filteredImages: undefined,
-      filteredAttachments: undefined,
-      error: undefined
-    })
     mocks.getEnabledExtensions.mockReturnValue([])
     mocks.runBeforeSendMessageHooks.mockImplementation(async (message: string) => message)
     mocks.runHook.mockResolvedValue(undefined)
@@ -245,7 +237,19 @@ describe('send-message', () => {
     expect(mocks.sendToRenderer.mock.calls.some(([eventName]) => eventName === 'agent:error')).toBe(false)
   })
 
-  it('surfaces image preprocessing failures through status and persistent thoughts', async () => {
+  it('rejects images sent to non-vision model with friendly error', async () => {
+    const { isNoVisionModel } = await import('../../../../src/shared/utils/vision-models')
+    vi.mocked(isNoVisionModel).mockReturnValueOnce(true)
+
+    const mockSend = vi.fn()
+    mocks.getOrCreateV2Session.mockResolvedValue({
+      setPermissionMode: vi.fn(async () => {}),
+      send: mockSend,
+      stream: async function* () {
+        yield { type: 'result' }
+      }
+    })
+
     const imageRequest = {
       ...request,
       images: [{
@@ -259,67 +263,20 @@ describe('send-message', () => {
     }
 
     mocks.enqueue.mockImplementationOnce(async (_conversationId: string, run: () => Promise<void>) => run())
-    mocks.preprocessImages.mockResolvedValueOnce({
-      preprocessed: true,
-      enhancedMessage: 'hello',
-      filteredImages: [],
-      filteredAttachments: [],
-      error: 'No vision model available. Please configure a vision-capable AI source.'
-    })
-    mocks.getOrCreateV2Session.mockResolvedValue({
-      setPermissionMode: vi.fn(async () => {}),
-      send: vi.fn(),
-      stream: async function* () {
-        yield { type: 'result' }
-      }
-    })
 
     await expect(sendMessage(null, imageRequest)).resolves.toBeUndefined()
 
     expect(mocks.sendToRenderer).toHaveBeenCalledWith(
-      'agent:status',
+      'agent:error',
       'space-1',
       'conv-1',
       expect.objectContaining({
-        type: 'status',
-        message: 'Analyzing images...'
+        type: 'error',
+        error: expect.stringContaining('does not support image understanding'),
+        errorCode: 400
       })
     )
-    expect(mocks.sendToRenderer).toHaveBeenCalledWith(
-      'agent:thought',
-      'space-1',
-      'conv-1',
-      expect.objectContaining({
-        thought: expect.objectContaining({
-          type: 'error',
-          content: 'No vision model available. Please configure a vision-capable AI source.',
-          isError: true
-        })
-      })
-    )
-    expect(mocks.sendToRenderer).not.toHaveBeenCalledWith(
-      'agent:message',
-      'space-1',
-      'conv-1',
-      expect.objectContaining({ type: 'status' })
-    )
-    expect(mocks.sendToRenderer).not.toHaveBeenCalledWith(
-      'agent:message',
-      'space-1',
-      'conv-1',
-      expect.objectContaining({ type: 'warning' })
-    )
-    expect(mocks.updateLastMessage).toHaveBeenCalledWith(
-      'space-1',
-      'conv-1',
-      expect.objectContaining({
-        thoughts: expect.arrayContaining([
-          expect.objectContaining({
-            type: 'error',
-            content: 'No vision model available. Please configure a vision-capable AI source.'
-          })
-        ])
-      })
-    )
+    // Should NOT send the message to the session
+    expect(mockSend).not.toHaveBeenCalled()
   })
 })

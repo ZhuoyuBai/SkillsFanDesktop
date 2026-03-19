@@ -27,7 +27,7 @@ export function isSkillsFanHostedProviderType(type: string | undefined | null): 
 }
 
 export const SKILLSFAN_PROVIDER_META: Record<string, SkillsFanProviderMeta> = {
-  'glm': { displayName: 'GLM-5', defaultModel: 'glm-5', ownedBy: ['zhipu'] },
-  'minimax-oauth': { displayName: 'MiniMax', defaultModel: 'MiniMax-M2.1', ownedBy: ['minimax'] },
+  'glm': { displayName: 'GLM-5', defaultModel: 'GLM-5-Turbo', ownedBy: ['zhipu'] },
+  'minimax-oauth': { displayName: 'MiniMax', defaultModel: 'MiniMax-2.7', ownedBy: ['minimax'] },
   'skillsfan-credits': { displayName: 'SkillsFan Credits', defaultModel: '' },
 }

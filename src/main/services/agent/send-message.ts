@@ -45,7 +45,7 @@ import {
 } from './session-manager'
 import { broadcastMcpStatus } from './mcp-manager'
 import { buildSdkOptions, resolveSdkTransport } from './sdk-options'
-import { preprocessImages } from './image-preprocess'
+import { isNoVisionModel } from '../../../shared/utils/vision-models'
 import {
   formatCanvasContext,
   buildMessageContent,
@@ -826,36 +826,19 @@ async function processMessageStream(
     )
   }
 
-  // Preprocess images for models that don't support vision
-  // This describes images using a vision-capable model and injects text descriptions
-  let finalMessage = messageWithContext
-  let finalImages = images
-  let finalAttachments = attachments
+  // Check if user is sending images to a model that doesn't support vision
   const hasAnyImages = (images && images.length > 0) || (attachments && attachments.some(a => a.type === 'image'))
-  if (hasAnyImages) {
-    sendToRenderer('agent:status', spaceId, conversationId, {
-      type: 'status',
-      message: 'Analyzing images...',
-      subtype: 'image_preprocess'
+  if (hasAnyImages && isNoVisionModel(displayModel)) {
+    sendToRenderer('agent:error', spaceId, conversationId, {
+      type: 'error',
+      error: 'The current model does not support image understanding. Please switch to a vision-capable model (e.g. Claude Sonnet, Claude Opus).',
+      errorCode: 400
     })
-    const preprocessResult = await preprocessImages(messageWithContext, displayModel, images, attachments)
-    if (preprocessResult.preprocessed) {
-      finalMessage = preprocessResult.enhancedMessage
-      finalImages = preprocessResult.filteredImages
-      finalAttachments = preprocessResult.filteredAttachments
-      if (preprocessResult.error) {
-        const warningThought: Thought = {
-          id: `thought-image-preprocess-${Date.now()}`,
-          type: 'error',
-          content: preprocessResult.error,
-          timestamp: new Date().toISOString(),
-          isError: true
-        }
-        sessionState.thoughts.push(warningThought)
-        sendToRenderer('agent:thought', spaceId, conversationId, { thought: warningThought })
-      }
-    }
+    return
   }
+  const finalMessage = messageWithContext
+  const finalImages = images
+  const finalAttachments = attachments
 
   // Build message content (text-only or multi-modal with images/PDFs/text)
   const messageContent = buildMessageContent(finalMessage, finalImages, finalAttachments)

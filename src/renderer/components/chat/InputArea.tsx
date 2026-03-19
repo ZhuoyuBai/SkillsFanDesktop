@@ -800,8 +800,8 @@ export function InputArea({ onSend, onStop, onInject, isGenerating, isCompact = 
               isProcessing={isProcessingFiles}
             />
             {attachments.some(a => a.type === 'image') && isNoVisionModel(currentModelId) && (
-              <p className="text-xs text-muted-foreground px-2 -mt-1">
-                {t('Images will be auto-converted to text descriptions before sending')}
+              <p className="text-xs text-amber-500 px-2 -mt-1">
+                {t('Current model does not support image understanding. Please switch to a vision-capable model.')}
               </p>
             )}
           </>
