@@ -275,7 +275,7 @@ export function ArtifactRail({
           ) : artifacts.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center px-2">
               <div className="w-12 h-12 rounded-full border-2 border-dashed border-muted-foreground/30 flex items-center justify-center mb-3 halo-breathe">
-                <img src={logoImage} alt="SkillsFan" className="w-8 h-8 rounded-full object-cover" />
+                <img src={logoImage} alt="SkillsFan" className="w-8 h-8 rounded-[22%] object-cover" />
               </div>
               <p className="text-xs text-muted-foreground">
                 {isTemp ? t('Ideas will crystallize here') : t('Files will appear here')}

@@ -24,6 +24,7 @@ import { useLoopTaskStore } from '../stores/loop-task.store'
 import { ChatView } from '../components/chat/ChatView'
 import { ArtifactRail } from '../components/artifact/ArtifactRail'
 import { ConversationList } from '../components/chat/ConversationList'
+import { SkillCreationPanel } from '../components/skill-creation/SkillCreationPanel'
 import { LoopTaskPanel } from '../components/loop-task/LoopTaskPanel'
 import { SpaceIcon } from '../components/icons/ToolIcons'
 import { Header, usePlatform } from '../components/layout/Header'
@@ -520,6 +521,8 @@ export function SpacePage() {
                 {/* Conditional rendering based on selection type */}
                 {selectionType === 'loopTask' ? (
                   <LoopTaskPanel spaceId={currentSpace.id} />
+                ) : selectionType === 'skillCreation' ? (
+                  <SkillCreationPanel spaceId={currentSpace.id} />
                 ) : (
                   <ChatView isCompact={isCanvasOpen} />
                 )}
@@ -566,6 +569,8 @@ export function SpacePage() {
           <div className="flex-1 min-h-0 flex flex-col min-w-0">
             {selectionType === 'loopTask' ? (
               <LoopTaskPanel spaceId={currentSpace.id} />
+            ) : selectionType === 'skillCreation' ? (
+              <SkillCreationPanel spaceId={currentSpace.id} />
             ) : (
               <ChatView isCompact={false} />
             )}

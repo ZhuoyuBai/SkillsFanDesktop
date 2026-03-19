@@ -23,7 +23,10 @@ export {
   installSkill,
   deleteSkill,
   openSkillFolder,
-  selectSkillArchive
+  selectSkillArchive,
+  saveSkillContent
 } from './skill-manager'
 
 export { getSkillContent } from './skill-loader'
+
+export { resolveSkillCreatorPrompt, buildSkillCreatorPrompt } from './skill-creator-prompt'

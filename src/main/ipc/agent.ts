@@ -18,6 +18,7 @@ export function registerAgentHandlers(window: BrowserWindow | null): void {
       spaceId: string
       conversationId: string
       message: string
+      messagePrefix?: string
       resumeSessionId?: string
       images?: ImageAttachment[]
       attachments?: Attachment[]

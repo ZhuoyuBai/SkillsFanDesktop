@@ -8,7 +8,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import type { ConversationMeta } from '../../types'
 import type { LoopTaskMeta } from '../../../shared/types/loop-task'
 import { MessageSquare } from '../icons/ToolIcons'
-import { PanelLeftClose, PanelLeft, SquarePen, Zap } from 'lucide-react'
+import { PanelLeftClose, PanelLeft, SquarePen, Zap, Sparkles } from 'lucide-react'
 import { SpaceSwitcher } from '../space/SpaceSwitcher'
 import { useTranslation } from '../../i18n'
 import { UserAvatarMenu } from './UserAvatarMenu'
@@ -467,6 +467,13 @@ export function ConversationList({
           >
             <Zap className="w-4 h-4" />
           </button>
+          <button
+            onClick={() => setSelectionType('skillCreation')}
+            className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-lg transition-colors"
+            title={t('Create Skill')}
+          >
+            <Sparkles className="w-4 h-4" />
+          </button>
         </div>
 
         {/* Collapsed unified task icons */}
@@ -580,7 +587,7 @@ export function ConversationList({
               active:scale-[0.98]"
           >
             <SquarePen className="w-4 h-4 text-foreground" />
-            {t('New conversation')}
+            {t('New Task')}
           </button>
           <div className="relative group">
             <button
@@ -600,6 +607,17 @@ export function ConversationList({
             </div>
           </div>
         </div>
+        {/* Create Skill button */}
+        <button
+          onClick={() => setSelectionType('skillCreation')}
+          className="w-full flex items-center justify-start gap-3 pl-0 pr-3 py-1.5 mt-2
+            text-sm font-semibold text-foreground bg-muted/40 hover:bg-muted/60
+            rounded-lg transition-all duration-150
+            active:scale-[0.98]"
+        >
+          <Sparkles className="w-4 h-4 text-foreground" />
+          {t('Create Skill')}
+        </button>
       </div>
 
       {/* Unified task list */}

@@ -14,7 +14,9 @@ import {
   installSkill,
   deleteSkill,
   openSkillFolder,
-  selectSkillArchive
+  selectSkillArchive,
+  resolveSkillCreatorPrompt,
+  saveSkillContent
 } from '../services/skill'
 import { listSlashCommands } from '../services/slash-command.service'
 import { ipcHandle } from './utils'
@@ -70,4 +72,13 @@ export function registerSkillHandlers(): void {
   })
 
   ipcHandle('skill:list-slash-commands', (_e, spaceId?: string) => listSlashCommands(spaceId))
+
+  ipcHandle('skill:get-creator-prompt', () => {
+    const skillsDir = getSkillsDir()
+    return resolveSkillCreatorPrompt(skillsDir)
+  })
+
+  ipcMain.handle('skill:save-content', (_e, skillName: string, content: string) =>
+    saveSkillContent(skillName, content)
+  )
 }

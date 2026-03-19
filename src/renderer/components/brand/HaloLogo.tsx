@@ -47,7 +47,7 @@ export function HaloLogo({ size = 'md', className = '', animated = true, hoverOn
       <img
         src={logoImage}
         alt="技能范"
-        className={animationClass}
+        className={`${animationClass} rounded-[22%]`}
         style={{
           width: pixelSize,
           height: pixelSize,

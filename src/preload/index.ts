@@ -80,6 +80,7 @@ export interface SkillsFanAPI {
     spaceId: string
     conversationId: string
     message: string
+    messagePrefix?: string
     resumeSessionId?: string
     images?: Array<{
       id: string
@@ -193,6 +194,8 @@ export interface SkillsFanAPI {
   listSlashCommands: (spaceId?: string) => Promise<IpcResponse>
   getSkillContent: (skillName: string) => Promise<IpcResponse<string>>
   getSkillFileContent: (skillName: string, relativePath: string) => Promise<IpcResponse<string>>
+  getSkillCreatorPrompt: () => Promise<IpcResponse<string>>
+  saveSkillContent: (skillName: string, content: string) => Promise<IpcResponse>
 
   // Onboarding
   writeOnboardingArtifact: (spaceId: string, filename: string, content: string) => Promise<IpcResponse>
@@ -595,6 +598,8 @@ const api: SkillsFanAPI = {
   getSkillContent: (skillName) => ipcRenderer.invoke('skill:get-content', skillName),
   getSkillFileContent: (skillName, relativePath) =>
     ipcRenderer.invoke('skill:get-file-content', skillName, relativePath),
+  getSkillCreatorPrompt: () => ipcRenderer.invoke('skill:get-creator-prompt'),
+  saveSkillContent: (skillName, content) => ipcRenderer.invoke('skill:save-content', skillName, content),
 
   // Onboarding
   writeOnboardingArtifact: (spaceId, filename, content) =>

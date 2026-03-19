@@ -2,7 +2,7 @@
 
 # =============================================================================
 # SkillsFan App Icon Generator
-# Generates platform-specific icons from a source SVG
+# Generates platform-specific icons from a source PNG (or SVG fallback)
 # =============================================================================
 
 set -e
@@ -10,6 +10,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 RESOURCES_DIR="$PROJECT_ROOT/resources"
+SOURCE_PNG="$RESOURCES_DIR/icon-source.png"
 SOURCE_SVG="$RESOURCES_DIR/icon.svg"
 ICONSET_DIR="$RESOURCES_DIR/icon.iconset"
 
@@ -44,30 +45,20 @@ check_tools() {
     echo "✅ All required tools available"
 }
 
-# Generate PNG from SVG at specific size
+# Generate PNG at specific size from source
 generate_png() {
     local size=$1
     local output=$2
-    local temp_dir=$(mktemp -d)
 
-    # Use qlmanage (macOS Quick Look) for proper SVG gradient rendering
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-        # Generate at larger size for quality
-        qlmanage -t -s 1024 -o "$temp_dir" "$SOURCE_SVG" 2>/dev/null
-        if [ -f "$temp_dir/icon.svg.png" ]; then
-            # Remove white background and resize
-            magick "$temp_dir/icon.svg.png" -fuzz 1% -transparent white -resize "${size}x${size}" "$output" 2>/dev/null || \
-            convert "$temp_dir/icon.svg.png" -fuzz 1% -transparent white -resize "${size}x${size}" "$output" 2>/dev/null
-            rm -rf "$temp_dir"
-            echo "   Generated: $output (${size}x${size})"
-            return
-        fi
+    if [ -f "$SOURCE_PNG" ]; then
+        # Resize from PNG source (high quality)
+        magick "$SOURCE_PNG" -resize "${size}x${size}" -strip "$output" 2>/dev/null || \
+        convert "$SOURCE_PNG" -resize "${size}x${size}" -strip "$output" 2>/dev/null
+    else
+        # Fallback to SVG source
+        magick -background none -density 300 "$SOURCE_SVG" -resize "${size}x${size}" -gravity center -extent "${size}x${size}" "$output" 2>/dev/null || \
+        convert -background none -density 300 "$SOURCE_SVG" -resize "${size}x${size}" -gravity center -extent "${size}x${size}" "$output" 2>/dev/null
     fi
-
-    # Fallback to ImageMagick
-    magick -background none -density 300 "$SOURCE_SVG" -resize "${size}x${size}" -gravity center -extent "${size}x${size}" "$output" 2>/dev/null || \
-    convert -background none -density 300 "$SOURCE_SVG" -resize "${size}x${size}" -gravity center -extent "${size}x${size}" "$output" 2>/dev/null
-    rm -rf "$temp_dir"
     echo "   Generated: $output (${size}x${size})"
 }
 
@@ -150,6 +141,32 @@ generate_linux_pngs() {
     echo "   Generated: $RESOURCES_DIR/icon.png (512x512)"
 }
 
+# Generate tray template icon (macOS: black silhouette with alpha)
+generate_tray_template() {
+    local size=$1
+    local output=$2
+    local source="${SOURCE_PNG:-$SOURCE_SVG}"
+
+    # Extract white petal shapes as a monochrome template:
+    # 1. Resize source to target size
+    # 2. Convert to grayscale - white petals stay bright, orange bg becomes dark
+    # 3. Threshold at 85% - isolates only the white petals
+    # 4. Use brightness as alpha channel with black fill
+    # Result: black opaque petals on transparent background (macOS template format)
+    magick "$source" -resize "${size}x${size}" \
+        -colorspace Gray \
+        -threshold 85% \
+        -background black -alpha shape \
+        "$output" 2>/dev/null || \
+    convert "$source" -resize "${size}x${size}" \
+        -colorspace Gray \
+        -threshold 85% \
+        -background black -alpha shape \
+        "$output" 2>/dev/null
+
+    echo "   Generated: $output (${size}x${size} template)"
+}
+
 # Generate tray icons (for system tray)
 generate_tray_icons() {
     echo ""
@@ -158,34 +175,31 @@ generate_tray_icons() {
     local tray_dir="$RESOURCES_DIR/tray"
     mkdir -p "$tray_dir"
 
-    # Tray icon sizes
+    # Tray icon sizes (Windows/Linux - full color)
     generate_png 16 "$tray_dir/tray-16.png"
-    generate_png 16 "$tray_dir/tray-16@2x.png"  # Actually 32px for retina
     generate_png 32 "$tray_dir/tray-16@2x.png"
     generate_png 24 "$tray_dir/tray-24.png"
     generate_png 48 "$tray_dir/tray-24@2x.png"
 
-    # Template icons for macOS (white silhouette)
-    convert -background none -density 400 "$SOURCE_SVG" -resize "22x22" \
-        -colorspace gray -fill white -colorize 100% \
-        "$tray_dir/trayTemplate.png"
-    convert -background none -density 400 "$SOURCE_SVG" -resize "44x44" \
-        -colorspace gray -fill white -colorize 100% \
-        "$tray_dir/trayTemplate@2x.png"
+    # Template icons for macOS (black silhouette with alpha)
+    generate_tray_template 22 "$tray_dir/trayTemplate.png"
+    generate_tray_template 44 "$tray_dir/trayTemplate@2x.png"
 
     echo "   Generated tray icons in $tray_dir"
 }
 
 # Main execution
 main() {
-    echo "Source: $SOURCE_SVG"
-    echo "Output: $RESOURCES_DIR"
-    echo ""
-
-    if [ ! -f "$SOURCE_SVG" ]; then
-        echo "❌ Source SVG not found: $SOURCE_SVG"
+    if [ -f "$SOURCE_PNG" ]; then
+        echo "Source: $SOURCE_PNG (PNG)"
+    elif [ -f "$SOURCE_SVG" ]; then
+        echo "Source: $SOURCE_SVG (SVG fallback)"
+    else
+        echo "❌ No source found. Place icon-source.png or icon.svg in resources/"
         exit 1
     fi
+    echo "Output: $RESOURCES_DIR"
+    echo ""
 
     check_tools
 
@@ -206,8 +220,8 @@ main() {
     echo "  - tray/         (System tray icons)"
     echo "  - icon.iconset/ (macOS iconset source)"
     echo ""
-    echo "To rebuild icons, place your new icon.svg in"
-    echo "resources/ and run this script again."
+    echo "To rebuild icons, place your new icon-source.png (or icon.svg)"
+    echo "in resources/ and run this script again."
     echo "============================================"
 }
 

@@ -10,6 +10,7 @@ import {
   mkdtempSync,
   rmSync,
   readFileSync,
+  writeFileSync,
   copyFileSync,
   readdirSync,
   statSync
@@ -300,6 +301,40 @@ export async function openSkillFolder(skillName: string): Promise<{
     return {
       success: false,
       error: `Failed to open folder: ${(err as Error).message}`
+    }
+  }
+}
+
+/**
+ * Save skill content directly to disk.
+ * Creates the skill directory and writes SKILL.md.
+ */
+export function saveSkillContent(
+  skillName: string,
+  content: string
+): { success: boolean; error?: string } {
+  try {
+    const skillsDir = getSkillsDir()
+    const skillDir = join(skillsDir, skillName)
+
+    // Ensure skills directory exists
+    if (!existsSync(skillsDir)) {
+      mkdirSync(skillsDir, { recursive: true })
+    }
+
+    // Create skill directory
+    if (!existsSync(skillDir)) {
+      mkdirSync(skillDir, { recursive: true })
+    }
+
+    // Write SKILL.md
+    writeFileSync(join(skillDir, 'SKILL.md'), content, 'utf-8')
+
+    return { success: true }
+  } catch (err) {
+    return {
+      success: false,
+      error: `Failed to save skill: ${(err as Error).message}`
     }
   }
 }

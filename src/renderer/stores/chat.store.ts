@@ -39,7 +39,7 @@ import {
 const CONVERSATION_CACHE_SIZE = 10
 
 // Selection type for switching between conversations and loop tasks
-export type SelectionType = 'conversation' | 'loopTask'
+export type SelectionType = 'conversation' | 'loopTask' | 'skillCreation'
 
 // Per-space state (conversations metadata belong to a space)
 interface SpaceState {
@@ -1259,6 +1259,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       })
       return { sessions: newSessions }
     })
+
   },
 
   // Handle tool call for a specific conversation

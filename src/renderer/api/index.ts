@@ -411,6 +411,7 @@ export const api = {
     spaceId: string
     conversationId: string
     message: string
+    messagePrefix?: string
     resumeSessionId?: string
     images?: Array<{
       id: string
@@ -708,6 +709,22 @@ export const api = {
       return window.skillsfan.getSkillFileContent(skillName, relativePath)
     }
     return httpRequest('GET', `/api/skills/${encodeURIComponent(skillName)}/files/${encodeURIComponent(relativePath)}`)
+  },
+
+  // Get built-in skill-creator prompt
+  getSkillCreatorPrompt: async (): Promise<ApiResponse<string>> => {
+    if (isElectron()) {
+      return window.skillsfan.getSkillCreatorPrompt()
+    }
+    return httpRequest('GET', '/api/skills/creator-prompt')
+  },
+
+  // Save skill content directly to disk
+  saveSkillContent: async (skillName: string, content: string): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.skillsfan.saveSkillContent(skillName, content)
+    }
+    return httpRequest('POST', '/api/skills/save-content', { skillName, content })
   },
 
   // ===== Onboarding =====

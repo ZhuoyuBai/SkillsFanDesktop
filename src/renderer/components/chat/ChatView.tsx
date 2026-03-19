@@ -585,7 +585,7 @@ function EmptyState({
       {/* Title - smaller on mobile */}
       <h1 className={`mt-8 font-bold tracking-tight text-foreground/85
         ${isMobile ? 'text-xl' : 'text-3xl'}`}>
-        {t('Halo, not just chat, can help you get things done')}
+        {t('Hey, what would you like to create today?')}
       </h1>
 
       {/* Input area - shown in center when empty */}
