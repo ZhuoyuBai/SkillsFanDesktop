@@ -37,7 +37,7 @@ import { ScheduledTasksSection } from '../components/settings/ScheduledTasksSect
 import { FeishuSettings } from '../components/settings/FeishuSettings'
 import { ApiConfigDialog } from '../components/settings/ApiConfigDialog'
 import { useTranslation, setLanguage, getCurrentLanguage, SUPPORTED_LOCALES, type LocaleCode } from '../i18n'
-import { Loader2, LogOut, Plus, Check, Globe, Key, MessageSquare, Bot, Palette, Server, Settings as SettingsIcon, Wifi, X, Package, User, Layers, Lock, SlidersHorizontal, Clock, ArrowLeft, Database, Pencil, Trash2, type LucideIcon } from 'lucide-react'
+import { Loader2, LogOut, Plus, Check, Globe, Key, MessageSquare, Bot, Palette, Server, Settings as SettingsIcon, Wifi, X, Package, User, Layers, Lock, SlidersHorizontal, ArrowLeft, Database, Pencil, Trash2, type LucideIcon } from 'lucide-react'
 import { usePlatform } from '../components/layout/Header'
 import { isElectron } from '../api/transport'
 import { useToastStore } from '../stores/toast.store'
@@ -285,7 +285,7 @@ interface RemoteAccessStatus {
 }
 
 // Settings section type
-type SettingsSection = 'ai-model' | 'display' | 'mcp' | 'skills' | 'system' | 'remote' | 'account' | 'spaces' | 'advanced' | 'scheduled'
+type SettingsSection = 'ai-model' | 'display' | 'mcp' | 'skills' | 'system' | 'remote' | 'account' | 'spaces' | 'advanced'
 
 export function SettingsPage() {
   const { t } = useTranslation()
@@ -1115,7 +1115,7 @@ export function SettingsPage() {
     { id: 'advanced', icon: SlidersHorizontal, label: t('Advanced'), desktopOnly: true },
     { id: 'mcp', icon: Server, label: t('MCP Servers'), hidden: true },
     { id: 'display', icon: Palette, label: t('Display & Language') },
-    { id: 'scheduled', icon: Clock, label: t('Scheduled Tasks'), desktopOnly: true },
+
     { id: 'remote', icon: Wifi, label: t('Remote Access'), desktopOnly: true },
   ]
 
@@ -1556,6 +1556,31 @@ export function SettingsPage() {
               <h2 className="text-lg font-medium mb-4">{t('Advanced')}</h2>
 
               <div className="space-y-4">
+                {/* Custom Instructions */}
+                <div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <p className="font-medium">{t('Custom Instructions')}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {t('Global instructions that AI will follow in every conversation')}
+                      </p>
+                    </div>
+                    <Switch checked={config?.customInstructions?.enabled ?? false} onChange={handleCustomInstructionsToggle} />
+                  </div>
+                  <div className={`mt-3 transition-opacity ${(config?.customInstructions?.enabled ?? false) ? '' : 'opacity-50 pointer-events-none'}`}>
+                    <textarea
+                      value={customInstructionsContent}
+                      onChange={(e) => setCustomInstructionsContent(e.target.value)}
+                      onBlur={() => handleCustomInstructionsSave(customInstructionsContent)}
+                      placeholder={t('e.g., Always respond in Chinese, Use concise language...')}
+                      className="w-full h-32 px-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground resize-y focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {t('Changes take effect in the next new conversation')}
+                    </p>
+                  </div>
+                </div>
+
                 {/* Permission Mode */}
                 <div>
                   <div className="flex items-center justify-between gap-4">
@@ -1635,31 +1660,6 @@ export function SettingsPage() {
                   </div>
                 </div>
 
-                {/* Custom Instructions */}
-                <div className="pt-4 border-t border-border">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <p className="font-medium">{t('Custom Instructions')}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {t('Global instructions that AI will follow in every conversation')}
-                      </p>
-                    </div>
-                    <Switch checked={config?.customInstructions?.enabled ?? false} onChange={handleCustomInstructionsToggle} />
-                  </div>
-                  <div className={`mt-3 transition-opacity ${(config?.customInstructions?.enabled ?? false) ? '' : 'opacity-50 pointer-events-none'}`}>
-                    <textarea
-                      value={customInstructionsContent}
-                      onChange={(e) => setCustomInstructionsContent(e.target.value)}
-                      onBlur={() => handleCustomInstructionsSave(customInstructionsContent)}
-                      placeholder={t('e.g., Always respond in Chinese, Use concise language...')}
-                      className="w-full h-32 px-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground resize-y focus:outline-none focus:ring-2 focus:ring-primary/50"
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {t('Changes take effect in the next new conversation')}
-                    </p>
-                  </div>
-                </div>
-
                 {/* Memory Management */}
                 <div className="pt-4 border-t border-border">
                   <div className="flex items-center justify-between">
@@ -1694,6 +1694,11 @@ export function SettingsPage() {
                       {t('Clear Memory')}
                     </button>
                   </div>
+                </div>
+
+                {/* Scheduled Tasks */}
+                <div className="pt-4 border-t border-border">
+                  <ScheduledTasksSection />
                 </div>
               </div>
             </section>
@@ -1895,12 +1900,6 @@ export function SettingsPage() {
 
           <div className="max-w-2xl">{/* reopen max-w-2xl */}
 
-          {/* Scheduled Tasks Section */}
-          {activeSection === 'scheduled' && !api.isRemoteMode() && (
-          <section className="bg-card rounded-xl border border-border p-6">
-            <ScheduledTasksSection />
-          </section>
-          )}
 
           {/* Spaces Management Section */}
           {activeSection === 'spaces' && !api.isRemoteMode() && (
