@@ -30,7 +30,7 @@ function StepIndicator({ currentStep }: { currentStep: 1 | 2 | 3 }) {
   ]
 
   return (
-    <div className="px-6 py-2.5 shrink-0 border-b border-border/30">
+    <div className="px-6 py-2.5 shrink-0">
       <div className="flex items-center">
         {steps.map((step, index) => {
           const isCompleted = step.key < currentStep
@@ -96,13 +96,17 @@ export function SkillCreationPanel({ spaceId }: SkillCreationPanelProps) {
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      {/* Step indicator */}
-      <StepIndicator currentStep={wizardStep} />
+      {/* Step indicator - flush to top (with traffic light padding on macOS) */}
+      <div className="pt-12 shrink-0">
+        <StepIndicator currentStep={wizardStep} />
+      </div>
 
-      {/* Step content */}
-      {wizardStep === 1 && <Step1DescribeSkill />}
-      {wizardStep === 2 && <Step2PreviewEdit />}
-      {wizardStep === 3 && <Step3Complete />}
+      {/* Step content - flex-1 to take remaining space, overflow-hidden to enable child scrolling */}
+      <div className="flex-1 overflow-hidden min-h-0">
+        {wizardStep === 1 && <Step1DescribeSkill />}
+        {wizardStep === 2 && <Step2PreviewEdit />}
+        {wizardStep === 3 && <Step3Complete />}
+      </div>
     </div>
   )
 }

@@ -51,6 +51,8 @@ import kimiLogo from '../assets/providers/kimi.jpg'
 import deepseekLogo from '../assets/providers/deepseek.jpg'
 import claudeLogo from '../assets/providers/claude.jpg'
 import openaiLogo from '../assets/providers/openai.jpg'
+import openrouterLogo from '../assets/providers/openrouter.png'
+import xiaomiLogo from '../assets/providers/xiaomi.png'
 
 // Provider presets for the grid
 interface ProviderPreset {
@@ -130,6 +132,26 @@ const PROVIDER_PRESETS: ProviderPreset[] = [
     logo: openaiLogo,
     apiType: 'openai',
     docsUrl: 'https://platform.openai.com/api-keys'
+  },
+  {
+    id: 'openrouter',
+    name: 'OpenRouter',
+    nameKey: 'OpenRouter',
+    apiUrl: 'https://openrouter.ai/api/v1/chat/completions',
+    defaultModel: 'xiaomi/mimo-v2-pro',
+    logo: openrouterLogo,
+    apiType: 'openai',
+    docsUrl: 'https://openrouter.ai/settings/keys'
+  },
+  {
+    id: 'xiaomi',
+    name: 'Xiaomi',
+    nameKey: 'Xiaomi',
+    apiUrl: 'https://api.xiaomimimo.com/anthropic',
+    defaultModel: 'mimo-v2-pro',
+    logo: xiaomiLogo,
+    apiType: 'anthropic',
+    docsUrl: 'https://mimo.xiaomi.com'
   },
   {
     id: 'custom',
@@ -263,7 +285,7 @@ interface RemoteAccessStatus {
 }
 
 // Settings section type
-type SettingsSection = 'ai-model' | 'display' | 'mcp' | 'skills' | 'system' | 'remote' | 'feishu' | 'account' | 'spaces' | 'advanced' | 'scheduled'
+type SettingsSection = 'ai-model' | 'display' | 'mcp' | 'skills' | 'system' | 'remote' | 'account' | 'spaces' | 'advanced' | 'scheduled'
 
 export function SettingsPage() {
   const { t } = useTranslation()
@@ -1093,7 +1115,6 @@ export function SettingsPage() {
     { id: 'advanced', icon: SlidersHorizontal, label: t('Advanced'), desktopOnly: true },
     { id: 'mcp', icon: Server, label: t('MCP Servers'), hidden: true },
     { id: 'display', icon: Palette, label: t('Display & Language') },
-    { id: 'feishu', icon: MessageSquare, label: t('Message Channels'), desktopOnly: true },
     { id: 'scheduled', icon: Clock, label: t('Scheduled Tasks'), desktopOnly: true },
     { id: 'remote', icon: Wifi, label: t('Remote Access'), desktopOnly: true },
   ]
@@ -1211,7 +1232,7 @@ export function SettingsPage() {
                           <div className="w-10 h-10 rounded-lg overflow-hidden">
                             {logo ? (
                               <img src={logo} alt={displayName}
-                                className="w-full h-full object-cover rounded-lg" />
+                                className="w-full h-full object-contain rounded-lg" />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center rounded-lg"
                                 style={{ backgroundColor: p.iconBgColor }}>
@@ -1319,7 +1340,7 @@ export function SettingsPage() {
                             {/* Provider logo */}
                             <div className="w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0">
                               {item.preset.logo ? (
-                                <img src={item.preset.logo} alt={item.preset.name} className="w-full h-full object-cover rounded-lg" />
+                                <img src={item.preset.logo} alt={item.preset.name} className="w-full h-full object-contain rounded-lg" />
                               ) : (
                                 <div className="w-full h-full bg-muted/50 flex items-center justify-center rounded-lg">
                                   <Key className="w-4 h-4 text-muted-foreground" />
@@ -1889,16 +1910,6 @@ export function SettingsPage() {
           </section>
           )}
 
-          {/* Message Channels Section */}
-          {activeSection === 'feishu' && !api.isRemoteMode() && (
-            <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                {t('Connect messaging platforms to control SkillsFan remotely via chat.')}
-              </p>
-              <FeishuSettings config={config as Record<string, unknown>} />
-            </div>
-          )}
-
           {/* Remote Access Section */}
           {activeSection === 'remote' && (
           <section className="bg-card rounded-xl border border-border p-6">
@@ -2160,6 +2171,17 @@ export function SettingsPage() {
                 </>
               )}
             </div>
+
+            {/* Message Channels */}
+            {!api.isRemoteMode() && (
+              <div className="mt-6 pt-6 border-t border-border">
+                <h3 className="text-lg font-medium mb-2">{t('Message Channels')}</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  {t('Connect messaging platforms to control SkillsFan remotely via chat.')}
+                </p>
+                <FeishuSettings config={config as Record<string, unknown>} />
+              </div>
+            )}
           </section>
           )}
 

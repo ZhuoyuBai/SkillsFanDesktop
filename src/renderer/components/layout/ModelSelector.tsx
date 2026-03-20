@@ -32,6 +32,8 @@ import kimiLogo from '../../assets/providers/kimi.jpg'
 import deepseekLogo from '../../assets/providers/deepseek.jpg'
 import claudeLogo from '../../assets/providers/claude.jpg'
 import openaiLogo from '../../assets/providers/openai.jpg'
+import openrouterLogo from '../../assets/providers/openrouter.png'
+import xiaomiLogo from '../../assets/providers/xiaomi.png'
 import skillsfanLogo from '../../assets/logo.png'
 
 // Provider logo mapping by API URL
@@ -42,6 +44,8 @@ const PROVIDER_LOGOS: Record<string, string> = {
   'https://api.deepseek.com/anthropic': deepseekLogo,
   'https://api.anthropic.com': claudeLogo,
   'https://api.openai.com': openaiLogo,
+  'https://openrouter.ai/api/v1/chat/completions': openrouterLogo,
+  'https://api.xiaomimimo.com/anthropic': xiaomiLogo,
 }
 
 // Provider logo mapping by provider ID (exported for reuse in Loop Task model selector)
@@ -55,6 +59,8 @@ export const PROVIDER_LOGOS_BY_ID: Record<string, string> = {
   'claude': claudeLogo,
   'openai': openaiLogo,
   'openai-codex': openaiLogo,
+  'openrouter': openrouterLogo,
+  'xiaomi': xiaomiLogo,
   'skillsfan-credits': skillsfanLogo,
 }
 
@@ -77,6 +83,8 @@ export const PROVIDER_NAMES: Record<string, string> = {
   'claude': 'Claude',
   'openai': 'OpenAI',
   'openai-codex': 'OpenAI (ChatGPT)',
+  'openrouter': 'OpenRouter',
+  'xiaomi': 'Xiaomi',
   'custom': 'Custom',
 }
 
@@ -113,6 +121,8 @@ export function getModelLogo(modelId: string, displayName: string, fallbackProvi
   if (key.includes('deepseek')) return deepseekLogo
   if (key.includes('claude')) return claudeLogo
   if (key.includes('gpt') || key.includes('openai')) return openaiLogo
+  if (key.includes('openrouter')) return openrouterLogo
+  if (key.includes('xiaomi') || key.includes('mimo')) return xiaomiLogo
   return fallbackProviderType ? getProviderLogoById(fallbackProviderType) : null
 }
 
@@ -700,7 +710,7 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
       >
         {/* Provider Logo */}
         {currentProviderLogo ? (
-          <img src={currentProviderLogo} alt="" className="w-4 h-4 rounded object-cover flex-shrink-0" />
+          <img src={currentProviderLogo} alt="" className="w-4 h-4 rounded object-contain flex-shrink-0" />
         ) : (
           <div className="w-4 h-4 rounded bg-muted flex items-center justify-center flex-shrink-0">
             <span className="text-[10px] text-muted-foreground">AI</span>
@@ -741,7 +751,7 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
               }`}
             >
               {option.logo ? (
-                <img src={option.logo} alt="" className="w-4 h-4 rounded object-cover flex-shrink-0" />
+                <img src={option.logo} alt="" className="w-4 h-4 rounded object-contain flex-shrink-0" />
               ) : (
                 <div className="w-4 h-4 rounded bg-muted flex items-center justify-center flex-shrink-0">
                   <span className="text-[10px] text-muted-foreground">AI</span>
@@ -770,7 +780,7 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
               }`}
             >
               {option.logo ? (
-                <img src={option.logo} alt="" className="w-4 h-4 rounded object-cover flex-shrink-0" />
+                <img src={option.logo} alt="" className="w-4 h-4 rounded object-contain flex-shrink-0" />
               ) : (
                 <div className="w-4 h-4 rounded bg-muted flex items-center justify-center flex-shrink-0">
                   <span className="text-[10px] text-muted-foreground">AI</span>
@@ -793,7 +803,7 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
                 }`}
               >
                 {option.logo ? (
-                  <img src={option.logo} alt="" className="w-4 h-4 rounded object-cover flex-shrink-0" />
+                  <img src={option.logo} alt="" className="w-4 h-4 rounded object-contain flex-shrink-0" />
                 ) : (
                   <div className="w-4 h-4 rounded bg-muted flex items-center justify-center flex-shrink-0">
                     <span className="text-[10px] text-muted-foreground">AI</span>

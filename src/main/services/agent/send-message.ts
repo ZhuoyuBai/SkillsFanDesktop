@@ -621,12 +621,31 @@ async function sendMessageInternal(
 
     // Try to extract friendly message from JSON error body embedded in error string
     // e.g., 'API Error: 402 {"type":"error","error":{"type":"billing_error","message":"Usage limit reached. Resets in ~40 minutes."}}'
+    // e.g., 'API Error: 402 {"error":{"code":"402","message":"Insufficient account balance","type":"insufficient_balance"}}'
     const jsonMatch = errorMessage.match(/\{[\s\S]*\}/)
     if (jsonMatch) {
       try {
         const parsed = JSON.parse(jsonMatch[0])
+        const errorType = parsed?.error?.type || parsed?.type
         const innerMsg = parsed?.error?.message || parsed?.message
-        if (innerMsg) {
+
+        // Map known API error types to standardized keys for frontend i18n translation
+        const ERROR_TYPE_MAP: Record<string, string> = {
+          'insufficient_balance': 'Insufficient account balance',
+          'insufficient_funds': 'Insufficient account balance',
+          'billing_error': 'Billing error',
+          'invalid_api_key': 'Invalid API key',
+          'authentication_error': 'Invalid API key',
+          'rate_limit_error': 'Rate limit exceeded',
+          'model_not_found': 'Model not found',
+          'overloaded_error': 'Service is temporarily overloaded',
+          'server_error': 'Server error, please try again later',
+        }
+
+        const mapped = errorType ? ERROR_TYPE_MAP[errorType] : undefined
+        if (mapped) {
+          errorMessage = mapped
+        } else if (innerMsg) {
           errorMessage = innerMsg
         }
       } catch {

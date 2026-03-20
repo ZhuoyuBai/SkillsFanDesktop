@@ -458,12 +458,39 @@ export function LinearStream({
       case 'error': {
         // Translate known error patterns
         let errorContent = item.content || ''
+
+        // Known API errors — keys must match backend ERROR_TYPE_MAP values
+        const KNOWN_ERRORS: Record<string, string> = {
+          'Insufficient account balance': t('Insufficient account balance'),
+          'Invalid API key': t('Invalid API key'),
+          'Rate limit exceeded': t('Rate limit exceeded'),
+          'Model not found': t('Model not found'),
+          'Service is temporarily overloaded': t('Service is temporarily overloaded'),
+          'Server error, please try again later': t('Server error, please try again later'),
+          'Billing error': t('Billing error'),
+        }
+
         const usageLimitMatch = errorContent.match(/^Usage limit reached\. Resets in ~(\d+) minutes\.$/)
         if (usageLimitMatch) {
           errorContent = t('Usage limit reached. Resets in ~{{minutes}} minutes.', { minutes: usageLimitMatch[1] })
         } else if (errorContent === 'Usage limit reached.') {
           errorContent = t('Usage limit reached.')
+        } else if (KNOWN_ERRORS[errorContent]) {
+          errorContent = KNOWN_ERRORS[errorContent]
+        } else if (errorContent.includes('ByteString')) {
+          errorContent = t('API key contains invalid characters. Please check your API key in Settings.')
+        } else if (errorContent.includes('"message"')) {
+          // Fallback: try to extract from raw JSON if backend extraction was bypassed
+          const jsonFallback = errorContent.match(/\{[\s\S]*\}/)
+          if (jsonFallback) {
+            try {
+              const parsed = JSON.parse(jsonFallback[0])
+              const msg = parsed?.error?.message || parsed?.message
+              if (msg) errorContent = KNOWN_ERRORS[msg] || msg
+            } catch { /* keep original */ }
+          }
         }
+
         return (
           <div key={item.id} className="py-1 text-xs text-destructive/70">
             <XCircle size={14} className="inline mr-1" />
@@ -477,7 +504,7 @@ export function LinearStream({
   }
 
   return (
-    <div className="px-0 py-1 w-full overflow-y-hidden overflow-x-auto text-left text-[13px]">
+    <div className="px-3 py-1 w-full overflow-y-hidden overflow-x-auto text-left text-[13px]">
       {/* Pre-step items (tools before first TodoWrite), skip skill badges */}
       {todoGrouping.hasTodos && todoGrouping.preStepItems.length > 0 && (() => {
         const counter = { value: 0 }
@@ -517,7 +544,7 @@ export function LinearStream({
       {isThinking && !isStreaming && !currentText.trim() && (
         <div className="py-1 flex flex-col gap-0.5">
           <div className="flex items-center gap-2 text-[13px] text-muted-foreground">
-            <Loader2 size={12} className="animate-spin text-orange-400" />
+            <span className="text-orange-400 animate-blink">⏺</span>
             <span>{t('chat.thinking').replace(/\.{3}$/, '')}<span className="thinking-dots"><span className="dot">.</span><span className="dot">.</span><span className="dot">.</span></span></span>
           </div>
           {sdkStatus && !shouldSuppressSetModelStatus(sdkStatus) && (

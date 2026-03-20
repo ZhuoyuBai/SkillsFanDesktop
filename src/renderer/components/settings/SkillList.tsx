@@ -106,7 +106,7 @@ function SkillCard({ skill, onOpenFolder, onDelete, t }: {
     <div className="border border-border/60 rounded-xl p-5 hover:bg-secondary/30 hover:shadow-sm transition-all flex flex-col justify-between group">
       <div>
         <div className="flex items-center gap-3">
-          <div className={`w-9 h-9 rounded-lg bg-gradient-to-br ${gradient} flex items-center justify-center flex-shrink-0`}>
+          <div className={`w-9 h-9 rounded-sm bg-gradient-to-br ${gradient} flex items-center justify-center flex-shrink-0`}>
             <Icon className="w-4.5 h-4.5 text-white" strokeWidth={2} />
           </div>
           <h4 className="text-base font-semibold text-foreground truncate" title={skill.displayName || skill.name}>

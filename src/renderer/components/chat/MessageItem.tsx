@@ -325,7 +325,7 @@ export function MessageItem({ message, hideThoughts = false, isInContainer = fal
     >
       {/* CLI indicator */}
       <span className={`flex-shrink-0 text-[13px] leading-relaxed select-none ${
-        isUser ? 'text-blue-400' : 'text-orange-400'
+        isUser ? 'text-foreground' : 'text-orange-400'
       }`}>
         {isUser ? '❯' : '⏺'}
       </span>

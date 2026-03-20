@@ -907,6 +907,15 @@ body {
   }
 }
 
+/* Blink animation - sharp on/off toggle */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+.animate-blink {
+  animation: blink 1.6s ease-in-out infinite;
+}
+
 /* Ghost absorb animation */
 .ghost-absorb {
   position: absolute;
