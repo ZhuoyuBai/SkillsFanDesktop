@@ -580,11 +580,11 @@ function EmptyState({
   const categoriesToShow = isMobile ? QUICK_CATEGORIES.slice(0, 4) : QUICK_CATEGORIES
 
   return (
-    <div className={`h-full flex flex-col items-center justify-start text-center pb-2
+    <div className={`h-full flex flex-col items-center justify-start pb-2
       ${isMobile ? 'pt-[8vh] px-4' : 'pt-[15vh] px-8'}`}>
-      {/* Title - smaller on mobile */}
-      <h1 className={`mt-8 font-bold tracking-tight text-foreground/85
-        ${isMobile ? 'text-xl' : 'text-3xl'}`}>
+      {/* Title - smaller on mobile, left-aligned with input box */}
+      <h1 className={`mt-8 w-full font-bold tracking-tight text-foreground/85 text-left pl-4
+        ${isMobile ? 'text-xl max-w-full' : 'text-4xl max-w-3xl'}`}>
         {t('Hey, what would you like to create today?')}
       </h1>
 

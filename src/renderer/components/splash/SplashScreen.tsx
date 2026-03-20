@@ -24,7 +24,7 @@ export function SplashScreen() {
           animate ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
         }`}
       >
-        <HaloLogo size="lg" />
+        <HaloLogo size="lg" animated={false} />
       </div>
 
       {/* Brand Name */}
