@@ -6,6 +6,7 @@
 
 import { create } from 'zustand'
 import { api } from '../api'
+import { matchSkillIcon } from '../assets/skill-icons/match'
 import { createLogger } from '../lib/logger'
 import type { Conversation } from '../types'
 
@@ -21,6 +22,7 @@ export interface GeneratedContent {
   name: string
   description: string
   body: string
+  icon?: string
 }
 
 export interface SkillCreationState {
@@ -94,6 +96,9 @@ export function assembleSkillMd(content: GeneratedContent): string {
   parts.push('---')
   parts.push(`name: ${content.name}`)
   parts.push(`description: ${content.description}`)
+  if (content.icon) {
+    parts.push(`icon: ${content.icon}`)
+  }
   parts.push('---')
   parts.push('')
   parts.push(content.body)
@@ -252,8 +257,15 @@ export const useSkillCreationStore = create<SkillCreationState>((set, get) => ({
   },
 
   saveSkill: async () => {
-    const { generatedContent } = get()
+    let { generatedContent } = get()
     if (!generatedContent) return false
+
+    // Auto-match icon if not already set
+    if (!generatedContent.icon) {
+      const icon = matchSkillIcon(generatedContent.name, generatedContent.description)
+      generatedContent = { ...generatedContent, icon }
+      set({ generatedContent })
+    }
 
     try {
       const skillMd = assembleSkillMd(generatedContent)

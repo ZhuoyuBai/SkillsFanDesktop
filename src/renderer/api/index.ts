@@ -727,6 +727,14 @@ export const api = {
     return httpRequest('POST', '/api/skills/save-content', { skillName, content })
   },
 
+  // Update skill icon
+  updateSkillIcon: async (skillName: string, iconName: string): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.skillsfan.updateSkillIcon(skillName, iconName)
+    }
+    return httpRequest('PUT', `/api/skills/${encodeURIComponent(skillName)}/icon`, { icon: iconName })
+  },
+
   // ===== Onboarding =====
   writeOnboardingArtifact: async (
     spaceId: string,

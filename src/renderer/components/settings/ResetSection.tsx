@@ -48,7 +48,7 @@ export function ResetSection() {
   return (
     <>
       {/* Danger Zone Section */}
-      <section className="bg-card rounded-xl border border-red-500/30 p-4 mt-6">
+      <section className="mt-6 pt-6 border-t border-border">
         <div className="flex items-center gap-2 mb-3">
           <AlertTriangle className="w-4 h-4 text-red-500 shrink-0" />
           <p className="text-sm text-muted-foreground">

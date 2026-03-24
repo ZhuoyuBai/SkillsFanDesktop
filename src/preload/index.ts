@@ -196,6 +196,7 @@ export interface SkillsFanAPI {
   getSkillFileContent: (skillName: string, relativePath: string) => Promise<IpcResponse<string>>
   getSkillCreatorPrompt: () => Promise<IpcResponse<string>>
   saveSkillContent: (skillName: string, content: string) => Promise<IpcResponse>
+  updateSkillIcon: (skillName: string, iconName: string) => Promise<IpcResponse>
 
   // Onboarding
   writeOnboardingArtifact: (spaceId: string, filename: string, content: string) => Promise<IpcResponse>
@@ -611,6 +612,7 @@ const api: SkillsFanAPI = {
     ipcRenderer.invoke('skill:get-file-content', skillName, relativePath),
   getSkillCreatorPrompt: () => ipcRenderer.invoke('skill:get-creator-prompt'),
   saveSkillContent: (skillName, content) => ipcRenderer.invoke('skill:save-content', skillName, content),
+  updateSkillIcon: (skillName, iconName) => ipcRenderer.invoke('skill:update-icon', skillName, iconName),
 
   // Onboarding
   writeOnboardingArtifact: (spaceId, filename, content) =>

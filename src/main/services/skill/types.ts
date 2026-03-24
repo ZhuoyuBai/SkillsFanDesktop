@@ -22,6 +22,8 @@ export interface SkillInfo {
   displayName: string
   /** 技能描述（用于 Claude 语义匹配） */
   description: string
+  /** 技能图标名称（对应 skill-icons 资源） */
+  icon?: string
   /** SKILL.md 或 .md 文件绝对路径 */
   location: string
   /** 技能根目录（commands 格式为文件所在目录） */

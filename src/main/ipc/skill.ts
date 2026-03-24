@@ -16,7 +16,8 @@ import {
   openSkillFolder,
   selectSkillArchive,
   resolveSkillCreatorPrompt,
-  saveSkillContent
+  saveSkillContent,
+  updateSkillIcon
 } from '../services/skill'
 import { listSlashCommands } from '../services/slash-command.service'
 import { ipcHandle } from './utils'
@@ -80,5 +81,9 @@ export function registerSkillHandlers(): void {
 
   ipcMain.handle('skill:save-content', (_e, skillName: string, content: string) =>
     saveSkillContent(skillName, content)
+  )
+
+  ipcMain.handle('skill:update-icon', (_e, skillName: string, iconName: string) =>
+    updateSkillIcon(skillName, iconName)
   )
 }

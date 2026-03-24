@@ -9,7 +9,7 @@ import { api } from '../../api'
 import { useTranslation } from '../../i18n'
 import { useAppStore } from '../../stores/app.store'
 import { Select } from '../ui/Select'
-import { Eye, EyeOff, Copy, RefreshCw, Trash2, CheckCircle2, XCircle, Loader2, ExternalLink } from 'lucide-react'
+import { Eye, EyeOff, Copy, RefreshCw, Trash2, CheckCircle2, XCircle, Loader2 } from 'lucide-react'
 import type { FeishuStatus, FeishuSessionMapping } from '@shared/types/feishu'
 
 interface FeishuConfig {
@@ -125,28 +125,14 @@ export function FeishuSettings({ config }: { config: Record<string, unknown> }) 
   }
 
   return (
-    <section className="bg-card rounded-xl border border-border p-6">
-      <h2 className="text-lg font-medium mb-4">{t('Feishu')}</h2>
-
-      {/* Setup Guide */}
-      <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 mb-4">
-        <div className="flex items-start gap-3">
-          <span className="text-blue-500 text-xl">💡</span>
-          <div className="text-sm">
-            <p className="text-blue-500 font-medium mb-1">{t('Setup Guide')}</p>
-            <p className="text-blue-500/80 mb-2">
-              {t('Create a self-built app in the Feishu Developer Console, enable the Bot capability, and add the required permissions.')}
-            </p>
-            <a
-              href="https://open.feishu.cn/app"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-blue-500 hover:text-blue-400"
-            >
-              {t('Open Feishu Developer Console')} <ExternalLink className="w-3 h-3" />
-            </a>
-          </div>
-        </div>
+    <section className="space-y-4">
+      {/* Quick Setup Steps */}
+      <div className="text-sm text-muted-foreground space-y-1 mb-2">
+        <p className="font-medium text-foreground mb-2">{t('Quick Setup')}</p>
+        <p>1. {t('Create an app at')} <a href="https://open.feishu.cn/app" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{t('Feishu Developer Console')}</a></p>
+        <p>2. {t('Enable Bot capability and add required permissions')}</p>
+        <p>3. {t('Enter App ID and App Secret below, then click Enable')}</p>
+        <p>4. {t('Share the pairing code to authorized users or groups')}</p>
       </div>
 
       <div className="space-y-4">
@@ -265,7 +251,7 @@ export function FeishuSettings({ config }: { config: Record<string, unknown> }) 
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">
-                    {t('Share this code with users who need to connect via Feishu')}
+                    {t('Pairing Code')}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">

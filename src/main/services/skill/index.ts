@@ -24,7 +24,8 @@ export {
   deleteSkill,
   openSkillFolder,
   selectSkillArchive,
-  saveSkillContent
+  saveSkillContent,
+  updateSkillIcon
 } from './skill-manager'
 
 export { getSkillContent } from './skill-loader'

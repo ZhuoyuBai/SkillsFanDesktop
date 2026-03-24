@@ -9,7 +9,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { api } from '../../api'
 import { useTranslation } from '../../i18n'
 import { useAppStore } from '../../stores/app.store'
-import { Copy, RefreshCw, Trash2, LogOut, Loader2, QrCode, MessageCircle } from 'lucide-react'
+import { Copy, RefreshCw, Trash2, LogOut, Loader2, QrCode } from 'lucide-react'
 import type { WeChatStatus, WeChatSessionMapping } from '@shared/types/wechat'
 
 export function WeChatSettings({ config }: { config: Record<string, unknown> }) {
@@ -160,24 +160,17 @@ export function WeChatSettings({ config }: { config: Record<string, unknown> }) 
   const isConnected = status?.connected === true
 
   return (
-    <section className="bg-card rounded-xl border border-border p-6">
-      <h2 className="text-lg font-medium mb-4">{t('WeChat')}</h2>
-
-      {/* Info Box */}
-      <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4 mb-4">
-        <div className="flex items-start gap-3">
-          <MessageCircle className="w-5 h-5 text-green-500 mt-0.5" />
-          <div className="text-sm">
-            <p className="text-green-600 dark:text-green-400 font-medium mb-1">{t('WeChat Personal Account')}</p>
-            <p className="text-green-600/80 dark:text-green-400/80">
-              {t('Scan the QR code with your WeChat app to enable AI chat through your personal WeChat account. Other WeChat users can then send you messages that will be processed by the AI agent.')}
-            </p>
-            <p className="text-green-600/80 dark:text-green-400/80 mt-2">
-              {t('Before the first normal message, the WeChat user must send the 6-digit pairing code once. Until pairing succeeds, the bot will only reply with pairing instructions.')}
-            </p>
-          </div>
+    <section className="space-y-4">
+      {/* Quick Setup Steps - only show when not connected */}
+      {!isConnected && (
+        <div className="text-sm text-muted-foreground space-y-1 mb-2">
+          <p className="font-medium text-foreground mb-2">{t('Quick Setup')}</p>
+          <p>1. {t('Click "Scan QR Code to Login" below')}</p>
+          <p>2. {t('Open WeChat and scan the QR code')}</p>
+          <p>3. {t('Send the 6-digit pairing code to pair')}</p>
+          <p>4. {t('After pairing, send messages directly')}</p>
         </div>
-      </div>
+      )}
 
       <div className="space-y-4">
         {/* Connection Status */}
@@ -280,7 +273,7 @@ export function WeChatSettings({ config }: { config: Record<string, unknown> }) 
             <div>
               <div className="flex items-center justify-between">
                 <p className="text-sm text-muted-foreground">
-                  {t('Share this code with users who need to connect via WeChat')}
+                  {t('Pairing Code')}
                 </p>
                 <div className="flex items-center gap-2">
                   <code className="px-3 py-1.5 bg-input rounded-lg text-lg font-mono tracking-widest">
@@ -303,7 +296,7 @@ export function WeChatSettings({ config }: { config: Record<string, unknown> }) 
                 </div>
               </div>
               <p className="text-xs text-muted-foreground mt-2">
-                {t('Ask the WeChat user to send this 6-digit code as their first message before they send normal questions.')}
+                {t('Users must send this code as their first message to pair.')}
               </p>
             </div>
           )}

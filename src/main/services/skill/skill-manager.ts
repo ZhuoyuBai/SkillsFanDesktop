@@ -340,6 +340,60 @@ export function saveSkillContent(
 }
 
 /**
+ * Update the icon field in a skill's SKILL.md frontmatter
+ */
+export function updateSkillIcon(
+  skillName: string,
+  iconName: string
+): { success: boolean; error?: string } {
+  try {
+    const skill = getSkill(skillName)
+    if (!skill) return { success: false, error: 'Skill not found' }
+    if (skill.readonly) return { success: false, error: 'Cannot modify read-only skill' }
+
+    const content = readFileSync(skill.location, 'utf-8')
+    const parsed = parseFrontmatter(content)
+    if (!parsed) return { success: false, error: 'Invalid SKILL.md format' }
+
+    // Find and update frontmatter
+    const fmMatch = content.match(/^(\s*---\s*\r?\n)([\s\S]*?)(\r?\n---\s*(?:\r?\n|$))/)
+    if (!fmMatch) return { success: false, error: 'No frontmatter found' }
+
+    const fmContent = fmMatch[2]
+    const fmLines = fmContent.split(/\r?\n/)
+
+    // Replace existing icon line or insert after description
+    let hasIcon = false
+    const newFmLines = fmLines.map((line) => {
+      if (line.match(/^\s*icon\s*:/)) {
+        hasIcon = true
+        return `icon: ${iconName}`
+      }
+      return line
+    })
+
+    if (!hasIcon) {
+      const descIdx = newFmLines.findIndex((l) => l.match(/^\s*description\s*:/))
+      if (descIdx >= 0) {
+        newFmLines.splice(descIdx + 1, 0, `icon: ${iconName}`)
+      } else {
+        newFmLines.push(`icon: ${iconName}`)
+      }
+    }
+
+    const newContent = fmMatch[1] + newFmLines.join('\n') + fmMatch[3] + parsed.body
+    writeFileSync(skill.location, newContent, 'utf-8')
+
+    return { success: true }
+  } catch (err) {
+    return {
+      success: false,
+      error: `Failed to update icon: ${(err as Error).message}`,
+    }
+  }
+}
+
+/**
  * Show file picker for skill archive
  */
 export async function selectSkillArchive(): Promise<{

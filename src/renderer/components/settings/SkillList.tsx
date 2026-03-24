@@ -1,10 +1,10 @@
 /**
  * Skill List Component
- * Grid layout with colorful icons for each skill card
+ * Grid layout with custom PNG icons for each skill card
  * Sources: SkillsFan, Claude commands (project/global), Claude skills, Agent skills
  */
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Package,
   RefreshCw,
@@ -13,23 +13,16 @@ import {
   Upload,
   Trash2,
   Compass,
-  Sparkles,
-  Zap,
-  Flame,
-  Star,
-  Heart,
-  Gem,
-  Rocket,
-  Wand2,
-  Palette,
-  Crown,
-  type LucideIcon
+  Pencil
 } from 'lucide-react'
 import { api } from '../../api'
 import { useTranslation } from '../../i18n'
 import { getSkillsFanBaseUrl } from '../../utils/region'
+import { getSkillIconUrl } from '../../assets/skill-icons'
+import { matchSkillIcon } from '../../assets/skill-icons/match'
 import { SkillConflictDialog } from './SkillConflictDialog'
 import { SkillDeleteDialog } from './SkillDeleteDialog'
+import { SkillIconPicker } from './SkillIconPicker'
 
 // Skill info type from backend
 interface SkillSource {
@@ -41,6 +34,7 @@ interface SkillInfo {
   name: string
   displayName: string
   description: string
+  icon?: string
   location: string
   baseDir: string
   source: SkillSource
@@ -58,57 +52,34 @@ function shortenPath(p: string): string {
     .replace(/^[A-Za-z]:\/Users\/[^/]+/, '~')
 }
 
-// Icon pool and color palette for skill cards
-const SKILL_ICONS: LucideIcon[] = [
-  Sparkles, Zap, Flame, Star, Heart, Gem, Rocket, Wand2, Palette, Crown
-]
-
-const SKILL_ICON_COLORS = [
-  'from-orange-400 to-rose-500',
-  'from-violet-500 to-purple-600',
-  'from-sky-400 to-blue-500',
-  'from-emerald-400 to-teal-500',
-  'from-pink-400 to-rose-500',
-  'from-amber-400 to-orange-500',
-  'from-indigo-400 to-violet-500',
-  'from-cyan-400 to-sky-500',
-  'from-fuchsia-400 to-pink-500',
-  'from-lime-400 to-emerald-500',
-]
-
-function hashString(str: string): number {
-  let hash = 0
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i)
-    hash = ((hash << 5) - hash) + char
-    hash |= 0
-  }
-  return Math.abs(hash)
-}
-
-function getSkillIcon(name: string): { Icon: LucideIcon; gradient: string } {
-  const hash = hashString(name)
-  return {
-    Icon: SKILL_ICONS[hash % SKILL_ICONS.length],
-    gradient: SKILL_ICON_COLORS[hash % SKILL_ICON_COLORS.length],
-  }
-}
-
-function SkillCard({ skill, onOpenFolder, onDelete, t }: {
+function SkillCard({ skill, onOpenFolder, onDelete, onIconClick, t }: {
   skill: SkillInfo
   onOpenFolder: (name: string) => void
   onDelete: (skill: SkillInfo) => void
+  onIconClick: (skill: SkillInfo) => void
   t: (key: string) => string
 }) {
-  const { Icon, gradient } = getSkillIcon(skill.name)
+  const iconName = skill.icon || matchSkillIcon(skill.name, skill.description)
+  const iconUrl = getSkillIconUrl(iconName)
 
   return (
     <div className="border border-border/60 rounded-xl p-5 hover:bg-secondary/30 hover:shadow-sm transition-all flex flex-col justify-between group">
       <div>
         <div className="flex items-center gap-3">
-          <div className={`w-9 h-9 rounded-sm bg-gradient-to-br ${gradient} flex items-center justify-center flex-shrink-0`}>
-            <Icon className="w-4.5 h-4.5 text-white" strokeWidth={2} />
-          </div>
+          <button
+            onClick={() => !skill.readonly && onIconClick(skill)}
+            className={`w-9 h-9 rounded-sm flex items-center justify-center flex-shrink-0 transition-all relative group/icon ${
+              !skill.readonly ? 'cursor-pointer hover:ring-2 hover:ring-primary/40' : 'cursor-default'
+            }`}
+            title={!skill.readonly ? t('Change icon') : undefined}
+          >
+            <img src={iconUrl} alt="" className="w-9 h-9 rounded-sm" />
+            {!skill.readonly && (
+              <div className="absolute inset-0 bg-black/40 rounded-sm opacity-0 group-hover/icon:opacity-100 transition-opacity flex items-center justify-center">
+                <Pencil className="w-3.5 h-3.5 text-white" />
+              </div>
+            )}
+          </button>
           <h4 className="text-base font-semibold text-foreground truncate" title={skill.displayName || skill.name}>
             {skill.displayName || skill.name}
           </h4>
@@ -168,6 +139,9 @@ export function SkillList() {
     skillDisplayName: string
     skillPath: string
   } | null>(null)
+
+  // Icon picker state
+  const [iconPickerSkill, setIconPickerSkill] = useState<SkillInfo | null>(null)
 
   // Toast notifications
   const [toast, setToast] = useState<{
@@ -322,6 +296,30 @@ export function SkillList() {
     }
   }
 
+  const handleIconClick = (skill: SkillInfo) => {
+    if (!skill.readonly) {
+      setIconPickerSkill(skill)
+    }
+  }
+
+  const handleIconSelect = async (iconName: string) => {
+    if (!iconPickerSkill) return
+
+    try {
+      const result = await api.updateSkillIcon(iconPickerSkill.name, iconName)
+      if (result.success) {
+        await loadSkills()
+        setToast({ message: t('Icon updated'), type: 'success' })
+      } else {
+        setToast({ message: result.error || t('Failed to update icon'), type: 'error' })
+      }
+    } catch (err) {
+      setToast({ message: (err as Error).message, type: 'error' })
+    }
+
+    setIconPickerSkill(null)
+  }
+
   const shortSkillsDir = skillsDir ? shortenPath(skillsDir) : ''
 
   return (
@@ -410,30 +408,19 @@ export function SkillList() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-3 gap-4 max-h-[420px] overflow-y-auto">
+        <div className="grid grid-cols-3 gap-4">
           {skills.map((skill) => (
             <SkillCard
               key={`${skill.source?.kind || 'unknown'}-${skill.name}`}
               skill={skill}
               onOpenFolder={handleOpenFolder}
               onDelete={handleDeleteClick}
+              onIconClick={handleIconClick}
               t={t}
             />
           ))}
         </div>
       )}
-
-      {/* Help text */}
-      <div className="pt-4 border-t border-border">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-xs text-muted-foreground">
-            {t('Each skill folder should contain a SKILL.md file')}
-          </span>
-        </div>
-        <p className="text-xs text-muted-foreground/70">
-          {t('Skills are automatically loaded when the app starts')}
-        </p>
-      </div>
 
       {/* Conflict Resolution Dialog */}
       {conflictInfo && (
@@ -448,6 +435,15 @@ export function SkillList() {
           skillPath={deleteDialogInfo.skillPath}
           onConfirm={handleDeleteConfirm}
           onCancel={() => setDeleteDialogInfo(null)}
+        />
+      )}
+
+      {/* Icon Picker Dialog */}
+      {iconPickerSkill && (
+        <SkillIconPicker
+          currentIcon={iconPickerSkill.icon || matchSkillIcon(iconPickerSkill.name, iconPickerSkill.description)}
+          onSelect={handleIconSelect}
+          onClose={() => setIconPickerSkill(null)}
         />
       )}
 

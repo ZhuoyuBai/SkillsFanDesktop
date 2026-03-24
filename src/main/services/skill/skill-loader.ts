@@ -101,6 +101,7 @@ export function loadSkillsFromDir(skillsDir: string, source: SkillSource): Skill
         name: parsed.data.name,
         displayName,
         description: parsed.data.description,
+        icon: parsed.data.icon || undefined,
         location: skillFile,
         baseDir: skillDir,
         source,
