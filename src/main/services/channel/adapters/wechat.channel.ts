@@ -18,8 +18,114 @@ import { resolveQRCodeImageSource } from '../../wechat/qrcode-image'
 import { WeChatSessionRouter } from '../../wechat/session-router'
 import { WeChatAccessControl } from '../../wechat/access-control'
 import { markdownToPlainText, chunkMessage } from '../../wechat/message-formatter'
+import { app } from 'electron'
 import fs from 'fs'
 import path from 'path'
+
+type WeChatLocale = 'zh-CN' | 'zh-TW' | 'en'
+
+const WECHAT_TEXT = {
+  pairingRateLimited: {
+    'zh-CN': '尝试次数过多，请稍后再试。',
+    'zh-TW': '嘗試次數過多，請稍後再試。',
+    en: 'Too many attempts. Please try again later.'
+  },
+  pairingSuccess: {
+    'zh-CN': '配对成功，现在可以正常发送消息了。',
+    'zh-TW': '配對成功，現在可以正常傳送訊息了。',
+    en: 'Pairing successful. You can now send normal messages.'
+  },
+  invalidPairingCode: {
+    'zh-CN': '配对码不正确。首次正常发送消息前，请先发送 SkillsFan 设置页里的 6 位配对码。',
+    'zh-TW': '配對碼不正確。首次正常傳送訊息前，請先傳送 SkillsFan 設定頁裡的 6 位配對碼。',
+    en: 'Incorrect pairing code. Before sending normal messages, please send the 6-digit pairing code shown in SkillsFan settings.'
+  },
+  pairingPrompt: {
+    'zh-CN': '首次正常发送消息前，请先发送 SkillsFan 设置页里的 6 位配对码。',
+    'zh-TW': '首次正常傳送訊息前，請先傳送 SkillsFan 設定頁裡的 6 位配對碼。',
+    en: 'Before sending normal messages for the first time, please send the 6-digit pairing code shown in SkillsFan settings.'
+  },
+  statusHeading: {
+    'zh-CN': '微信机器人状态：',
+    'zh-TW': '微信機器人狀態：',
+    en: 'WeChat Bot Status:'
+  },
+  connectedLabel: {
+    'zh-CN': '已连接',
+    'zh-TW': '已連線',
+    en: 'Connected'
+  },
+  activeSessionsLabel: {
+    'zh-CN': '活跃会话',
+    'zh-TW': '活躍會話',
+    en: 'Active sessions'
+  },
+  yes: {
+    'zh-CN': '是',
+    'zh-TW': '是',
+    en: 'Yes'
+  },
+  no: {
+    'zh-CN': '否',
+    'zh-TW': '否',
+    en: 'No'
+  },
+  sourceLabel: {
+    'zh-CN': '微信',
+    'zh-TW': '微信',
+    en: 'WeChat'
+  },
+  stopConfirmation: {
+    'zh-CN': '已停止执行。',
+    'zh-TW': '已停止執行。',
+    en: 'Agent execution stopped.'
+  },
+  newConversationCreated: {
+    'zh-CN': '已创建新会话：{conversationId}',
+    'zh-TW': '已建立新會話：{conversationId}',
+    en: 'New conversation created: {conversationId}'
+  },
+  commandHelp: {
+    'zh-CN': '可用命令：/status、/stop、/new',
+    'zh-TW': '可用指令：/status、/stop、/new',
+    en: 'Available commands: /status, /stop, /new'
+  },
+  toolApprovalRequest: {
+    'zh-CN': '工具“{toolName}”需要批准。\n回复 Y 表示允许，回复 N 表示拒绝。',
+    'zh-TW': '工具「{toolName}」需要批准。\n回覆 Y 表示允許，回覆 N 表示拒絕。',
+    en: 'Tool "{toolName}" requires approval.\nReply Y to approve or N to reject.'
+  },
+  toolApprovalConfirmation: {
+    'zh-CN': '已收到批准，继续执行。',
+    'zh-TW': '已收到批准，繼續執行。',
+    en: 'Approval received. Continuing execution.'
+  },
+  toolRejectionConfirmation: {
+    'zh-CN': '已拒绝该请求，我已经停止执行。',
+    'zh-TW': '已拒絕該請求，我已經停止執行。',
+    en: 'Request rejected. I stopped that action.'
+  },
+  agentQuestionFallback: {
+    'zh-CN': '来自助手的问题',
+    'zh-TW': '來自助手的問題',
+    en: 'Question from agent'
+  },
+  errorPrefix: {
+    'zh-CN': '错误：{error}',
+    'zh-TW': '錯誤：{error}',
+    en: 'Error: {error}'
+  },
+  failedToProcessMessage: {
+    'zh-CN': '处理消息失败',
+    'zh-TW': '處理訊息失敗',
+    en: 'Failed to process message'
+  },
+  unexpectedError: {
+    'zh-CN': '发生了错误',
+    'zh-TW': '發生了錯誤',
+    en: 'An error occurred'
+  }
+} as const
 
 export class WeChatChannel implements Channel {
   readonly id = 'wechat'
@@ -157,7 +263,8 @@ export class WeChatChannel implements Channel {
             enabled: true,
             pairingCode: wechatConfig?.pairingCode || WeChatAccessControl.generatePairingCode(),
             allowedUserIds: wechatConfig?.allowedUserIds || [],
-            defaultSpaceId: wechatConfig?.defaultSpaceId
+            defaultSpaceId: wechatConfig?.defaultSpaceId,
+            autoApproveTools: wechatConfig?.autoApproveTools ?? true
           }
         } as Record<string, unknown>)
       }
@@ -273,12 +380,12 @@ export class WeChatChannel implements Channel {
       console.log(`[WeChatChannel] Agent completed for ${fromUserId}`)
     } catch (err) {
       console.error('[WeChatChannel] Failed to send message to agent:', err)
-      const errorText = err instanceof Error ? err.message : 'Failed to process message'
+      const errorText = err instanceof Error ? err.message : this.getText('failedToProcessMessage')
       await this.sendTextSafely(
         botToken,
         fromUserId,
         contextToken,
-        `Error: ${errorText}`,
+        this.getText('errorPrefix', { error: errorText }),
         'agent error notice'
       )
     }
@@ -321,7 +428,7 @@ export class WeChatChannel implements Channel {
           botToken,
           fromUserId,
           contextToken,
-          'Too many attempts. Please try again later.',
+          this.getText('pairingRateLimited'),
           'pairing rate-limit notice'
         )
         return
@@ -339,7 +446,7 @@ export class WeChatChannel implements Channel {
           botToken,
           fromUserId,
           contextToken,
-          'Pairing successful. You can now send normal messages.\n配对成功，现在可以正常发送消息了。',
+          this.getText('pairingSuccess'),
           'pairing success notice'
         )
         return
@@ -349,7 +456,7 @@ export class WeChatChannel implements Channel {
         botToken,
         fromUserId,
         contextToken,
-        'Incorrect pairing code. Before sending normal messages, please send the 6-digit pairing code shown in SkillsFan settings.\n配对码不正确。首次正常发送消息前，请先发送 SkillsFan 设置页里的 6 位配对码。',
+        this.getText('invalidPairingCode'),
         'invalid pairing code notice'
       )
       return
@@ -360,7 +467,7 @@ export class WeChatChannel implements Channel {
       botToken,
       fromUserId,
       contextToken,
-      'Before sending normal messages for the first time, please send the 6-digit pairing code shown in SkillsFan settings.\n首次正常发送消息前，请先发送 SkillsFan 设置页里的 6 位配对码。',
+      this.getText('pairingPrompt'),
       'pairing prompt'
     )
   }
@@ -381,9 +488,9 @@ export class WeChatChannel implements Channel {
           botToken,
           fromUserId,
           contextToken,
-          `WeChat Bot Status:\n` +
-          `Connected: ${status.connected}\n` +
-          `Active sessions: ${status.activeSessions}`,
+          `${this.getText('statusHeading')}\n` +
+          `${this.getText('connectedLabel')}: ${this.getBooleanText(status.connected)}\n` +
+          `${this.getText('activeSessionsLabel')}: ${status.activeSessions}`,
           'status response'
         )
         break
@@ -397,7 +504,7 @@ export class WeChatChannel implements Channel {
             botToken,
             fromUserId,
             contextToken,
-            'Agent execution stopped.',
+            this.getText('stopConfirmation'),
             'stop confirmation'
           )
         }
@@ -416,7 +523,9 @@ export class WeChatChannel implements Channel {
           botToken,
           fromUserId,
           contextToken,
-          `New conversation created: ${session.conversationId.slice(0, 8)}`,
+          this.getText('newConversationCreated', {
+            conversationId: session.conversationId.slice(0, 8)
+          }),
           'new conversation confirmation'
         )
         break
@@ -426,7 +535,7 @@ export class WeChatChannel implements Channel {
           botToken,
           fromUserId,
           contextToken,
-          'Available commands: /status, /stop, /new',
+          this.getText('commandHelp'),
           'command help'
         )
       }
@@ -465,8 +574,8 @@ export class WeChatChannel implements Channel {
       fromUserId,
       contextToken,
       approved
-        ? 'Approval received. Continuing execution.\n已收到批准，继续执行。'
-        : 'Request rejected. I stopped that action.\n已拒绝该请求，我已经停止执行。',
+        ? this.getText('toolApprovalConfirmation')
+        : this.getText('toolRejectionConfirmation'),
       approved ? 'tool approval confirmation' : 'tool rejection confirmation'
     )
 
@@ -550,8 +659,9 @@ export class WeChatChannel implements Channel {
 
     if ((conversation.messages?.length || 0) === 0) {
       const truncated = normalized.slice(0, 50) + (normalized.length > 50 ? '...' : '')
+      const sep = this.getLocaleTag() === 'en' ? ': ' : '：'
       updateConversation(spaceId, conversationId, {
-        title: `WeChat: ${truncated}`
+        title: `${this.getText('sourceLabel')}${sep}${truncated}`
       } as any)
     }
   }
@@ -570,6 +680,7 @@ export class WeChatChannel implements Channel {
 
     const convId = event.conversationId
     const payload = event.payload
+    const wechatConfig = this.getWeChatConfig()
 
     switch (event.type) {
       case 'agent:start': {
@@ -605,12 +716,19 @@ export class WeChatChannel implements Channel {
       case 'agent:tool-call': {
         const requiresApproval = payload.requiresApproval as boolean
         if (requiresApproval) {
+          if (this.shouldAutoApproveTools(wechatConfig)) {
+            console.log(`[WeChatChannel] Auto-approving tool request for conversation ${convId}`)
+            const { handleToolApproval } = await import('../../agent')
+            handleToolApproval(convId, true)
+            break
+          }
+
           const toolName = (payload.toolName as string) || 'Tool'
           await this.sendTextSafely(
             botToken,
             fromUserId,
             contextToken,
-            `Tool "${toolName}" requires approval.\nReply Y to approve or N to reject.`,
+            this.getText('toolApprovalRequest', { toolName }),
             'tool approval request'
           )
         }
@@ -618,7 +736,7 @@ export class WeChatChannel implements Channel {
       }
 
       case 'agent:user-question': {
-        const question = (payload.question as string) || 'Question from agent'
+        const question = (payload.question as string) || this.getText('agentQuestionFallback')
         await this.sendTextSafely(botToken, fromUserId, contextToken, question, 'agent question')
         break
       }
@@ -657,12 +775,12 @@ export class WeChatChannel implements Channel {
 
         if (!this.deliveredOutputs.has(convId)) {
           this.deliveredOutputs.add(convId)
-          const errorMsg = (payload.error as string) || (payload.message as string) || 'An error occurred'
+          const errorMsg = (payload.error as string) || (payload.message as string) || this.getText('unexpectedError')
           await this.sendTextSafely(
             botToken,
             fromUserId,
             contextToken,
-            `Error: ${errorMsg}`,
+            this.getText('errorPrefix', { error: errorMsg }),
             'agent failure notice'
           )
         }
@@ -673,7 +791,42 @@ export class WeChatChannel implements Channel {
 
   private getConversationTitle(fromUserId: string): string {
     const label = fromUserId.split('@')[0] || 'chat'
-    return `WeChat: ${label}`
+    const sep = this.getLocaleTag() === 'en' ? ': ' : '：'
+    return `${this.getText('sourceLabel')}${sep}${label}`
+  }
+
+  private getWeChatConfig(): WeChatConfig | undefined {
+    const config = getConfig()
+    return (config as Record<string, unknown>).wechat as WeChatConfig | undefined
+  }
+
+  private shouldAutoApproveTools(config?: WeChatConfig): boolean {
+    return config?.autoApproveTools !== false
+  }
+
+  private getLocaleTag(): WeChatLocale {
+    const locale = (app.getLocale?.() || Intl.DateTimeFormat().resolvedOptions().locale).toLowerCase()
+
+    if (locale.startsWith('zh-tw') || locale.startsWith('zh-hk') || locale.startsWith('zh-mo')) {
+      return 'zh-TW'
+    }
+    if (locale.startsWith('zh')) {
+      return 'zh-CN'
+    }
+    return 'en'
+  }
+
+  private getText(
+    key: keyof typeof WECHAT_TEXT,
+    vars?: Record<string, string | number>
+  ): string {
+    const template = WECHAT_TEXT[key][this.getLocaleTag()]
+    if (!vars) return template
+    return template.replace(/\{(\w+)\}/g, (_, token: string) => String(vars[token] ?? `{${token}}`))
+  }
+
+  private getBooleanText(value: boolean): string {
+    return value ? this.getText('yes') : this.getText('no')
   }
 
   private async sendTextSafely(

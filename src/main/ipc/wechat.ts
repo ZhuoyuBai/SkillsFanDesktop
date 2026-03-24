@@ -97,4 +97,11 @@ export function registerWeChatHandlers(): void {
     if (!config) throw new Error('WeChat not configured')
     saveConfig({ wechat: { ...config, defaultSpaceId: spaceId ?? undefined } } as Record<string, unknown>)
   })
+
+  // Set tool auto-approval behavior
+  ipcHandle('wechat:set-auto-approve-tools', (_e, enabled: boolean) => {
+    const config = getWeChatConfig()
+    if (!config) throw new Error('WeChat not configured')
+    saveConfig({ wechat: { ...config, autoApproveTools: enabled } } as Record<string, unknown>)
+  })
 }

@@ -32,10 +32,15 @@ export class ElectronChannel implements Channel {
    * Returns null when unavailable or already destroyed.
    */
   getMainWindow(): MainWindowRef {
-    if (!this.mainWindow || this.mainWindow.isDestroyed()) {
-      return null
+    if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+      return this.mainWindow
     }
-    return this.mainWindow
+
+    const fallback = BrowserWindow.getAllWindows().find((window) => !window.isDestroyed()) ?? null
+    if (fallback) {
+      this.mainWindow = fallback
+    }
+    return fallback
   }
 
   /**

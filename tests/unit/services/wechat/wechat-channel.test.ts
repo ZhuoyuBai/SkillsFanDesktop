@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { app } from 'electron'
 
 const mocks = vi.hoisted(() => ({
+  getConfig: vi.fn(() => ({})),
   getActiveSpaceId: vi.fn(() => 'skillsfan-temp'),
   createConversation: vi.fn(),
   getConversation: vi.fn(() => null),
@@ -16,7 +18,7 @@ const mocks = vi.hoisted(() => ({
 }))
 
 vi.mock('../../../../src/main/services/config.service', () => ({
-  getConfig: vi.fn(() => ({})),
+  getConfig: mocks.getConfig,
   saveConfig: mocks.saveConfig,
   getActiveSpaceId: mocks.getActiveSpaceId,
   getHaloDir: vi.fn(() => '/tmp/skillsfan-tests')
@@ -76,12 +78,14 @@ describe('WeChatChannel', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.getActiveSpaceId.mockReturnValue('skillsfan-temp')
+    mocks.getConfig.mockReturnValue({ wechat: config })
     mocks.createConversation.mockReturnValue({ id: 'conv-created' })
     mocks.getConversation.mockReturnValue(null)
     mocks.sendText.mockResolvedValue(undefined)
     mocks.sendTyping.mockResolvedValue(undefined)
     mocks.getBotToken.mockReturnValue('bot-token')
     mocks.activeSessions.clear()
+    vi.mocked(app.getLocale).mockReturnValue('en-US')
   })
 
   it('stores the real conversation id returned by createConversation', async () => {
@@ -186,7 +190,7 @@ describe('WeChatChannel', () => {
       'bot-token',
       'user@im.wechat',
       'ctx-1',
-      'Before sending normal messages for the first time, please send the 6-digit pairing code shown in SkillsFan settings.\n首次正常发送消息前，请先发送 SkillsFan 设置页里的 6 位配对码。',
+      'Before sending normal messages for the first time, please send the 6-digit pairing code shown in SkillsFan settings.',
       undefined
     )
   })
@@ -219,8 +223,80 @@ describe('WeChatChannel', () => {
       'bot-token',
       'user@im.wechat',
       'ctx-1',
-      'Approval received. Continuing execution.\n已收到批准，继续执行。',
+      'Approval received. Continuing execution.',
       undefined
     )
+  })
+
+  it('auto-approves remote tool calls by default', async () => {
+    const channel = new WeChatChannel()
+
+    channel.getSessionRouter().setSession({
+      fromUserId: 'user@im.wechat',
+      spaceId: 'skillsfan-temp',
+      conversationId: 'conv-created',
+      contextToken: 'ctx-1',
+      pairedAt: 1,
+      lastMessageAt: 1
+    })
+
+    channel.dispatch({
+      type: 'agent:tool-call',
+      spaceId: 'skillsfan-temp',
+      conversationId: 'conv-created',
+      payload: {
+        requiresApproval: true,
+        toolName: 'Bash'
+      },
+      timestamp: Date.now()
+    })
+
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(mocks.handleToolApproval).toHaveBeenCalledWith('conv-created', true)
+    expect(mocks.sendText).not.toHaveBeenCalled()
+  })
+
+  it('localizes manual tool approval prompts in Traditional Chinese when auto-approve is disabled', async () => {
+    const channel = new WeChatChannel()
+
+    mocks.getConfig.mockReturnValue({
+      wechat: {
+        ...config,
+        autoApproveTools: false
+      }
+    })
+    vi.mocked(app.getLocale).mockReturnValue('zh-TW')
+
+    channel.getSessionRouter().setSession({
+      fromUserId: 'user@im.wechat',
+      spaceId: 'skillsfan-temp',
+      conversationId: 'conv-created',
+      contextToken: 'ctx-1',
+      pairedAt: 1,
+      lastMessageAt: 1
+    })
+
+    channel.dispatch({
+      type: 'agent:tool-call',
+      spaceId: 'skillsfan-temp',
+      conversationId: 'conv-created',
+      payload: {
+        requiresApproval: true,
+        toolName: 'Bash'
+      },
+      timestamp: Date.now()
+    })
+
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(mocks.sendText).toHaveBeenCalledWith(
+      'bot-token',
+      'user@im.wechat',
+      'ctx-1',
+      '工具「Bash」需要批准。\n回覆 Y 表示允許，回覆 N 表示拒絕。',
+      undefined
+    )
+    expect(mocks.handleToolApproval).not.toHaveBeenCalled()
   })
 })

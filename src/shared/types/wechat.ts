@@ -13,6 +13,8 @@ export interface WeChatConfig {
   allowedUserIds: string[]
   /** Default space to route messages to */
   defaultSpaceId?: string
+  /** Whether remote tool approval requests should be auto-approved */
+  autoApproveTools?: boolean
 }
 
 export interface WeChatAccount {

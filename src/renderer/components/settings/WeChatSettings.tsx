@@ -9,13 +9,14 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { api } from '../../api'
 import { useTranslation } from '../../i18n'
 import { useAppStore } from '../../stores/app.store'
+import { Switch } from '../ui/Switch'
 import { Copy, RefreshCw, Trash2, LogOut, Loader2, QrCode } from 'lucide-react'
-import type { WeChatStatus, WeChatSessionMapping } from '@shared/types/wechat'
+import type { WeChatConfig, WeChatStatus, WeChatSessionMapping } from '@shared/types/wechat'
 
 export function WeChatSettings({ config }: { config: Record<string, unknown> }) {
   const { t } = useTranslation()
   const { setConfig } = useAppStore()
-  const wechatConfig = config.wechat as { enabled: boolean; pairingCode: string; allowedUserIds: string[]; defaultSpaceId?: string } | undefined
+  const wechatConfig = config.wechat as WeChatConfig | undefined
 
   const [status, setStatus] = useState<WeChatStatus | null>(null)
   const [sessions, setSessions] = useState<WeChatSessionMapping[]>([])
@@ -24,6 +25,7 @@ export function WeChatSettings({ config }: { config: Record<string, unknown> }) 
   const [qrCode, setQrCode] = useState<string | null>(null)
   const [loginError, setLoginError] = useState<string | null>(null)
   const [isLoggingOut, setIsLoggingOut] = useState(false)
+  const [isUpdatingAutoApprove, setIsUpdatingAutoApprove] = useState(false)
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const refreshConfig = useCallback(async () => {
@@ -153,6 +155,18 @@ export function WeChatSettings({ config }: { config: Record<string, unknown> }) 
     await loadSessions()
   }
 
+  const handleToggleAutoApproveTools = async (enabled: boolean) => {
+    setIsUpdatingAutoApprove(true)
+    try {
+      const res = await api.wechatSetAutoApproveTools(enabled)
+      if (res.success) {
+        await refreshConfig()
+      }
+    } finally {
+      setIsUpdatingAutoApprove(false)
+    }
+  }
+
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text)
   }
@@ -267,6 +281,22 @@ export function WeChatSettings({ config }: { config: Record<string, unknown> }) 
         {/* Pairing & Authorization */}
         <div className="pt-3 border-t border-border space-y-4">
           <p className="text-sm font-medium">{t('Pairing & Authorization')}</p>
+
+          <div className="flex items-center justify-between gap-4 rounded-lg bg-secondary/40 px-3 py-3">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground">
+                {t('Auto-approve remote tool requests')}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {t('When enabled, WeChat remote conversations can run approved tools without sending a Y/N confirmation message.')}
+              </p>
+            </div>
+            <Switch
+              checked={wechatConfig?.autoApproveTools ?? true}
+              onChange={handleToggleAutoApproveTools}
+              disabled={isUpdatingAutoApprove}
+            />
+          </div>
 
           {/* Pairing Code */}
           {wechatConfig?.pairingCode && (

@@ -894,6 +894,10 @@ export const api = {
     if (!isElectron()) return { success: false, error: 'Only available in desktop app' }
     return window.skillsfan.wechatSetDefaultSpace(spaceId)
   },
+  wechatSetAutoApproveTools: async (enabled: boolean): Promise<ApiResponse> => {
+    if (!isElectron()) return { success: false, error: 'Only available in desktop app' }
+    return window.skillsfan.wechatSetAutoApproveTools(enabled)
+  },
 
   // ===== System Settings (Electron only) =====
   getAutoLaunch: async (): Promise<ApiResponse> => {

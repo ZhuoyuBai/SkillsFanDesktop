@@ -53,7 +53,8 @@ vi.mock('electron', () => {
       setLoginItemSettings: vi.fn(),
       getLoginItemSettings: vi.fn(() => ({ openAtLogin: false })),
       getName: vi.fn(() => 'Halo'),
-      getVersion: vi.fn(() => '1.0.0-test')
+      getVersion: vi.fn(() => '1.0.0-test'),
+      getLocale: vi.fn(() => 'en-US')
     },
     BrowserWindow: vi.fn(() => ({
       webContents: {

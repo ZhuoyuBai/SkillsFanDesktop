@@ -29,6 +29,7 @@ import { registerSystemHandlers } from '../ipc/system'
 import { registerUpdaterHandlers, initAutoUpdater } from '../services/updater.service'
 import { registerAuthHandlers } from '../ipc/auth'
 import { registerSkillsFanAuthHandlers } from '../ipc/skillsfan-auth'
+import { setMainWindow as setAgentMainWindow } from '../services/agent/helpers'
 import { getChannelManager, ElectronChannel, RemoteWebChannel } from '../services/channel'
 
 /**
@@ -51,6 +52,7 @@ export function initializeEssentialServices(mainWindow: BrowserWindow): void {
   const channelManager = getChannelManager()
   const electronChannel = new ElectronChannel()
   electronChannel.setMainWindow(mainWindow)
+  setAgentMainWindow(mainWindow)
   channelManager.registerChannel(electronChannel)
   channelManager.registerChannel(new RemoteWebChannel())
 

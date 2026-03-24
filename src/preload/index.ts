@@ -235,6 +235,7 @@ export interface SkillsFanAPI {
   wechatGetSessions: () => Promise<IpcResponse>
   wechatRemoveSession: (fromUserId: string) => Promise<IpcResponse>
   wechatSetDefaultSpace: (spaceId: string | null) => Promise<IpcResponse>
+  wechatSetAutoApproveTools: (enabled: boolean) => Promise<IpcResponse>
 
   // System Settings
   getAutoLaunch: () => Promise<IpcResponse>
@@ -653,6 +654,7 @@ const api: SkillsFanAPI = {
   wechatGetSessions: () => ipcRenderer.invoke('wechat:get-sessions'),
   wechatRemoveSession: (fromUserId) => ipcRenderer.invoke('wechat:remove-session', fromUserId),
   wechatSetDefaultSpace: (spaceId) => ipcRenderer.invoke('wechat:set-default-space', spaceId),
+  wechatSetAutoApproveTools: (enabled) => ipcRenderer.invoke('wechat:set-auto-approve-tools', enabled),
 
   // System Settings
   getAutoLaunch: () => ipcRenderer.invoke('system:get-auto-launch'),
