@@ -9,9 +9,6 @@
  */
 
 import { useState, useMemo } from 'react'
-import {
-  ChevronRight,
-} from 'lucide-react'
 import { TodoCard, parseTodoInput } from '../tool/TodoCard'
 import { InlineActivity } from './InlineActivity'
 import type { Thought } from '../../types'
@@ -100,14 +97,9 @@ export function CollapsedThoughtProcess({
       {/* Header - minimal CLI style */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="flex items-center gap-1.5 py-0.5 text-[13px] w-full text-left
+        className="flex items-center gap-2.5 py-0.5 px-3 text-[13px] w-full text-left
           text-muted-foreground/50 hover:text-muted-foreground/70 transition-colors"
       >
-        <ChevronRight
-          size={10}
-          className={`flex-shrink-0 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
-        />
-
         {/* Status symbol */}
         <span className={`flex-shrink-0 ${
           isThinking ? 'text-orange-400' : errorCount > 0 ? 'text-destructive/70' : 'text-muted-foreground/40'
@@ -137,7 +129,7 @@ export function CollapsedThoughtProcess({
 
       {/* Expanded content - border-left style */}
       {isExpanded && (
-        <div className="ml-3 pl-3 border-l-2 border-muted-foreground/15 py-1 animate-slide-down">
+        <div className="ml-[22px] pl-3 border-l-2 border-muted-foreground/15 py-1 animate-slide-down">
           {hasTodos && (
             <div className="mb-2">
               <TodoCard

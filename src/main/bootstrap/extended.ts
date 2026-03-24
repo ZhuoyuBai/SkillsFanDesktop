@@ -36,9 +36,11 @@ import { registerLoopTaskHandlers } from '../ipc/loop-task'
 import { registerMemoryHandlers } from '../ipc/memory'
 import { shutdownMemory } from '../services/memory'
 import { registerFeishuHandlers } from '../ipc/feishu'
+import { registerWeChatHandlers } from '../ipc/wechat'
 import { registerExtensionHandlers } from '../ipc/extension'
 import { initializeExtensions as initExtensions, shutdownExtensions } from '../services/extension'
 import { FeishuChannel } from '../services/channel/adapters/feishu.channel'
+import { WeChatChannel } from '../services/channel/adapters/wechat.channel'
 import { getChannelManager } from '../services/channel'
 import { initializeSubagentRuntime, shutdownSubagentRuntime } from '../services/agent'
 import { shutdownScheduler } from '../services/scheduler.service'
@@ -128,6 +130,14 @@ export function initializeExtendedServices(mainWindow: BrowserWindow): void {
     console.error('[Bootstrap] Feishu initialization failed:', err)
   })
 
+  // WeChat: Personal account chat integration (optional)
+  registerWeChatHandlers()
+  const wechatChannel = new WeChatChannel()
+  getChannelManager().registerChannel(wechatChannel)
+  wechatChannel.initialize().catch((err) => {
+    console.error('[Bootstrap] WeChat initialization failed:', err)
+  })
+
   // Skill: Initialize skill registry and start file watcher
   // Skills are loaded from 5 sources: project commands, SkillsFan, global commands, Claude skills, Agent skills
   initializeRegistry()
@@ -198,6 +208,14 @@ export function cleanupExtendedServices(): void {
   if (feishuChannel) {
     feishuChannel.shutdown().catch((err) => {
       console.error('[Bootstrap] Feishu shutdown error:', err)
+    })
+  }
+
+  // WeChat: Stop polling
+  const wechatChannel = getChannelManager().getChannel<WeChatChannel>('wechat')
+  if (wechatChannel) {
+    wechatChannel.shutdown().catch((err) => {
+      console.error('[Bootstrap] WeChat shutdown error:', err)
     })
   }
 

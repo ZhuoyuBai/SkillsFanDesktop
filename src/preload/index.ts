@@ -224,6 +224,17 @@ export interface SkillsFanAPI {
   feishuSetGroupPolicy: (policy: string) => Promise<IpcResponse>
   feishuSetDefaultSpace: (spaceId: string | null) => Promise<IpcResponse>
 
+  // WeChat Bot
+  wechatStatus: () => Promise<IpcResponse>
+  wechatGetQRCode: () => Promise<IpcResponse>
+  wechatCheckQRCodeStatus: (qrcode: string) => Promise<IpcResponse>
+  wechatLogout: () => Promise<IpcResponse>
+  wechatRegeneratePairingCode: () => Promise<IpcResponse>
+  wechatRevokeUser: (userId: string) => Promise<IpcResponse>
+  wechatGetSessions: () => Promise<IpcResponse>
+  wechatRemoveSession: (fromUserId: string) => Promise<IpcResponse>
+  wechatSetDefaultSpace: (spaceId: string | null) => Promise<IpcResponse>
+
   // System Settings
   getAutoLaunch: () => Promise<IpcResponse>
   setAutoLaunch: (enabled: boolean) => Promise<IpcResponse>
@@ -629,6 +640,17 @@ const api: SkillsFanAPI = {
   feishuGetSessions: () => ipcRenderer.invoke('feishu:get-sessions'),
   feishuSetGroupPolicy: (policy) => ipcRenderer.invoke('feishu:set-group-policy', policy),
   feishuSetDefaultSpace: (spaceId) => ipcRenderer.invoke('feishu:set-default-space', spaceId),
+
+  // WeChat Bot
+  wechatStatus: () => ipcRenderer.invoke('wechat:status'),
+  wechatGetQRCode: () => ipcRenderer.invoke('wechat:get-qrcode'),
+  wechatCheckQRCodeStatus: (qrcode) => ipcRenderer.invoke('wechat:check-qrcode-status', qrcode),
+  wechatLogout: () => ipcRenderer.invoke('wechat:logout'),
+  wechatRegeneratePairingCode: () => ipcRenderer.invoke('wechat:regenerate-pairing-code'),
+  wechatRevokeUser: (userId) => ipcRenderer.invoke('wechat:revoke-user', userId),
+  wechatGetSessions: () => ipcRenderer.invoke('wechat:get-sessions'),
+  wechatRemoveSession: (fromUserId) => ipcRenderer.invoke('wechat:remove-session', fromUserId),
+  wechatSetDefaultSpace: (spaceId) => ipcRenderer.invoke('wechat:set-default-space', spaceId),
 
   // System Settings
   getAutoLaunch: () => ipcRenderer.invoke('system:get-auto-launch'),

@@ -35,6 +35,7 @@ import { SpaceManagementSection } from '../components/settings/SpaceManagementSe
 import { ResetSection } from '../components/settings/ResetSection'
 import { ScheduledTasksSection } from '../components/settings/ScheduledTasksSection'
 import { FeishuSettings } from '../components/settings/FeishuSettings'
+import { WeChatSettings } from '../components/settings/WeChatSettings'
 import { ApiConfigDialog } from '../components/settings/ApiConfigDialog'
 import { useTranslation, setLanguage, getCurrentLanguage, SUPPORTED_LOCALES, type LocaleCode } from '../i18n'
 import { Loader2, LogOut, Plus, Check, Globe, Key, MessageSquare, Bot, Palette, Server, Settings as SettingsIcon, Wifi, X, Package, User, Layers, Lock, SlidersHorizontal, ArrowLeft, Database, Pencil, Trash2, type LucideIcon } from 'lucide-react'
@@ -2179,6 +2180,9 @@ export function SettingsPage() {
                   {t('Connect messaging platforms to control SkillsFan remotely via chat.')}
                 </p>
                 <FeishuSettings config={config as Record<string, unknown>} />
+                <div className="mt-4">
+                  <WeChatSettings config={config as Record<string, unknown>} />
+                </div>
               </div>
             )}
           </section>

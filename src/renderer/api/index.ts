@@ -849,6 +849,44 @@ export const api = {
     return window.skillsfan.feishuSetDefaultSpace(spaceId)
   },
 
+  // ===== WeChat Bot (Electron only) =====
+  wechatStatus: async (): Promise<ApiResponse> => {
+    if (!isElectron()) return { success: false, error: 'Only available in desktop app' }
+    return window.skillsfan.wechatStatus()
+  },
+  wechatGetQRCode: async (): Promise<ApiResponse> => {
+    if (!isElectron()) return { success: false, error: 'Only available in desktop app' }
+    return window.skillsfan.wechatGetQRCode()
+  },
+  wechatCheckQRCodeStatus: async (qrcode: string): Promise<ApiResponse> => {
+    if (!isElectron()) return { success: false, error: 'Only available in desktop app' }
+    return window.skillsfan.wechatCheckQRCodeStatus(qrcode)
+  },
+  wechatLogout: async (): Promise<ApiResponse> => {
+    if (!isElectron()) return { success: false, error: 'Only available in desktop app' }
+    return window.skillsfan.wechatLogout()
+  },
+  wechatRegeneratePairingCode: async (): Promise<ApiResponse> => {
+    if (!isElectron()) return { success: false, error: 'Only available in desktop app' }
+    return window.skillsfan.wechatRegeneratePairingCode()
+  },
+  wechatRevokeUser: async (userId: string): Promise<ApiResponse> => {
+    if (!isElectron()) return { success: false, error: 'Only available in desktop app' }
+    return window.skillsfan.wechatRevokeUser(userId)
+  },
+  wechatGetSessions: async (): Promise<ApiResponse> => {
+    if (!isElectron()) return { success: false, error: 'Only available in desktop app' }
+    return window.skillsfan.wechatGetSessions()
+  },
+  wechatRemoveSession: async (fromUserId: string): Promise<ApiResponse> => {
+    if (!isElectron()) return { success: false, error: 'Only available in desktop app' }
+    return window.skillsfan.wechatRemoveSession(fromUserId)
+  },
+  wechatSetDefaultSpace: async (spaceId: string | null): Promise<ApiResponse> => {
+    if (!isElectron()) return { success: false, error: 'Only available in desktop app' }
+    return window.skillsfan.wechatSetDefaultSpace(spaceId)
+  },
+
   // ===== System Settings (Electron only) =====
   getAutoLaunch: async (): Promise<ApiResponse> => {
     if (!isElectron()) {
