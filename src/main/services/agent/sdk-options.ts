@@ -196,15 +196,15 @@ export async function buildSdkOptions(params: BuildSdkOptionsParams): Promise<{
   })
   addedMcpServers.push('local-tools')
 
+  if (includeSkillMcp) {
+    mcpServers['skill'] = await createSkillMcpServer()
+    addedMcpServers.push('skill')
+  }
+
   if (effectiveAiBrowserEnabled) {
     const { createAutomatedBrowserMcpServer } = await import('../automated-browser/sdk-mcp-server')
     mcpServers['ai-browser'] = createAutomatedBrowserMcpServer()
     addedMcpServers.push('ai-browser')
-  }
-
-  if (includeSkillMcp) {
-    mcpServers['skill'] = await createSkillMcpServer()
-    addedMcpServers.push('skill')
   }
 
   // Extension MCP servers
@@ -236,6 +236,16 @@ export async function buildSdkOptions(params: BuildSdkOptionsParams): Promise<{
     // Planning and isolation
     'EnterPlanMode', 'EnterWorktree',
   ]
+
+  const disallowedTools = isNativeAnthropicApi(anthropicBaseUrl)
+    ? [...DISALLOWED_SERVER_SIDE_TOOLS_BASE]
+    : [...DISALLOWED_SERVER_SIDE_TOOLS_BASE, ...WEB_SEARCH_SERVER_TOOLS]
+
+  if (includeSkillMcp && !disallowedTools.includes('Skill')) {
+    // Prefer the app-managed MCP skill loader over Claude Code's native Skill tool.
+    // This keeps skill invocation consistent across non-Claude backends.
+    disallowedTools.push('Skill')
+  }
 
   const sdkOptions: Record<string, any> = {
     model: sdkModel,
@@ -277,9 +287,7 @@ export async function buildSdkOptions(params: BuildSdkOptionsParams): Promise<{
     maxTurns: 50,
     allowedTools: builtInTools,
     tools: builtInTools,
-    disallowedTools: isNativeAnthropicApi(anthropicBaseUrl)
-      ? DISALLOWED_SERVER_SIDE_TOOLS_BASE
-      : [...DISALLOWED_SERVER_SIDE_TOOLS_BASE, ...WEB_SEARCH_SERVER_TOOLS],
+    disallowedTools,
     permissionMode: 'acceptEdits' as const,
     canUseTool: createCanUseTool(workDir, spaceId, conversationId),
     includePartialMessages: true,

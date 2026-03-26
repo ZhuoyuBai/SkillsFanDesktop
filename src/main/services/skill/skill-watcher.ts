@@ -12,10 +12,23 @@
 import { watch, existsSync, mkdirSync } from 'fs'
 import { join } from 'path'
 import { homedir } from 'os'
-import { getSkillsDir, reloadSkills } from './skill-registry'
+import { getAllSkillsfanDirs, reloadSkills } from './skill-registry'
 
 let watchers: ReturnType<typeof watch>[] = []
 let debounceTimer: NodeJS.Timeout | null = null
+
+function shouldReloadForEvent(eventType: string, filename?: string | Buffer | null): boolean {
+  if (eventType === 'rename') {
+    return true
+  }
+
+  if (!filename) {
+    return true
+  }
+
+  const normalized = String(filename).replace(/\\/g, '/')
+  return normalized.endsWith('.md') || normalized.includes('SKILL.md')
+}
 
 /**
  * 启动所有技能目录的文件监控
@@ -25,18 +38,24 @@ export function startSkillWatcher(): void {
   stopSkillWatcher()
 
   const home = homedir()
+  const skillsfanDirs = getAllSkillsfanDirs()
+  const claudeSkillsDir = join(home, '.claude', 'skills')
 
   const dirsToWatch = [
-    getSkillsDir(),                             // ~/.skillsfan/skills/
+    ...skillsfanDirs,                           // ~/.skillsfan/skills/ and ~/.skillsfan-dev/skills/
     join(home, '.claude', 'commands'),           // ~/.claude/commands/
-    join(home, '.claude', 'skills'),             // ~/.claude/skills/
+    claudeSkillsDir,                             // ~/.claude/skills/
     join(home, '.agents', 'skills'),             // ~/.agents/skills/
   ]
 
+  const dirsToEnsure = new Set<string>([
+    ...skillsfanDirs,
+    claudeSkillsDir
+  ])
+
   for (const dir of dirsToWatch) {
     if (!existsSync(dir)) {
-      // Only create SkillsFan's own directory
-      if (dir === getSkillsDir()) {
+      if (dirsToEnsure.has(dir)) {
         try {
           mkdirSync(dir, { recursive: true })
           console.log(`[Skill] Created skills directory: ${dir}`)
@@ -51,8 +70,7 @@ export function startSkillWatcher(): void {
 
     try {
       const watcher = watch(dir, { recursive: true }, (eventType, filename) => {
-        // Watch for .md file changes (SKILL.md for skills, *.md for commands)
-        if (!filename?.endsWith('.md')) return
+        if (!shouldReloadForEvent(eventType, filename)) return
 
         console.log(`[Skill] Detected change in ${dir}: ${eventType} ${filename}`)
 

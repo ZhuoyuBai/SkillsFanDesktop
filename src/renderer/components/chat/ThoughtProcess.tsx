@@ -132,8 +132,9 @@ function getActionSummaryData(thoughts: Thought[]): { key: string; params?: Reco
         case 'NotebookEdit': return { key: 'Editing {{file}}...', params: { file: extractFileName(input?.notebook_path) } }
         case 'AskUserQuestion': return { key: 'Waiting for user response...' }
         // Skill tool - show the skill name
-        case 'Skill': {
-          const skillName = (input?.skill as string) || 'skill'
+        case 'Skill':
+        case 'mcp__skill__Skill': {
+          const skillName = (input?.skill as string) || (input?.name as string) || 'skill'
           return { key: 'Running {{skill}}...', params: { skill: skillName } }
         }
         default: return { key: 'Processing...' }

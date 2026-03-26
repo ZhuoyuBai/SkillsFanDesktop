@@ -26,6 +26,10 @@ import { HaloLogo } from '../brand/HaloLogo'
 import type { Thought, TimelineItem, TextSegment } from '../../types'
 import type { SubagentRunEntry } from '../../stores/chat.store'
 import { useTranslation } from '../../i18n'
+import {
+  isCompactLinearStreamText,
+  trimBoundaryBlankLines,
+} from '../../utils/linear-stream-text'
 import { shouldSuppressSetModelStatus } from '../../../shared/utils/sdk-status'
 import { useTypewriter } from '../../hooks/useTypewriter'
 import {
@@ -94,13 +98,12 @@ const ThinkingItem = memo(function ThinkingItem({
         <span className="truncate">{t('Thinking')}</span>
       </button>
 
-      {/* Expanded content - border-left style, no italic */}
+      {/* Expanded content - plain text, no markdown rendering */}
       {isExpanded && (
-        <div className="thinking-content ml-4 pl-3 py-1.5 border-l-2 border-muted-foreground/35 text-[13px] text-muted-foreground leading-relaxed overflow-x-auto max-h-60 overflow-y-auto bg-muted/20 rounded-r">
-          <StreamdownRenderer
-            content={displayText}
-            isStreaming={isAnimating}
-          />
+        <div className="ml-4 pl-3 py-1 border-l-2 border-muted-foreground/35 text-[13px] text-muted-foreground leading-relaxed max-h-48 overflow-y-auto bg-muted/20 rounded-r">
+          <div className="whitespace-pre-wrap break-words">
+            {displayText}
+          </div>
           {isAnimating && (
             <span className="inline-block w-0.5 h-3 bg-muted-foreground/50 animate-pulse ml-0.5 align-middle" />
           )}
@@ -175,15 +178,19 @@ const TextBlock = memo(function TextBlock({
   isStreaming: boolean
   isLast: boolean
 }) {
-  if (!content.trim()) return null
+  const normalizedContent = trimBoundaryBlankLines(content)
+  if (!normalizedContent.trim()) return null
 
   const isCurrentlyStreaming = isStreaming && isLast
+  // Ignore boundary blank lines when deciding if a status line should stay compact.
+  const isShortText = isCompactLinearStreamText(normalizedContent)
 
   return (
-    <div className="py-2 text-foreground break-words leading-relaxed">
+    <div className={`${isShortText ? 'py-0.5' : 'py-2'} text-foreground break-words leading-relaxed`}>
       <StreamdownRenderer
-        content={content}
+        content={normalizedContent}
         isStreaming={isCurrentlyStreaming}
+        className={isShortText ? 'streamdown-compact' : undefined}
       />
       {isCurrentlyStreaming && (
         <span className="inline-flex items-center ml-1 align-middle">
@@ -213,6 +220,8 @@ export function LinearStream({
 }: LinearStreamProps) {
   const { t } = useTranslation()
 
+  const isSkillToolName = (toolName?: string) => toolName === 'Skill' || toolName === 'mcp__skill__Skill'
+
   // Track which thinking IDs have been seen (for typewriter animation on new ones only)
   const seenThinkingIds = useRef<Set<string>>(new Set())
 
@@ -238,7 +247,7 @@ export function LinearStream({
 
     // First, identify all Skill tools and their children
     for (const thought of thoughts) {
-      if (thought.type === 'tool_use' && thought.toolName === 'Skill') {
+      if (thought.type === 'tool_use' && isSkillToolName(thought.toolName)) {
         skillToolIds.add(thought.id)
         childToolMap.set(thought.id, [])
       }
@@ -286,13 +295,13 @@ export function LinearStream({
         }
 
         // Handle Skill tool specially
-        if (thought.toolName === 'Skill') {
+        if (isSkillToolName(thought.toolName)) {
           const result = getToolResult(thought)
           items.push({
             id: thought.id,
             timestamp: thought.timestamp,
             type: 'skill',
-            skillName: String(thought.toolInput?.skill || 'skill'),
+            skillName: String(thought.toolInput?.skill || thought.toolInput?.name || 'skill'),
             isComplete,
             isError: result?.isError || false,
             duration: result?.duration,

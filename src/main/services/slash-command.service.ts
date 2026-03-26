@@ -149,7 +149,7 @@ function scanSkillMdDirs(baseDir: string, source: CommandSource): SlashCommand[]
   try {
     const dirs = fs.readdirSync(baseDir, { withFileTypes: true })
     for (const dir of dirs) {
-      if (!dir.isDirectory()) continue
+      if (!dir.isDirectory() && !dir.isSymbolicLink()) continue
 
       const skillMdPath = path.join(baseDir, dir.name, 'SKILL.md')
       if (!fs.existsSync(skillMdPath)) continue

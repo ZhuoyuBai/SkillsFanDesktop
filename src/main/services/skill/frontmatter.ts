@@ -94,6 +94,13 @@ function parseYamlFrontmatter(yaml: string): Record<string, string> {
       const { block, nextIndex } = readBlock(lines, i + 1)
       i = nextIndex
       value = value.startsWith('>') ? foldBlock(block).trim() : block.join('\n').trim()
+    } else if (value === '' && i + 1 < lines.length && /^\s+\S/.test(lines[i + 1])) {
+      // Bare multiline value without | or > indicator:
+      //   description:
+      //     indented text here
+      const { block, nextIndex } = readBlock(lines, i + 1)
+      i = nextIndex
+      value = foldBlock(block).trim()
     } else {
       value = stripQuotes(value)
     }

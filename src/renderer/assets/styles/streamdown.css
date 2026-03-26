@@ -199,8 +199,11 @@
   opacity: 1;
 }
 
-/* ========== Thinking Context ========== */
-/* Inherit parent's muted color inside thinking blocks */
-.thinking-content .streamdown-content {
-  color: inherit;
+/* ========== Compact Mode ========== */
+/* Short transitional text (single line) needs no paragraph margin */
+.streamdown-compact p {
+  margin-bottom: 0;
 }
+
+/* ========== Thinking Context ========== */
+/* ThinkingItem uses plain text rendering (no StreamdownRenderer) */

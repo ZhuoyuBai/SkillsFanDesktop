@@ -10,6 +10,7 @@
 import type { Thought, ImageAttachment, CanvasContext, Attachment, PdfAttachment, TextAttachment } from './types'
 import { sanitizeWebSearchInput } from './tool-input-utils'
 import {
+  normalizeSdkStatusText,
   shouldSuppressSetModelStatus,
   stripLeadingSetModelStatus
 } from '../../../shared/utils/sdk-status'
@@ -165,7 +166,235 @@ export function buildMessageContent(
  * Hide noisy SDK status lines that don't help the user.
  */
 export function shouldSuppressSdkStatus(statusText: string): boolean {
-  return shouldSuppressSetModelStatus(statusText)
+  return shouldSuppressSetModelStatus(normalizeSdkStatusText(statusText))
+}
+
+export function normalizeToolThoughtName(name?: string): string | undefined {
+  if (!name) return name
+
+  switch (name) {
+    case 'web_search':
+      return 'WebSearch'
+    case 'web_fetch':
+      return 'WebFetch'
+    default:
+      return name
+  }
+}
+
+function isWebSearchToolName(name?: string): boolean {
+  const normalizedName = normalizeToolThoughtName(name)
+  return normalizedName === 'WebSearch' || normalizedName === 'mcp__web-tools__WebSearch'
+}
+
+export function normalizeToolThoughtInput(
+  toolName: string | undefined,
+  input: unknown
+): Record<string, unknown> | undefined {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    return undefined
+  }
+
+  const normalizedInput = input as Record<string, unknown>
+  return isWebSearchToolName(toolName)
+    ? sanitizeWebSearchInput(normalizedInput)
+    : normalizedInput
+}
+
+function formatWebSearchResultContent(content: Array<Record<string, unknown>>): string {
+  return content
+    .map((item) => {
+      const title = typeof item.title === 'string' ? item.title.trim() : ''
+      const url = typeof item.url === 'string' ? item.url.trim() : ''
+      if (title && url) return `${title} - ${url}`
+      return title || url
+    })
+    .filter(Boolean)
+    .join('\n')
+}
+
+export function serializeToolResultContent(content: unknown): string {
+  if (typeof content === 'string') {
+    return content
+  }
+
+  if (Array.isArray(content)) {
+    const webSearchResults = content.every((item) =>
+      item && typeof item === 'object' && (item as Record<string, unknown>).type === 'web_search_result'
+    )
+    if (webSearchResults) {
+      return formatWebSearchResultContent(content as Array<Record<string, unknown>>)
+    }
+  }
+
+  if (content === undefined || content === null) {
+    return ''
+  }
+
+  try {
+    return JSON.stringify(content)
+  } catch {
+    return String(content)
+  }
+}
+
+function parseAssistantContentBlock(
+  block: Record<string, any>,
+  timestamp: string,
+  parentToolId?: string
+): Thought | null {
+  if (block.type === 'thinking') {
+    return {
+      id: generateThoughtId(),
+      type: 'thinking',
+      content: block.thinking || '',
+      timestamp
+    }
+  }
+
+  if (block.type === 'tool_use' || block.type === 'server_tool_use') {
+    const toolName = normalizeToolThoughtName(block.name)
+    let toolInput = normalizeToolThoughtInput(toolName, block.input)
+    const isSkillInvocation = Boolean(toolName && isSkillToolName(toolName))
+
+    if (isSkillInvocation && toolInput) {
+      toolInput = {
+        ...toolInput,
+        skill: typeof toolInput.skill === 'string'
+          ? toolInput.skill
+          : typeof toolInput.name === 'string'
+            ? toolInput.name
+            : undefined
+      }
+    }
+
+    return {
+      id: block.id || generateThoughtId(),
+      type: 'tool_use',
+      content: `Tool call: ${toolName || block.name || 'tool'}`,
+      timestamp,
+      toolName,
+      toolInput,
+      parentToolId,
+      isSkillInvocation
+    }
+  }
+
+  if (block.type === 'text') {
+    const visibleText = stripLeadingSetModelStatus(block.text || '')
+    if (!visibleText.trim()) {
+      return null
+    }
+
+    return {
+      id: generateThoughtId(),
+      type: 'text',
+      content: visibleText,
+      timestamp
+    }
+  }
+
+  if (block.type === 'web_search_tool_result') {
+    return {
+      id: block.tool_use_id || generateThoughtId(),
+      type: 'tool_result',
+      content: 'Tool execution succeeded',
+      timestamp,
+      toolName: 'WebSearch',
+      toolOutput: serializeToolResultContent(block.content),
+      isError: false,
+      parentToolId
+    }
+  }
+
+  return null
+}
+
+function parseUserContentBlock(
+  block: Record<string, any>,
+  timestamp: string,
+  parentToolId?: string
+): Thought | null {
+  if (block.type !== 'tool_result') {
+    return null
+  }
+
+  const isError = block.is_error || false
+  const resultContent = serializeToolResultContent(block.content)
+
+  return {
+    id: block.tool_use_id || generateThoughtId(),
+    type: 'tool_result',
+    content: isError ? 'Tool execution failed' : 'Tool execution succeeded',
+    timestamp,
+    toolOutput: resultContent,
+    isError,
+    parentToolId
+  }
+}
+
+export function parseSDKMessageThoughts(message: any, displayModel?: string, parentToolId?: string): Thought[] {
+  const timestamp = new Date().toISOString()
+
+  if (message.type === 'system') {
+    if (message.subtype === 'init') {
+      const modelName = displayModel || message.model || 'claude'
+      return [{
+        id: generateThoughtId(),
+        type: 'system',
+        content: `Connected | Model: ${modelName}`,
+        timestamp
+      }]
+    }
+    return []
+  }
+
+  if (message.type === 'assistant') {
+    const content = message.message?.content
+    if (!Array.isArray(content)) {
+      return []
+    }
+
+    return content
+      .map((block) => parseAssistantContentBlock(block as Record<string, any>, timestamp, parentToolId))
+      .filter((thought): thought is Thought => thought !== null)
+  }
+
+  if (message.type === 'user') {
+    const content = message.message?.content
+
+    if (typeof content === 'string') {
+      const match = content.match(/<local-command-stdout>([\s\S]*?)<\/local-command-stdout>/)
+      if (match) {
+        return [{
+          id: generateThoughtId(),
+          type: 'text',
+          content: match[1].trim(),
+          timestamp
+        }]
+      }
+    }
+
+    if (!Array.isArray(content)) {
+      return []
+    }
+
+    return content
+      .map((block) => parseUserContentBlock(block as Record<string, any>, timestamp, parentToolId))
+      .filter((thought): thought is Thought => thought !== null)
+  }
+
+  if (message.type === 'result') {
+    return [{
+      id: generateThoughtId(),
+      type: 'result',
+      content: message.message?.result || message.result || '',
+      timestamp,
+      duration: message.duration_ms
+    }]
+  }
+
+  return []
 }
 
 // ============================================
@@ -179,6 +408,10 @@ function generateThoughtId(): string {
   return `thought-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 }
 
+function isSkillToolName(name: string): boolean {
+  return name === 'Skill' || name === 'mcp__skill__Skill'
+}
+
 /**
  * Parse SDK message into a Thought object
  *
@@ -188,127 +421,7 @@ function generateThoughtId(): string {
  * @returns Thought object or null if message type is not relevant
  */
 export function parseSDKMessage(message: any, displayModel?: string, parentToolId?: string): Thought | null {
-  const timestamp = new Date().toISOString()
-
-  // System initialization
-  if (message.type === 'system') {
-    if (message.subtype === 'init') {
-      // Use displayModel (user's configured model) instead of SDK's internal model
-      // This ensures users see the actual model they configured, not the spoofed Claude model
-      const modelName = displayModel || message.model || 'claude'
-      return {
-        id: generateThoughtId(),
-        type: 'system',
-        content: `Connected | Model: ${modelName}`,
-        timestamp
-      }
-    }
-    return null
-  }
-
-  // Assistant messages (thinking, tool_use, text blocks)
-  if (message.type === 'assistant') {
-    const content = message.message?.content
-    if (Array.isArray(content)) {
-      for (const block of content) {
-        // Thinking blocks
-        if (block.type === 'thinking') {
-          return {
-            id: generateThoughtId(),
-            type: 'thinking',
-            content: block.thinking || '',
-            timestamp
-          }
-        }
-        // Tool use blocks
-        if (block.type === 'tool_use') {
-          const isSkillInvocation = block.name === 'Skill'
-          const toolInput = block.name === 'WebSearch' && block.input && typeof block.input === 'object'
-            ? sanitizeWebSearchInput(block.input as Record<string, unknown>)
-            : block.input
-          return {
-            id: block.id || generateThoughtId(),
-            type: 'tool_use',
-            content: `Tool call: ${block.name}`,
-            timestamp,
-            toolName: block.name,
-            toolInput,
-            parentToolId,
-            isSkillInvocation
-          }
-        }
-        // Text blocks
-        if (block.type === 'text') {
-          const visibleText = stripLeadingSetModelStatus(block.text || '')
-          if (!visibleText.trim()) {
-            return null
-          }
-          return {
-            id: generateThoughtId(),
-            type: 'text',
-            content: visibleText,
-            timestamp
-          }
-        }
-      }
-    }
-    return null
-  }
-
-  // User messages (tool results or command output)
-  if (message.type === 'user') {
-    const content = message.message?.content
-
-    // Handle slash command output: <local-command-stdout>...</local-command-stdout>
-    // These are returned as user messages with isReplay: true
-    if (typeof content === 'string') {
-      const match = content.match(/<local-command-stdout>([\s\S]*?)<\/local-command-stdout>/)
-      if (match) {
-        return {
-          id: generateThoughtId(),
-          type: 'text',  // Render as text block (will show in assistant bubble)
-          content: match[1].trim(),
-          timestamp
-        }
-      }
-    }
-
-    // Handle tool results (array content)
-    if (Array.isArray(content)) {
-      for (const block of content) {
-        if (block.type === 'tool_result') {
-          const isError = block.is_error || false
-          const resultContent = typeof block.content === 'string'
-            ? block.content
-            : JSON.stringify(block.content)
-
-          return {
-            id: block.tool_use_id || generateThoughtId(),
-            type: 'tool_result',
-            content: isError ? `Tool execution failed` : `Tool execution succeeded`,
-            timestamp,
-            toolOutput: resultContent,
-            isError,
-            parentToolId
-          }
-        }
-      }
-    }
-    return null
-  }
-
-  // Final result
-  if (message.type === 'result') {
-    return {
-      id: generateThoughtId(),
-      type: 'result',
-      content: message.message?.result || message.result || '',
-      timestamp,
-      duration: message.duration_ms
-    }
-  }
-
-  return null
+  return parseSDKMessageThoughts(message, displayModel, parentToolId)[0] || null
 }
 
 // ============================================

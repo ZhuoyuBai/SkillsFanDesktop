@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   registerActiveSession: vi.fn(),
   unregisterActiveSession: vi.fn(),
   parseSDKMessage: vi.fn(),
+  parseSDKMessageThoughts: vi.fn(),
   buildMessageContent: vi.fn(),
   getEnabledExtensions: vi.fn(),
   runBeforeSendMessageHooks: vi.fn(),
@@ -24,7 +25,8 @@ const mocks = vi.hoisted(() => ({
   markCompactionTriggered: vi.fn(),
   buildCompactionPrompt: vi.fn(),
   getCompactionStatus: vi.fn(),
-  clearCompactionState: vi.fn()
+  clearCompactionState: vi.fn(),
+  getSkill: vi.fn()
 }))
 
 vi.mock('../../../../src/main/services/agent/lane-queue', () => ({
@@ -50,8 +52,9 @@ vi.mock('../../../../src/main/services/ai-browser/tool-utils', () => ({
 }))
 
 vi.mock('../../../../src/main/services/skill', () => ({
-  hasSkills: vi.fn(() => false),
-  ensureSkillsInitialized: vi.fn(async () => {})
+  ensureSkillsInitialized: vi.fn(async () => {}),
+  getSkillsSignature: vi.fn(() => ''),
+  getSkill: mocks.getSkill
 }))
 
 vi.mock('../../../../src/main/services/agent/helpers', () => ({
@@ -95,6 +98,10 @@ vi.mock('../../../../src/main/services/agent/message-utils', () => ({
   formatCanvasContext: vi.fn(() => ''),
   buildMessageContent: mocks.buildMessageContent,
   parseSDKMessage: mocks.parseSDKMessage,
+  parseSDKMessageThoughts: mocks.parseSDKMessageThoughts,
+  normalizeToolThoughtInput: vi.fn((toolName: string | undefined, input: unknown) => input),
+  normalizeToolThoughtName: vi.fn((name: string | undefined) => name),
+  serializeToolResultContent: vi.fn((content: unknown) => typeof content === 'string' ? content : JSON.stringify(content)),
   extractSingleUsage: vi.fn(() => null),
   extractResultUsage: vi.fn(() => null)
 }))
@@ -147,6 +154,7 @@ describe('send-message', () => {
     mocks.shouldTriggerCompaction.mockReturnValue(false)
     mocks.buildCompactionPrompt.mockReturnValue('')
     mocks.getCompactionStatus.mockReturnValue(null)
+    mocks.getSkill.mockReturnValue(undefined)
     mocks.createSessionState.mockImplementation((spaceId: string, conversationId: string, abortController: AbortController) => ({
       spaceId,
       conversationId,
@@ -159,6 +167,7 @@ describe('send-message', () => {
     }))
     mocks.updateLastMessage.mockReturnValue({ id: 'assistant-1' })
     mocks.parseSDKMessage.mockReturnValue(null)
+    mocks.parseSDKMessageThoughts.mockReturnValue([])
   })
 
   it('notifies renderer when message is queued behind a running task', async () => {
@@ -210,9 +219,9 @@ describe('send-message', () => {
     }
 
     mocks.enqueue.mockImplementationOnce(async (_conversationId: string, run: () => Promise<void>) => run())
-    mocks.parseSDKMessage.mockImplementation((sdkMessage: { type: string }) => {
-      if (sdkMessage.type === 'assistant') return toolThought
-      return null
+    mocks.parseSDKMessageThoughts.mockImplementation((sdkMessage: { type: string }) => {
+      if (sdkMessage.type === 'assistant') return [toolThought]
+      return []
     })
     mocks.getOrCreateV2Session.mockResolvedValue({
       setPermissionMode: vi.fn(async () => {}),
@@ -278,5 +287,133 @@ describe('send-message', () => {
     )
     // Should NOT send the message to the session
     expect(mockSend).not.toHaveBeenCalled()
+  })
+
+  it('normalizes repairable SendMessage tool errors before sending them to the renderer', async () => {
+    const sendMessageToolUse = {
+      id: 'tool-send-message',
+      type: 'tool_use',
+      content: 'Tool call: SendMessage',
+      timestamp: '2026-03-26T07:00:00.000Z',
+      toolName: 'SendMessage',
+      toolInput: {
+        recipient: 'web-access',
+        summary: 'search xiaohongshu'
+      },
+      parentToolId: 'tool-skill'
+    }
+    const sendMessageToolResult = {
+      id: 'tool-send-message',
+      type: 'tool_result',
+      content: 'Tool execution failed',
+      timestamp: '2026-03-26T07:00:01.000Z',
+      toolOutput: 'SendMessage routing hint: SendMessage is only for messaging an existing agent team member and it requires a non-empty "content" field. "web-access" is a skill, not a team member. Use the Skill tool to load that skill. For one-off delegated work, use mcp__local-tools__subagent_spawn instead.',
+      isError: true,
+      parentToolId: 'tool-skill'
+    }
+
+    mocks.getSkill.mockReturnValue({ name: 'web-access' })
+    mocks.enqueue.mockImplementationOnce(async (_conversationId: string, run: () => Promise<void>) => run())
+    mocks.parseSDKMessageThoughts
+      .mockReturnValueOnce([sendMessageToolUse])
+      .mockReturnValueOnce([sendMessageToolResult])
+      .mockReturnValue([])
+
+    mocks.getOrCreateV2Session.mockResolvedValue({
+      setPermissionMode: vi.fn(async () => {}),
+      send: vi.fn(),
+      stream: async function* () {
+        yield { type: 'assistant', message: { content: [] } }
+        yield { type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 'tool-send-message', is_error: true, content: sendMessageToolResult.toolOutput }] } }
+        yield { type: 'result' }
+      }
+    })
+
+    await expect(sendMessage(null, request)).resolves.toBeUndefined()
+
+    const thoughtEvent = mocks.sendToRenderer.mock.calls.find(([eventName, , , payload]) =>
+      eventName === 'agent:thought'
+      && payload?.thought?.id === 'tool-send-message'
+      && payload?.thought?.type === 'tool_result'
+    )
+
+    expect(thoughtEvent?.[3]).toEqual({
+      thought: expect.objectContaining({
+        id: 'tool-send-message',
+        type: 'tool_result',
+        isError: false,
+        content: 'Tool routing corrected',
+        toolOutput: expect.stringContaining('System auto-corrected the tool choice')
+      })
+    })
+  })
+
+  it('emits tool activity from stream events before final assistant text arrives', async () => {
+    mocks.enqueue.mockImplementationOnce(async (_conversationId: string, run: () => Promise<void>) => run())
+
+    mocks.getOrCreateV2Session.mockResolvedValue({
+      setPermissionMode: vi.fn(async () => {}),
+      send: vi.fn(),
+      stream: async function* () {
+        yield {
+          type: 'stream_event',
+          event: {
+            type: 'content_block_start',
+            index: 0,
+            content_block: {
+              type: 'tool_use',
+              id: 'tool-search-1',
+              name: 'mcp__web-tools__WebSearch',
+              input: {}
+            }
+          }
+        }
+        yield {
+          type: 'stream_event',
+          event: {
+            type: 'content_block_delta',
+            index: 0,
+            delta: {
+              type: 'input_json_delta',
+              partial_json: '{"query":"minimax 2.7 news"}'
+            }
+          }
+        }
+        yield {
+          type: 'stream_event',
+          event: {
+            type: 'content_block_stop',
+            index: 0
+          }
+        }
+        yield { type: 'result' }
+      }
+    })
+
+    await expect(sendMessage(null, request)).resolves.toBeUndefined()
+
+    expect(mocks.sendToRenderer).toHaveBeenCalledWith(
+      'agent:thought',
+      'space-1',
+      'conv-1',
+      expect.objectContaining({
+        thought: expect.objectContaining({
+          id: 'tool-search-1',
+          type: 'tool_use',
+          toolName: 'mcp__web-tools__WebSearch'
+        })
+      })
+    )
+
+    expect(mocks.sendToRenderer).toHaveBeenCalledWith(
+      'agent:tool-call',
+      'space-1',
+      'conv-1',
+      expect.objectContaining({
+        id: 'tool-search-1',
+        name: 'mcp__web-tools__WebSearch',
+        status: 'running'
+      })
+    )
   })
 })

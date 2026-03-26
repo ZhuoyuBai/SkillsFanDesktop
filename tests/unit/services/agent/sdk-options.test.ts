@@ -52,7 +52,7 @@ describe('sdk-options', () => {
     mocks.encodeBackendConfig.mockReturnValue('encoded-backend-config')
     mocks.createAIBrowserMcpServer.mockReturnValue({ type: 'stdio', command: 'ai-browser' })
     mocks.createLocalToolsMcpServer.mockReturnValue({ type: 'stdio', command: 'local-tools' })
-    mocks.createSkillMcpServer.mockResolvedValue({ type: 'stdio', command: 'skill' })
+    mocks.createSkillMcpServer.mockResolvedValue({ type: 'stdio', command: 'skill-mcp' })
     mocks.createCanUseTool.mockReturnValue(vi.fn())
     mocks.buildSystemPromptAppend.mockReturnValue('[BASE_PROMPT]')
     mocks.getEnabledMcpServers.mockReturnValue({})
@@ -217,7 +217,7 @@ describe('sdk-options', () => {
       expect(onStderr).toHaveBeenCalledWith('stderr message')
     })
 
-    it('adds ai-browser + skill MCP and thinking tokens when enabled', async () => {
+    it('adds ai-browser MCP and thinking tokens when enabled', async () => {
       mocks.getEnabledMcpServers.mockReturnValue({
         github: { type: 'stdio', command: 'github-mcp' }
       })
@@ -237,14 +237,12 @@ describe('sdk-options', () => {
         onStderr: vi.fn(),
         aiBrowserEnabled: true,
         thinkingEnabled: true,
-        includeSkillMcp: true,
         ralphSystemPromptAppend: '[RALPH_APPEND]'
       })
 
-      expect(addedMcpServers).toEqual(['local-tools', 'ai-browser', 'skill'])
+      expect(addedMcpServers).toEqual(['local-tools', 'ai-browser'])
       expect(mocks.createAIBrowserMcpServer).toHaveBeenCalledTimes(1)
       expect(mocks.createLocalToolsMcpServer).toHaveBeenCalledTimes(1)
-      expect(mocks.createSkillMcpServer).toHaveBeenCalledTimes(1)
       expect(sdkOptions.thinking).toEqual({ type: 'enabled', budgetTokens: 10240 })
       expect(sdkOptions.systemPrompt.append).toContain('[BASE_PROMPT]')
       expect(sdkOptions.systemPrompt.append).toContain('[AI_BROWSER_PROMPT]')
@@ -266,8 +264,7 @@ describe('sdk-options', () => {
       expect(sdkOptions.mcpServers).toEqual({
         github: { type: 'stdio', command: 'github-mcp' },
         'local-tools': { type: 'stdio', command: 'local-tools' },
-        'ai-browser': { type: 'stdio', command: 'ai-browser' },
-        skill: { type: 'stdio', command: 'skill' }
+        'ai-browser': { type: 'stdio', command: 'ai-browser' }
       })
       expect(mocks.buildSystemPromptAppend).toHaveBeenCalledWith('/tmp/space-2', 'gpt-4.1', false)
     })
@@ -347,6 +344,41 @@ describe('sdk-options', () => {
         'local-tools': { type: 'stdio', command: 'local-tools' }
       })
       expect(sdkOptions.strictMcpConfig).toBe(true)
+    })
+
+    it('adds skill MCP and blocks native Skill tool when skills are available', async () => {
+      const abortController = new AbortController()
+
+      const { sdkOptions, addedMcpServers } = await buildSdkOptions({
+        conversationId: 'conv-skill',
+        spaceId: 'space-skill',
+        workDir: '/tmp/space-skill',
+        config: { mcpServers: {}, memory: { enabled: false } },
+        abortController,
+        sdkModel: 'claude-sonnet-4-20250514',
+        credentialsModel: 'kimi-k2.5',
+        anthropicBaseUrl: 'http://router.local',
+        anthropicApiKey: 'encoded-key',
+        electronPath: '/Applications/Electron.app/Contents/MacOS/Electron',
+        onStderr: vi.fn(),
+        includeSkillMcp: true
+      })
+
+      expect(addedMcpServers).toEqual(['local-tools', 'skill'])
+      expect(mocks.createSkillMcpServer).toHaveBeenCalledTimes(1)
+      expect(mocks.createLocalToolsMcpServer).toHaveBeenCalledWith({
+        workDir: '/tmp/space-skill',
+        spaceId: 'space-skill',
+        conversationId: 'conv-skill',
+        aiBrowserEnabled: false,
+        includeSkillMcp: true,
+        includeSubagentTools: true
+      })
+      expect(sdkOptions.mcpServers).toEqual({
+        'local-tools': { type: 'stdio', command: 'local-tools' },
+        skill: { type: 'stdio', command: 'skill-mcp' }
+      })
+      expect(sdkOptions.disallowedTools).toContain('Skill')
     })
   })
 })

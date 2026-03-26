@@ -71,7 +71,7 @@ export function loadSkillsFromDir(skillsDir: string, source: SkillSource): Skill
   }
 
   for (const entry of entries) {
-    if (!entry.isDirectory()) continue
+    if (!entry.isDirectory() && !entry.isSymbolicLink()) continue
 
     const skillFile = join(skillsDir, entry.name, 'SKILL.md')
     if (!existsSync(skillFile)) continue

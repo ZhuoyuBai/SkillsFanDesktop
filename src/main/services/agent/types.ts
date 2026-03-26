@@ -287,7 +287,7 @@ export type V2SDKSession = {
  */
 export interface SessionConfig {
   aiBrowserEnabled: boolean
-  hasSkills: boolean
+  skillsSignature: string
   browserAutomationMode?: 'ai-browser' | 'system-browser'
   customInstructionsHash?: string  // Change detection for custom instructions
   extensionHash?: string  // Change detection for enabled extensions

@@ -3,7 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
   getConfig: vi.fn(),
   isAIBrowserTool: vi.fn(),
-  sendToRenderer: vi.fn()
+  sendToRenderer: vi.fn(),
+  getSkill: vi.fn()
 }))
 
 vi.mock('../../../../src/main/services/config.service', () => ({
@@ -22,6 +23,10 @@ vi.mock('../../../../src/main/services/agent/helpers', () => ({
   sendToRenderer: mocks.sendToRenderer
 }))
 
+vi.mock('../../../../src/main/services/skill', () => ({
+  getSkill: mocks.getSkill
+}))
+
 import { createCanUseTool, handleToolApproval } from '../../../../src/main/services/agent/permission-handler'
 import { activeSessions } from '../../../../src/main/services/agent/session-manager'
 
@@ -36,6 +41,7 @@ describe('permission-handler', () => {
       }
     })
     mocks.isAIBrowserTool.mockReturnValue(false)
+    mocks.getSkill.mockReturnValue(undefined)
   })
 
   it('returns updatedInput for default allow decisions', async () => {
@@ -95,6 +101,22 @@ describe('permission-handler', () => {
       behavior: 'deny',
       message: 'Built-in server-side tool "code_execution" is disabled. Use local MCP tools instead.'
     })
+  })
+
+  it('returns a routing repair hint for malformed SendMessage calls targeting a skill', async () => {
+    mocks.getSkill.mockReturnValue({ name: 'web-access' })
+    const canUseTool = createCanUseTool('/tmp/workspace', 'space-1', 'conv-1')
+
+    const result = await canUseTool('SendMessage', {
+      recipient: 'web-access',
+      summary: 'search xiaohongshu'
+    }, { signal: new AbortController().signal })
+
+    expect(result).toEqual({
+      behavior: 'deny',
+      message: expect.stringContaining('"web-access" is a skill, not a team member')
+    })
+    expect(result.message).toContain('mcp__local-tools__subagent_spawn')
   })
 
   it('allows local memory tool with updated input', async () => {

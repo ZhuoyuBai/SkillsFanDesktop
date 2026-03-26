@@ -16,7 +16,7 @@ import { getConversation, saveSessionId, addMessage, updateLastMessage } from '.
 import {
   isAIBrowserTool
 } from '../ai-browser/tool-utils'
-import { hasSkills, ensureSkillsInitialized } from '../skill'
+import { ensureSkillsInitialized, getSkill, getSkillsSignature } from '../skill'
 import type {
   AgentRequest,
   ToolCall,
@@ -50,7 +50,10 @@ import {
   formatCanvasContext,
   buildMessageContent,
   shouldSuppressSdkStatus,
-  parseSDKMessage,
+  parseSDKMessageThoughts,
+  normalizeToolThoughtInput,
+  normalizeToolThoughtName,
+  serializeToolResultContent,
   extractSingleUsage,
   extractResultUsage
 } from './message-utils'
@@ -70,8 +73,9 @@ import {
   thinkingEffortToBudgetTokens
 } from '../../../shared/utils/openai-models'
 import { isDuplicateActiveToolUse } from '../../../shared/utils/thought-dedupe'
-import { stripLeadingSetModelStatus } from '../../../shared/utils/sdk-status'
+import { normalizeSdkStatusText, stripLeadingSetModelStatus } from '../../../shared/utils/sdk-status'
 import { resolveAccessibleAiSource } from '../ai-sources/hosted-ai-availability'
+import { normalizeRepairableSendMessageResult } from './tool-repair'
 
 function getRuntimeModelDisplayName(config: Record<string, any>, modelId: string): string {
   const aiSources = config.aiSources || {}
@@ -160,6 +164,16 @@ function resetSessionStateForRetry(sessionState: SessionState): void {
   sessionState.pendingUserQuestion = null
   sessionState.currentStreamingContent = ''
   sessionState.thoughts.length = 0
+}
+
+function findToolUseThought(sessionState: SessionState, toolId: string): Thought | undefined {
+  for (let i = sessionState.thoughts.length - 1; i >= 0; i -= 1) {
+    const candidate = sessionState.thoughts[i]
+    if (candidate.id === toolId && candidate.type === 'tool_use') {
+      return candidate
+    }
+  }
+  return undefined
 }
 
 function persistAssistantSnapshot(
@@ -387,8 +401,8 @@ async function sendMessageInternal(
 
     // Ensure skills are loaded before creating session
     // This determines if Skill MCP server should be added and triggers session rebuild if needed
-    await ensureSkillsInitialized()
-    const skillsAvailable = hasSkills()
+    await ensureSkillsInitialized(workDir, { forceRefresh: true })
+    const skillsSignature = getSkillsSignature()
 
     // Log MCP servers if configured (only enabled ones)
     const enabledMcpServers = getEnabledMcpServers(config.mcpServers || {})
@@ -404,7 +418,7 @@ async function sendMessageInternal(
     const { getExtensionHash } = await import('../extension')
     const sessionConfig: SessionConfig = {
       aiBrowserEnabled: effectiveAiBrowserEnabled,
-      hasSkills: skillsAvailable,
+      skillsSignature,
       browserAutomationMode,
       customInstructionsHash: ci?.enabled && ci?.content ? ci.content : undefined,
       extensionHash: getExtensionHash()
@@ -441,7 +455,7 @@ async function sendMessageInternal(
         },
         aiBrowserEnabled: !!aiBrowserEnabled,
         thinkingEnabled: !!thinkingEnabled,
-        includeSkillMcp: skillsAvailable,
+        includeSkillMcp: skillsSignature.length > 0,
         ralphSystemPromptAppend: ralphMode?.systemPromptAppend || '',
         routed: transport.routed
       })
@@ -752,8 +766,120 @@ async function processMessageStream(
     toolName: string
   }
   let activeToolStack: ActiveToolCall[] = []
+  interface StreamToolUseState {
+    thought: Thought
+    inputJson: string
+  }
+  const streamToolUses = new Map<number, StreamToolUseState>()
 
   const getVisibleAssistantContent = (content: string): string => stripLeadingSetModelStatus(content)
+
+  const emitThought = (incomingThought: Thought | null | undefined): void => {
+    if (!incomingThought) {
+      return
+    }
+
+    let thought = incomingThought
+
+    if (thought.type === 'tool_result') {
+      const relatedToolUse = findToolUseThought(sessionState, thought.id)
+      const recipient = typeof relatedToolUse?.toolInput?.recipient === 'string'
+        ? relatedToolUse.toolInput.recipient
+        : undefined
+      thought = normalizeRepairableSendMessageResult({
+        thought,
+        toolName: relatedToolUse?.toolName,
+        toolInput: relatedToolUse?.toolInput,
+        recipientIsSkill: typeof recipient === 'string' && Boolean(getSkill(recipient))
+      })
+    }
+
+    if (sessionState.thoughts.some(
+      (existingThought) => existingThought.id === thought.id && existingThought.type === thought.type
+    )) {
+      console.log(`[Agent][${conversationId}] Skipping duplicate thought: ${thought.type} ${thought.id}`)
+      return
+    }
+
+    if (thought.type === 'tool_use' && isDuplicateActiveToolUse(sessionState.thoughts, thought)) {
+      console.log(
+        `[Agent][${conversationId}] Skipping duplicate active tool_use: ${thought.toolName} ${JSON.stringify(thought.toolInput || {})}`
+      )
+      return
+    }
+
+    if (thought.type === 'tool_use' && thought.isSkillInvocation) {
+      activeToolStack.push({ id: thought.id, toolName: thought.toolName! })
+      console.log(`[Agent][${conversationId}] Skill tool pushed to stack: ${thought.toolName}, depth: ${activeToolStack.length}`)
+    }
+
+    if (thought.type === 'tool_result') {
+      const topTool = activeToolStack[activeToolStack.length - 1]
+      if (topTool && thought.id === topTool.id) {
+        activeToolStack.pop()
+        console.log(`[Agent][${conversationId}] Skill tool popped from stack: ${topTool.toolName}, depth: ${activeToolStack.length}`)
+      }
+    }
+
+    sessionState.thoughts.push(thought)
+    sendToRenderer('agent:thought', spaceId, conversationId, { thought })
+
+    if (thought.type === 'text') {
+      if (textBlockCount === 0) {
+        accumulatedTextContent = getVisibleAssistantContent(accumulatedTextContent + thought.content)
+        textBlockCount++
+
+        if (ralphMode?.onOutput) {
+          ralphMode.onOutput(accumulatedTextContent)
+        }
+
+        sendToRenderer('agent:message', spaceId, conversationId, {
+          type: 'message',
+          content: accumulatedTextContent,
+          isComplete: false
+        })
+      }
+      return
+    }
+
+    if (thought.type === 'tool_use') {
+      if (!thought.parentToolId) {
+        const toolCall: ToolCall = {
+          id: thought.id,
+          name: thought.toolName || '',
+          status: 'running',
+          input: thought.toolInput || {}
+        }
+        sendToRenderer('agent:tool-call', spaceId, conversationId, toolCall as unknown as Record<string, unknown>)
+      }
+      return
+    }
+
+    if (thought.type === 'tool_result') {
+      if (!thought.parentToolId) {
+        sendToRenderer('agent:tool-result', spaceId, conversationId, {
+          type: 'tool_result',
+          toolId: thought.id,
+          result: thought.toolOutput || '',
+          isError: thought.isError || false
+        })
+      }
+      return
+    }
+
+    if (thought.type === 'result') {
+      const finalContent = getVisibleAssistantContent(accumulatedTextContent || thought.content)
+      sendToRenderer('agent:message', spaceId, conversationId, {
+        type: 'message',
+        content: finalContent,
+        isComplete: true
+      })
+      if (!accumulatedTextContent && thought.content) {
+        accumulatedTextContent = finalContent
+      }
+      console.log(`[Agent][${conversationId}] Result thought received, ${sessionState.thoughts.length} thoughts accumulated`)
+    }
+  }
 
   const t1 = Date.now()
   console.log(`[Agent][${conversationId}] Sending message to V2 session...`)
@@ -896,9 +1022,12 @@ async function processMessageStream(
     if (sdkMessage.type === 'system') {
       const sub = (sdkMessage as any).subtype
       if (sub === 'local_command_output' || sub === 'status') {
-        const statusText = (sdkMessage as any).content || (sdkMessage as any).status || ''
+        const rawStatusText = (sdkMessage as any).content || (sdkMessage as any).status || ''
+        const statusText = typeof rawStatusText === 'string'
+          ? normalizeSdkStatusText(rawStatusText)
+          : ''
         console.log(`[Agent][${conversationId}] SDK status: ${sub} → ${JSON.stringify(statusText)} (suppress=${shouldSuppressSdkStatus(statusText)})`)
-        if (!shouldSuppressSdkStatus(statusText)) {
+        if (statusText && !shouldSuppressSdkStatus(statusText)) {
           sendToRenderer('agent:status', spaceId, conversationId, {
             type: 'status',
             message: statusText,
@@ -998,7 +1127,7 @@ async function processMessageStream(
       }
     }
 
-    // Handle stream_event for token-level streaming (text only)
+    // Handle stream_event for token-level streaming and tool activity
     if (sdkMessage.type === 'stream_event') {
       const event = (sdkMessage as any).event
       if (!event) continue
@@ -1031,6 +1160,56 @@ async function processMessageStream(
         console.log(`[Agent][${conversationId}] ⏱️ Text block #${textBlockCount} started: ${Date.now() - t1}ms after send`)
       }
 
+      if (
+        event.type === 'content_block_start'
+        && (event.content_block?.type === 'tool_use' || event.content_block?.type === 'server_tool_use')
+      ) {
+        const currentParentId = activeToolStack.length > 0
+          ? activeToolStack[activeToolStack.length - 1].id
+          : undefined
+        const toolName = normalizeToolThoughtName(event.content_block?.name) || event.content_block?.name || 'tool'
+        const toolInput = normalizeToolThoughtInput(toolName, event.content_block?.input) || {}
+        const thought: Thought = {
+          id: event.content_block?.id || `tool-${Date.now()}-${event.index ?? 0}`,
+          type: 'tool_use',
+          content: `Tool call: ${toolName}`,
+          timestamp: new Date().toISOString(),
+          toolName,
+          toolInput,
+          parentToolId: currentParentId,
+          isSkillInvocation: toolName === 'Skill' || toolName === 'mcp__skill__Skill'
+        }
+        streamToolUses.set(event.index ?? -1, {
+          thought,
+          inputJson: ''
+        })
+        emitThought(thought)
+      }
+
+      if (event.type === 'content_block_start' && event.content_block?.type === 'web_search_tool_result') {
+        const toolUseId = event.content_block?.tool_use_id || `web-search-${Date.now()}-${event.index ?? 0}`
+        if (!findToolUseThought(sessionState, toolUseId)) {
+          emitThought({
+            id: toolUseId,
+            type: 'tool_use',
+            content: 'Tool call: WebSearch',
+            timestamp: new Date().toISOString(),
+            toolName: 'WebSearch',
+            toolInput: {}
+          })
+        }
+
+        emitThought({
+          id: toolUseId,
+          type: 'tool_result',
+          content: 'Tool execution succeeded',
+          timestamp: new Date().toISOString(),
+          toolName: 'WebSearch',
+          toolOutput: serializeToolResultContent(event.content_block?.content),
+          isError: false
+        })
+      }
+
       // Text delta - accumulate locally, send full content to frontend
       if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta' && isStreamingTextBlock) {
         const delta = event.delta.text || ''
@@ -1054,7 +1233,29 @@ async function processMessageStream(
         })
       }
 
+      if (event.type === 'content_block_delta' && event.delta?.type === 'input_json_delta') {
+        const streamToolState = streamToolUses.get(event.index ?? -1)
+        if (streamToolState && typeof event.delta.partial_json === 'string') {
+          streamToolState.inputJson += event.delta.partial_json
+        }
+      }
+
       // Text block ended
+      if (event.type === 'content_block_stop') {
+        const streamToolState = streamToolUses.get(event.index ?? -1)
+        if (streamToolState) {
+          if (streamToolState.inputJson) {
+            try {
+              const parsedInput = JSON.parse(streamToolState.inputJson) as Record<string, unknown>
+              streamToolState.thought.toolInput = normalizeToolThoughtInput(streamToolState.thought.toolName, parsedInput) || streamToolState.thought.toolInput
+            } catch (error) {
+              console.warn(`[Agent][${conversationId}] Failed to parse stream tool input JSON:`, error)
+            }
+          }
+          streamToolUses.delete(event.index ?? -1)
+        }
+      }
+
       if (event.type === 'content_block_stop' && isStreamingTextBlock) {
         isStreamingTextBlock = false
         // Accumulate this block's content
@@ -1074,7 +1275,7 @@ async function processMessageStream(
         console.log(`[Agent][${conversationId}] Text block #${textBlockCount} completed, block length: ${currentStreamingText.length}, total: ${accumulatedTextContent.length}`)
       }
 
-      continue  // stream_event handled, skip normal processing
+      continue
     }
 
     // DEBUG: Log all SDK messages with timestamp
@@ -1108,108 +1309,15 @@ async function processMessageStream(
       }
     }
 
-    // Parse SDK message into Thought and send to renderer
+    // Parse SDK message into Thoughts and send to renderer
     // Pass credentials.model to display the user's actual configured model
     // Pass current parent tool ID for child tool relationship tracking
     const currentParentId = activeToolStack.length > 0
       ? activeToolStack[activeToolStack.length - 1].id
       : undefined
-    const thought = parseSDKMessage(sdkMessage, displayModel, currentParentId)
-
-    if (thought) {
-      if (sessionState.thoughts.some(
-        (existingThought) => existingThought.id === thought.id && existingThought.type === thought.type
-      )) {
-        console.log(`[Agent][${conversationId}] Skipping duplicate thought: ${thought.type} ${thought.id}`)
-        continue
-      }
-
-      if (thought.type === 'tool_use' && isDuplicateActiveToolUse(sessionState.thoughts, thought)) {
-        console.log(
-          `[Agent][${conversationId}] Skipping duplicate active tool_use: ${thought.toolName} ${JSON.stringify(thought.toolInput || {})}`
-        )
-        continue
-      }
-
-      // Track Skill tool calls in stack (for parent-child relationship)
-      if (thought.type === 'tool_use' && thought.isSkillInvocation) {
-        activeToolStack.push({ id: thought.id, toolName: thought.toolName! })
-        console.log(`[Agent][${conversationId}] Skill tool pushed to stack: ${thought.toolName}, depth: ${activeToolStack.length}`)
-      }
-
-      // Pop from stack when Skill result comes back
-      if (thought.type === 'tool_result') {
-        const topTool = activeToolStack[activeToolStack.length - 1]
-        if (topTool && thought.id === topTool.id) {
-          activeToolStack.pop()
-          console.log(`[Agent][${conversationId}] Skill tool popped from stack: ${topTool.toolName}, depth: ${activeToolStack.length}`)
-        }
-      }
-
-      // Accumulate thought in backend session (Single Source of Truth)
-      sessionState.thoughts.push(thought)
-
-      // Send ALL thoughts to renderer for real-time display in thought process area
-      // This includes text blocks - they appear in the timeline during generation
-      sendToRenderer('agent:thought', spaceId, conversationId, { thought })
-
-      // Handle specific thought types
-      if (thought.type === 'text') {
-        // Text blocks are handled via stream_event for token-level streaming
-        // Only use this fallback for non-streaming SDKs (when textBlockCount is still 0)
-        // If textBlockCount > 0, content was already accumulated via stream_event - skip to avoid duplication
-        if (textBlockCount === 0) {
-          accumulatedTextContent = getVisibleAssistantContent(accumulatedTextContent + thought.content)
-          textBlockCount++
-
-          // Ralph mode: non-streaming fallback still needs output callback.
-          if (ralphMode?.onOutput) {
-            ralphMode.onOutput(accumulatedTextContent)
-          }
-
-          // Send streaming update with accumulated content
-          sendToRenderer('agent:message', spaceId, conversationId, {
-            type: 'message',
-            content: accumulatedTextContent,
-            isComplete: false
-          })
-        }
-      } else if (thought.type === 'tool_use') {
-        // Only send tool-call event for top-level tools (not children of Skill)
-        if (!thought.parentToolId) {
-          const toolCall: ToolCall = {
-            id: thought.id,
-            name: thought.toolName || '',
-            status: 'running',
-            input: thought.toolInput || {}
-          }
-          sendToRenderer('agent:tool-call', spaceId, conversationId, toolCall as unknown as Record<string, unknown>)
-        }
-      } else if (thought.type === 'tool_result') {
-        // Only send tool-result event for top-level tools (not children of Skill)
-        if (!thought.parentToolId) {
-          sendToRenderer('agent:tool-result', spaceId, conversationId, {
-            type: 'tool_result',
-            toolId: thought.id,
-            result: thought.toolOutput || '',
-            isError: thought.isError || false
-          })
-        }
-      } else if (thought.type === 'result') {
-        // Final result - use accumulated text content
-        const finalContent = getVisibleAssistantContent(accumulatedTextContent || thought.content)
-        sendToRenderer('agent:message', spaceId, conversationId, {
-          type: 'message',
-          content: finalContent,
-          isComplete: true
-        })
-        // Fallback: if no text block was received, use result content for persistence
-        if (!accumulatedTextContent && thought.content) {
-          accumulatedTextContent = finalContent
-        }
-        // Note: updateLastMessage is called after loop to include tokenUsage
-        console.log(`[Agent][${conversationId}] Result thought received, ${sessionState.thoughts.length} thoughts accumulated`)
-      }
+    const thoughts = parseSDKMessageThoughts(sdkMessage, displayModel, currentParentId)
+    for (const thought of thoughts) {
+      emitThought(thought)
     }
 
     // Capture session ID and MCP status from system/result messages

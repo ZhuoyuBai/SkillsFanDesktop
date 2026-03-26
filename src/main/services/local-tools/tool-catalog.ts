@@ -18,9 +18,9 @@ const BUILT_IN_TOOLS: ToolCatalogEntry[] = [
   { name: 'NotebookEdit', description: 'Edit a Jupyter notebook cell.', source: 'built-in', category: 'files' },
   { name: 'Task', description: 'Launch a sub-agent for parallel work.', source: 'built-in', category: 'tasks' },
   { name: 'AskUserQuestion', description: 'Pause and ask the user a structured follow-up question.', source: 'built-in', category: 'tasks' },
-  { name: 'TeamCreate', description: 'Create an agent team for coordinated work.', source: 'built-in', category: 'tasks' },
+  { name: 'TeamCreate', description: 'Create a persistent agent team before using team messaging or team task tools.', source: 'built-in', category: 'tasks' },
   { name: 'TeamDelete', description: 'Delete an agent team.', source: 'built-in', category: 'tasks' },
-  { name: 'SendMessage', description: 'Send a message between team members.', source: 'built-in', category: 'tasks' },
+  { name: 'SendMessage', description: 'Send a message to an existing team member. Requires a non-empty content field and should not be used as the first delegation step.', source: 'built-in', category: 'tasks' },
   { name: 'TaskCreate', description: 'Create a team task.', source: 'built-in', category: 'tasks' },
   { name: 'TaskUpdate', description: 'Update a team task.', source: 'built-in', category: 'tasks' },
   { name: 'TaskList', description: 'List team tasks.', source: 'built-in', category: 'tasks' },
@@ -95,7 +95,7 @@ const BASE_MCP_TOOLS: ToolCatalogEntry[] = [
   },
   {
     name: 'mcp__local-tools__subagent_spawn',
-    description: 'Launch a hosted subagent run managed by the app runtime.',
+    description: 'Launch a hosted subagent run managed by the app runtime. Use this as the default tool for one-off delegated work.',
     source: 'mcp',
     server: 'local-tools',
     category: 'tasks'
@@ -136,13 +136,15 @@ const AI_BROWSER_TOOLS: ToolCatalogEntry[] = [
   { name: 'mcp__ai-browser__browser_screenshot', description: 'Take a screenshot of the page or a selected element.', source: 'mcp', server: 'ai-browser', category: 'browser' }
 ]
 
-const SKILL_TOOL: ToolCatalogEntry = {
-  name: 'mcp__skill__Skill',
-  description: 'Load a Skill package with task-specific instructions from the local skill registry.',
-  source: 'mcp',
-  server: 'skill',
-  category: 'skills'
-}
+const SKILL_MCP_TOOLS: ToolCatalogEntry[] = [
+  {
+    name: 'mcp__skill__Skill',
+    description: 'Load a registered skill from SkillsFan, Claude, or Agent skill directories to get the task-specific instructions before doing the work.',
+    source: 'mcp',
+    server: 'skill',
+    category: 'skills'
+  }
+]
 
 export function buildToolCatalog(options: {
   aiBrowserEnabled?: boolean
@@ -163,7 +165,7 @@ export function buildToolCatalog(options: {
   }
 
   if (options.includeSkillMcp) {
-    catalog.push(SKILL_TOOL)
+    catalog.push(...SKILL_MCP_TOOLS)
   }
 
   return catalog

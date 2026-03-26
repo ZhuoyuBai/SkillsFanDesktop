@@ -13,6 +13,99 @@ import { getAllSkills, getSkill, getSkillsDir } from './skill-registry'
 import { getSkillContent } from './skill-loader'
 import type { SkillInfo } from './types'
 
+function normalizeRequestedSkillName(value: string): string {
+  const trimmed = value.trim()
+  return trimmed.replace(/^[：:]+/, '').trim()
+}
+
+function normalizeSkillLookupText(value: string): string {
+  return normalizeRequestedSkillName(value)
+    .toLowerCase()
+    .normalize('NFKC')
+    .replace(/[“”"'`]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function extractSkillMatchTokens(value: string): Set<string> {
+  const normalized = normalizeSkillLookupText(value)
+  const tokens = new Set<string>()
+
+  for (const match of normalized.matchAll(/[a-z0-9][a-z0-9._-]*/g)) {
+    const token = match[0]
+    if (token.length >= 2) tokens.add(token)
+  }
+
+  const hanSequences = normalized.match(/[\p{Script=Han}]{1,}/gu) || []
+  for (const sequence of hanSequences) {
+    if (sequence.length === 1) {
+      tokens.add(sequence)
+      continue
+    }
+    tokens.add(sequence)
+    for (let i = 0; i < sequence.length - 1; i += 1) {
+      tokens.add(sequence.slice(i, i + 2))
+    }
+  }
+
+  return tokens
+}
+
+function scoreSkillMatch(query: string, skill: SkillInfo): number {
+  const normalizedQuery = normalizeSkillLookupText(query)
+  if (!normalizedQuery) return 0
+
+  const normalizedName = normalizeSkillLookupText(skill.name)
+  const normalizedDescription = normalizeSkillLookupText(skill.description || '')
+
+  if (normalizedQuery === normalizedName) return 1000
+
+  let score = 0
+
+  if (normalizedQuery.includes(normalizedName) || normalizedName.includes(normalizedQuery)) {
+    score += 120
+  }
+
+  const queryTokens = extractSkillMatchTokens(query)
+  const nameTokens = extractSkillMatchTokens(skill.name)
+  const descriptionTokens = extractSkillMatchTokens(skill.description || '')
+
+  for (const token of queryTokens) {
+    if (nameTokens.has(token)) {
+      score += token.length >= 4 ? 24 : 12
+      continue
+    }
+    if (descriptionTokens.has(token)) {
+      score += token.length >= 4 ? 12 : 6
+    }
+  }
+
+  if (normalizedDescription && normalizedQuery.includes(normalizedDescription)) {
+    score += 40
+  }
+
+  return score
+}
+
+function inferSkillFromTask(query: string, skills: SkillInfo[]): SkillInfo | undefined {
+  const ranked = skills
+    .map((skill) => ({ skill, score: scoreSkillMatch(query, skill) }))
+    .sort((a, b) => b.score - a.score)
+
+  const best = ranked[0]
+  const second = ranked[1]
+
+  if (!best || best.score < 12) {
+    return undefined
+  }
+
+  if (second && best.score < second.score + 6) {
+    return undefined
+  }
+
+  return best.skill
+}
+
 /**
  * Group skills by source for display
  */
@@ -126,16 +219,47 @@ async function createSkillTool() {
   return tool(
     'Skill',
     await generateDescription(),
-    { name: z.string().describe(`技能名称${hint}`) },
+    {
+      skill: z.string().optional().describe(`技能名称；如果模型暂时拿不准，也可以传用户任务文本，服务端会尝试自动匹配${hint}`),
+      name: z.string().optional().describe('兼容旧格式的技能名称别名')
+    },
     async (args) => {
-      const skill = getSkill(args.name)
+      const requestedSkill = args.skill?.trim() || args.name?.trim()
+
+      if (!requestedSkill) {
+        return {
+          content: [{
+            type: 'text' as const,
+            text: 'Skill tool requires a non-empty `skill` parameter.'
+          }],
+          isError: true
+        }
+      }
+
+      const requestedBySkill = args.skill?.trim()
+      const requestedByName = args.name?.trim()
+      const normalizedSkillArg = requestedBySkill ? normalizeRequestedSkillName(requestedBySkill) : ''
+      const normalizedNameArg = requestedByName ? normalizeRequestedSkillName(requestedByName) : ''
+
+      const exactByName = requestedByName
+        ? getSkill(requestedByName) || getSkill(normalizedNameArg)
+        : undefined
+      const exactBySkill = requestedBySkill
+        ? getSkill(requestedBySkill) || getSkill(normalizedSkillArg)
+        : undefined
+
+      let skill = exactByName || exactBySkill
+
+      if (!skill) {
+        skill = inferSkillFromTask(requestedSkill, skills)
+      }
 
       if (!skill) {
         const available = (await getAllSkills()).map(s => s.name).join(', ')
         return {
           content: [{
             type: 'text' as const,
-            text: `技能 "${args.name}" 不存在。可用技能: ${available || '无'}`
+            text: `技能 "${requestedSkill}" 不存在。可用技能: ${available || '无'}`
           }],
           isError: true
         }

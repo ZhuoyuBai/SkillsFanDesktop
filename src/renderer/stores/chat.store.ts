@@ -31,6 +31,7 @@ import { logger } from '../lib/logger'
 import type { ThinkingEffort } from '../../shared/utils/openai-models'
 import { isSkillsFanHostedProviderType } from '../../shared/constants/providers'
 import {
+  normalizeSdkStatusText,
   shouldSuppressSetModelStatus,
   stripLeadingSetModelStatus
 } from '../../shared/utils/sdk-status'
@@ -194,7 +195,8 @@ function createEmptySpaceState(): SpaceState {
 
 function shouldHideSdkStatus(message?: string | null): boolean {
   if (!message) return false
-  return shouldSuppressSetModelStatus(message)
+  const normalized = normalizeSdkStatusText(message)
+  return !normalized || shouldSuppressSetModelStatus(normalized)
 }
 
 interface ChatState {
@@ -1590,12 +1592,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
   // Handle SDK status line messages (ephemeral progress indicator)
   handleAgentStatus: (data) => {
     const { conversationId, message } = data
+    const normalizedMessage = normalizeSdkStatusText(message || '')
     set((state) => {
       const newSessions = new Map(state.sessions)
       const session = newSessions.get(conversationId) || createEmptySessionState()
       newSessions.set(conversationId, {
         ...session,
-        sdkStatus: shouldHideSdkStatus(message) ? null : (message || null)
+        sdkStatus: shouldHideSdkStatus(normalizedMessage) ? null : (normalizedMessage || null)
       })
       return { sessions: newSessions }
     })

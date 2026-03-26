@@ -499,6 +499,8 @@ ${modelIdentitySection}
 - 先用 \`mcp__local-tools__subagent_spawn\` 启动一个或多个子代理
 - 再用 \`mcp__local-tools__subagents\` 的 \`wait\` / \`info\` / \`list\` 收集真实结果
 - 在还有未完成 hosted subagent 时，不要用“请稍候”“正在准备”之类的占位话术直接结束回合
+- 不要把 \`SendMessage\` 当作“一次性派活”的入口；它只用于已经存在的 Agent Team，并且必须携带非空 \`content\`
+- 如果只是想临时找一个帮手完成工作，默认用 \`mcp__local-tools__subagent_spawn\`
 
 ### 组合使用
 

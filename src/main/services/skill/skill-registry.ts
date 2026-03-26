@@ -13,8 +13,10 @@
 import { homedir } from 'os'
 import { join } from 'path'
 import { existsSync } from 'fs'
+import { createHash } from 'crypto'
 import { app } from 'electron'
 import { loadSkillsFromDir, loadClaudeCommands } from './skill-loader'
+import { syncNativeClaudeSkillBridges } from './native-bridge'
 import type { SkillInfo } from './types'
 
 // 技能缓存
@@ -27,7 +29,7 @@ let initialized = false
 let currentSpaceWorkDir: string | undefined
 
 /**
- * 获取技能目录路径
+ * 获取技能目录路径（主目录，用于安装）
  * 跨平台支持：Mac/Linux/Windows
  */
 export function getSkillsDir(): string {
@@ -49,12 +51,44 @@ export function getSkillsDir(): string {
   return join(home, '.skillsfan', 'skills')
 }
 
+function uniqueDirs(dirs: Array<string | undefined>): string[] {
+  return Array.from(new Set(dirs.filter((dir): dir is string => typeof dir === 'string' && dir.length > 0)))
+}
+
+/**
+ * 获取所有 SkillsFan 技能目录。
+ *
+ * 为了兼容以下场景，始终同时扫描：
+ * - 当前运行目录（可能来自 SKILLSFAN_DATA_DIR）
+ * - ~/.skillsfan/skills
+ * - ~/.skillsfan-dev/skills
+ */
+export function getAllSkillsfanDirs(): string[] {
+  const home = homedir()
+  return uniqueDirs([
+    getSkillsDir(),
+    join(home, '.skillsfan', 'skills'),
+    join(home, '.skillsfan-dev', 'skills')
+  ])
+}
+
+/**
+ * 获取备用技能目录（dev ↔ prod 互补）
+ * 开发模式返回生产目录，生产模式返回开发目录
+ * 当存在多个候选目录时，返回主安装目录以外的第一个目录
+ */
+export function getAltSkillsDir(): string | undefined {
+  return getAllSkillsfanDirs().find((dir) => dir !== getSkillsDir())
+}
+
 /**
  * 初始化技能注册表 — 扫描所有来源
  * 优先级：项目级 > SkillsFan > 全局 Claude > Claude Skills > Agents Skills
  */
 export async function initializeRegistry(spaceWorkDir?: string): Promise<void> {
   if (initialized) return
+
+  syncNativeClaudeSkillBridges()
 
   const home = homedir()
   const seenNames = new Set<string>()
@@ -84,8 +118,8 @@ export async function initializeRegistry(spaceWorkDir?: string): Promise<void> {
   }
 
   // ========== 2. SkillsFan installed skills ==========
-  const skillsfanDir = getSkillsDir()
-  if (existsSync(skillsfanDir)) {
+  for (const skillsfanDir of getAllSkillsfanDirs()) {
+    if (!existsSync(skillsfanDir)) continue
     addSkills(loadSkillsFromDir(skillsfanDir, { kind: 'skillsfan' }))
   }
 
@@ -162,6 +196,19 @@ export async function reloadSkills(spaceWorkDir?: string): Promise<SkillInfo[]> 
 }
 
 /**
+ * Invalidate the in-memory registry cache.
+ * The next read will rescan all sources from disk.
+ */
+export function invalidateSkillsCache(): void {
+  skillCache.clear()
+  initialized = false
+}
+
+export interface EnsureSkillsOptions {
+  forceRefresh?: boolean
+}
+
+/**
  * 更新当前活跃 Space 的工作目录
  * 切换 Space 时调用，会触发技能重新加载
  */
@@ -178,10 +225,46 @@ export function hasSkills(): boolean {
 }
 
 /**
+ * Build a stable signature for the currently loaded skill catalog.
+ * Used by V2 session rebuild logic so skill changes force a new CC session.
+ */
+export function getSkillsSignature(): string {
+  if (skillCache.size === 0) {
+    return ''
+  }
+
+  const fingerprint = Array.from(skillCache.values())
+    .map((skill) => ({
+      name: skill.name,
+      description: skill.description,
+      source: skill.source.kind,
+      location: skill.location
+    }))
+    .sort((left, right) => left.name.localeCompare(right.name))
+
+  return createHash('sha1')
+    .update(JSON.stringify(fingerprint))
+    .digest('hex')
+}
+
+/**
  * 确保已初始化（供外部模块使用）
  */
-export async function ensureSkillsInitialized(): Promise<void> {
+export async function ensureSkillsInitialized(
+  spaceWorkDir?: string,
+  options?: EnsureSkillsOptions
+): Promise<void> {
   if (!initialized) {
-    await initializeRegistry()
+    await initializeRegistry(spaceWorkDir)
+    return
+  }
+
+  if (options?.forceRefresh) {
+    await reloadSkills(spaceWorkDir !== undefined ? spaceWorkDir : currentSpaceWorkDir)
+    return
+  }
+
+  if (spaceWorkDir !== undefined && spaceWorkDir !== currentSpaceWorkDir) {
+    await updateSpaceWorkDir(spaceWorkDir)
   }
 }

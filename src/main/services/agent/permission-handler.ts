@@ -8,10 +8,12 @@
 import path from 'path'
 import { getConfig } from '../config.service'
 import { isAIBrowserTool } from '../ai-browser/tool-utils'
+import { getSkill } from '../skill'
 import { activeSessions } from './session-manager'
 import { sendToRenderer } from './helpers'
 import type { ToolCall, UserQuestionInfo } from './types'
 import { sanitizeWebSearchInput } from './tool-input-utils'
+import { buildSendMessageRepairHint } from './tool-repair'
 import { getEnabledExtensions, runToolUseHooks } from '../extension'
 
 // ============================================
@@ -432,6 +434,22 @@ export function createCanUseTool(
       'TaskCreate', 'TaskUpdate', 'TaskList', 'TaskGet',
       'EnterPlanMode', 'EnterWorktree'
     ]
+
+    if (toolName === 'SendMessage') {
+      const hasContent = typeof input.content === 'string' && input.content.trim().length > 0
+      if (!hasContent) {
+        const recipient = typeof input.recipient === 'string' ? input.recipient.trim() : ''
+        const recipientIsSkill = recipient.length > 0 && Boolean(getSkill(recipient))
+        return {
+          behavior: 'deny' as const,
+          message: buildSendMessageRepairHint({
+            recipient: recipient || undefined,
+            recipientIsSkill
+          })
+        }
+      }
+    }
+
     if (teamTools.includes(toolName)) {
       return { behavior: 'allow' as const, updatedInput: input }
     }

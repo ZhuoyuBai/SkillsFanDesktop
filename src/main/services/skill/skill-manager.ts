@@ -17,8 +17,9 @@ import {
 } from 'fs'
 import { tmpdir } from 'os'
 import AdmZip from 'adm-zip'
-import { getSkillsDir, getSkill } from './skill-registry'
+import { getSkill, getSkillsDir, invalidateSkillsCache } from './skill-registry'
 import { parseFrontmatter } from './frontmatter'
+import { syncNativeClaudeSkillBridges } from './native-bridge'
 
 // Validation errors
 export class SkillValidationError extends Error {
@@ -132,6 +133,37 @@ function copyDirectory(src: string, dest: string): void {
   }
 }
 
+function rewriteSkillNameInFrontmatter(content: string, nextSkillName: string): string {
+  const frontmatterMatch = content.match(/^(\s*---\s*\r?\n)([\s\S]*?)(\r?\n---\s*(?:\r?\n|$))/)
+  if (!frontmatterMatch) return content
+
+  const lines = frontmatterMatch[2].split(/\r?\n/)
+  let replaced = false
+  const updatedLines = lines.map((line) => {
+    if (/^\s*name\s*:/.test(line)) {
+      replaced = true
+      return `name: ${nextSkillName}`
+    }
+    return line
+  })
+
+  if (!replaced) {
+    updatedLines.unshift(`name: ${nextSkillName}`)
+  }
+
+  return (
+    frontmatterMatch[1]
+    + updatedLines.join('\n')
+    + frontmatterMatch[3]
+    + content.slice(frontmatterMatch[0].length)
+  )
+}
+
+function refreshSkillRuntimeState(): void {
+  syncNativeClaudeSkillBridges()
+  invalidateSkillsCache()
+}
+
 /**
  * Install skill from archive file
  *
@@ -194,6 +226,13 @@ export async function installSkill(
 
         // Copy to unique path
         copyDirectory(tempDir, uniquePath)
+        const originalSkillMd = readFileSync(join(tempDir, 'SKILL.md'), 'utf-8')
+        writeFileSync(
+          join(uniquePath, 'SKILL.md'),
+          rewriteSkillNameInFrontmatter(originalSkillMd, uniqueName),
+          'utf-8'
+        )
+        refreshSkillRuntimeState()
 
         return {
           success: true,
@@ -209,6 +248,7 @@ export async function installSkill(
 
     // Step 5: Copy to final destination
     copyDirectory(tempDir, targetPath)
+    refreshSkillRuntimeState()
 
     return {
       success: true,
@@ -250,6 +290,7 @@ export function deleteSkill(skillName: string): {
     }
 
     rmSync(skillPath, { recursive: true, force: true })
+    refreshSkillRuntimeState()
     return { success: true }
   } catch (err) {
     return {
@@ -329,6 +370,7 @@ export function saveSkillContent(
 
     // Write SKILL.md
     writeFileSync(join(skillDir, 'SKILL.md'), content, 'utf-8')
+    refreshSkillRuntimeState()
 
     return { success: true }
   } catch (err) {
