@@ -207,6 +207,8 @@ describe('sdk-options', () => {
         spaceId: 'space-1',
         conversationId: 'conv-1',
         aiBrowserEnabled: false,
+        browserAutomationEnabled: false,
+        browserAutomationMode: 'ai-browser',
         includeSkillMcp: false,
         includeSubagentTools: true
       })
@@ -227,7 +229,11 @@ describe('sdk-options', () => {
         conversationId: 'conv-2',
         spaceId: 'space-2',
         workDir: '/tmp/space-2',
-        config: { mcpServers: { github: { command: 'github-mcp' } }, memory: { enabled: false } },
+        config: {
+          mcpServers: { github: { command: 'github-mcp' } },
+          memory: { enabled: false },
+          browserAutomation: { enabled: true, mode: 'ai-browser' }
+        },
         abortController,
         sdkModel: 'claude-sonnet-4-20250514',
         credentialsModel: 'gpt-4.1',
@@ -246,7 +252,7 @@ describe('sdk-options', () => {
       expect(sdkOptions.thinking).toEqual({ type: 'enabled', budgetTokens: 10240 })
       expect(sdkOptions.systemPrompt.append).toContain('[BASE_PROMPT]')
       expect(sdkOptions.systemPrompt.append).toContain('[AI_BROWSER_PROMPT]')
-      expect(sdkOptions.systemPrompt.append).toContain('prefer the automated browser tools')
+      expect(sdkOptions.systemPrompt.append).toContain('prefer the built-in browser tools')
       expect(sdkOptions.systemPrompt.append).toContain('[RALPH_APPEND]')
       expect(sdkOptions.tools).toEqual(sdkOptions.allowedTools)
       expect(sdkOptions.disallowedTools).toEqual([
@@ -279,7 +285,7 @@ describe('sdk-options', () => {
         config: {
           mcpServers: {},
           memory: { enabled: true },
-          browserAutomation: { mode: 'system-browser' }
+          browserAutomation: { enabled: true, mode: 'system-browser' }
         },
         abortController,
         sdkModel: 'claude-sonnet-4-20250514',
@@ -298,6 +304,8 @@ describe('sdk-options', () => {
         spaceId: 'space-3',
         conversationId: 'conv-3',
         aiBrowserEnabled: false,
+        browserAutomationEnabled: true,
+        browserAutomationMode: 'system-browser',
         includeSkillMcp: false,
         includeSubagentTools: true
       })
@@ -325,7 +333,7 @@ describe('sdk-options', () => {
             'ai-browser': { command: 'custom-ai-browser' }
           },
           memory: { enabled: true },
-          browserAutomation: { mode: 'system-browser' }
+          browserAutomation: { enabled: true, mode: 'system-browser' }
         },
         abortController,
         sdkModel: 'claude-sonnet-4-20250514',
@@ -344,6 +352,44 @@ describe('sdk-options', () => {
         'local-tools': { type: 'stdio', command: 'local-tools' }
       })
       expect(sdkOptions.strictMcpConfig).toBe(true)
+    })
+
+    it('keeps all browser MCP tooling disabled when browser usage is turned off', async () => {
+      const abortController = new AbortController()
+
+      const { sdkOptions, addedMcpServers } = await buildSdkOptions({
+        conversationId: 'conv-disabled',
+        spaceId: 'space-disabled',
+        workDir: '/tmp/space-disabled',
+        config: {
+          mcpServers: {},
+          memory: { enabled: true },
+          browserAutomation: { enabled: false, mode: 'system-browser' }
+        },
+        abortController,
+        sdkModel: 'claude-sonnet-4-20250514',
+        credentialsModel: 'glm-5',
+        anthropicBaseUrl: 'http://router.local',
+        anthropicApiKey: 'encoded-key',
+        electronPath: '/Applications/Electron.app/Contents/MacOS/Electron',
+        onStderr: vi.fn(),
+        aiBrowserEnabled: true
+      })
+
+      expect(addedMcpServers).toEqual(['local-tools'])
+      expect(mocks.createAIBrowserMcpServer).not.toHaveBeenCalled()
+      expect(mocks.createLocalToolsMcpServer).toHaveBeenCalledWith({
+        workDir: '/tmp/space-disabled',
+        spaceId: 'space-disabled',
+        conversationId: 'conv-disabled',
+        aiBrowserEnabled: false,
+        browserAutomationEnabled: false,
+        browserAutomationMode: 'system-browser',
+        includeSkillMcp: false,
+        includeSubagentTools: true
+      })
+      expect(sdkOptions.systemPrompt.append).not.toContain('System Browser Mode')
+      expect(sdkOptions.systemPrompt.append).not.toContain('[AI_BROWSER_PROMPT]')
     })
 
     it('adds skill MCP and blocks native Skill tool when skills are available', async () => {
@@ -371,6 +417,8 @@ describe('sdk-options', () => {
         spaceId: 'space-skill',
         conversationId: 'conv-skill',
         aiBrowserEnabled: false,
+        browserAutomationEnabled: false,
+        browserAutomationMode: 'ai-browser',
         includeSkillMcp: true,
         includeSubagentTools: true
       })
@@ -411,6 +459,8 @@ describe('sdk-options', () => {
         spaceId: 'space-skill-native',
         conversationId: 'conv-skill-native',
         aiBrowserEnabled: false,
+        browserAutomationEnabled: false,
+        browserAutomationMode: 'ai-browser',
         includeSkillMcp: false,
         includeSubagentTools: true
       })

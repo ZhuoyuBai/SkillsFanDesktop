@@ -16,6 +16,7 @@ import {
   thinkingEffortToBudgetTokens
 } from '../../../../shared/utils/openai-models'
 import { stripLeadingSetModelStatus } from '../../../../shared/utils/sdk-status'
+import { resolveBrowserAutomationConfig } from '@shared/types/browser-automation'
 import type {
   SerializedSubagentRun,
   SubagentRun,
@@ -581,10 +582,18 @@ function createSubagentCanUseTool(workDir: string) {
 
     if (toolName === 'mcp__local-tools__open_url') {
       const currentConfig = getConfig()
-      if (currentConfig.browserAutomation?.mode !== 'system-browser') {
+      const browserAutomation = resolveBrowserAutomationConfig(currentConfig)
+      if (!browserAutomation.enabled) {
         return {
           behavior: 'deny' as const,
-          message: 'System browser opening is disabled while automated browser mode is active. Use automated browser tools instead.'
+          message: 'Browser tools are disabled in Settings > Advanced.'
+        }
+      }
+
+      if (browserAutomation.mode !== 'system-browser') {
+        return {
+          behavior: 'deny' as const,
+          message: 'System browser opening is disabled while built-in browser mode is active. Use built-in browser tools instead.'
         }
       }
       return { behavior: 'allow' as const, updatedInput: input }
@@ -592,10 +601,18 @@ function createSubagentCanUseTool(workDir: string) {
 
     if (isAIBrowserTool(toolName)) {
       const currentConfig = getConfig()
-      if (currentConfig.browserAutomation?.mode === 'system-browser') {
+      const browserAutomation = resolveBrowserAutomationConfig(currentConfig)
+      if (!browserAutomation.enabled) {
         return {
           behavior: 'deny' as const,
-          message: 'Automated browser is disabled while "Use System Default Browser" mode is enabled.'
+          message: 'Browser tools are disabled in Settings > Advanced.'
+        }
+      }
+
+      if (browserAutomation.mode === 'system-browser') {
+        return {
+          behavior: 'deny' as const,
+          message: 'Built-in browser is disabled while "System Browser" mode is enabled.'
         }
       }
       return { behavior: 'allow' as const, updatedInput: input }
@@ -649,14 +666,13 @@ async function runSubagent(runId: string): Promise<void> {
     })
 
     const { getExtensionHash } = await import('../../extension')
-    const browserAutomationMode = config.browserAutomation?.mode === 'system-browser'
-      ? 'system-browser'
-      : 'ai-browser'
+    const browserAutomation = resolveBrowserAutomationConfig(config as any)
     const sessionConfig: SessionConfig = {
       aiBrowserEnabled: false,
       skillsSignature,
       skillToolMode,
-      browserAutomationMode,
+      browserAutomationEnabled: browserAutomation.enabled,
+      browserAutomationMode: browserAutomation.mode,
       customInstructionsHash: config.customInstructions?.enabled && config.customInstructions?.content
         ? config.customInstructions.content
         : undefined,

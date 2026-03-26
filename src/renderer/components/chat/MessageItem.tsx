@@ -21,6 +21,7 @@ import {
   Sparkles,
   Copy,
   Check,
+  ListChecks,
 } from 'lucide-react'
 import { getToolIcon } from '../icons/ToolIcons'
 import { BrowserTaskCard, isBrowserTool } from '../tool/BrowserTaskCard'
@@ -82,6 +83,40 @@ function ThoughtHistory({ thoughts }: { thoughts: Thought[] }) {
         <div className="mt-2 space-y-2 animate-slide-down">
           {displayThoughts.map((thought) => (
             <ThoughtItem key={thought.id} thought={thought} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Collapsible process steps - intermediate status text folded away from result
+function ProcessSteps({ steps }: { steps: string[] }) {
+  const [isExpanded, setIsExpanded] = useState(false)
+  const { t } = useTranslation()
+
+  if (steps.length === 0) return null
+
+  return (
+    <div className="mt-2 mb-1">
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="flex items-center gap-1.5 py-0.5 text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+      >
+        <ChevronRight
+          size={10}
+          className={`transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+        />
+        <ListChecks size={12} />
+        <span>{t('{{count}} execution steps', { count: steps.length })}</span>
+      </button>
+
+      {isExpanded && (
+        <div className="mt-1 ml-4 pl-3 border-l-2 border-muted-foreground/15 space-y-0.5 animate-slide-down">
+          {steps.map((step, i) => (
+            <div key={i} className="text-xs text-muted-foreground/50 truncate">
+              {step}
+            </div>
           ))}
         </div>
       )}
@@ -206,6 +241,22 @@ export function MessageItem({ message, hideThoughts = false, isInContainer = fal
     return normalizeAssistantContent(message.content)
   }, [isUser, message.content])
 
+  // Split content into process steps (intermediate) and result (final)
+  const { processSteps, resultContent } = useMemo(() => {
+    if (isUser || !message.textSegments?.length || message.resultStartIndex == null) {
+      return { processSteps: null, resultContent: normalizedAssistantContent }
+    }
+    const rawResult = (message.content || '').slice(message.resultStartIndex)
+    const result = normalizeAssistantContent(rawResult)
+    const steps = message.textSegments
+      .map(s => s.content.trim())
+      .filter(Boolean)
+    return {
+      processSteps: steps.length > 0 ? steps : null,
+      resultContent: result || normalizedAssistantContent,
+    }
+  }, [isUser, message.content, message.textSegments, message.resultStartIndex, normalizedAssistantContent])
+
   // Handle copying message content to clipboard
   const handleCopyMessage = useCallback(async () => {
     if (!normalizedAssistantContent) return
@@ -305,11 +356,11 @@ export function MessageItem({ message, hideThoughts = false, isInContainer = fal
   }, [message.thoughts])
 
   const useCompactLogRenderer = useMemo(() => {
-    if (isUser || !normalizedAssistantContent) {
+    if (isUser || !resultContent) {
       return false
     }
-    return shouldUseCompactLogText(normalizedAssistantContent)
-  }, [isUser, normalizedAssistantContent])
+    return shouldUseCompactLogText(resultContent)
+  }, [isUser, resultContent])
 
   const auxiliaryContent = (
     <>
@@ -352,15 +403,20 @@ export function MessageItem({ message, hideThoughts = false, isInContainer = fal
           <MessageAttachments attachments={userAttachments} />
         )}
 
+        {/* Process steps (collapsed intermediate text) */}
+        {!isUser && processSteps && processSteps.length > 0 && (
+          <ProcessSteps steps={processSteps} />
+        )}
+
         {/* Message content */}
         <div className="break-words leading-relaxed text-[13px]" data-message-content>
           {hasMessageContent && (
             isUser ? (
               <span className="whitespace-pre-wrap text-foreground">{message.content}</span>
             ) : useCompactLogRenderer ? (
-              <CompactTextRenderer content={normalizedAssistantContent} />
+              <CompactTextRenderer content={resultContent} />
             ) : (
-              <MarkdownRenderer content={normalizedAssistantContent} filePathMap={filePathMap} />
+              <MarkdownRenderer content={resultContent} filePathMap={filePathMap} />
             )
           )}
           {isStreaming && (

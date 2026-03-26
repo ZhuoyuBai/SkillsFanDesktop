@@ -77,22 +77,42 @@
   color: hsl(var(--muted-foreground) / 0.5);
 }
 
-/* ========== Code Blocks ========== */
+/* ========== Code Blocks — Style D: left gradient accent ========== */
 .streamdown-content pre {
   margin: 0.75rem 0;
-  border-radius: 0.75rem;
+  border-radius: 0.625rem;
   overflow: hidden;
   border: 1px solid hsl(var(--border) / 0.5);
   background: hsl(var(--card));
+  position: relative;
+  padding-left: calc(4px + 1rem);
+}
+
+/* Left gradient accent bar */
+.streamdown-content pre::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: linear-gradient(180deg, #f97316 0%, #ef4444 100%);
 }
 
 .streamdown-content pre code {
   display: block;
-  padding: 1rem;
+  padding: 0.875rem 1rem 0.875rem 0;
   overflow-x: auto;
   font-family: "SF Mono", "Fira Code", "Consolas", monospace;
   font-size: 0.85em;
-  line-height: 1.6;
+  line-height: 1.7;
+}
+
+/* No-language code blocks: use system font instead of monospace */
+.streamdown-content pre code:not([class]) {
+  font-family: inherit;
+  font-size: 1em;
+  line-height: 1.8;
 }
 
 /* Inline code */
@@ -117,10 +137,11 @@
 /* ========== Blockquote ========== */
 .streamdown-content blockquote {
   margin: 0.75rem 0;
-  padding-left: 1rem;
-  border-left: 2px solid hsl(var(--border));
-  color: hsl(var(--muted-foreground));
-  font-style: italic;
+  padding: 0.75rem 1rem;
+  border-left: 3px solid hsl(var(--primary) / 0.5);
+  background: hsl(var(--muted) / 0.15);
+  border-radius: 0 0.5rem 0.5rem 0;
+  color: hsl(var(--foreground));
 }
 
 /* ========== Table ========== */

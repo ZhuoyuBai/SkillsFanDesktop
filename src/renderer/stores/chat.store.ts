@@ -1369,7 +1369,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
           content: session.streamingContent,
           timestamp: new Date().toISOString(),
           thoughts: session.thoughts?.length > 0 ? session.thoughts : undefined,
-          userMessageUuid  // Store UUID for file rewind support
+          userMessageUuid,  // Store UUID for file rewind support
+          textSegments: session.textSegments.length > 0 ? session.textSegments : undefined,
+          resultStartIndex: session.textSegments.length > 0 ? session.lastSegmentIndex : undefined,
         }
         const messages = [...cached.messages]
         const lastMsg = messages[messages.length - 1]

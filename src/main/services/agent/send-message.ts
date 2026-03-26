@@ -75,6 +75,7 @@ import {
 import { isDuplicateActiveToolUse } from '../../../shared/utils/thought-dedupe'
 import { normalizeSdkStatusText, stripLeadingSetModelStatus } from '../../../shared/utils/sdk-status'
 import { normalizeAssistantContent } from '../../../shared/utils/assistant-content'
+import { resolveBrowserAutomationConfig } from '@shared/types/browser-automation'
 import { resolveAccessibleAiSource } from '../ai-sources/hosted-ai-availability'
 import { normalizeRepairableSendMessageResult } from './tool-repair'
 
@@ -415,8 +416,9 @@ async function sendMessageInternal(
 
     // Session config for rebuild detection
     const ci = config.customInstructions
-    const browserAutomationMode = config.browserAutomation?.mode === 'system-browser' ? 'system-browser' : 'ai-browser'
-    const effectiveAiBrowserEnabled = !!aiBrowserEnabled && browserAutomationMode !== 'system-browser'
+    const browserAutomation = resolveBrowserAutomationConfig(config as any)
+    const browserAutomationMode = browserAutomation.mode
+    const effectiveAiBrowserEnabled = !!aiBrowserEnabled && browserAutomation.enabled && browserAutomationMode === 'ai-browser'
     const skillToolMode = resolveSkillToolMode(config as Record<string, any>, {
       skillsAvailable,
       routed: transport.routed
@@ -426,6 +428,7 @@ async function sendMessageInternal(
       aiBrowserEnabled: effectiveAiBrowserEnabled,
       skillsSignature,
       skillToolMode,
+      browserAutomationEnabled: browserAutomation.enabled,
       browserAutomationMode,
       customInstructionsHash: ci?.enabled && ci?.content ? ci.content : undefined,
       extensionHash: getExtensionHash()

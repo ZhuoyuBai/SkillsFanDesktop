@@ -1,3 +1,5 @@
+import type { BrowserAutomationMode } from '@shared/types/browser-automation'
+
 export interface ToolCatalogEntry {
   name: string
   description: string
@@ -148,6 +150,8 @@ const SKILL_MCP_TOOLS: ToolCatalogEntry[] = [
 
 export function buildToolCatalog(options: {
   aiBrowserEnabled?: boolean
+  browserAutomationEnabled?: boolean
+  browserAutomationMode?: BrowserAutomationMode
   includeSkillMcp?: boolean
   includeSubagentTools?: boolean
 }): ToolCatalogEntry[] {
@@ -158,7 +162,24 @@ export function buildToolCatalog(options: {
       )
     : BASE_MCP_TOOLS
 
-  const catalog = [...BUILT_IN_TOOLS, ...baseTools]
+  const browserToolsEnabled = options.browserAutomationEnabled === true
+  const systemBrowserMode = browserToolsEnabled && options.browserAutomationMode === 'system-browser'
+  const filteredBaseTools = baseTools.filter((entry) => {
+    if (entry.name === 'mcp__local-tools__open_url') {
+      return systemBrowserMode
+    }
+
+    if (
+      entry.name === 'mcp__local-tools__open_application'
+      || entry.name === 'mcp__local-tools__run_applescript'
+    ) {
+      return systemBrowserMode && process.platform === 'darwin'
+    }
+
+    return true
+  })
+
+  const catalog = [...BUILT_IN_TOOLS, ...filteredBaseTools]
 
   if (options.aiBrowserEnabled) {
     catalog.push(...AI_BROWSER_TOOLS)

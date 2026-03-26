@@ -19,3 +19,6 @@ export * from './feishu'
 
 // Product feature flags
 export * from './product-features'
+
+// Browser automation types
+export * from './browser-automation'

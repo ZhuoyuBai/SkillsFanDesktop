@@ -13,7 +13,9 @@
     "lib": ["DOM", "DOM.Iterable", "ESNext"],
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/renderer/*"]
+      "@/*": ["src/renderer/*"],
+      "@shared": ["src/shared"],
+      "@shared/*": ["src/shared/*"]
     }
   },
   "include": ["src/renderer/**/*", "src/shared/**/*"]

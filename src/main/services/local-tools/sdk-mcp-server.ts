@@ -6,6 +6,7 @@ import { executeMemoryCommand } from './memory-tool'
 import { executeTextEditorCommand } from './text-editor'
 import { buildToolCatalog } from './tool-catalog'
 import { searchToolsByBm25, searchToolsByRegex } from './tool-search'
+import type { BrowserAutomationMode } from '@shared/types/browser-automation'
 
 function toToolText(payload: unknown): string {
   return JSON.stringify(payload, null, 2)
@@ -16,6 +17,8 @@ export interface CreateLocalToolsMcpServerOptions {
   spaceId: string
   conversationId: string
   aiBrowserEnabled?: boolean
+  browserAutomationEnabled?: boolean
+  browserAutomationMode?: BrowserAutomationMode
   includeSkillMcp?: boolean
   includeSubagentTools?: boolean
 }
@@ -37,6 +40,8 @@ function getToolUseId(extra: unknown): string | undefined {
 export function createLocalToolsMcpServer(options: CreateLocalToolsMcpServerOptions) {
   const catalog = buildToolCatalog({
     aiBrowserEnabled: options.aiBrowserEnabled,
+    browserAutomationEnabled: options.browserAutomationEnabled,
+    browserAutomationMode: options.browserAutomationMode,
     includeSkillMcp: options.includeSkillMcp,
     includeSubagentTools: options.includeSubagentTools
   })
@@ -466,12 +471,17 @@ export function createLocalToolsMcpServer(options: CreateLocalToolsMcpServerOpti
     codeExecutionTool,
     bashCodeExecutionTool,
     textEditorTool,
-    openUrlTool,
-    openApplicationTool,
-    runAppleScriptTool,
     regexToolSearch,
     bm25ToolSearch
   ]
+
+  if (options.browserAutomationEnabled && options.browserAutomationMode === 'system-browser') {
+    tools.push(openUrlTool)
+
+    if (process.platform === 'darwin') {
+      tools.push(openApplicationTool, runAppleScriptTool)
+    }
+  }
 
   if (subagentSpawnTool) {
     tools.push(subagentSpawnTool)

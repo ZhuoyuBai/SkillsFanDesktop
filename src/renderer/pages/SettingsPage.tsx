@@ -11,6 +11,8 @@ import type { HaloConfig, ThemeMode, McpServersConfig, AISourceType, OAuthSource
 import { AVAILABLE_MODELS, DEFAULT_CONFIG, DEFAULT_MODEL, syncTopLevelFromActive } from '../types'
 import { Select } from '../components/ui/Select'
 import { Switch } from '../components/ui/Switch'
+import type { BrowserAutomationMode } from '@shared/types/browser-automation'
+import { resolveBrowserAutomationConfig } from '@shared/types/browser-automation'
 
 /**
  * Localized text - either a simple string or object with language codes
@@ -506,7 +508,8 @@ export function SettingsPage() {
 
   const isFullAccessEnabled = (config?.permissions?.commandExecution === 'allow')
     || (config?.permissions?.trustMode ?? false)
-  const isSystemBrowserMode = (config?.browserAutomation?.mode ?? DEFAULT_CONFIG.browserAutomation?.mode) === 'system-browser'
+  const browserAutomation = resolveBrowserAutomationConfig(config ?? DEFAULT_CONFIG)
+  const isBrowserAutomationEnabled = browserAutomation.enabled
   const prefersNativeClaudeSkillTool = (
     config?.skillSettings?.preferNativeClaudeSkillTool
     ?? DEFAULT_CONFIG.skillSettings?.preferNativeClaudeSkillTool
@@ -553,9 +556,26 @@ export function SettingsPage() {
     }
   }
 
-  const handleSystemBrowserModeChange = async (enabled: boolean) => {
+  const handleBrowserAutomationToggle = async (enabled: boolean) => {
     const browserAutomation = {
-      mode: enabled ? 'system-browser' as const : 'ai-browser' as const
+      enabled,
+      mode: resolveBrowserAutomationConfig(config ?? DEFAULT_CONFIG).mode
+    }
+
+    try {
+      await api.setConfig({ browserAutomation })
+      setConfig({ ...(config ?? DEFAULT_CONFIG), browserAutomation } as HaloConfig)
+      addToast(t('Saved'), 'success')
+    } catch (error) {
+      console.error('[Settings] Failed to update browser automation toggle:', error)
+      addToast(t('Save failed'), 'error')
+    }
+  }
+
+  const handleBrowserAutomationModeChange = async (mode: BrowserAutomationMode) => {
+    const browserAutomation = {
+      enabled: true,
+      mode
     }
 
     try {
@@ -1506,18 +1526,39 @@ export function SettingsPage() {
                   <Switch checked={config?.memory?.enabled ?? true} onChange={handleMemoryEnabledChange} />
                 </div>
 
-                {platform.isMac && (
+                <div className="flex items-center justify-between pt-4 border-t border-border">
+                  <div className="flex-1">
+                    <p className="font-medium">{t('Use Browser')}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {t('Allow AI to use browser tools when a task needs web pages.')}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {t('Changes take effect on the next message')}
+                    </p>
+                  </div>
+                  <Switch checked={isBrowserAutomationEnabled} onChange={handleBrowserAutomationToggle} />
+                </div>
+
+                {isBrowserAutomationEnabled && (
                   <div className="flex items-center justify-between pt-4 border-t border-border">
                     <div className="flex-1">
-                      <p className="font-medium">{t('Prefer System Browser')}</p>
+                      <p className="font-medium">{t('Browser mode')}</p>
                       <p className="text-sm text-muted-foreground">
-                        {t('Use your normal Chrome or Safari for browser tasks and avoid opening the AI-controlled browser.')}
+                        {t('Choose whether browser tasks open in your system browser or the built-in browser.')}
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
                         {t('Changes take effect on the next message')}
                       </p>
                     </div>
-                    <Switch checked={isSystemBrowserMode} onChange={handleSystemBrowserModeChange} />
+                    <Select<BrowserAutomationMode>
+                      variant="compact"
+                      value={browserAutomation.mode}
+                      onChange={handleBrowserAutomationModeChange}
+                      options={[
+                        { value: 'system-browser', label: t('System Browser') },
+                        { value: 'ai-browser', label: t('Built-in Browser') }
+                      ]}
+                    />
                   </div>
                 )}
 

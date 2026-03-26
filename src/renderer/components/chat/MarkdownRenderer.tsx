@@ -83,46 +83,82 @@ function CodeBlock({
     setTimeout(() => setCopied(false), 2000)
   }, [])
 
-  // Inline code (no language class, short content)
+  // No language class: distinguish inline code from no-language fenced blocks
   if (!className) {
+    const text = typeof children === 'string' ? children : String(children || '')
+    if (text.includes('\n')) {
+      // Multi-line = fenced code block without language tag → system font
+      return (
+        <div className="group relative my-3 rounded-[10px] overflow-hidden border border-border/50 bg-muted/10">
+          <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+            <button
+              onClick={handleCopy}
+              className="flex items-center gap-1.5 px-2.5 py-1 text-xs text-muted-foreground/60
+                hover:text-foreground bg-background/60 backdrop-blur-sm border border-border/50
+                rounded-md transition-all"
+              title={t('Copy code')}
+            >
+              {copied ? (
+                <>
+                  <Check size={14} className="text-green-400" />
+                  <span className="text-green-400">{t('Copied')}</span>
+                </>
+              ) : (
+                <>
+                  <Copy size={14} />
+                  <span>{t('Copy')}</span>
+                </>
+              )}
+            </button>
+          </div>
+          <pre className="p-4 overflow-x-auto whitespace-pre-wrap text-[13px] leading-relaxed" style={{ fontFamily: 'inherit' }}>
+            <code ref={codeRef} {...props}>{children}</code>
+          </pre>
+        </div>
+      )
+    }
+    // Single-line = true inline code
     return <InlineCode filePathMap={filePathMap} {...props}>{children}</InlineCode>
   }
 
-  // Code block
-  // Use theme-aware colors: dark mode uses GitHub Dark, light mode uses GitHub Light
+  // Code block — Style D: left gradient accent bar + compact header
   return (
-    <div className="group relative my-3 rounded-xl overflow-hidden border border-border/50 bg-card">
-      {/* Header with language and copy button */}
-      <div className="flex items-center justify-between px-4 py-2 bg-secondary border-b border-border/30">
-        <span className="text-xs text-muted-foreground/70 font-mono uppercase tracking-wide">
-          {language || 'code'}
-        </span>
-        <button
-          onClick={handleCopy}
-          className="flex items-center gap-1.5 px-2 py-1 text-xs text-muted-foreground/60
-            hover:text-foreground hover:bg-white/5 [.light_&]:hover:bg-black/5 rounded-md transition-all"
-          title={t('Copy code')}
-        >
-          {copied ? (
-            <>
-              <Check size={14} className="text-green-400" />
-              <span className="text-green-400">{t('Copied')}</span>
-            </>
-          ) : (
-            <>
-              <Copy size={14} />
-              <span className="opacity-0 group-hover:opacity-100 transition-opacity">{t('Copy')}</span>
-            </>
-          )}
-        </button>
-      </div>
+    <div className="group relative my-3 rounded-[10px] overflow-hidden border border-border/50 bg-card flex">
+      {/* Left gradient accent bar */}
+      <div className="w-1 shrink-0 bg-gradient-to-b from-orange-500 to-red-500" />
+      <div className="flex-1 min-w-0">
+        {/* Compact header */}
+        <div className="flex items-center justify-between px-3.5 py-1.5 border-b border-border/30">
+          <span className="text-xs text-orange-400 font-mono font-medium">
+            {language}
+          </span>
+          <button
+            onClick={handleCopy}
+            className="flex items-center gap-1.5 px-2 py-1 text-xs text-muted-foreground/60
+              hover:text-foreground hover:bg-white/5 [.light_&]:hover:bg-black/5 rounded-md transition-all"
+            title={t('Copy code')}
+          >
+            {copied ? (
+              <>
+                <Check size={14} className="text-green-400" />
+                <span className="text-green-400">{t('Copied')}</span>
+              </>
+            ) : (
+              <>
+                <Copy size={14} />
+                <span className="opacity-0 group-hover:opacity-100 transition-opacity">{t('Copy')}</span>
+              </>
+            )}
+          </button>
+        </div>
 
-      {/* Code content */}
-      <pre className="p-4 overflow-x-auto">
-        <code ref={codeRef} className={`${className} text-sm font-mono leading-relaxed`} {...props}>
-          {children}
-        </code>
-      </pre>
+        {/* Code content */}
+        <pre className="px-4 py-3.5 overflow-x-auto">
+          <code ref={codeRef} className={`${className} text-sm font-mono leading-relaxed`} {...props}>
+            {children}
+          </code>
+        </pre>
+      </div>
     </div>
   )
 }
@@ -162,7 +198,7 @@ function buildComponents(filePathMap?: Record<string, string>) {
 
   // Blockquote
   blockquote: ({ children }: { children?: React.ReactNode }) => (
-    <blockquote className="my-3 pl-4 border-l-2 border-primary/40 text-muted-foreground italic">
+    <blockquote className="my-3 py-3 px-4 border-l-[3px] border-primary/50 bg-muted/15 rounded-r-lg text-foreground">
       {children}
     </blockquote>
   ),

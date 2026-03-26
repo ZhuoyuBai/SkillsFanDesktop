@@ -15,6 +15,7 @@ import { createCanUseTool } from './permission-handler'
 import { buildSystemPromptAppend, getEnabledMcpServers, inferOpenAIWireApi } from './helpers'
 import { getEnabledExtensions, runSystemPromptHooks, runGetMcpServersHooks } from '../extension'
 import type { ApiCredentials } from './types'
+import { resolveBrowserAutomationConfig } from '@shared/types/browser-automation'
 
 const DEFAULT_MODEL = 'claude-opus-4-5-20251101'
 const ROUTED_MODEL = 'claude-sonnet-4-20250514'
@@ -23,21 +24,21 @@ const SYSTEM_BROWSER_AUTOMATION_PROMPT = `
 
 ## System Browser Mode
 
-The user prefers the normal system browser instead of the automated browser.
+The user wants browser tasks to use the system default browser instead of the built-in browser.
 When browser automation is needed:
 1. Do not use \`mcp__ai-browser__*\` tools.
 2. Prefer \`mcp__local-tools__open_url\` to open the page in the user's normal browser.
-3. Use \`mcp__local-tools__open_application\` only when the user explicitly wants a specific browser such as Chrome or Safari.
-4. Do not use \`mcp__local-tools__run_applescript\` unless the user explicitly asks for system-level UI automation after the browser is open.
-5. Avoid opening any additional automated browser window unless the user explicitly asks for it.
+3. On macOS, \`mcp__local-tools__open_application\` can be used only when the user explicitly wants a specific browser app.
+4. On macOS, do not use \`mcp__local-tools__run_applescript\` unless the user explicitly asks for system-level UI automation after the browser is open.
+5. Avoid opening any additional built-in browser window unless the user explicitly asks for it.
 `
 
 const AI_BROWSER_PREFERENCE_PROMPT = `
 
 ## Browser Preference
 
-When browser automation is needed in this conversation, prefer the automated browser tools from MCP server \`ai-browser\`.
-Avoid opening a separate system browser unless the user explicitly asks for it or the automated browser tools are unavailable.
+When browser automation is needed in this conversation, prefer the built-in browser tools from MCP server \`ai-browser\`.
+Avoid opening a separate system browser unless the user explicitly asks for it or the built-in browser tools are unavailable.
 `
 
 const DISALLOWED_SERVER_SIDE_TOOLS_BASE = [
@@ -181,10 +182,10 @@ export async function buildSdkOptions(params: BuildSdkOptionsParams): Promise<{
     routed = false
   } = params
 
-  const browserAutomationMode = config.browserAutomation?.mode === 'system-browser'
-    ? 'system-browser'
-    : 'ai-browser'
-  const effectiveAiBrowserEnabled = aiBrowserEnabled && browserAutomationMode !== 'system-browser'
+  const browserAutomation = resolveBrowserAutomationConfig(config)
+  const browserAutomationEnabled = browserAutomation.enabled
+  const browserAutomationMode = browserAutomation.mode
+  const effectiveAiBrowserEnabled = aiBrowserEnabled && browserAutomationEnabled && browserAutomationMode === 'ai-browser'
   const skillToolMode = resolveSkillToolMode(config, {
     skillsAvailable: includeSkillMcp,
     routed
@@ -201,7 +202,7 @@ export async function buildSdkOptions(params: BuildSdkOptionsParams): Promise<{
   const mcpServers: Record<string, any> = enabledMcp ? { ...enabledMcp } : {}
   const addedMcpServers: string[] = []
 
-  if (browserAutomationMode === 'system-browser' && mcpServers['ai-browser']) {
+  if ((!browserAutomationEnabled || browserAutomationMode !== 'ai-browser') && mcpServers['ai-browser']) {
     delete mcpServers['ai-browser']
   }
 
@@ -211,6 +212,8 @@ export async function buildSdkOptions(params: BuildSdkOptionsParams): Promise<{
     spaceId,
     conversationId,
     aiBrowserEnabled: effectiveAiBrowserEnabled,
+    browserAutomationEnabled,
+    browserAutomationMode,
     includeSkillMcp: effectiveIncludeSkillMcp,
     includeSubagentTools
   })
@@ -295,7 +298,7 @@ export async function buildSdkOptions(params: BuildSdkOptionsParams): Promise<{
       preset: 'claude_code' as const,
       append: buildSystemPromptAppend(workDir, credentialsModel, config.memory?.enabled)
         + (effectiveAiBrowserEnabled ? AI_BROWSER_SYSTEM_PROMPT + AI_BROWSER_PREFERENCE_PROMPT : '')
-        + (browserAutomationMode === 'system-browser' ? SYSTEM_BROWSER_AUTOMATION_PROMPT : '')
+        + (browserAutomationEnabled && browserAutomationMode === 'system-browser' ? SYSTEM_BROWSER_AUTOMATION_PROMPT : '')
         + ralphSystemPromptAppend
         + (config.customInstructions?.enabled && config.customInstructions?.content
           ? `\n\n## User Custom Instructions\n\n${config.customInstructions.content}\n`

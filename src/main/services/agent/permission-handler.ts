@@ -15,6 +15,7 @@ import type { ToolCall, UserQuestionInfo } from './types'
 import { sanitizeWebSearchInput } from './tool-input-utils'
 import { buildSendMessageRepairHint } from './tool-repair'
 import { getEnabledExtensions, runToolUseHooks } from '../extension'
+import { resolveBrowserAutomationConfig } from '@shared/types/browser-automation'
 
 // ============================================
 // Tool Permission Types
@@ -248,10 +249,18 @@ export function createCanUseTool(
 
     if (toolName === 'mcp__local-tools__open_url') {
       const currentConfig = getConfig()
-      if (currentConfig.browserAutomation?.mode !== 'system-browser') {
+      const browserAutomation = resolveBrowserAutomationConfig(currentConfig)
+      if (!browserAutomation.enabled) {
         return {
           behavior: 'deny' as const,
-          message: 'System browser opening is disabled while automated browser mode is active. Use automated browser tools instead.'
+          message: 'Browser tools are disabled in Settings > Advanced.'
+        }
+      }
+
+      if (browserAutomation.mode !== 'system-browser') {
+        return {
+          behavior: 'deny' as const,
+          message: 'System browser opening is disabled while built-in browser mode is active. Use built-in browser tools instead.'
         }
       }
 
@@ -417,10 +426,18 @@ export function createCanUseTool(
 
     if (isAIBrowserTool(toolName)) {
       const currentConfig = getConfig()
-      if (currentConfig.browserAutomation?.mode === 'system-browser') {
+      const browserAutomation = resolveBrowserAutomationConfig(currentConfig)
+      if (!browserAutomation.enabled) {
         return {
           behavior: 'deny' as const,
-          message: 'Automated browser is disabled while "Use System Default Browser" mode is enabled. Use local system browser tools instead.'
+          message: 'Browser tools are disabled in Settings > Advanced.'
+        }
+      }
+
+      if (browserAutomation.mode === 'system-browser') {
+        return {
+          behavior: 'deny' as const,
+          message: 'Built-in browser is disabled while "System Browser" mode is enabled. Use local system browser tools instead.'
         }
       }
 

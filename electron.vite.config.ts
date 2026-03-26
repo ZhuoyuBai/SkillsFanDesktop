@@ -57,12 +57,20 @@ const regionDefine = {
   '__SKILLSFAN_API_URL__': JSON.stringify(process.env.SKILLSFAN_API_URL || ''),
 }
 
+const sharedAliases = {
+  '@main': resolve(__dirname, 'src/main'),
+  '@shared': resolve(__dirname, 'src/shared')
+}
+
 export default defineConfig({
   main: {
     plugins: [
       externalizeDepsPlugin()
     ],
     define: { ...analyticsDefine, ...regionDefine },
+    resolve: {
+      alias: sharedAliases
+    },
     build: {
       sourcemap: true,
       rollupOptions: {
@@ -78,6 +86,9 @@ export default defineConfig({
   },
   preload: {
     plugins: [externalizeDepsPlugin()],
+    resolve: {
+      alias: sharedAliases
+    },
     build: {
       rollupOptions: {
         input: {
@@ -148,7 +159,8 @@ export default defineConfig({
     plugins: [react()],
     resolve: {
       alias: {
-        '@': resolve(__dirname, 'src/renderer')
+        '@': resolve(__dirname, 'src/renderer'),
+        ...sharedAliases
       }
     }
   }

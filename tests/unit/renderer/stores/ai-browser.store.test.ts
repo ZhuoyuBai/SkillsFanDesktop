@@ -22,7 +22,7 @@ describe('ai-browser store browser mode sync', () => {
 
   it('enables AI Browser by default when config mode is ai-browser', () => {
     syncAIBrowserStoreWithConfig({
-      browserAutomation: { mode: 'ai-browser' }
+      browserAutomation: { enabled: true, mode: 'ai-browser' }
     })
 
     const state = useAIBrowserStore.getState()
@@ -33,7 +33,7 @@ describe('ai-browser store browser mode sync', () => {
 
   it('disables AI Browser state when config mode is system-browser', () => {
     syncAIBrowserStoreWithConfig({
-      browserAutomation: { mode: 'system-browser' }
+      browserAutomation: { enabled: true, mode: 'system-browser' }
     })
 
     const state = useAIBrowserStore.getState()
@@ -48,7 +48,7 @@ describe('ai-browser store browser mode sync', () => {
   it('keeps the AI Browser store in sync when app config changes', () => {
     useAppStore.getState().setConfig({
       ...DEFAULT_CONFIG,
-      browserAutomation: { mode: 'ai-browser' }
+      browserAutomation: { enabled: true, mode: 'ai-browser' }
     })
 
     expect(useAIBrowserStore.getState().enabled).toBe(true)
@@ -56,10 +56,20 @@ describe('ai-browser store browser mode sync', () => {
 
     useAppStore.getState().setConfig({
       ...DEFAULT_CONFIG,
-      browserAutomation: { mode: 'system-browser' }
+      browserAutomation: { enabled: true, mode: 'system-browser' }
     })
 
     expect(useAIBrowserStore.getState().enabled).toBe(false)
     expect(useAIBrowserStore.getState().defaultEnabled).toBe(false)
+  })
+
+  it('keeps AI Browser disabled when browser tools are turned off', () => {
+    syncAIBrowserStoreWithConfig({
+      browserAutomation: { enabled: false, mode: 'ai-browser' }
+    })
+
+    const state = useAIBrowserStore.getState()
+    expect(state.enabled).toBe(false)
+    expect(state.defaultEnabled).toBe(false)
   })
 })

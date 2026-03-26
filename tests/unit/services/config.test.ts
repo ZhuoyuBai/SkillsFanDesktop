@@ -77,6 +77,8 @@ describe('Config Service', () => {
       expect(config.api.apiUrl).toBe('https://api.anthropic.com')
       expect(config.permissions.commandExecution).toBe('ask')
       expect(config.appearance.theme).toBe('light')
+      expect(config.browserAutomation?.enabled).toBe(false)
+      expect(config.browserAutomation?.mode).toBe('ai-browser')
       expect(config.isFirstLaunch).toBe(true)
     })
 
@@ -100,6 +102,22 @@ describe('Config Service', () => {
       expect(config.api.provider).toBe('anthropic')
       expect(config.api.apiUrl).toBe('https://api.anthropic.com')
       expect(config.permissions.fileAccess).toBe('allow')
+    })
+
+    it('should migrate legacy browser automation mode-only config to enabled', async () => {
+      await initializeApp()
+
+      const configPath = getConfigPath()
+      fs.writeFileSync(configPath, JSON.stringify({
+        browserAutomation: { mode: 'system-browser' }
+      }))
+
+      const config = getConfig()
+
+      expect(config.browserAutomation).toEqual({
+        enabled: true,
+        mode: 'system-browser'
+      })
     })
   })
 

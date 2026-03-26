@@ -18,6 +18,8 @@ import {
 // Import analytics config type
 import type { AnalyticsConfig } from './analytics/types'
 import type { AISourcesConfig, CustomSourceConfig } from '../../shared/types'
+import type { BrowserAutomationMode } from '@shared/types/browser-automation'
+import { resolveBrowserAutomationMode } from '@shared/types/browser-automation'
 
 // ============================================================================
 // Config Change Notification (EventEmitter Pattern)
@@ -126,7 +128,8 @@ interface HaloConfig {
     semanticSearch?: boolean // Enable vector-based semantic search, default true
   }
   browserAutomation?: {
-    mode: 'ai-browser' | 'system-browser'
+    enabled: boolean
+    mode: BrowserAutomationMode
   }
   skillSettings?: {
     preferNativeClaudeSkillTool: boolean
@@ -248,6 +251,7 @@ const DEFAULT_CONFIG: HaloConfig = {
     port: 3456
   },
   browserAutomation: {
+    enabled: false,
     mode: 'ai-browser'
   },
   skillSettings: {
@@ -406,6 +410,21 @@ function normalizeAiSources(parsed: Record<string, any>): AISourcesConfig {
   return aiSources
 }
 
+function normalizeBrowserAutomation(parsed: Record<string, any>): {
+  enabled: boolean
+  mode: BrowserAutomationMode
+} {
+  const raw = parsed?.browserAutomation
+  const hasLegacyMode = Boolean(raw && typeof raw === 'object' && typeof raw.mode === 'string')
+
+  return {
+    enabled: typeof raw?.enabled === 'boolean'
+      ? raw.enabled
+      : hasLegacyMode,
+    mode: resolveBrowserAutomationMode(raw?.mode)
+  }
+}
+
 function getAiSourcesSignature(aiSources?: AISourcesConfig): string {
   if (!aiSources) return ''
   const current = aiSources.current || 'custom'
@@ -460,6 +479,7 @@ function getAiSourcesSignature(aiSources?: AISourcesConfig): string {
 
 function mergeConfigWithDefaults(parsed: Record<string, any>): HaloConfig {
   const aiSources = normalizeAiSources(parsed)
+  const browserAutomation = normalizeBrowserAutomation(parsed)
   return {
     ...DEFAULT_CONFIG,
     ...parsed,
@@ -477,7 +497,7 @@ function mergeConfigWithDefaults(parsed: Record<string, any>): HaloConfig {
     spaces: { ...DEFAULT_CONFIG.spaces, ...parsed.spaces },
     // memory: merge with defaults
     memory: { ...DEFAULT_CONFIG.memory, ...parsed.memory },
-    browserAutomation: { ...DEFAULT_CONFIG.browserAutomation, ...parsed.browserAutomation },
+    browserAutomation,
     skillSettings: { ...DEFAULT_CONFIG.skillSettings, ...parsed.skillSettings }
   }
 }

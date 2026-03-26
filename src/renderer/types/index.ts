@@ -3,6 +3,7 @@
 // ============================================
 
 import type { ThinkingEffort } from '../../shared/utils/openai-models'
+import type { BrowserAutomationMode } from '@shared/types/browser-automation'
 
 // API Provider Configuration
 export type ApiProvider = 'anthropic' | 'openai';
@@ -217,7 +218,8 @@ export interface MemoryConfig {
 }
 
 export interface BrowserAutomationConfig {
-  mode: 'ai-browser' | 'system-browser';
+  enabled: boolean;
+  mode: BrowserAutomationMode;
 }
 
 export interface SkillSettingsConfig {
@@ -401,6 +403,8 @@ export interface Message {
   attachments?: Attachment[];  // All file attachments (images, PDFs, text/code)
   tokenUsage?: TokenUsage;  // Token usage for this assistant message
   userMessageUuid?: string;  // SDK user message UUID for file rewind support
+  textSegments?: TextSegment[];  // Text blocks between tool calls (for process/result split)
+  resultStartIndex?: number;  // Position in content where final result begins
 }
 
 // ============================================
@@ -638,6 +642,7 @@ export const DEFAULT_CONFIG: HaloConfig = {
     port: 3456
   },
   browserAutomation: {
+    enabled: false,
     mode: 'ai-browser'
   },
   skillSettings: {

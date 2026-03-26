@@ -289,6 +289,7 @@ export interface SessionConfig {
   aiBrowserEnabled: boolean
   skillsSignature: string
   skillToolMode?: 'none' | 'mcp' | 'native'
+  browserAutomationEnabled?: boolean
   browserAutomationMode?: 'ai-browser' | 'system-browser'
   customInstructionsHash?: string  // Change detection for custom instructions
   extensionHash?: string  // Change detection for enabled extensions

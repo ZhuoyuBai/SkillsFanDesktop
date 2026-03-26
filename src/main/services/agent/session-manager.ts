@@ -27,6 +27,7 @@ import {
 } from './helpers'
 import { buildSdkOptions, resolveSdkTransport, resolveSkillToolMode } from './sdk-options'
 import { isUsageLimitActive } from '../../openai-compat-router/server/request-handler'
+import { resolveBrowserAutomationConfig } from '@shared/types/browser-automation'
 
 // ============================================
 // Session Maps
@@ -103,6 +104,7 @@ export function needsSessionRebuild(existing: V2SessionInfo, newConfig: SessionC
   return existing.config.aiBrowserEnabled !== newConfig.aiBrowserEnabled
     || existing.config.skillsSignature !== newConfig.skillsSignature
     || existing.config.skillToolMode !== newConfig.skillToolMode
+    || existing.config.browserAutomationEnabled !== newConfig.browserAutomationEnabled
     || existing.config.browserAutomationMode !== newConfig.browserAutomationMode
     || existing.config.customInstructionsHash !== newConfig.customInstructionsHash
     || existing.config.extensionHash !== newConfig.extensionHash
@@ -155,7 +157,7 @@ export async function getOrCreateV2Session(
   if (existing) {
     // Check if config changed and requires rebuild
     if (config && needsSessionRebuild(existing, config)) {
-      console.log(`[Agent][${conversationId}] Config changed (aiBrowser: ${existing.config.aiBrowserEnabled} → ${config.aiBrowserEnabled}, skillToolMode: ${existing.config.skillToolMode || 'none'} → ${config.skillToolMode || 'none'}, browserMode: ${existing.config.browserAutomationMode || 'ai-browser'} → ${config.browserAutomationMode || 'ai-browser'}), rebuilding session...`)
+      console.log(`[Agent][${conversationId}] Config changed (aiBrowser: ${existing.config.aiBrowserEnabled} → ${config.aiBrowserEnabled}, skillToolMode: ${existing.config.skillToolMode || 'none'} → ${config.skillToolMode || 'none'}, browserEnabled: ${existing.config.browserAutomationEnabled ?? false} → ${config.browserAutomationEnabled ?? false}, browserMode: ${existing.config.browserAutomationMode || 'ai-browser'} → ${config.browserAutomationMode || 'ai-browser'}), rebuilding session...`)
       closeV2SessionForRebuild(conversationId)
       // Fall through to create new session
     } else {
@@ -280,12 +282,14 @@ export async function ensureSessionWarm(
 
     // Session config must match sendMessage to avoid rebuild
     const ci = (config as any).customInstructions
+    const browserAutomation = resolveBrowserAutomationConfig(config as any)
     const { getExtensionHash } = await import('../extension')
     const sessionConfig: SessionConfig = {
       aiBrowserEnabled: false,  // Default to false for warm-up (user hasn't enabled it yet)
       skillsSignature,
       skillToolMode,
-      browserAutomationMode: (config as any).browserAutomation?.mode === 'system-browser' ? 'system-browser' : 'ai-browser',
+      browserAutomationEnabled: browserAutomation.enabled,
+      browserAutomationMode: browserAutomation.mode,
       customInstructionsHash: ci?.enabled && ci?.content ? ci.content : undefined,
       extensionHash: getExtensionHash()
     }

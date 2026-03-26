@@ -349,6 +349,7 @@ describe('permission-handler', () => {
         trustMode: false
       },
       browserAutomation: {
+        enabled: true,
         mode: 'system-browser'
       }
     })
@@ -361,7 +362,7 @@ describe('permission-handler', () => {
 
     expect(result).toEqual({
       behavior: 'deny',
-      message: 'Automated browser is disabled while "Use System Default Browser" mode is enabled. Use local system browser tools instead.'
+      message: 'Built-in browser is disabled while "System Browser" mode is enabled. Use local system browser tools instead.'
     })
   })
 
@@ -372,6 +373,7 @@ describe('permission-handler', () => {
         trustMode: false
       },
       browserAutomation: {
+        enabled: true,
         mode: 'ai-browser'
       }
     })
@@ -397,6 +399,7 @@ describe('permission-handler', () => {
         trustMode: false
       },
       browserAutomation: {
+        enabled: true,
         mode: 'ai-browser'
       }
     })
@@ -408,7 +411,7 @@ describe('permission-handler', () => {
 
     expect(result).toEqual({
       behavior: 'deny',
-      message: 'System browser opening is disabled while automated browser mode is active. Use automated browser tools instead.'
+      message: 'System browser opening is disabled while built-in browser mode is active. Use built-in browser tools instead.'
     })
   })
 
@@ -419,6 +422,7 @@ describe('permission-handler', () => {
         trustMode: false
       },
       browserAutomation: {
+        enabled: true,
         mode: 'system-browser'
       }
     })
@@ -433,6 +437,30 @@ describe('permission-handler', () => {
       updatedInput: {
         url: 'https://example.com'
       }
+    })
+  })
+
+  it('denies browser tools when browser usage is disabled', async () => {
+    mocks.getConfig.mockReturnValue({
+      permissions: {
+        commandExecution: 'allow',
+        trustMode: false
+      },
+      browserAutomation: {
+        enabled: false,
+        mode: 'ai-browser'
+      }
+    })
+    mocks.isAIBrowserTool.mockReturnValue(true)
+
+    const canUseTool = createCanUseTool('/tmp/workspace', 'space-1', 'conv-1')
+    const result = await canUseTool('mcp__ai-browser__browser_new_page', {
+      url: 'https://example.com'
+    }, { signal: new AbortController().signal })
+
+    expect(result).toEqual({
+      behavior: 'deny',
+      message: 'Browser tools are disabled in Settings > Advanced.'
     })
   })
 })

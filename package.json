@@ -101,6 +101,7 @@
     "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^4.2.0",
     "autoprefixer": "^10.4.16",
+    "baseline-browser-mapping": "^2.10.10",
     "cross-env": "^10.1.0",
     "electron": "^31.2.1",
     "electron-builder": "24.13.1",

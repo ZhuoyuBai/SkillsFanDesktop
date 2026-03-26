@@ -14,6 +14,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { api } from '../api'
 import type { HaloConfig } from '../types'
+import { isAIBrowserMode } from '@shared/types/browser-automation'
 
 // ============================================
 // Types
@@ -49,7 +50,7 @@ interface AIBrowserState {
 }
 
 function shouldEnableAIBrowser(config?: Pick<HaloConfig, 'browserAutomation'> | null): boolean {
-  return config?.browserAutomation?.mode !== 'system-browser'
+  return isAIBrowserMode(config)
 }
 
 // ============================================
