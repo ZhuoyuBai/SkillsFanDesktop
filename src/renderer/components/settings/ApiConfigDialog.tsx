@@ -23,6 +23,13 @@ export interface ProviderPreset {
   isCustom?: boolean
   docsUrl?: string
   apiDocsUrl?: string
+  altNote?: {
+    prefixKey: string
+    linkLabelKey: string
+    linkUrl: string
+    suffixKey: string
+    altApiUrl: string
+  }
 }
 
 interface ApiConfigDialogProps {
@@ -274,6 +281,16 @@ export function ApiConfigDialog({
                   {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
+              {currentPreset?.altNote && (
+                <p className="text-xs text-muted-foreground/70 mt-1.5">
+                  {t(currentPreset.altNote.prefixKey)}{' '}
+                  <a href={currentPreset.altNote.linkUrl} target="_blank" rel="noopener noreferrer" className="text-primary/70 hover:underline">
+                    {t(currentPreset.altNote.linkLabelKey)}
+                  </a>
+                  {t(currentPreset.altNote.suffixKey)}{' '}
+                  <code className="px-1 py-0.5 bg-secondary/50 rounded text-[11px] select-all">{currentPreset.altNote.altApiUrl}</code>
+                </p>
+              )}
             </div>
 
             {/* API URL */}

@@ -32,7 +32,7 @@ import kimiLogo from '../../assets/providers/kimi.jpg'
 import deepseekLogo from '../../assets/providers/deepseek.jpg'
 import claudeLogo from '../../assets/providers/claude.jpg'
 import openaiLogo from '../../assets/providers/openai.jpg'
-import openrouterLogo from '../../assets/providers/openrouter.png'
+import openrouterLogo from '../../assets/providers/openrouter.jpg'
 import xiaomiLogo from '../../assets/providers/xiaomi.png'
 import skillsfanLogo from '../../assets/logo.png'
 

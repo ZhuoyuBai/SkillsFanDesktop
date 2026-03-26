@@ -1,5 +1,6 @@
 {
   ", be mindful of backing up important files": ",請注意備份重要檔案",
+  ":": "",
   "...(content truncated)": "...(內容已截斷)",
   "{{count}} columns_one": "{{count}} 欄",
   "{{count}} columns_other": "{{count}} 欄",
@@ -100,6 +101,9 @@
   "Answer questions, organize notes, and create study materials.": "回答問題、整理筆記並建立學習資料。",
   "Antivirus software blocking": "",
   "Anyone with the password can fully control your computer. Do not share with untrusted people.": "知道密碼的人可完全控制本機，請勿分享給不信任的人。",
+  "You can also get API Key from": "也可從",
+  "Kimi Official Open Platform": "Kimi 官方開放平台",
+  ", if so change API URL below to": "獲取 API Key，如需使用請將下方 API 地址改為",
   "API Documentation": "API 文檔",
   "API key contains invalid characters. Please check your API key in Settings.": "API Key 包含無效字元，請在設定中檢查",
   "API URL": "API 地址",

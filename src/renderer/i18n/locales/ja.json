@@ -1,5 +1,6 @@
 {
   ", be mindful of backing up important files": "",
+  ":": "",
   "...(content truncated)": "",
   "{{count}} columns_other": "",
   "{{count}} completed_other": "",
@@ -82,6 +83,9 @@
   "Answer questions, organize notes, and create study materials.": "",
   "Antivirus software blocking": "",
   "Anyone with the password can fully control your computer. Do not share with untrusted people.": "",
+  "You can also get API Key from": "こちらからもAPI Keyを取得できます：",
+  "Kimi Official Open Platform": "Kimi公式オープンプラットフォーム",
+  ", if so change API URL below to": "。その場合、下のAPI URLを次に変更してください",
   "API Documentation": "",
   "API key contains invalid characters. Please check your API key in Settings.": "API Keyに無効な文字が含まれています。設定で確認してください。",
   "API URL": "",

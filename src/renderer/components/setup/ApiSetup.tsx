@@ -32,6 +32,13 @@ interface ProviderPreset {
   isCustom?: boolean           // 标记是否为自定义选项
   docsUrl?: string             // 获取 API Key 链接
   apiDocsUrl?: string          // API 文档链接（可选）
+  altNote?: {                  // 备注提示（可选）
+    prefixKey: string          // 链接前文字
+    linkLabelKey: string       // 链接文字
+    linkUrl: string            // 链接地址
+    suffixKey: string          // 链接后文字
+    altApiUrl: string          // 备用 API 地址（纯文本）
+  }
 }
 
 const PROVIDER_PRESETS: ProviderPreset[] = [
@@ -61,12 +68,19 @@ const PROVIDER_PRESETS: ProviderPreset[] = [
     id: 'kimi',
     name: 'Kimi',
     nameKey: 'Kimi',
-    apiUrl: 'https://api.moonshot.cn/anthropic',
-    defaultModel: 'kimi-k2-thinking',
+    apiUrl: 'https://api.kimi.com/coding/',
+    defaultModel: 'kimi-k2.5',
     logo: kimiLogo,
     apiType: 'anthropic',
-    docsUrl: 'https://platform.moonshot.cn/console/api-keys',
-    apiDocsUrl: 'https://platform.moonshot.cn/docs/guide/agent-support#%E4%BD%BF%E7%94%A8%E6%B3%A8%E6%84%8F%E4%BA%8B%E9%A1%B9'
+    docsUrl: 'https://www.kimi.com/code/console?from=kfc_overview_topbar',
+    apiDocsUrl: 'https://platform.moonshot.cn/docs/guide/agent-support#%E4%BD%BF%E7%94%A8%E6%B3%A8%E6%84%8F%E4%BA%8B%E9%A1%B9',
+    altNote: {
+      prefixKey: 'You can also get API Key from',
+      linkLabelKey: 'Kimi Official Open Platform',
+      linkUrl: 'https://platform.moonshot.cn/console/api-keys',
+      suffixKey: ', if so change API URL below to',
+      altApiUrl: 'https://api.moonshot.cn/anthropic'
+    }
   },
   {
     id: 'deepseek',
@@ -335,6 +349,19 @@ export function ApiSetup({ onBack, showBack = false, initialProviderId }: ApiSet
                 </button>
               </div>
             </div>
+            {selectedProvider && (() => {
+              const preset = PROVIDER_PRESETS.find(p => p.id === selectedProvider)
+              return preset?.altNote ? (
+                <p className="text-xs text-muted-foreground/70 mt-1.5">
+                  {t(preset.altNote.prefixKey)}{' '}
+                  <a href={preset.altNote.linkUrl} target="_blank" rel="noopener noreferrer" className="text-primary/70 hover:underline">
+                    {t(preset.altNote.linkLabelKey)}
+                  </a>
+                  {t(preset.altNote.suffixKey)}{' '}
+                  <code className="px-1 py-0.5 bg-secondary/50 rounded text-[11px] select-all">{preset.altNote.altApiUrl}</code>
+                </p>
+              ) : null
+            })()}
 
             {/* API URL input */}
             <div>

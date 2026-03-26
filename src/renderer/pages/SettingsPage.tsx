@@ -50,7 +50,7 @@ import kimiLogo from '../assets/providers/kimi.jpg'
 import deepseekLogo from '../assets/providers/deepseek.jpg'
 import claudeLogo from '../assets/providers/claude.jpg'
 import openaiLogo from '../assets/providers/openai.jpg'
-import openrouterLogo from '../assets/providers/openrouter.png'
+import openrouterLogo from '../assets/providers/openrouter.jpg'
 import xiaomiLogo from '../assets/providers/xiaomi.png'
 
 // Provider presets for the grid
@@ -65,6 +65,13 @@ interface ProviderPreset {
   isCustom?: boolean
   docsUrl?: string
   apiDocsUrl?: string
+  altNote?: {
+    prefixKey: string
+    linkLabelKey: string
+    linkUrl: string
+    suffixKey: string
+    altApiUrl: string
+  }
 }
 
 const PROVIDER_PRESETS: ProviderPreset[] = [
@@ -94,12 +101,19 @@ const PROVIDER_PRESETS: ProviderPreset[] = [
     id: 'kimi',
     name: 'Kimi',
     nameKey: 'Kimi',
-    apiUrl: 'https://api.moonshot.cn/anthropic',
-    defaultModel: 'kimi-k2-thinking',
+    apiUrl: 'https://api.kimi.com/coding/',
+    defaultModel: 'kimi-k2.5',
     logo: kimiLogo,
     apiType: 'anthropic',
-    docsUrl: 'https://platform.moonshot.cn/console/api-keys',
-    apiDocsUrl: 'https://platform.moonshot.cn/docs/guide/agent-support#%E4%BD%BF%E7%94%A8%E6%B3%A8%E6%84%8F%E4%BA%8B%E9%A1%B9'
+    docsUrl: 'https://www.kimi.com/code/console?from=kfc_overview_topbar',
+    apiDocsUrl: 'https://platform.moonshot.cn/docs/guide/agent-support#%E4%BD%BF%E7%94%A8%E6%B3%A8%E6%84%8F%E4%BA%8B%E9%A1%B9',
+    altNote: {
+      prefixKey: 'You can also get API Key from',
+      linkLabelKey: 'Kimi Official Open Platform',
+      linkUrl: 'https://platform.moonshot.cn/console/api-keys',
+      suffixKey: ', if so change API URL below to',
+      altApiUrl: 'https://api.moonshot.cn/anthropic'
+    }
   },
   {
     id: 'deepseek',
