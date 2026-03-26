@@ -11,11 +11,10 @@
  * - Shiki-based syntax highlighting (inline styles, no CSS class flickering)
  */
 
-import { memo, useRef, useCallback, useState } from 'react'
+import { memo, useRef, useCallback } from 'react'
 import { Streamdown } from 'streamdown'
 import { code } from '@streamdown/code'
 import { cjk } from '@streamdown/cjk'
-import { Check, Copy } from 'lucide-react'
 
 // Import Streamdown built-in animation styles
 import 'streamdown/styles.css'
@@ -27,6 +26,17 @@ interface StreamdownRendererProps {
   isStreaming?: boolean
   /** Custom CSS class name */
   className?: string
+  /** Enable Streamdown built-in controls (copy/download/table controls) */
+  controls?: boolean | {
+    code?: boolean
+    table?: boolean
+    mermaid?: boolean | {
+      download?: boolean
+      copy?: boolean
+      fullscreen?: boolean
+      panZoom?: boolean
+    }
+  }
 }
 
 // Plugin configuration (singleton, avoid recreating on every render)
@@ -39,9 +49,9 @@ export const StreamdownRenderer = memo(function StreamdownRenderer({
   content,
   isStreaming = false,
   className = '',
+  controls = { code: true, table: true },
 }: StreamdownRendererProps) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const [copiedPre, setCopiedPre] = useState<HTMLPreElement | null>(null)
 
   // Event delegation for code block copy
   const handleClick = useCallback((e: React.MouseEvent) => {
@@ -58,8 +68,6 @@ export const StreamdownRenderer = memo(function StreamdownRenderer({
     const codeEl = pre?.querySelector('code')
     if (codeEl) {
       navigator.clipboard.writeText(codeEl.textContent || '')
-      setCopiedPre(pre!)
-      setTimeout(() => setCopiedPre(null), 2000)
     }
   }, [])
 
@@ -75,7 +83,7 @@ export const StreamdownRenderer = memo(function StreamdownRenderer({
         plugins={plugins}
         isAnimating={isStreaming}
         shikiTheme={['github-light', 'github-dark']}
-        controls={{ code: true, table: true }}
+        controls={controls}
         parseIncompleteMarkdown={true}
       >
         {content}

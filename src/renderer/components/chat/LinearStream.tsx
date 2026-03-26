@@ -17,6 +17,7 @@ import {
   XCircle,
 } from 'lucide-react'
 import { StreamdownRenderer } from './StreamdownRenderer'
+import { CompactTextRenderer } from './CompactTextRenderer'
 import { parseTodoInput } from '../tool/TodoCard'
 import { AgentTaskCard } from '../tool/AgentTaskCard'
 import { HostedSubagentCard } from '../tool/HostedSubagentCard'
@@ -30,6 +31,7 @@ import {
   isCompactLinearStreamText,
   trimBoundaryBlankLines,
 } from '../../utils/linear-stream-text'
+import { shouldUseCompactLogText } from '../../utils/message-text-rendering'
 import { shouldSuppressSetModelStatus } from '../../../shared/utils/sdk-status'
 import { useTypewriter } from '../../hooks/useTypewriter'
 import {
@@ -184,14 +186,20 @@ const TextBlock = memo(function TextBlock({
   const isCurrentlyStreaming = isStreaming && isLast
   // Ignore boundary blank lines when deciding if a status line should stay compact.
   const isShortText = isCompactLinearStreamText(normalizedContent)
+  const useCompactLogText = shouldUseCompactLogText(normalizedContent, true)
 
   return (
     <div className={`${isShortText ? 'py-0.5' : 'py-2'} text-foreground break-words leading-relaxed`}>
-      <StreamdownRenderer
-        content={normalizedContent}
-        isStreaming={isCurrentlyStreaming}
-        className={isShortText ? 'streamdown-compact' : undefined}
-      />
+      {useCompactLogText ? (
+        <CompactTextRenderer content={normalizedContent} />
+      ) : (
+        <StreamdownRenderer
+          content={normalizedContent}
+          isStreaming={isCurrentlyStreaming}
+          className={isShortText ? 'streamdown-compact' : undefined}
+          controls={false}
+        />
+      )}
       {isCurrentlyStreaming && (
         <span className="inline-flex items-center ml-1 align-middle">
           <HaloLogo size={16} animated={true} />

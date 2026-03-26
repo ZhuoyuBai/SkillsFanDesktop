@@ -74,6 +74,7 @@ import {
 } from '../../../shared/utils/openai-models'
 import { isDuplicateActiveToolUse } from '../../../shared/utils/thought-dedupe'
 import { normalizeSdkStatusText, stripLeadingSetModelStatus } from '../../../shared/utils/sdk-status'
+import { normalizeAssistantContent } from '../../../shared/utils/assistant-content'
 import { resolveAccessibleAiSource } from '../ai-sources/hosted-ai-availability'
 import { normalizeRepairableSendMessageResult } from './tool-repair'
 
@@ -778,7 +779,8 @@ async function processMessageStream(
   }
   const streamToolUses = new Map<number, StreamToolUseState>()
 
-  const getVisibleAssistantContent = (content: string): string => stripLeadingSetModelStatus(content)
+  const getVisibleAssistantContent = (content: string): string =>
+    normalizeAssistantContent(stripLeadingSetModelStatus(content))
 
   const emitThought = (incomingThought: Thought | null | undefined): void => {
     if (!incomingThought) {

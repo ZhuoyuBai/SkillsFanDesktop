@@ -25,6 +25,7 @@ import {
 import { getToolIcon } from '../icons/ToolIcons'
 import { BrowserTaskCard, isBrowserTool } from '../tool/BrowserTaskCard'
 import { MarkdownRenderer } from './MarkdownRenderer'
+import { CompactTextRenderer } from './CompactTextRenderer'
 import { FileChangesFooter } from '../diff'
 import { MessageAttachments } from './AttachmentPreview'
 import { HaloLogo } from '../brand/HaloLogo'
@@ -34,6 +35,8 @@ import {
   getLatestVisibleActiveToolUseIds,
   getMatchingToolResult
 } from '../../../shared/utils/thought-dedupe'
+import { shouldUseCompactLogText } from '../../utils/message-text-rendering'
+import { normalizeAssistantContent } from '../../../shared/utils/assistant-content'
 
 interface MessageItemProps {
   message: Message
@@ -198,17 +201,22 @@ export function MessageItem({ message, hideThoughts = false, isInContainer = fal
     return message.images || []
   }, [isUser, message.attachments, message.images])
 
+  const normalizedAssistantContent = useMemo(() => {
+    if (isUser || !message.content) return message.content
+    return normalizeAssistantContent(message.content)
+  }, [isUser, message.content])
+
   // Handle copying message content to clipboard
   const handleCopyMessage = useCallback(async () => {
-    if (!message.content) return
+    if (!normalizedAssistantContent) return
     try {
-      await navigator.clipboard.writeText(message.content)
+      await navigator.clipboard.writeText(normalizedAssistantContent)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch (err) {
       console.error('Failed to copy message:', err)
     }
-  }, [message.content])
+  }, [normalizedAssistantContent])
 
   // Right-click context menu state
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
@@ -296,6 +304,13 @@ export function MessageItem({ message, hideThoughts = false, isInContainer = fal
     return Object.keys(map).length > 0 ? map : undefined
   }, [message.thoughts])
 
+  const useCompactLogRenderer = useMemo(() => {
+    if (isUser || !normalizedAssistantContent) {
+      return false
+    }
+    return shouldUseCompactLogText(normalizedAssistantContent)
+  }, [isUser, normalizedAssistantContent])
+
   const auxiliaryContent = (
     <>
       {browserToolCalls.length > 0 && (
@@ -342,8 +357,10 @@ export function MessageItem({ message, hideThoughts = false, isInContainer = fal
           {hasMessageContent && (
             isUser ? (
               <span className="whitespace-pre-wrap text-foreground">{message.content}</span>
+            ) : useCompactLogRenderer ? (
+              <CompactTextRenderer content={normalizedAssistantContent} />
             ) : (
-              <MarkdownRenderer content={message.content} filePathMap={filePathMap} />
+              <MarkdownRenderer content={normalizedAssistantContent} filePathMap={filePathMap} />
             )
           )}
           {isStreaming && (
@@ -368,7 +385,7 @@ export function MessageItem({ message, hideThoughts = false, isInContainer = fal
   )
 
   // Hover action buttons
-  const actionButtons = message.content ? (
+  const actionButtons = normalizedAssistantContent ? (
     <div className="absolute top-1 right-0 opacity-0 group-hover:opacity-100
       flex items-center gap-0.5 bg-background border border-border shadow-sm
       rounded-lg p-0.5 transition-all z-10">
