@@ -58,7 +58,12 @@ import {
   v2Sessions
 } from '../../../../src/main/services/agent/session-manager'
 
-function makeSessionInfo(session: { close: () => void }, config: { aiBrowserEnabled: boolean; skillsSignature: string; browserAutomationMode?: 'ai-browser' | 'system-browser' }) {
+function makeSessionInfo(session: { close: () => void }, config: {
+  aiBrowserEnabled: boolean
+  skillsSignature: string
+  skillToolMode?: 'none' | 'mcp' | 'native'
+  browserAutomationMode?: 'ai-browser' | 'system-browser'
+}) {
   return {
     session,
     spaceId: 'space-1',
@@ -89,12 +94,43 @@ describe('session-manager', () => {
   })
 
   it('detects when a V2 session needs rebuild', () => {
-    const existing = makeSessionInfo({ close: vi.fn() }, { aiBrowserEnabled: false, skillsSignature: '', browserAutomationMode: 'ai-browser' })
+    const existing = makeSessionInfo({ close: vi.fn() }, {
+      aiBrowserEnabled: false,
+      skillsSignature: '',
+      skillToolMode: 'mcp',
+      browserAutomationMode: 'ai-browser'
+    })
 
-    expect(needsSessionRebuild(existing as any, { aiBrowserEnabled: false, skillsSignature: '', browserAutomationMode: 'ai-browser' })).toBe(false)
-    expect(needsSessionRebuild(existing as any, { aiBrowserEnabled: true, skillsSignature: '', browserAutomationMode: 'ai-browser' })).toBe(true)
-    expect(needsSessionRebuild(existing as any, { aiBrowserEnabled: false, skillsSignature: 'sig-2', browserAutomationMode: 'ai-browser' })).toBe(true)
-    expect(needsSessionRebuild(existing as any, { aiBrowserEnabled: false, skillsSignature: '', browserAutomationMode: 'system-browser' })).toBe(true)
+    expect(needsSessionRebuild(existing as any, {
+      aiBrowserEnabled: false,
+      skillsSignature: '',
+      skillToolMode: 'mcp',
+      browserAutomationMode: 'ai-browser'
+    })).toBe(false)
+    expect(needsSessionRebuild(existing as any, {
+      aiBrowserEnabled: true,
+      skillsSignature: '',
+      skillToolMode: 'mcp',
+      browserAutomationMode: 'ai-browser'
+    })).toBe(true)
+    expect(needsSessionRebuild(existing as any, {
+      aiBrowserEnabled: false,
+      skillsSignature: 'sig-2',
+      skillToolMode: 'mcp',
+      browserAutomationMode: 'ai-browser'
+    })).toBe(true)
+    expect(needsSessionRebuild(existing as any, {
+      aiBrowserEnabled: false,
+      skillsSignature: '',
+      skillToolMode: 'native',
+      browserAutomationMode: 'ai-browser'
+    })).toBe(true)
+    expect(needsSessionRebuild(existing as any, {
+      aiBrowserEnabled: false,
+      skillsSignature: '',
+      skillToolMode: 'mcp',
+      browserAutomationMode: 'system-browser'
+    })).toBe(true)
   })
 
   it('reuses existing session and rebuilds when config changes', async () => {
@@ -109,7 +145,7 @@ describe('session-manager', () => {
       'conv-1',
       { model: 'claude' },
       undefined,
-      { aiBrowserEnabled: false, skillsSignature: '', browserAutomationMode: 'ai-browser' }
+      { aiBrowserEnabled: false, skillsSignature: '', skillToolMode: 'mcp', browserAutomationMode: 'ai-browser' }
     )
     expect(first).toBe(firstSession)
     expect(mocks.unstableV2CreateSession).toHaveBeenCalledTimes(1)
@@ -119,7 +155,7 @@ describe('session-manager', () => {
       'conv-1',
       { model: 'claude' },
       undefined,
-      { aiBrowserEnabled: false, skillsSignature: '', browserAutomationMode: 'ai-browser' }
+      { aiBrowserEnabled: false, skillsSignature: '', skillToolMode: 'mcp', browserAutomationMode: 'ai-browser' }
     )
     expect(reused).toBe(firstSession)
     expect(mocks.unstableV2CreateSession).toHaveBeenCalledTimes(1)
@@ -129,7 +165,7 @@ describe('session-manager', () => {
       'conv-1',
       { model: 'claude' },
       undefined,
-      { aiBrowserEnabled: true, skillsSignature: '', browserAutomationMode: 'ai-browser' }
+      { aiBrowserEnabled: true, skillsSignature: '', skillToolMode: 'mcp', browserAutomationMode: 'ai-browser' }
     )
     expect(firstSession.close).toHaveBeenCalledTimes(1)
     expect(rebuilt).toBe(rebuiltSession)
@@ -141,11 +177,11 @@ describe('session-manager', () => {
     const activeSession = { close: vi.fn() }
     v2Sessions.set(
       'idle-conv',
-      makeSessionInfo(idleSession, { aiBrowserEnabled: false, skillsSignature: '', browserAutomationMode: 'ai-browser' }) as any
+      makeSessionInfo(idleSession, { aiBrowserEnabled: false, skillsSignature: '', skillToolMode: 'mcp', browserAutomationMode: 'ai-browser' }) as any
     )
     v2Sessions.set(
       'active-conv',
-      makeSessionInfo(activeSession, { aiBrowserEnabled: false, skillsSignature: '', browserAutomationMode: 'ai-browser' }) as any
+      makeSessionInfo(activeSession, { aiBrowserEnabled: false, skillsSignature: '', skillToolMode: 'mcp', browserAutomationMode: 'ai-browser' }) as any
     )
 
     const state = createSessionState('space-1', 'active-conv', new AbortController())
@@ -168,8 +204,8 @@ describe('session-manager', () => {
   it('closes all sessions on shutdown', () => {
     const s1 = { close: vi.fn() }
     const s2 = { close: vi.fn() }
-    v2Sessions.set('conv-1', makeSessionInfo(s1, { aiBrowserEnabled: false, skillsSignature: '', browserAutomationMode: 'ai-browser' }) as any)
-    v2Sessions.set('conv-2', makeSessionInfo(s2, { aiBrowserEnabled: true, skillsSignature: 'sig-2', browserAutomationMode: 'system-browser' }) as any)
+    v2Sessions.set('conv-1', makeSessionInfo(s1, { aiBrowserEnabled: false, skillsSignature: '', skillToolMode: 'mcp', browserAutomationMode: 'ai-browser' }) as any)
+    v2Sessions.set('conv-2', makeSessionInfo(s2, { aiBrowserEnabled: true, skillsSignature: 'sig-2', skillToolMode: 'native', browserAutomationMode: 'system-browser' }) as any)
 
     closeAllV2Sessions()
 

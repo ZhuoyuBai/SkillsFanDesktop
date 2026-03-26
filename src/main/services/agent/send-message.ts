@@ -44,7 +44,7 @@ import {
   v2Sessions
 } from './session-manager'
 import { broadcastMcpStatus } from './mcp-manager'
-import { buildSdkOptions, resolveSdkTransport } from './sdk-options'
+import { buildSdkOptions, resolveSdkTransport, resolveSkillToolMode } from './sdk-options'
 import { isNoVisionModel } from '../../../shared/utils/vision-models'
 import {
   formatCanvasContext,
@@ -403,6 +403,7 @@ async function sendMessageInternal(
     // This determines if Skill MCP server should be added and triggers session rebuild if needed
     await ensureSkillsInitialized(workDir, { forceRefresh: true })
     const skillsSignature = getSkillsSignature()
+    const skillsAvailable = skillsSignature.length > 0
 
     // Log MCP servers if configured (only enabled ones)
     const enabledMcpServers = getEnabledMcpServers(config.mcpServers || {})
@@ -415,10 +416,15 @@ async function sendMessageInternal(
     const ci = config.customInstructions
     const browserAutomationMode = config.browserAutomation?.mode === 'system-browser' ? 'system-browser' : 'ai-browser'
     const effectiveAiBrowserEnabled = !!aiBrowserEnabled && browserAutomationMode !== 'system-browser'
+    const skillToolMode = resolveSkillToolMode(config as Record<string, any>, {
+      skillsAvailable,
+      routed: transport.routed
+    })
     const { getExtensionHash } = await import('../extension')
     const sessionConfig: SessionConfig = {
       aiBrowserEnabled: effectiveAiBrowserEnabled,
       skillsSignature,
+      skillToolMode,
       browserAutomationMode,
       customInstructionsHash: ci?.enabled && ci?.content ? ci.content : undefined,
       extensionHash: getExtensionHash()

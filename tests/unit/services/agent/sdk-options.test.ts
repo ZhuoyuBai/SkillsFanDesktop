@@ -380,5 +380,72 @@ describe('sdk-options', () => {
       })
       expect(sdkOptions.disallowedTools).toContain('Skill')
     })
+
+    it('prefers native Claude Skill tool when the setting is enabled on direct transports', async () => {
+      const abortController = new AbortController()
+
+      const { sdkOptions, addedMcpServers } = await buildSdkOptions({
+        conversationId: 'conv-skill-native',
+        spaceId: 'space-skill-native',
+        workDir: '/tmp/space-skill-native',
+        config: {
+          mcpServers: {},
+          memory: { enabled: false },
+          skillSettings: { preferNativeClaudeSkillTool: true }
+        },
+        abortController,
+        sdkModel: 'MiniMax-M2.1',
+        credentialsModel: 'MiniMax-M2.1',
+        anthropicBaseUrl: 'https://api.minimaxi.com/anthropic',
+        anthropicApiKey: 'encoded-key',
+        electronPath: '/Applications/Electron.app/Contents/MacOS/Electron',
+        onStderr: vi.fn(),
+        includeSkillMcp: true,
+        routed: false
+      })
+
+      expect(addedMcpServers).toEqual(['local-tools'])
+      expect(mocks.createSkillMcpServer).not.toHaveBeenCalled()
+      expect(mocks.createLocalToolsMcpServer).toHaveBeenCalledWith({
+        workDir: '/tmp/space-skill-native',
+        spaceId: 'space-skill-native',
+        conversationId: 'conv-skill-native',
+        aiBrowserEnabled: false,
+        includeSkillMcp: false,
+        includeSubagentTools: true
+      })
+      expect(sdkOptions.mcpServers).toEqual({
+        'local-tools': { type: 'stdio', command: 'local-tools' }
+      })
+      expect(sdkOptions.disallowedTools).not.toContain('Skill')
+    })
+
+    it('keeps MCP skill fallback for routed providers even when native skill preference is enabled', async () => {
+      const abortController = new AbortController()
+
+      const { sdkOptions, addedMcpServers } = await buildSdkOptions({
+        conversationId: 'conv-skill-routed',
+        spaceId: 'space-skill-routed',
+        workDir: '/tmp/space-skill-routed',
+        config: {
+          mcpServers: {},
+          memory: { enabled: false },
+          skillSettings: { preferNativeClaudeSkillTool: true }
+        },
+        abortController,
+        sdkModel: 'claude-sonnet-4-20250514',
+        credentialsModel: 'gpt-4.1',
+        anthropicBaseUrl: 'http://router.local',
+        anthropicApiKey: 'encoded-key',
+        electronPath: '/Applications/Electron.app/Contents/MacOS/Electron',
+        onStderr: vi.fn(),
+        includeSkillMcp: true,
+        routed: true
+      })
+
+      expect(addedMcpServers).toEqual(['local-tools', 'skill'])
+      expect(mocks.createSkillMcpServer).toHaveBeenCalledTimes(1)
+      expect(sdkOptions.disallowedTools).toContain('Skill')
+    })
   })
 })

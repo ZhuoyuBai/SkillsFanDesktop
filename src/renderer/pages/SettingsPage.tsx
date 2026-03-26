@@ -507,6 +507,11 @@ export function SettingsPage() {
   const isFullAccessEnabled = (config?.permissions?.commandExecution === 'allow')
     || (config?.permissions?.trustMode ?? false)
   const isSystemBrowserMode = (config?.browserAutomation?.mode ?? DEFAULT_CONFIG.browserAutomation?.mode) === 'system-browser'
+  const prefersNativeClaudeSkillTool = (
+    config?.skillSettings?.preferNativeClaudeSkillTool
+    ?? DEFAULT_CONFIG.skillSettings?.preferNativeClaudeSkillTool
+    ?? false
+  )
 
   const handlePermissionModeChange = async (enabled: boolean) => {
     const currentPermissions = config?.permissions ?? DEFAULT_CONFIG.permissions
@@ -559,6 +564,21 @@ export function SettingsPage() {
       addToast(t('Saved'), 'success')
     } catch (error) {
       console.error('[Settings] Failed to update browser automation mode:', error)
+      addToast(t('Save failed'), 'error')
+    }
+  }
+
+  const handleNativeClaudeSkillToolChange = async (enabled: boolean) => {
+    const skillSettings = {
+      preferNativeClaudeSkillTool: enabled
+    }
+
+    try {
+      await api.setConfig({ skillSettings })
+      setConfig({ ...(config ?? DEFAULT_CONFIG), skillSettings } as HaloConfig)
+      addToast(t('Saved'), 'success')
+    } catch (error) {
+      console.error('[Settings] Failed to update skill settings:', error)
       addToast(t('Save failed'), 'error')
     }
   }
@@ -1500,6 +1520,19 @@ export function SettingsPage() {
                     <Switch checked={isSystemBrowserMode} onChange={handleSystemBrowserModeChange} />
                   </div>
                 )}
+
+                <div className="flex items-center justify-between pt-4 border-t border-border">
+                  <div className="flex-1">
+                    <p className="font-medium">{t('Prefer Native Claude Skill Tool')}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {t("When supported by the current provider, use Claude Code's built-in Skill tool instead of SkillsFan's MCP Skill tool.")}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {t('Changes take effect on the next message')}
+                    </p>
+                  </div>
+                  <Switch checked={prefersNativeClaudeSkillTool} onChange={handleNativeClaudeSkillToolChange} />
+                </div>
 
                 {/* Memory Retention Period */}
                 <div className={`pt-4 border-t border-border transition-opacity ${(config?.memory?.enabled ?? true) ? '' : 'opacity-50 pointer-events-none'}`}>

@@ -220,6 +220,10 @@ export interface BrowserAutomationConfig {
   mode: 'ai-browser' | 'system-browser';
 }
 
+export interface SkillSettingsConfig {
+  preferNativeClaudeSkillTool: boolean;
+}
+
 export interface HaloConfig {
   api: ApiConfig;  // Legacy, kept for backward compatibility
   aiSources?: AISourcesConfig;  // New multi-source configuration
@@ -231,6 +235,7 @@ export interface HaloConfig {
   spaces?: SpacesConfig;  // Space settings (default space, etc.)
   memory?: MemoryConfig;  // Cross-conversation memory settings
   browserAutomation?: BrowserAutomationConfig;  // Browser automation mode preference
+  skillSettings?: SkillSettingsConfig;  // Native Claude Skill tool preference
   thinkingEffort?: ThinkingEffort;  // Default thinking effort level
   customInstructions?: {  // Global custom instructions appended to system prompt
     enabled: boolean;
@@ -634,6 +639,9 @@ export const DEFAULT_CONFIG: HaloConfig = {
   },
   browserAutomation: {
     mode: 'ai-browser'
+  },
+  skillSettings: {
+    preferNativeClaudeSkillTool: true
   },
   tools: {
     web: {

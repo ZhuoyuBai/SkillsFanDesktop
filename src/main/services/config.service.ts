@@ -128,6 +128,9 @@ interface HaloConfig {
   browserAutomation?: {
     mode: 'ai-browser' | 'system-browser'
   }
+  skillSettings?: {
+    preferNativeClaudeSkillTool: boolean
+  }
   // Custom instructions appended to system prompt
   customInstructions?: {
     enabled: boolean
@@ -246,6 +249,9 @@ const DEFAULT_CONFIG: HaloConfig = {
   },
   browserAutomation: {
     mode: 'ai-browser'
+  },
+  skillSettings: {
+    preferNativeClaudeSkillTool: true
   },
   onboarding: {
     completed: false
@@ -471,7 +477,8 @@ function mergeConfigWithDefaults(parsed: Record<string, any>): HaloConfig {
     spaces: { ...DEFAULT_CONFIG.spaces, ...parsed.spaces },
     // memory: merge with defaults
     memory: { ...DEFAULT_CONFIG.memory, ...parsed.memory },
-    browserAutomation: { ...DEFAULT_CONFIG.browserAutomation, ...parsed.browserAutomation }
+    browserAutomation: { ...DEFAULT_CONFIG.browserAutomation, ...parsed.browserAutomation },
+    skillSettings: { ...DEFAULT_CONFIG.skillSettings, ...parsed.skillSettings }
   }
 }
 
@@ -516,6 +523,9 @@ function applyConfigUpdates(currentConfig: HaloConfig, config: Partial<HaloConfi
   }
   if (config.browserAutomation) {
     newConfig.browserAutomation = { ...currentConfig.browserAutomation, ...config.browserAutomation }
+  }
+  if (config.skillSettings) {
+    newConfig.skillSettings = { ...currentConfig.skillSettings, ...config.skillSettings }
   }
 
   return newConfig

@@ -96,6 +96,21 @@ export interface BuildSdkOptionsParams {
   routed?: boolean
 }
 
+export type SkillToolMode = 'none' | 'mcp' | 'native'
+
+export function resolveSkillToolMode(
+  config: Record<string, any>,
+  options: { skillsAvailable: boolean; routed?: boolean }
+): SkillToolMode {
+  if (!options.skillsAvailable) {
+    return 'none'
+  }
+
+  return config.skillSettings?.preferNativeClaudeSkillTool === true && !options.routed
+    ? 'native'
+    : 'mcp'
+}
+
 /**
  * Resolve provider credentials into Anthropic-compatible runtime transport.
  */
@@ -170,6 +185,11 @@ export async function buildSdkOptions(params: BuildSdkOptionsParams): Promise<{
     ? 'system-browser'
     : 'ai-browser'
   const effectiveAiBrowserEnabled = aiBrowserEnabled && browserAutomationMode !== 'system-browser'
+  const skillToolMode = resolveSkillToolMode(config, {
+    skillsAvailable: includeSkillMcp,
+    routed
+  })
+  const effectiveIncludeSkillMcp = skillToolMode === 'mcp'
 
   // Load custom agent definitions from .claude/agents/*.md
   const agents = loadAgentDefinitions(workDir)
@@ -191,12 +211,12 @@ export async function buildSdkOptions(params: BuildSdkOptionsParams): Promise<{
     spaceId,
     conversationId,
     aiBrowserEnabled: effectiveAiBrowserEnabled,
-    includeSkillMcp,
+    includeSkillMcp: effectiveIncludeSkillMcp,
     includeSubagentTools
   })
   addedMcpServers.push('local-tools')
 
-  if (includeSkillMcp) {
+  if (effectiveIncludeSkillMcp) {
     mcpServers['skill'] = await createSkillMcpServer()
     addedMcpServers.push('skill')
   }
@@ -241,7 +261,7 @@ export async function buildSdkOptions(params: BuildSdkOptionsParams): Promise<{
     ? [...DISALLOWED_SERVER_SIDE_TOOLS_BASE]
     : [...DISALLOWED_SERVER_SIDE_TOOLS_BASE, ...WEB_SEARCH_SERVER_TOOLS]
 
-  if (includeSkillMcp && !disallowedTools.includes('Skill')) {
+  if (effectiveIncludeSkillMcp && !disallowedTools.includes('Skill')) {
     // Prefer the app-managed MCP skill loader over Claude Code's native Skill tool.
     // This keeps skill invocation consistent across non-Claude backends.
     disallowedTools.push('Skill')

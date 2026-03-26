@@ -25,7 +25,7 @@ import {
   getWorkingDir,
   getApiCredentials
 } from './helpers'
-import { buildSdkOptions, resolveSdkTransport } from './sdk-options'
+import { buildSdkOptions, resolveSdkTransport, resolveSkillToolMode } from './sdk-options'
 import { isUsageLimitActive } from '../../openai-compat-router/server/request-handler'
 
 // ============================================
@@ -102,6 +102,7 @@ export function stopSessionCleanup(): void {
 export function needsSessionRebuild(existing: V2SessionInfo, newConfig: SessionConfig): boolean {
   return existing.config.aiBrowserEnabled !== newConfig.aiBrowserEnabled
     || existing.config.skillsSignature !== newConfig.skillsSignature
+    || existing.config.skillToolMode !== newConfig.skillToolMode
     || existing.config.browserAutomationMode !== newConfig.browserAutomationMode
     || existing.config.customInstructionsHash !== newConfig.customInstructionsHash
     || existing.config.extensionHash !== newConfig.extensionHash
@@ -154,7 +155,7 @@ export async function getOrCreateV2Session(
   if (existing) {
     // Check if config changed and requires rebuild
     if (config && needsSessionRebuild(existing, config)) {
-      console.log(`[Agent][${conversationId}] Config changed (aiBrowser: ${existing.config.aiBrowserEnabled} → ${config.aiBrowserEnabled}, browserMode: ${existing.config.browserAutomationMode || 'ai-browser'} → ${config.browserAutomationMode || 'ai-browser'}), rebuilding session...`)
+      console.log(`[Agent][${conversationId}] Config changed (aiBrowser: ${existing.config.aiBrowserEnabled} → ${config.aiBrowserEnabled}, skillToolMode: ${existing.config.skillToolMode || 'none'} → ${config.skillToolMode || 'none'}, browserMode: ${existing.config.browserAutomationMode || 'ai-browser'} → ${config.browserAutomationMode || 'ai-browser'}), rebuilding session...`)
       closeV2SessionForRebuild(conversationId)
       // Fall through to create new session
     } else {
@@ -251,6 +252,10 @@ export async function ensureSessionWarm(
   await ensureSkillsInitialized(workDir, { forceRefresh: true })
   const skillsSignature = getSkillsSignature()
   const skillsAvailable = skillsSignature.length > 0
+  const skillToolMode = resolveSkillToolMode(config as Record<string, any>, {
+    skillsAvailable,
+    routed: transport.routed
+  })
 
   const { sdkOptions, addedMcpServers } = await buildSdkOptions({
     conversationId,
@@ -279,6 +284,7 @@ export async function ensureSessionWarm(
     const sessionConfig: SessionConfig = {
       aiBrowserEnabled: false,  // Default to false for warm-up (user hasn't enabled it yet)
       skillsSignature,
+      skillToolMode,
       browserAutomationMode: (config as any).browserAutomation?.mode === 'system-browser' ? 'system-browser' : 'ai-browser',
       customInstructionsHash: ci?.enabled && ci?.content ? ci.content : undefined,
       extensionHash: getExtensionHash()

@@ -7,7 +7,7 @@ import { ensureSkillsInitialized, getSkillsSignature } from '../../skill'
 import { isAIBrowserTool } from '../../ai-browser/tool-utils'
 import type { ApiCredentials, SessionConfig, V2SDKSession } from '../types'
 import { getApiCredentials, getHeadlessElectronPath, getMainWindow, sendToRenderer } from '../helpers'
-import { buildSdkOptions, resolveSdkTransport } from '../sdk-options'
+import { buildSdkOptions, resolveSdkTransport, resolveSkillToolMode } from '../sdk-options'
 import { closeV2Session, getOrCreateV2Session } from '../session-manager'
 import { extractResultUsage, extractSingleUsage } from '../message-utils'
 import { atomicWriteJsonSync, safeReadJsonSync } from '../../../utils/atomic-write'
@@ -642,6 +642,11 @@ async function runSubagent(runId: string): Promise<void> {
 
     await ensureSkillsInitialized(execution.workDir, { forceRefresh: true })
     const skillsSignature = getSkillsSignature()
+    const skillsAvailable = skillsSignature.length > 0
+    const skillToolMode = resolveSkillToolMode(config as Record<string, any>, {
+      skillsAvailable,
+      routed: transport.routed
+    })
 
     const { getExtensionHash } = await import('../../extension')
     const browserAutomationMode = config.browserAutomation?.mode === 'system-browser'
@@ -650,6 +655,7 @@ async function runSubagent(runId: string): Promise<void> {
     const sessionConfig: SessionConfig = {
       aiBrowserEnabled: false,
       skillsSignature,
+      skillToolMode,
       browserAutomationMode,
       customInstructionsHash: config.customInstructions?.enabled && config.customInstructions?.content
         ? config.customInstructions.content
