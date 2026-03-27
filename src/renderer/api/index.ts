@@ -856,7 +856,6 @@ export const api = {
     if (!isElectron()) return { success: false, error: 'Only available in desktop app' }
     return window.skillsfan.feishuSetDefaultSpace(spaceId)
   },
-
   // ===== WeChat Bot (Electron only) =====
   wechatStatus: async (): Promise<ApiResponse> => {
     if (!isElectron()) return { success: false, error: 'Only available in desktop app' }
@@ -898,7 +897,6 @@ export const api = {
     if (!isElectron()) return { success: false, error: 'Only available in desktop app' }
     return window.skillsfan.wechatSetAutoApproveTools(enabled)
   },
-
   // ===== System Settings (Electron only) =====
   getAutoLaunch: async (): Promise<ApiResponse> => {
     if (!isElectron()) {
@@ -1156,7 +1154,12 @@ export const api = {
     onEvent('browser:zoom-changed', callback as (data: unknown) => void),
 
   // PTY (embedded Claude Code CLI terminal in Canvas)
-  ptyCreate: async (options: { id: string; spaceId: string; cols: number; rows: number }): Promise<ApiResponse> => {
+  ptyCreate: async (options: {
+    id: string
+    spaceId: string
+    cols: number
+    rows: number
+  }): Promise<ApiResponse> => {
     if (isElectron()) {
       return window.skillsfan.ptyCreate(options)
     }

@@ -134,7 +134,7 @@ export function TerminalSessionPane({
       term.dispose()
       api.ptyDestroy(terminalId).catch(() => {})
     }
-  }, [terminalId, spaceId])
+  }, [terminalId, spaceId, t])
 
   // Handle container resize
   useEffect(() => {

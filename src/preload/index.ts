@@ -300,7 +300,12 @@ export interface SkillsFanAPI {
   onBrowserZoomChanged: (callback: (data: { viewId: string; zoomLevel: number }) => void) => () => void
 
   // PTY (embedded Claude Code CLI terminal in Canvas)
-  ptyCreate: (options: { id: string; spaceId: string; cols: number; rows: number }) => Promise<IpcResponse>
+  ptyCreate: (options: {
+    id: string
+    spaceId: string
+    cols: number
+    rows: number
+  }) => Promise<IpcResponse>
   ptyWrite: (id: string, data: string) => Promise<IpcResponse>
   ptyResize: (id: string, cols: number, rows: number) => Promise<IpcResponse>
   ptyDestroy: (id: string) => Promise<IpcResponse>
@@ -720,7 +725,12 @@ const api: SkillsFanAPI = {
   onBrowserZoomChanged: (callback) => createEventListener('browser:zoom-changed', callback as (data: unknown) => void),
 
   // PTY (embedded Claude Code CLI terminal in Canvas)
-  ptyCreate: (options: { id: string; spaceId: string; cols: number; rows: number }) =>
+  ptyCreate: (options: {
+    id: string
+    spaceId: string
+    cols: number
+    rows: number
+  }) =>
     ipcRenderer.invoke('pty:create', options),
   ptyWrite: (id: string, data: string) =>
     ipcRenderer.invoke('pty:write', id, data),

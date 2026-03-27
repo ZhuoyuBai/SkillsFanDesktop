@@ -26,7 +26,7 @@ import {
 import { dirname, join } from 'path'
 import { app, BrowserWindow, nativeTheme } from 'electron'
 import { getConfig, getHaloDir } from './config.service'
-import { getApiCredentials, getWorkingDir } from './agent/helpers'
+import { getApiCredentialsForSource, getWorkingDir } from './agent/helpers'
 import { resolveSdkTransport } from './agent/sdk-options'
 
 // Lazy-loaded to avoid native module issues at import time
@@ -328,13 +328,18 @@ function ensureEmbeddedClaudeGlobalConfig(params: { configDir: string; apiKey: s
   writeFileSync(configPath, `${JSON.stringify(nextConfig, null, 2)}\n`, 'utf-8')
 }
 
-async function resolveClaudeCliEnv(params: { workDir: string }): Promise<{
+export async function resolveClaudeCliEnv(params: {
+  workDir: string
+  source?: string
+  modelOverride?: string
+}): Promise<{
   env: Record<string, string>
   model: string
   skipClaudeLogin: boolean
 }> {
   const config = getConfig()
-  const credentials = await getApiCredentials(config)
+  const source = params.source || ((config as Record<string, any>).aiSources?.current || 'custom')
+  const credentials = await getApiCredentialsForSource(config, source, params.modelOverride)
   const transport = await resolveSdkTransport(credentials)
   const skipClaudeLogin = config.terminal?.skipClaudeLogin !== false
   const embeddedClaudeConfigDir = skipClaudeLogin ? getEmbeddedClaudeConfigDir() : null
@@ -380,7 +385,7 @@ function getEmbeddedClaudeConfigDir(): string {
  * Find the bundled Claude Code CLI path.
  * Falls back to global `claude` if bundled version not found.
  */
-function findClaudeCliPath(): string {
+export function findClaudeCliPath(): string {
   const candidates = [
     join(app.getAppPath(), 'node_modules', '@anthropic-ai', 'claude-code', 'cli.js'),
     join(unwrapAsarPath(app.getAppPath()), 'node_modules', '@anthropic-ai', 'claude-code', 'cli.js')
@@ -414,16 +419,24 @@ export interface CreatePtyOptions {
   spaceId: string
   cols: number
   rows: number
+  source?: string
+  modelOverride?: string
 }
 
 /**
  * Create a PTY instance and spawn Claude Code CLI.
  */
 export async function createPty(options: CreatePtyOptions): Promise<{ model: string }> {
-  const { id, spaceId, cols, rows } = options
+  const { id, spaceId, cols, rows, source, modelOverride } = options
 
-  // Destroy existing PTY with same ID
-  if (ptyInstances.has(id)) {
+  const existing = ptyInstances.get(id)
+  if (existing?.isAlive) {
+    resizePty(id, cols, rows)
+    return { model: existing.model }
+  }
+
+  // Clean up any stale PTY with the same ID before recreating it.
+  if (existing) {
     destroyPty(id)
   }
 
@@ -443,7 +456,11 @@ export async function createPty(options: CreatePtyOptions): Promise<{ model: str
     helperPath = validatePtyLaunchPrerequisites({ electronPath, cliPath, workDir }).helperPath
 
     const nodePty = getPty()
-    const { env: claudeEnv, model, skipClaudeLogin } = await resolveClaudeCliEnv({ workDir })
+    const { env: claudeEnv, model, skipClaudeLogin } = await resolveClaudeCliEnv({
+      workDir,
+      source,
+      modelOverride
+    })
 
     const args = [cliPath, '--model', model]
 

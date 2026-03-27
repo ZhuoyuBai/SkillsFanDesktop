@@ -16,7 +16,9 @@ interface SpaceTerminalProps {
 
 interface TerminalWorkspaceSession {
   id: string
-  sequence: number
+  kind: 'local'
+  sequence?: number
+  defaultTitle: string
   customTitle?: string
 }
 
@@ -37,7 +39,9 @@ export function SpaceTerminal({ spaceId }: SpaceTerminalProps) {
     sequenceRef.current = 1
     initialSessionsRef.current = [{
       id: buildTerminalId(spaceId, 1),
-      sequence: 1
+      kind: 'local',
+      sequence: 1,
+      defaultTitle: t('Claude Code')
     }]
   }
 
@@ -51,9 +55,13 @@ export function SpaceTerminal({ spaceId }: SpaceTerminalProps) {
     const sequence = sequenceRef.current
     return {
       id: buildTerminalId(spaceId, sequence),
-      sequence
+      kind: 'local',
+      sequence,
+      defaultTitle: sequence === 1
+        ? t('Claude Code')
+        : t('Claude Code {{number}}', { number: sequence })
     }
-  }, [spaceId])
+  }, [spaceId, t])
 
   // Initialize a fresh terminal workspace when switching spaces.
   useEffect(() => {
@@ -105,10 +113,8 @@ export function SpaceTerminal({ spaceId }: SpaceTerminalProps) {
       return session.customTitle.trim()
     }
 
-    return session.sequence === 1
-      ? t('Claude Code')
-      : t('Claude Code {{number}}', { number: session.sequence })
-  }, [t])
+    return session.defaultTitle
+  }, [])
 
   const startRenaming = useCallback((session: TerminalWorkspaceSession) => {
     setEditingSessionId(session.id)
@@ -147,6 +153,7 @@ export function SpaceTerminal({ spaceId }: SpaceTerminalProps) {
             {sessions.map((session) => {
               const isActive = session.id === activeSessionId
               const title = renderSessionTitle(session)
+              const canRename = true
 
               return (
                 <div
@@ -161,7 +168,11 @@ export function SpaceTerminal({ spaceId }: SpaceTerminalProps) {
                     role="button"
                     tabIndex={0}
                     onClick={() => setActiveSessionId(session.id)}
-                    onDoubleClick={() => startRenaming(session)}
+                    onDoubleClick={() => {
+                      if (canRename) {
+                        startRenaming(session)
+                      }
+                    }}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') {
                         e.preventDefault()
@@ -172,7 +183,7 @@ export function SpaceTerminal({ spaceId }: SpaceTerminalProps) {
                     title={title}
                   >
                     <TerminalIcon className="w-4 h-4 flex-shrink-0" />
-                    {editingSessionId === session.id ? (
+                    {canRename && editingSessionId === session.id ? (
                       <input
                         ref={renameInputRef}
                         value={draftTitle}
@@ -222,16 +233,14 @@ export function SpaceTerminal({ spaceId }: SpaceTerminalProps) {
 
       <div className="relative flex-1 min-h-0">
         {sessions.length > 0 ? (
-          sessions.map((session) => {
-            return (
-              <TerminalSessionPane
-                key={session.id}
-                terminalId={session.id}
-                spaceId={spaceId}
-                isActive={session.id === activeSessionId}
-              />
-            )
-          })
+          sessions.map((session) => (
+            <TerminalSessionPane
+              key={session.id}
+              terminalId={session.id}
+              spaceId={spaceId}
+              isActive={session.id === activeSessionId}
+            />
+          ))
         ) : (
           <div className="flex h-full items-center justify-center px-6">
             <div className="max-w-sm text-center">
