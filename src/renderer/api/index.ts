@@ -1155,6 +1155,55 @@ export const api = {
   onBrowserZoomChanged: (callback: (data: { viewId: string; zoomLevel: number }) => void) =>
     onEvent('browser:zoom-changed', callback as (data: unknown) => void),
 
+  // PTY (embedded Claude Code CLI terminal in Canvas)
+  ptyCreate: async (options: { id: string; spaceId: string; cols: number; rows: number }): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.skillsfan.ptyCreate(options)
+    }
+    return { success: false, error: 'PTY only available in desktop app' }
+  },
+
+  ptyWrite: async (id: string, data: string): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.skillsfan.ptyWrite(id, data)
+    }
+    return { success: false, error: 'PTY only available in desktop app' }
+  },
+
+  ptyResize: async (id: string, cols: number, rows: number): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.skillsfan.ptyResize(id, cols, rows)
+    }
+    return { success: false, error: 'PTY only available in desktop app' }
+  },
+
+  ptyDestroy: async (id: string): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.skillsfan.ptyDestroy(id)
+    }
+    return { success: false, error: 'PTY only available in desktop app' }
+  },
+
+  ptyList: async (): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.skillsfan.ptyList()
+    }
+    return { success: false, error: 'PTY only available in desktop app' }
+  },
+
+  ptyInfo: async (id: string): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.skillsfan.ptyInfo(id)
+    }
+    return { success: false, error: 'PTY only available in desktop app' }
+  },
+
+  onPtyData: (callback: (data: { id: string; data: string }) => void) =>
+    onEvent('pty:data', callback as (data: unknown) => void),
+
+  onPtyExit: (callback: (data: { id: string; exitCode: number }) => void) =>
+    onEvent('pty:exit', callback as (data: unknown) => void),
+
   // Canvas Tab Context Menu (native Electron menu)
   showCanvasTabContextMenu: async (options: {
     tabId: string

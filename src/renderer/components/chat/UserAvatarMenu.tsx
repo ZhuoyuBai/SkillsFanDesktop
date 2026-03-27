@@ -6,8 +6,9 @@ import { useState, useEffect, useRef } from 'react'
 import { api } from '../../api'
 import { useTranslation } from '../../i18n'
 import { useAppStore } from '../../stores/app.store'
-import { User, Settings, LogOut, Loader2, HelpCircle, Gem } from 'lucide-react'
+import { User, Settings, LogOut, Loader2, HelpCircle, Gem, Terminal, MessageSquare } from 'lucide-react'
 import { SpaceGuideDialog } from '../space/SpaceGuideDialog'
+import { useSpaceStore } from '../../stores/space.store'
 import type { SkillsFanAuthState } from '../../../shared/types/skillsfan'
 
 interface UserAvatarMenuProps {
@@ -17,7 +18,8 @@ interface UserAvatarMenuProps {
 
 export function UserAvatarMenu({ collapsed = false }: UserAvatarMenuProps) {
   const { t } = useTranslation()
-  const { setView, openSettingsWithSection, productFeatures } = useAppStore()
+  const { setView, openSettingsWithSection, productFeatures, spaceViewMode, toggleSpaceViewMode } = useAppStore()
+  const { currentSpace } = useSpaceStore()
   const hostedAiEnabled = productFeatures.skillsfanHostedAiEnabled
 
   const [authState, setAuthState] = useState<SkillsFanAuthState | null>(null)
@@ -123,6 +125,11 @@ export function UserAvatarMenu({ collapsed = false }: UserAvatarMenuProps) {
     setShowSpaceGuide(true)
   }
 
+  const handleViewModeToggle = () => {
+    setIsMenuOpen(false)
+    toggleSpaceViewMode()
+  }
+
   const isLoggedIn = authState?.isLoggedIn && authState.user
   const userName = isLoggedIn ? authState.user!.name : t('Login')
   const userEmail = isLoggedIn ? authState.user!.email : ''
@@ -196,6 +203,29 @@ export function UserAvatarMenu({ collapsed = false }: UserAvatarMenuProps) {
             <HelpCircle className="w-4 h-4 text-muted-foreground" />
             <span className="text-sm">{t('What is a Space?')}</span>
           </button>
+
+          {/* View Mode Toggle - switch between Chat and Terminal mode */}
+          {currentSpace && (
+            <>
+              <div className="border-t border-border/50" />
+              <button
+                onClick={handleViewModeToggle}
+                className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-muted/50 transition-colors text-left"
+              >
+                {spaceViewMode === 'chat' ? (
+                  <>
+                    <Terminal className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm">{t('Switch to Terminal Mode')}</span>
+                  </>
+                ) : (
+                  <>
+                    <MessageSquare className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm">{t('Switch to Chat Mode')}</span>
+                  </>
+                )}
+              </button>
+            </>
+          )}
 
           <div className="border-t border-border/50" />
 

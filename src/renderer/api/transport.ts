@@ -243,6 +243,8 @@ export function onEvent(channel: string, callback: (data: unknown) => void): () 
       'browser:state-change': 'onBrowserStateChange',
       'browser:zoom-changed': 'onBrowserZoomChanged',
       'canvas:tab-action': 'onCanvasTabAction',
+      'pty:data': 'onPtyData',
+      'pty:exit': 'onPtyExit',
       'ai-browser:active-view-changed': 'onAIBrowserActiveViewChanged',
       'artifact:file-changed': 'onArtifactFileChanged',
       'perf:snapshot': 'onPerfSnapshot',

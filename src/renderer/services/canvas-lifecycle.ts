@@ -607,6 +607,32 @@ class CanvasLifecycle {
   }
 
   /**
+   * Open a Claude Code CLI terminal in a new tab.
+   * Creates a PTY in the main process that runs the Claude Code binary.
+   */
+  async openTerminal(spaceId: string, title?: string): Promise<string> {
+    const tabId = generateTabId()
+    const tab: TabState = {
+      id: tabId,
+      type: 'terminal',
+      title: title || 'Claude Code',
+      isDirty: false,
+      isLoading: false,
+    }
+
+    // Store spaceId on the tab so TerminalViewer can access it
+    ;(tab as any).spaceId = spaceId
+
+    this.tabs.set(tabId, tab)
+    this.setOpen(true)
+    this.notifyTabsChange()
+
+    await this.switchTab(tabId)
+
+    return tabId
+  }
+
+  /**
    * Close a tab
    */
   async closeTab(tabId: string): Promise<void> {
@@ -624,6 +650,13 @@ class CanvasLifecycle {
     const hasBrowserView = (tab.type === 'browser' || tab.type === 'pdf') && tab.browserViewId
     if (hasBrowserView) {
       await this.destroyBrowserView(tab.browserViewId!)
+    }
+
+    // Destroy PTY if this is a terminal tab
+    if (tab.type === 'terminal') {
+      api.ptyDestroy(tabId).catch((err) => {
+        console.error('[CanvasLifecycle] Failed to destroy PTY:', err)
+      })
     }
 
     // Remove tab

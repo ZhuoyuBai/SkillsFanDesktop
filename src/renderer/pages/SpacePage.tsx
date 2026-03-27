@@ -22,6 +22,7 @@ import { canvasLifecycle } from '../services/canvas-lifecycle'
 import { useSearchStore } from '../stores/search.store'
 import { useLoopTaskStore } from '../stores/loop-task.store'
 import { ChatView } from '../components/chat/ChatView'
+import { SpaceTerminal } from '../components/terminal/SpaceTerminal'
 import { ArtifactRail } from '../components/artifact/ArtifactRail'
 import { ConversationList } from '../components/chat/ConversationList'
 import { SkillCreationPanel } from '../components/skill-creation/SkillCreationPanel'
@@ -64,7 +65,7 @@ function useIsMobile() {
 export function SpacePage() {
   const { t } = useTranslation()
   const platform = usePlatform()
-  const { setView, mockBashMode, gitBashInstallProgress, startGitBashInstall } = useAppStore()
+  const { setView, mockBashMode, gitBashInstallProgress, startGitBashInstall, spaceViewMode } = useAppStore()
   const hostedAiEnabled = useAppStore((s) => s.productFeatures.skillsfanHostedAiEnabled)
   const { currentSpace, refreshCurrentSpace, openSpaceFolder } = useSpaceStore()
   const {
@@ -489,8 +490,13 @@ export function SpacePage() {
           />
         )}
 
-        {/* Desktop Layout */}
-        {!isMobile && (
+        {/* Terminal Mode - full-screen Claude Code CLI */}
+        {spaceViewMode === 'terminal' && !isMobile && (
+          <SpaceTerminal key={currentSpace.id} spaceId={currentSpace.id} />
+        )}
+
+        {/* Desktop Layout - only in chat mode */}
+        {spaceViewMode === 'chat' && !isMobile && (
           <>
             {/* Chat view - hidden when maximized, adjusts width based on canvas state */}
             {!isCanvasMaximized && (
@@ -564,8 +570,8 @@ export function SpacePage() {
           </>
         )}
 
-        {/* Mobile Layout */}
-        {isMobile && (
+        {/* Mobile Layout - only in chat mode */}
+        {spaceViewMode === 'chat' && isMobile && (
           <div className="flex-1 min-h-0 flex flex-col min-w-0">
             {selectionType === 'loopTask' ? (
               <LoopTaskPanel spaceId={currentSpace.id} />
@@ -577,9 +583,14 @@ export function SpacePage() {
           </div>
         )}
 
+        {/* Mobile Terminal Mode */}
+        {spaceViewMode === 'terminal' && isMobile && (
+          <SpaceTerminal key={currentSpace.id} spaceId={currentSpace.id} />
+        )}
+
         {/* Artifact rail - auto-collapses when maximized via useEffect above */}
         {/* Smart collapse: collapses when canvas is open, respects user preference */}
-        {!isMobile && (
+        {spaceViewMode === 'chat' && !isMobile && (
           <ArtifactRail
             spaceId={currentSpace.id}
             isTemp={currentSpace.isTemp}

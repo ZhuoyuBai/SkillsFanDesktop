@@ -10,7 +10,7 @@
     "dev": "cross-env SKILLSFAN_DATA_DIR=~/.skillsfan-dev SKILLSFAN_API_URL=http://localhost:3000 electron-vite dev",
     "build": "electron-vite build",
     "start": "electron-vite preview",
-    "postinstall": "patch-package && electron-builder install-app-deps",
+    "postinstall": "patch-package && electron-builder install-app-deps && node scripts/fix-node-pty-helper-permissions.mjs",
     "build:mac": "npm run build && electron-builder --mac",
     "build:win": "npm run build && electron-builder --win",
     "build:win-x64": "npm run build && electron-builder --win --x64",
@@ -55,6 +55,9 @@
     "@streamdown/cjk": "^1.0.2",
     "@streamdown/code": "^1.0.2",
     "@tailwindcss/typography": "^0.5.19",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/addon-web-links": "^0.12.0",
+    "@xterm/xterm": "^6.0.0",
     "adm-zip": "^0.5.16",
     "better-sqlite3": "^12.6.2",
     "cloudflared": "^0.7.1",
@@ -68,6 +71,7 @@
     "i18next": "^25.7.4",
     "lucide-react": "^0.555.0",
     "mammoth": "^1.11.0",
+    "node-pty": "^1.1.0",
     "qrcode": "^1.5.4",
     "react": "^18.2.0",
     "react-arborist": "^3.4.3",
@@ -133,7 +137,8 @@
       "skillsfan-local/dist/**/*"
     ],
     "asarUnpack": [
-      "node_modules/cloudflared/**/*"
+      "node_modules/cloudflared/**/*",
+      "node_modules/node-pty/**/*"
     ],
     "publish": {
       "provider": "generic",

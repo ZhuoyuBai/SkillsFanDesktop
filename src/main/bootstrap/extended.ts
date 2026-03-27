@@ -38,6 +38,8 @@ import { shutdownMemory } from '../services/memory'
 import { registerFeishuHandlers } from '../ipc/feishu'
 import { registerWeChatHandlers } from '../ipc/wechat'
 import { registerExtensionHandlers } from '../ipc/extension'
+import { registerPtyHandlers } from '../ipc/pty'
+import { destroyAllPtys } from '../services/pty-manager.service'
 import { initializeExtensions as initExtensions, shutdownExtensions } from '../services/extension'
 import { FeishuChannel } from '../services/channel/adapters/feishu.channel'
 import { WeChatChannel } from '../services/channel/adapters/wechat.channel'
@@ -99,6 +101,9 @@ export function initializeExtendedServices(mainWindow: BrowserWindow): void {
 
   // Hosted subagent runtime: recover persisted run registry
   initializeSubagentRuntime()
+
+  // PTY: Embedded Claude Code CLI terminal in Canvas
+  registerPtyHandlers(mainWindow)
 
   // Skill: Settings and slash-command APIs
   registerSkillHandlers()
@@ -181,6 +186,9 @@ export function initializeExtendedServices(mainWindow: BrowserWindow): void {
  */
 export function cleanupExtendedServices(): void {
   shutdownSubagentRuntime()
+
+  // PTY: Kill all terminal processes
+  destroyAllPtys()
 
   // AI Browser: Cleanup MCP server and browser context
   cleanupAIBrowserHandlers()

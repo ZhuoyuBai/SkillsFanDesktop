@@ -1,7 +1,28 @@
 // afterPack hook - Execute professional ad-hoc signing after packaging, before DMG creation
 // Prevents users from seeing "damaged app" prompts
 const { execSync } = require('child_process');
+const fs = require('fs');
 const path = require('path');
+
+function fixNodePtySpawnHelpers(appPath) {
+  const candidates = [
+    path.join(appPath, 'Contents', 'Resources', 'app.asar.unpacked', 'node_modules', 'node-pty', 'prebuilds', 'darwin-arm64', 'spawn-helper'),
+    path.join(appPath, 'Contents', 'Resources', 'app.asar.unpacked', 'node_modules', 'node-pty', 'prebuilds', 'darwin-x64', 'spawn-helper'),
+  ];
+
+  for (const candidate of candidates) {
+    if (!fs.existsSync(candidate)) {
+      continue;
+    }
+
+    try {
+      fs.chmodSync(candidate, 0o755);
+      console.log(`[afterPack] Ensured executable permission: ${candidate}`);
+    } catch (error) {
+      console.warn(`[afterPack] Failed to chmod ${candidate}: ${error.message}`);
+    }
+  }
+}
 
 module.exports = async function(context) {
   // Only process macOS
@@ -15,6 +36,8 @@ module.exports = async function(context) {
   console.log(`[afterPack] Professional ad-hoc signing: ${appPath}`);
 
   try {
+    fixNodePtySpawnHelpers(appPath);
+
     // 1. Remove quarantine attribute (if exists)
     try {
       execSync(`xattr -dr com.apple.quarantine "${appPath}"`, { stdio: 'pipe' });

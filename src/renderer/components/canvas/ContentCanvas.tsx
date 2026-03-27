@@ -35,6 +35,7 @@ import { JsonViewer } from './viewers/JsonViewer'
 import { CsvViewer } from './viewers/CsvViewer'
 import { ExcelViewer } from './viewers/ExcelViewer'
 import { TextViewer } from './viewers/TextViewer'
+import { TerminalViewer } from './viewers/TerminalViewer'
 import { BrowserViewer, BrowserViewerFallback } from './viewers/BrowserViewer'
 import { api } from '../../api'
 import { useTranslation } from '../../i18n'
@@ -220,15 +221,7 @@ function TabContent({ tab, onScrollChange }: TabContentProps) {
       return <TextViewer tab={tab} onScrollChange={onScrollChange} />
 
     case 'terminal':
-      // Terminal view placeholder (future feature)
-      return (
-        <div className="flex items-center justify-center h-full">
-          <div className="text-center">
-            <p className="text-lg font-medium mb-2">{t('Terminal output')}</p>
-            <p className="text-sm text-muted-foreground">{t('This feature is coming soon')}</p>
-          </div>
-        </div>
-      )
+      return <TerminalViewer tab={tab} />
 
     default:
       return <TextViewer tab={tab} onScrollChange={onScrollChange} />

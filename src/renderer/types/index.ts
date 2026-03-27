@@ -222,6 +222,10 @@ export interface BrowserAutomationConfig {
   mode: BrowserAutomationMode;
 }
 
+export interface TerminalConfig {
+  skipClaudeLogin: boolean;
+}
+
 export interface SkillSettingsConfig {
   preferNativeClaudeSkillTool: boolean;
 }
@@ -237,6 +241,7 @@ export interface HaloConfig {
   spaces?: SpacesConfig;  // Space settings (default space, etc.)
   memory?: MemoryConfig;  // Cross-conversation memory settings
   browserAutomation?: BrowserAutomationConfig;  // Browser automation mode preference
+  terminal?: TerminalConfig;  // Embedded Claude Code terminal preferences
   skillSettings?: SkillSettingsConfig;  // Native Claude Skill tool preference
   thinkingEffort?: ThinkingEffort;  // Default thinking effort level
   customInstructions?: {  // Global custom instructions appended to system prompt
@@ -644,6 +649,9 @@ export const DEFAULT_CONFIG: HaloConfig = {
   browserAutomation: {
     enabled: false,
     mode: 'ai-browser'
+  },
+  terminal: {
+    skipClaudeLogin: true
   },
   skillSettings: {
     preferNativeClaudeSkillTool: true

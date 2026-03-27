@@ -41,6 +41,9 @@ interface AppState {
   mockBashMode: boolean
   gitBashInstallProgress: GitBashInstallProgress
 
+  // Space view mode: chat (default GUI) or terminal (Claude Code CLI)
+  spaceViewMode: 'chat' | 'terminal'
+
   // Settings page initial section
   settingsSection: SettingsSection | null
 
@@ -70,6 +73,10 @@ interface AppState {
   startGitBashInstall: () => Promise<void>
   refreshGitBashStatus: () => Promise<void>
 
+  // View mode actions
+  setSpaceViewMode: (mode: 'chat' | 'terminal') => void
+  toggleSpaceViewMode: () => void
+
   // Settings actions
   setSettingsSection: (section: SettingsSection | null) => void
   openSettingsWithSection: (section: SettingsSection) => void
@@ -91,6 +98,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   mcpStatusTimestamp: null,
   mockBashMode: false,
   gitBashInstallProgress: { phase: 'idle', progress: 0, message: '' },
+  spaceViewMode: 'chat',
   settingsSection: null,
   skillsfanLoggedIn: false,
   productFeatures: { skillsfanHostedAiEnabled: true },
@@ -139,6 +147,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   setAuthProviders: (providers) => set({ authProviders: providers }),
 
   // Settings actions
+  setSpaceViewMode: (mode) => set({ spaceViewMode: mode }),
+  toggleSpaceViewMode: () => {
+    const current = get().spaceViewMode
+    set({ spaceViewMode: current === 'chat' ? 'terminal' : 'chat' })
+  },
   setSettingsSection: (section) => set({ settingsSection: section }),
 
   openSettingsWithSection: (section) => {

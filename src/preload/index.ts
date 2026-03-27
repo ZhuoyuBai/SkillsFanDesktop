@@ -299,6 +299,16 @@ export interface SkillsFanAPI {
   onBrowserStateChange: (callback: (data: unknown) => void) => () => void
   onBrowserZoomChanged: (callback: (data: { viewId: string; zoomLevel: number }) => void) => () => void
 
+  // PTY (embedded Claude Code CLI terminal in Canvas)
+  ptyCreate: (options: { id: string; spaceId: string; cols: number; rows: number }) => Promise<IpcResponse>
+  ptyWrite: (id: string, data: string) => Promise<IpcResponse>
+  ptyResize: (id: string, cols: number, rows: number) => Promise<IpcResponse>
+  ptyDestroy: (id: string) => Promise<IpcResponse>
+  ptyList: () => Promise<IpcResponse>
+  ptyInfo: (id: string) => Promise<IpcResponse>
+  onPtyData: (callback: (data: { id: string; data: string }) => void) => () => void
+  onPtyExit: (callback: (data: { id: string; exitCode: number }) => void) => () => void
+
   // Canvas Tab Menu
   showCanvasTabContextMenu: (options: {
     tabId: string
@@ -708,6 +718,24 @@ const api: SkillsFanAPI = {
   showBrowserContextMenu: (options) => ipcRenderer.invoke('browser:show-context-menu', options),
   onBrowserStateChange: (callback) => createEventListener('browser:state-change', callback),
   onBrowserZoomChanged: (callback) => createEventListener('browser:zoom-changed', callback as (data: unknown) => void),
+
+  // PTY (embedded Claude Code CLI terminal in Canvas)
+  ptyCreate: (options: { id: string; spaceId: string; cols: number; rows: number }) =>
+    ipcRenderer.invoke('pty:create', options),
+  ptyWrite: (id: string, data: string) =>
+    ipcRenderer.invoke('pty:write', id, data),
+  ptyResize: (id: string, cols: number, rows: number) =>
+    ipcRenderer.invoke('pty:resize', id, cols, rows),
+  ptyDestroy: (id: string) =>
+    ipcRenderer.invoke('pty:destroy', id),
+  ptyList: () =>
+    ipcRenderer.invoke('pty:list'),
+  ptyInfo: (id: string) =>
+    ipcRenderer.invoke('pty:info', id),
+  onPtyData: (callback: (data: { id: string; data: string }) => void) =>
+    createEventListener('pty:data', callback as (data: unknown) => void),
+  onPtyExit: (callback: (data: { id: string; exitCode: number }) => void) =>
+    createEventListener('pty:exit', callback as (data: unknown) => void),
 
   // Canvas Tab Menu (native Electron menu)
   showCanvasTabContextMenu: (options) => ipcRenderer.invoke('canvas:show-tab-context-menu', options),

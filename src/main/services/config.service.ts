@@ -131,6 +131,9 @@ interface HaloConfig {
     enabled: boolean
     mode: BrowserAutomationMode
   }
+  terminal?: {
+    skipClaudeLogin: boolean
+  }
   skillSettings?: {
     preferNativeClaudeSkillTool: boolean
   }
@@ -253,6 +256,9 @@ const DEFAULT_CONFIG: HaloConfig = {
   browserAutomation: {
     enabled: false,
     mode: 'ai-browser'
+  },
+  terminal: {
+    skipClaudeLogin: true
   },
   skillSettings: {
     preferNativeClaudeSkillTool: true
@@ -425,6 +431,18 @@ function normalizeBrowserAutomation(parsed: Record<string, any>): {
   }
 }
 
+function normalizeTerminalConfig(parsed: Record<string, any>): {
+  skipClaudeLogin: boolean
+} {
+  const raw = parsed?.terminal
+
+  return {
+    skipClaudeLogin: typeof raw?.skipClaudeLogin === 'boolean'
+      ? raw.skipClaudeLogin
+      : DEFAULT_CONFIG.terminal.skipClaudeLogin
+  }
+}
+
 function getAiSourcesSignature(aiSources?: AISourcesConfig): string {
   if (!aiSources) return ''
   const current = aiSources.current || 'custom'
@@ -480,6 +498,7 @@ function getAiSourcesSignature(aiSources?: AISourcesConfig): string {
 function mergeConfigWithDefaults(parsed: Record<string, any>): HaloConfig {
   const aiSources = normalizeAiSources(parsed)
   const browserAutomation = normalizeBrowserAutomation(parsed)
+  const terminal = normalizeTerminalConfig(parsed)
   return {
     ...DEFAULT_CONFIG,
     ...parsed,
@@ -498,6 +517,7 @@ function mergeConfigWithDefaults(parsed: Record<string, any>): HaloConfig {
     // memory: merge with defaults
     memory: { ...DEFAULT_CONFIG.memory, ...parsed.memory },
     browserAutomation,
+    terminal,
     skillSettings: { ...DEFAULT_CONFIG.skillSettings, ...parsed.skillSettings }
   }
 }
@@ -543,6 +563,9 @@ function applyConfigUpdates(currentConfig: HaloConfig, config: Partial<HaloConfi
   }
   if (config.browserAutomation) {
     newConfig.browserAutomation = { ...currentConfig.browserAutomation, ...config.browserAutomation }
+  }
+  if (config.terminal) {
+    newConfig.terminal = { ...currentConfig.terminal, ...config.terminal }
   }
   if (config.skillSettings) {
     newConfig.skillSettings = { ...currentConfig.skillSettings, ...config.skillSettings }
