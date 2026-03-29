@@ -116,8 +116,8 @@ export function MessageList({
 
   return (
     <div className={`
-      space-y-2 transition-[max-width] duration-300 ease-out
-      ${isCompact ? 'max-w-full' : 'max-w-3xl mx-auto'}
+      space-y-3 transition-[max-width] duration-300 ease-out
+      ${isCompact ? 'max-w-full' : 'max-w-4xl mx-auto'}
     `}>
       {/* Render completed messages - thoughts shown above assistant messages */}
       {displayMessages.map((message) => {

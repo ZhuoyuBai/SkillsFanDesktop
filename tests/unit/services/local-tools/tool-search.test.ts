@@ -12,8 +12,8 @@ describe('local tool search', () => {
     })
 
     expect(results.map((item) => item.name)).toEqual([
-      'mcp__web-tools__WebFetch',
-      'mcp__web-tools__WebSearch'
+      'WebFetch',
+      'WebSearch'
     ])
   })
 

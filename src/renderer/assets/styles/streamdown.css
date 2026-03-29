@@ -8,9 +8,9 @@
 
 /* ========== Base ========== */
 .streamdown-content {
-  font-size: 13px;
-  line-height: 1.7;
-  color: hsl(var(--foreground));
+  font-size: 15px;
+  line-height: 1.85;
+  color: hsl(var(--foreground) / 0.92);
   overflow-x: auto;
   max-width: 100%;
 }
@@ -18,10 +18,12 @@
 /* ========== Headings ========== */
 /* Unified font size - only bold distinguishes headings */
 .streamdown-content h1 {
-  font-size: inherit;
+  font-size: 1.35rem;
   font-weight: 600;
-  margin-top: 1rem;
-  margin-bottom: 0.5rem;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
 }
 
 .streamdown-content h1:first-child {
@@ -29,10 +31,11 @@
 }
 
 .streamdown-content h2 {
-  font-size: inherit;
+  font-size: 1.125rem;
   font-weight: 600;
-  margin-top: 0.75rem;
-  margin-bottom: 0.5rem;
+  line-height: 1.3;
+  margin-top: 1.25rem;
+  margin-bottom: 0.75rem;
 }
 
 .streamdown-content h2:first-child {
@@ -40,15 +43,16 @@
 }
 
 .streamdown-content h3 {
-  font-size: inherit;
+  font-size: 1rem;
   font-weight: 600;
-  margin-top: 0.75rem;
-  margin-bottom: 0.375rem;
+  line-height: 1.35;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
 }
 
 /* ========== Paragraphs ========== */
 .streamdown-content p {
-  margin-bottom: 0.75rem;
+  margin-bottom: 1rem;
 }
 
 .streamdown-content p:last-child {
@@ -57,19 +61,19 @@
 
 /* ========== Lists ========== */
 .streamdown-content ul {
-  margin-bottom: 0.75rem;
-  padding-left: 1.25rem;
+  margin-bottom: 1rem;
+  padding-left: 1.5rem;
   list-style-type: disc;
 }
 
 .streamdown-content ol {
-  margin-bottom: 0.75rem;
-  padding-left: 1.25rem;
+  margin-bottom: 1rem;
+  padding-left: 1.5rem;
   list-style-type: decimal;
 }
 
 .streamdown-content li {
-  margin-bottom: 0.25rem;
+  margin-bottom: 0.45rem;
 }
 
 .streamdown-content ul ::marker,
@@ -79,11 +83,11 @@
 
 /* ========== Code Blocks — Style D: left gradient accent ========== */
 .streamdown-content pre {
-  margin: 0.75rem 0;
-  border-radius: 0.625rem;
+  margin: 1rem 0;
+  border-radius: 0.75rem;
   overflow: hidden;
-  border: 1px solid hsl(var(--border) / 0.5);
-  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border) / 0.4);
+  background: hsl(var(--card) / 0.55);
   position: relative;
   padding-left: calc(4px + 1rem);
 }
@@ -101,27 +105,27 @@
 
 .streamdown-content pre code {
   display: block;
-  padding: 0.875rem 1rem 0.875rem 0;
+  padding: 1rem 1rem 1rem 0;
   overflow-x: auto;
   font-family: "SF Mono", "Fira Code", "Consolas", monospace;
-  font-size: 0.85em;
-  line-height: 1.7;
+  font-size: 0.9em;
+  line-height: 1.75;
 }
 
 /* No-language code blocks: use system font instead of monospace */
 .streamdown-content pre code:not([class]) {
   font-family: inherit;
   font-size: 1em;
-  line-height: 1.8;
+  line-height: 1.85;
 }
 
 /* Inline code */
 .streamdown-content code:not(pre code) {
   padding: 0.125rem 0.375rem;
   margin: 0 0.125rem;
-  background: hsl(var(--secondary) / 0.8);
+  background: hsl(var(--secondary) / 0.72);
   color: hsl(var(--foreground));
-  border-radius: 0.25rem;
+  border-radius: 0.375rem;
   font-size: 0.9em;
   font-family: "SF Mono", "Fira Code", "Consolas", monospace;
 }
@@ -136,12 +140,12 @@
 
 /* ========== Blockquote ========== */
 .streamdown-content blockquote {
-  margin: 0.75rem 0;
-  padding: 0.75rem 1rem;
-  border-left: 3px solid hsl(var(--primary) / 0.5);
-  background: hsl(var(--muted) / 0.15);
-  border-radius: 0 0.5rem 0.5rem 0;
-  color: hsl(var(--foreground));
+  margin: 1rem 0;
+  padding: 0.875rem 1rem;
+  border-left: 3px solid rgb(249 115 22 / 0.6);
+  background: rgb(249 115 22 / 0.07);
+  border-radius: 0 0.75rem 0.75rem 0;
+  color: hsl(var(--foreground) / 0.9);
 }
 
 /* ========== Table ========== */
@@ -172,11 +176,14 @@
 /* ========== Links ========== */
 .streamdown-content a {
   color: hsl(var(--link));
-  text-decoration: none;
+  text-decoration: underline;
+  text-decoration-color: hsl(var(--link) / 0.3);
+  text-underline-offset: 0.25rem;
+  word-break: break-word;
 }
 
 .streamdown-content a:hover {
-  text-decoration: underline;
+  text-decoration-color: hsl(var(--link));
 }
 
 /* ========== Horizontal Rule ========== */
@@ -196,6 +203,7 @@
 /* ========== Strong / Emphasis ========== */
 .streamdown-content strong {
   font-weight: 600;
+  color: hsl(var(--foreground));
 }
 
 .streamdown-content em {

@@ -385,13 +385,15 @@ export function MessageItem({ message, hideThoughts = false, isInContainer = fal
   const messageContent = shouldRenderShell ? (
     <div
       onContextMenu={handleContextMenu}
-      className={`flex items-start gap-2.5 py-2 px-3 overflow-y-hidden overflow-x-auto w-full rounded ${
-        isUser ? 'bg-muted/15' : 'bg-muted/8'
+      className={`flex items-start gap-3 w-full overflow-hidden rounded-2xl border px-4 py-3.5 backdrop-blur-sm ${
+        isUser
+          ? 'bg-secondary/20 border-border/35'
+          : 'bg-card/45 border-border/30 shadow-[0_1px_0_hsl(var(--foreground)/0.04)]'
       }`}
     >
       {/* CLI indicator */}
-      <span className={`flex-shrink-0 text-[13px] leading-relaxed select-none ${
-        isUser ? 'text-foreground' : 'text-orange-400'
+      <span className={`mt-0.5 flex-shrink-0 select-none text-[11px] leading-6 ${
+        isUser ? 'text-foreground/70' : 'text-orange-400'
       }`}>
         {isUser ? '❯' : '⏺'}
       </span>
@@ -409,10 +411,10 @@ export function MessageItem({ message, hideThoughts = false, isInContainer = fal
         )}
 
         {/* Message content */}
-        <div className="break-words leading-relaxed text-[13px]" data-message-content>
+        <div className="break-words text-[15px] leading-7 text-foreground/92" data-message-content>
           {hasMessageContent && (
             isUser ? (
-              <span className="whitespace-pre-wrap text-foreground">{message.content}</span>
+              <span className="whitespace-pre-wrap text-[15px] leading-7 text-foreground">{message.content}</span>
             ) : useCompactLogRenderer ? (
               <CompactTextRenderer content={resultContent} />
             ) : (
@@ -435,16 +437,16 @@ export function MessageItem({ message, hideThoughts = false, isInContainer = fal
       </div>
     </div>
   ) : (
-    <div className="pl-7 pr-3 py-1">
+    <div className="pl-9 pr-4 py-2">
       {auxiliaryContent}
     </div>
   )
 
   // Hover action buttons
   const actionButtons = normalizedAssistantContent ? (
-    <div className="absolute top-1 right-0 opacity-0 group-hover:opacity-100
-      flex items-center gap-0.5 bg-background border border-border shadow-sm
-      rounded-lg p-0.5 transition-all z-10">
+    <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100
+      flex items-center gap-0.5 rounded-lg border border-border/70 bg-background/80 p-0.5
+      shadow-sm backdrop-blur-md transition-all z-10">
       <button
         onClick={handleCopyMessage}
         className="p-1 rounded text-muted-foreground hover:text-foreground transition-colors"

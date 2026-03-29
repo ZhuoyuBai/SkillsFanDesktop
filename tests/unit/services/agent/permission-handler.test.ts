@@ -44,10 +44,10 @@ describe('permission-handler', () => {
     mocks.getSkill.mockReturnValue(undefined)
   })
 
-  it('returns updatedInput for default allow decisions', async () => {
+  it('allows built-in web fetch by default', async () => {
     const canUseTool = createCanUseTool('/tmp/workspace', 'space-1', 'conv-1')
 
-    const result = await canUseTool('mcp__web-tools__WebFetch', {
+    const result = await canUseTool('WebFetch', {
       url: 'https://example.com',
       prompt: 'ignored'
     }, { signal: new AbortController().signal })
@@ -61,10 +61,10 @@ describe('permission-handler', () => {
     })
   })
 
-  it('sanitizes local MCP web search input before allowing the tool', async () => {
+  it('sanitizes built-in web search input before allowing the tool', async () => {
     const canUseTool = createCanUseTool('/tmp/workspace', 'space-1', 'conv-1')
 
-    const result = await canUseTool('mcp__web-tools__WebSearch', {
+    const result = await canUseTool('WebSearch', {
       query: '  GPT-5.4   最新资讯  ',
       allowed_domains: ['openai.com']
     }, { signal: new AbortController().signal })
@@ -77,16 +77,18 @@ describe('permission-handler', () => {
     })
   })
 
-  it('denies sdk server-side web tools so only local MCP replacements can run', async () => {
+  it('allows built-in web search aliases', async () => {
     const canUseTool = createCanUseTool('/tmp/workspace', 'space-1', 'conv-1')
 
-    const result = await canUseTool('WebSearch', {
+    const result = await canUseTool('web_search', {
       query: 'GPT-5.4 最新资讯'
     }, { signal: new AbortController().signal })
 
     expect(result).toEqual({
-      behavior: 'deny',
-      message: 'Built-in server-side tool "WebSearch" is disabled. Use local MCP tools instead.'
+      behavior: 'allow',
+      updatedInput: {
+        query: 'GPT-5.4 最新资讯'
+      }
     })
   })
 
@@ -328,7 +330,7 @@ describe('permission-handler', () => {
     })
   })
 
-  it('denies delegating web research to a Task sub-agent', async () => {
+  it('allows delegating web research to a Task sub-agent', async () => {
     const canUseTool = createCanUseTool('/tmp/workspace', 'space-1', 'conv-1')
 
     const result = await canUseTool('Task', {
@@ -337,8 +339,11 @@ describe('permission-handler', () => {
     }, { signal: new AbortController().signal })
 
     expect(result).toEqual({
-      behavior: 'deny',
-      message: 'Web research must run in the primary agent. Use mcp__web-tools__WebSearch/WebFetch directly instead of delegating it to a Task sub-agent.'
+      behavior: 'allow',
+      updatedInput: {
+        description: '搜索飞机乘客数据',
+        prompt: '联网搜索并汇总可用于中文社交帖子中的可靠数据，并附来源链接'
+      }
     })
   })
 

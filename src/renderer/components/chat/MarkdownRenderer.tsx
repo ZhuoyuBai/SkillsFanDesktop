@@ -39,7 +39,7 @@ function InlineCode({
     return (
       <button
         onClick={() => canvasLifecycle.openFile(fullPath, text.split('/').pop())}
-        className="inline-flex items-center gap-1 px-1.5 py-0.5 mx-0.5 bg-primary/10 text-primary rounded text-[0.9em] font-mono hover:bg-primary/20 transition-colors cursor-pointer border border-primary/20"
+        className="mx-0.5 inline-flex items-center gap-1 rounded-md border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[0.9em] font-mono text-primary transition-colors hover:bg-primary/20 cursor-pointer"
         title={fullPath}
         {...props}
       >
@@ -51,7 +51,7 @@ function InlineCode({
 
   return (
     <code
-      className="px-1.5 py-0.5 mx-0.5 bg-secondary/80 text-primary rounded text-[0.9em] font-mono"
+      className="mx-0.5 rounded-md bg-secondary/70 px-1.5 py-0.5 text-[0.9em] font-mono text-foreground"
       {...props}
     >
       {children}
@@ -89,7 +89,7 @@ function CodeBlock({
     if (text.includes('\n')) {
       // Multi-line = fenced code block without language tag → system font
       return (
-        <div className="group relative my-3 rounded-[10px] overflow-hidden border border-border/50 bg-muted/10">
+        <div className="group relative my-4 overflow-hidden rounded-xl border border-border/40 bg-card/30">
           <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
             <button
               onClick={handleCopy}
@@ -111,7 +111,7 @@ function CodeBlock({
               )}
             </button>
           </div>
-          <pre className="p-4 overflow-x-auto whitespace-pre-wrap text-[13px] leading-relaxed" style={{ fontFamily: 'inherit' }}>
+          <pre className="overflow-x-auto whitespace-pre-wrap px-4 py-4 text-[14px] leading-7" style={{ fontFamily: 'inherit' }}>
             <code ref={codeRef} {...props}>{children}</code>
           </pre>
         </div>
@@ -123,13 +123,13 @@ function CodeBlock({
 
   // Code block — Style D: left gradient accent bar + compact header
   return (
-    <div className="group relative my-3 rounded-[10px] overflow-hidden border border-border/50 bg-card flex">
+    <div className="group relative my-4 flex overflow-hidden rounded-xl border border-border/40 bg-card/50">
       {/* Left gradient accent bar */}
       <div className="w-1 shrink-0 bg-gradient-to-b from-orange-500 to-red-500" />
       <div className="flex-1 min-w-0">
         {/* Compact header */}
-        <div className="flex items-center justify-between px-3.5 py-1.5 border-b border-border/30">
-          <span className="text-xs text-orange-400 font-mono font-medium">
+        <div className="flex items-center justify-between border-b border-border/20 px-3.5 py-2">
+          <span className="text-xs font-mono font-medium uppercase tracking-[0.14em] text-orange-400/90">
             {language}
           </span>
           <button
@@ -153,8 +153,8 @@ function CodeBlock({
         </div>
 
         {/* Code content */}
-        <pre className="px-4 py-3.5 overflow-x-auto">
-          <code ref={codeRef} className={`${className} text-sm font-mono leading-relaxed`} {...props}>
+        <pre className="overflow-x-auto px-4 py-4">
+          <code ref={codeRef} className={`${className} text-[13.5px] font-mono leading-7`} {...props}>
             {children}
           </code>
         </pre>
@@ -171,34 +171,34 @@ function buildComponents(filePathMap?: Record<string, string>) {
 
   // Paragraphs
   p: ({ children }: { children?: React.ReactNode }) => (
-    <p className="mb-3 last:mb-0 leading-relaxed">{children}</p>
+    <p className="mb-4 last:mb-0 leading-7 text-foreground/92">{children}</p>
   ),
 
   // Headings
   h1: ({ children }: { children?: React.ReactNode }) => (
-    <h1 className="font-semibold mt-4 mb-2 first:mt-0">{children}</h1>
+    <h1 className="mb-3 mt-6 text-[1.35rem] font-semibold leading-tight tracking-[-0.015em] text-foreground first:mt-0">{children}</h1>
   ),
   h2: ({ children }: { children?: React.ReactNode }) => (
-    <h2 className="font-semibold mt-3 mb-2 first:mt-0">{children}</h2>
+    <h2 className="mb-3 mt-5 text-[1.12rem] font-semibold leading-snug text-foreground first:mt-0">{children}</h2>
   ),
   h3: ({ children }: { children?: React.ReactNode }) => (
-    <h3 className="font-semibold mt-3 mb-1.5 first:mt-0">{children}</h3>
+    <h3 className="mb-2 mt-4 text-[1rem] font-semibold leading-snug text-foreground/95 first:mt-0">{children}</h3>
   ),
 
   // Lists
   ul: ({ children }: { children?: React.ReactNode }) => (
-    <ul className="mb-3 pl-5 space-y-1 list-disc marker:text-muted-foreground/50">{children}</ul>
+    <ul className="mb-4 list-disc space-y-2 pl-6 marker:text-muted-foreground/55">{children}</ul>
   ),
   ol: ({ children }: { children?: React.ReactNode }) => (
-    <ol className="mb-3 pl-5 space-y-1 list-decimal marker:text-muted-foreground/50">{children}</ol>
+    <ol className="mb-4 list-decimal space-y-2 pl-6 marker:text-muted-foreground/55">{children}</ol>
   ),
   li: ({ children }: { children?: React.ReactNode }) => (
-    <li className="leading-relaxed">{children}</li>
+    <li className="leading-7 text-foreground/90">{children}</li>
   ),
 
   // Blockquote
   blockquote: ({ children }: { children?: React.ReactNode }) => (
-    <blockquote className="my-3 py-3 px-4 border-l-[3px] border-primary/50 bg-muted/15 rounded-r-lg text-foreground">
+    <blockquote className="my-4 rounded-r-xl border-l-[3px] border-orange-500/60 bg-orange-500/[0.07] px-4 py-3.5 text-foreground/90">
       {children}
     </blockquote>
   ),
@@ -209,7 +209,7 @@ function buildComponents(filePathMap?: Record<string, string>) {
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="text-primary hover:underline underline-offset-2"
+      className="break-words text-link underline decoration-link/30 underline-offset-4 transition-colors hover:decoration-link"
     >
       {children}
     </a>
@@ -217,7 +217,7 @@ function buildComponents(filePathMap?: Record<string, string>) {
 
   // Tables
   table: ({ children }: { children?: React.ReactNode }) => (
-    <div className="my-3 overflow-x-auto rounded-lg border border-border/50">
+    <div className="my-4 overflow-x-auto rounded-xl border border-border/40 bg-card/20">
       <table className="w-full text-sm">{children}</table>
     </div>
   ),
@@ -236,7 +236,7 @@ function buildComponents(filePathMap?: Record<string, string>) {
 
   // Strong and emphasis
   strong: ({ children }: { children?: React.ReactNode }) => (
-    <strong className="font-semibold">{children}</strong>
+    <strong className="font-semibold text-foreground">{children}</strong>
   ),
   em: ({ children }: { children?: React.ReactNode }) => (
     <em className="italic">{children}</em>
@@ -272,7 +272,7 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({
   if (!content) return null
 
   return (
-    <div className={`markdown-content ${className}`}>
+    <div className={`markdown-content text-[15px] leading-7 text-foreground/92 ${className}`}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         rehypePlugins={rehypeHighlightOptions}

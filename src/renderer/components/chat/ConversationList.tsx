@@ -8,7 +8,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import type { ConversationMeta } from '../../types'
 import type { LoopTaskMeta } from '../../../shared/types/loop-task'
 import { MessageSquare } from '../icons/ToolIcons'
-import { PanelLeftClose, PanelLeft, SquarePen, Zap, Sparkles } from 'lucide-react'
+import { PanelLeftClose, PanelLeft, SquarePen, Zap, Wand2, Trash2 } from 'lucide-react'
 import { SpaceSwitcher } from '../space/SpaceSwitcher'
 import { useTranslation } from '../../i18n'
 import { UserAvatarMenu } from './UserAvatarMenu'
@@ -281,6 +281,7 @@ export function ConversationList({
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingTitle, setEditingTitle] = useState('')
   const [deleteConfirm, setDeleteConfirm] = useState<{ taskId: string; taskType: 'conversation' | 'loopTask' } | null>(null)
+  const [showClearAllConfirm, setShowClearAllConfirm] = useState(false)
   const [showCollapseTooltip, setShowCollapseTooltip] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const editInputRef = useRef<HTMLInputElement>(null)
@@ -472,7 +473,7 @@ export function ConversationList({
             className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-lg transition-colors"
             title={t('Create Skill')}
           >
-            <Sparkles className="w-4 h-4" />
+            <Wand2 className="w-4 h-4" />
           </button>
         </div>
 
@@ -615,7 +616,7 @@ export function ConversationList({
             rounded-lg transition-all duration-150
             active:scale-[0.98]"
         >
-          <Sparkles className="w-4 h-4 text-foreground" />
+          <Wand2 className="w-4 h-4 text-foreground" />
           {t('Create Skill')}
         </button>
       </div>
@@ -676,6 +677,17 @@ export function ConversationList({
                 t={t}
               />
             ))}
+            {unifiedTasks.length > 10 && (
+              <button
+                onClick={() => setShowClearAllConfirm(true)}
+                className="w-full flex items-center justify-center gap-1.5 py-2 mt-1 mb-2
+                  text-xs text-muted-foreground hover:text-destructive
+                  transition-colors duration-150"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                {t('Clear Task History')}
+              </button>
+            )}
           </>
         )}
       </div>
@@ -696,6 +708,21 @@ export function ConversationList({
           <div className="absolute inset-y-1/3 left-1/2 -translate-x-1/2 w-0.5 bg-border/60 rounded-full opacity-0 group-hover/handle:opacity-100 transition-opacity" />
         </div>
       )}
+
+      {/* Clear All Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={showClearAllConfirm}
+        title={t('Clear Task History')}
+        message={t('Are you sure you want to clear all task history? This will not delete any files created by your tasks.')}
+        confirmLabel={t('Delete')}
+        variant="danger"
+        onConfirm={() => {
+          onClearAll?.()
+          onClearAllAdvanced?.()
+          setShowClearAllConfirm(false)
+        }}
+        onCancel={() => setShowClearAllConfirm(false)}
+      />
 
       {/* Delete Confirmation Dialog */}
       <ConfirmDialog

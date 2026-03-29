@@ -16,7 +16,7 @@ export const CompactTextRenderer = memo(function CompactTextRenderer({
 
   return (
     <div
-      className={`whitespace-pre-wrap break-words text-[13px] leading-6 text-foreground ${className}`.trim()}
+      className={`whitespace-pre-wrap break-words text-[14px] leading-6 text-foreground/88 ${className}`.trim()}
     >
       {normalized}
     </div>

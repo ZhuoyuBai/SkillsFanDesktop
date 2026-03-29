@@ -473,9 +473,6 @@ async function sendMessageInternal(
       if (addedMcpServers.includes('ai-browser')) {
         console.log(`[Agent][${conversationId}] AI Browser MCP server added`)
       }
-      if (addedMcpServers.includes('web-tools')) {
-        console.log(`[Agent][${conversationId}] Web Tools MCP server added`)
-      }
       if (addedMcpServers.includes('skill')) {
         console.log(`[Agent][${conversationId}] Skill MCP server added`)
       }

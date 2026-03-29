@@ -15,6 +15,8 @@ const BUILT_IN_TOOLS: ToolCatalogEntry[] = [
   { name: 'Grep', description: 'Search file contents with ripgrep.', source: 'built-in', category: 'files' },
   { name: 'Glob', description: 'Find files by glob pattern.', source: 'built-in', category: 'files' },
   { name: 'Bash', description: 'Run a shell command in the workspace.', source: 'built-in', category: 'shell' },
+  { name: 'WebSearch', description: 'Search the web using Claude Code native web search.', source: 'built-in', category: 'web' },
+  { name: 'WebFetch', description: 'Fetch and extract readable text from a public web page using Claude Code native web fetch.', source: 'built-in', category: 'web' },
   { name: 'TodoWrite', description: 'Maintain a visible task checklist.', source: 'built-in', category: 'tasks' },
   { name: 'TaskOutput', description: 'Read output from a background task.', source: 'built-in', category: 'tasks' },
   { name: 'NotebookEdit', description: 'Edit a Jupyter notebook cell.', source: 'built-in', category: 'files' },
@@ -108,20 +110,6 @@ const BASE_MCP_TOOLS: ToolCatalogEntry[] = [
     source: 'mcp',
     server: 'local-tools',
     category: 'tasks'
-  },
-  {
-    name: 'mcp__web-tools__WebSearch',
-    description: 'Search the web using the app-configured local search provider.',
-    source: 'mcp',
-    server: 'web-tools',
-    category: 'web'
-  },
-  {
-    name: 'mcp__web-tools__WebFetch',
-    description: 'Fetch and extract readable text from a public web page.',
-    source: 'mcp',
-    server: 'web-tools',
-    category: 'web'
   }
 ]
 

@@ -4,6 +4,7 @@ const EXPLICIT_RICH_MARKDOWN_RE = /(^|\n)\s*(?:```|~~~|#{1,6}\s|>\s|!\[[^\]]*\]\
 const TABLE_RE = /(^|\n)\s*\|.+\|\s*(\n|$)/
 const LIST_RE = /^(?:[-*+]\s|\d+\.\s|•\s)/
 const TOOLISH_LINE_RE = /^(?:Bash|Read|Write|Edit|Glob|Grep|WebFetch|WebSearch|Task|Skill)\b|^\{.+\}$|^\w+\(/
+const INLINE_RICH_MARKDOWN_RE = /(?:\[[^\]]+\]\([^)]+\)|\*\*[^*\n]+\*\*|__[^_\n]+__|`[^`\n]+`)/
 
 function countLeadingIndent(line: string): number {
   let indent = 0
@@ -71,7 +72,11 @@ export function shouldUseCompactLogText(content: string, preferCompact = false):
   const normalized = normalizeCompactLogText(content)
   if (!normalized) return false
 
-  if (EXPLICIT_RICH_MARKDOWN_RE.test(normalized) || TABLE_RE.test(normalized)) {
+  if (
+    EXPLICIT_RICH_MARKDOWN_RE.test(normalized)
+    || TABLE_RE.test(normalized)
+    || INLINE_RICH_MARKDOWN_RE.test(normalized)
+  ) {
     return false
   }
 

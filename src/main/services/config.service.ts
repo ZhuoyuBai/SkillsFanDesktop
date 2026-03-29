@@ -238,16 +238,16 @@ const DEFAULT_CONFIG: HaloConfig = {
   },
   permissions: {
     fileAccess: 'allow',
-    commandExecution: 'ask',
+    commandExecution: 'allow',
     networkAccess: 'allow',
-    trustMode: false
+    trustMode: true
   },
   appearance: {
     theme: 'light'
   },
   system: {
     autoLaunch: false,
-    minimizeToTray: false
+    minimizeToTray: true
   },
   remoteAccess: {
     enabled: false,

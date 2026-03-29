@@ -177,30 +177,17 @@ describe('sdk-options', () => {
       expect(sdkOptions.env.ANTHROPIC_API_KEY).toBe('encoded-key')
       expect(sdkOptions.env.ANTHROPIC_BASE_URL).toBe('http://router.local')
       expect(sdkOptions.systemPrompt.append).toContain('[BASE_PROMPT]')
-      expect(sdkOptions.allowedTools).toEqual([
-        'Read', 'Write', 'Edit', 'Grep', 'Glob',
-        'Bash',
-        'TodoWrite', 'TaskOutput',
-        'NotebookEdit',
-        'Task',
-        'AskUserQuestion',
-        'TeamCreate', 'TeamDelete', 'SendMessage',
-        'TaskCreate', 'TaskUpdate', 'TaskList', 'TaskGet',
-        'EnterPlanMode', 'EnterWorktree',
-      ])
-      expect(sdkOptions.tools).toEqual(sdkOptions.allowedTools)
-      expect(sdkOptions.strictMcpConfig).toBe(true)
+      expect(sdkOptions.allowedTools).toBeUndefined()
+      expect(sdkOptions.tools).toBeUndefined()
+      expect(sdkOptions.strictMcpConfig).toBeUndefined()
+      expect(sdkOptions.settingSources).toBeUndefined()
       expect(sdkOptions.disallowedTools).toEqual([
         'code_execution',
         'bash_code_execution',
         'text_editor_code_execution',
         'tool_search_tool_regex',
         'tool_search_tool_bm25',
-        'memory',
-        'WebSearch',
-        'WebFetch',
-        'web_search',
-        'web_fetch'
+        'memory'
       ])
       expect(mocks.createLocalToolsMcpServer).toHaveBeenCalledWith({
         workDir: '/tmp/space-1',
@@ -254,18 +241,17 @@ describe('sdk-options', () => {
       expect(sdkOptions.systemPrompt.append).toContain('[AI_BROWSER_PROMPT]')
       expect(sdkOptions.systemPrompt.append).toContain('prefer the built-in browser tools')
       expect(sdkOptions.systemPrompt.append).toContain('[RALPH_APPEND]')
-      expect(sdkOptions.tools).toEqual(sdkOptions.allowedTools)
+      expect(sdkOptions.allowedTools).toBeUndefined()
+      expect(sdkOptions.tools).toBeUndefined()
+      expect(sdkOptions.strictMcpConfig).toBeUndefined()
+      expect(sdkOptions.settingSources).toBeUndefined()
       expect(sdkOptions.disallowedTools).toEqual([
         'code_execution',
         'bash_code_execution',
         'text_editor_code_execution',
         'tool_search_tool_regex',
         'tool_search_tool_bm25',
-        'memory',
-        'WebSearch',
-        'WebFetch',
-        'web_search',
-        'web_fetch'
+        'memory'
       ])
       expect(sdkOptions.mcpServers).toEqual({
         github: { type: 'stdio', command: 'github-mcp' },
@@ -313,7 +299,8 @@ describe('sdk-options', () => {
       expect(sdkOptions.systemPrompt.append).toContain('mcp__local-tools__open_url')
       expect(sdkOptions.systemPrompt.append).toContain('mcp__local-tools__open_application')
       expect(sdkOptions.systemPrompt.append).not.toContain('[AI_BROWSER_PROMPT]')
-      expect(sdkOptions.strictMcpConfig).toBe(true)
+      expect(sdkOptions.strictMcpConfig).toBeUndefined()
+      expect(sdkOptions.settingSources).toBeUndefined()
     })
 
     it('removes configured ai-browser MCP servers in system browser mode', async () => {
@@ -351,7 +338,8 @@ describe('sdk-options', () => {
         github: { type: 'stdio', command: 'github-mcp' },
         'local-tools': { type: 'stdio', command: 'local-tools' }
       })
-      expect(sdkOptions.strictMcpConfig).toBe(true)
+      expect(sdkOptions.strictMcpConfig).toBeUndefined()
+      expect(sdkOptions.settingSources).toBeUndefined()
     })
 
     it('keeps all browser MCP tooling disabled when browser usage is turned off', async () => {
@@ -470,7 +458,7 @@ describe('sdk-options', () => {
       expect(sdkOptions.disallowedTools).not.toContain('Skill')
     })
 
-    it('keeps MCP skill fallback for routed providers even when native skill preference is enabled', async () => {
+    it('prefers native Claude Skill tool for routed providers when the setting is enabled', async () => {
       const abortController = new AbortController()
 
       const { sdkOptions, addedMcpServers } = await buildSdkOptions({
@@ -493,9 +481,22 @@ describe('sdk-options', () => {
         routed: true
       })
 
-      expect(addedMcpServers).toEqual(['local-tools', 'skill'])
-      expect(mocks.createSkillMcpServer).toHaveBeenCalledTimes(1)
-      expect(sdkOptions.disallowedTools).toContain('Skill')
+      expect(addedMcpServers).toEqual(['local-tools'])
+      expect(mocks.createSkillMcpServer).not.toHaveBeenCalled()
+      expect(mocks.createLocalToolsMcpServer).toHaveBeenCalledWith({
+        workDir: '/tmp/space-skill-routed',
+        spaceId: 'space-skill-routed',
+        conversationId: 'conv-skill-routed',
+        aiBrowserEnabled: false,
+        browserAutomationEnabled: false,
+        browserAutomationMode: 'ai-browser',
+        includeSkillMcp: false,
+        includeSubagentTools: true
+      })
+      expect(sdkOptions.mcpServers).toEqual({
+        'local-tools': { type: 'stdio', command: 'local-tools' }
+      })
+      expect(sdkOptions.disallowedTools).not.toContain('Skill')
     })
   })
 })
