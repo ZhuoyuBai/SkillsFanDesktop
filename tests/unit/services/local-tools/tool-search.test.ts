@@ -30,11 +30,15 @@ describe('local tool search', () => {
   })
 
   it('surfaces macOS automation tools for system browser workflows', () => {
-    const catalog = buildToolCatalog({ aiBrowserEnabled: false })
+    const catalog = buildToolCatalog({
+      aiBrowserEnabled: false,
+      browserAutomationEnabled: true,
+      browserAutomationMode: 'system-browser'
+    })
     const results = searchToolsByBm25({
       catalog,
       query: 'open real chrome and automate macos ui with applescript',
-      limit: 4
+      limit: 6
     })
 
     expect(results.map((item) => item.name)).toEqual(expect.arrayContaining([

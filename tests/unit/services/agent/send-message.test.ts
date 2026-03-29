@@ -91,7 +91,8 @@ vi.mock('../../../../src/main/services/agent/sdk-options', () => ({
     anthropicApiKey: 'mock-key',
     sdkModel: 'claude-sonnet-4-20250514',
     routed: false
-  }))
+  })),
+  resolveSkillToolMode: vi.fn(() => 'mcp')
 }))
 
 vi.mock('../../../../src/main/services/agent/message-utils', () => ({
