@@ -31,17 +31,15 @@ describe('wechat qr code image helpers', () => {
 
   it('falls back to local generation for unsupported payloads', async () => {
     const generateDataUrl = vi.fn(async (qrcode: string) => `generated:${qrcode}`)
-    const imageUrl = 'https://example.com/qr.png'
 
     const result = await resolveQRCodeImageSource(
       'wechat-login-token',
-      imageUrl,
-      undefined,
+      'https://example.com/qr.png',
       generateDataUrl
     )
 
-    expect(result).toBe(`generated:${imageUrl}`)
-    expect(generateDataUrl).toHaveBeenCalledWith(imageUrl)
+    expect(result).toBe('generated:wechat-login-token')
+    expect(generateDataUrl).toHaveBeenCalledWith('wechat-login-token')
   })
 
   it('uses normalized inline content without generating a new qr code', async () => {
