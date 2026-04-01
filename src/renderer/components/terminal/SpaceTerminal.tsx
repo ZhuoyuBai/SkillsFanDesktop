@@ -158,15 +158,15 @@ export function SpaceTerminal({ spaceId }: SpaceTerminalProps) {
     <div className="flex h-full min-h-0 w-full min-w-0 flex-1 bg-background">
       <aside className="w-[280px] flex-shrink-0 border-r border-border bg-card/50">
         <div className="flex h-full flex-col">
-          <div className="border-b border-border p-3">
-            <div className="rounded-xl border border-border bg-background px-3 py-2 shadow-sm">
+          <div className="border-b border-border px-3 pt-3 pb-2">
+            <div className="px-3">
               <SpaceSwitcher />
             </div>
 
             <div className="mt-3">
               <button
                 onClick={handleNewTerminal}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+                className="inline-flex w-full items-center justify-start gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-foreground hover:bg-secondary transition-colors"
               >
                 <SquarePen className="w-4 h-4" />
                 {t('New task')}
@@ -174,14 +174,14 @@ export function SpaceTerminal({ spaceId }: SpaceTerminalProps) {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 px-4 py-3 text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
-            <History className="w-3.5 h-3.5" />
+          <div className="flex items-center gap-2 px-6 py-3 text-sm font-medium uppercase tracking-[0.12em] text-muted-foreground">
+            <History className="w-4 h-4" />
             <span>{t('History')}</span>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-2 pb-3">
+          <div className="flex-1 overflow-y-auto pb-3">
             {sessions.length > 0 ? (
-              <div className="space-y-1">
+              <div>
                 {sessions.map((session) => {
                   const isActive = session.id === activeSessionId
                   const title = renderSessionTitle(session)
@@ -191,8 +191,8 @@ export function SpaceTerminal({ spaceId }: SpaceTerminalProps) {
                       key={session.id}
                       className={
                         isActive
-                          ? 'group rounded-xl border border-border bg-background px-3 py-2 shadow-sm'
-                          : 'group rounded-xl border border-transparent px-3 py-2 hover:bg-secondary/60 transition-colors'
+                          ? 'group bg-secondary/80 px-6 py-2'
+                          : 'group px-6 py-2 hover:bg-secondary/40 transition-colors'
                       }
                     >
                       <div className="flex items-start gap-2">
