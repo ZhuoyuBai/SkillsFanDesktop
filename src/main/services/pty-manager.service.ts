@@ -26,6 +26,7 @@ import {
 import { dirname, join } from 'path'
 import { app, BrowserWindow, nativeTheme } from 'electron'
 import { getConfig, getHaloDir } from './config.service'
+import { getPtyRuntimePath } from './headless-electron.service'
 import { getApiCredentialsForSource, getWorkingDir, resolveSdkTransport } from './pty-credentials'
 
 // Lazy-loaded to avoid native module issues at import time
@@ -446,11 +447,9 @@ export async function createPty(options: CreatePtyOptions): Promise<{ model: str
 
   try {
     cliPath = findClaudeCliPath()
-    // Use process.execPath directly instead of the headless symlink.
-    // The headless symlink (getHeadlessElectronPath) exists to prevent Dock icon flashing
-    // for SDK subprocess, but node-pty may not work with symlinks on macOS.
-    // ELECTRON_RUN_AS_NODE=1 already prevents the GUI from showing.
-    electronPath = process.execPath
+    // On macOS, launching the app bundle path directly causes a transient Dock icon
+    // for every terminal child process. A stable symlink suppresses that behavior.
+    electronPath = getPtyRuntimePath()
     workDir = getWorkingDir(spaceId)
     helperPath = validatePtyLaunchPrerequisites({ electronPath, cliPath, workDir }).helperPath
 
@@ -473,7 +472,7 @@ export async function createPty(options: CreatePtyOptions): Promise<{ model: str
     }
 
     console.log(
-      `[PTY] Creating terminal ${id} with model ${model} in ${workDir} (${skipClaudeLogin ? 'local-model mode' : 'default auth mode'})`
+      `[PTY] Creating terminal ${id} with model ${model} in ${workDir} via ${electronPath} (${skipClaudeLogin ? 'local-model mode' : 'default auth mode'})`
     )
 
     const ptyProcess = nodePty.spawn(electronPath, args, {

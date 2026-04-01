@@ -31,8 +31,10 @@ export function SpacePage() {
 
   return (
     <div className="h-full min-h-0 w-full flex flex-col bg-card">
-      {shouldShowHeader && (
+      {shouldShowHeader ? (
         <Header className="bg-card backdrop-blur-sm border-b border-border/20" />
+      ) : (
+        <div className="h-10 flex-shrink-0 drag-region" />
       )}
 
       {mockBashMode && (
