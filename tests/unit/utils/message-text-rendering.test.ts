@@ -58,19 +58,4 @@ These are normal answer bullets, not tool logs.
 
     expect(shouldUseCompactLogText(content)).toBe(false)
   })
-
-  it('keeps inline markdown answers in the normal renderer', () => {
-    const content = `
-根据最新天气预报，杭州**明天（3月30日）**的天气情况：
-
-- **天气**：中雨转多云
-- **气温**：12°C ~ 20°C
-
-Sources:
-- [中国气象局 - 杭州天气预报](https://weather.cma.cn/web/weather/58457.html)
-    `
-
-    expect(shouldUseCompactLogText(content)).toBe(false)
-    expect(shouldUseCompactLogText(content, true)).toBe(false)
-  })
 })

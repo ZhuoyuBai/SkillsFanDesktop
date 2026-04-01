@@ -63,54 +63,57 @@ function SkillCard({ skill, onOpenFolder, onDelete, onIconClick, t }: {
   const iconUrl = getSkillIconUrl(iconName)
 
   return (
-    <div className="relative bg-card border border-border/40 rounded-xl p-4 shadow-sm hover:shadow-md hover:border-border/60 transition-all group">
-      {/* Action buttons - top right, hover visible */}
-      <div className="absolute top-2.5 right-2.5 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-        <button
-          onClick={() => onOpenFolder(skill.name)}
-          className="p-1 text-muted-foreground hover:text-foreground hover:bg-secondary/60 rounded transition-colors"
-          title={t('Open Folder')}
-        >
-          <FolderOpen className="w-3.5 h-3.5" />
-        </button>
-        {skill.source?.kind === 'skillsfan' && (
+    <div className="border border-border/60 rounded-xl p-5 hover:bg-secondary/30 hover:shadow-sm transition-all flex flex-col justify-between group">
+      <div>
+        <div className="flex items-center gap-3">
           <button
-            onClick={() => onDelete(skill)}
-            className="p-1 text-destructive/60 hover:text-destructive hover:bg-destructive/10 rounded transition-colors"
-            title={t('Delete skill')}
+            onClick={() => !skill.readonly && onIconClick(skill)}
+            className={`w-9 h-9 rounded-sm flex items-center justify-center flex-shrink-0 transition-all relative group/icon ${
+              !skill.readonly ? 'cursor-pointer hover:ring-2 hover:ring-primary/40' : 'cursor-default'
+            }`}
+            title={!skill.readonly ? t('Change icon') : undefined}
           >
-            <Trash2 className="w-3.5 h-3.5" />
+            <img src={iconUrl} alt="" className="w-9 h-9 rounded-sm" />
+            {!skill.readonly && (
+              <div className="absolute inset-0 bg-black/40 rounded-sm opacity-0 group-hover/icon:opacity-100 transition-opacity flex items-center justify-center">
+                <Pencil className="w-3.5 h-3.5 text-white" />
+              </div>
+            )}
           </button>
+          <h4 className="text-base font-semibold text-foreground truncate" title={skill.displayName || skill.name}>
+            {skill.displayName || skill.name}
+          </h4>
+        </div>
+        {skill.description ? (
+          <p className="text-xs text-muted-foreground mt-2 line-clamp-3" title={skill.description}>
+            {skill.description}
+          </p>
+        ) : (
+          <p className="text-xs text-muted-foreground/50 mt-2 italic">
+            {t('No description')}
+          </p>
         )}
       </div>
-      <div className="flex items-center gap-2">
-        <button
-          onClick={() => !skill.readonly && onIconClick(skill)}
-          className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 transition-all relative group/icon ${
-            !skill.readonly ? 'cursor-pointer hover:ring-2 hover:ring-primary/40' : 'cursor-default'
-          }`}
-          title={!skill.readonly ? t('Change icon') : undefined}
-        >
-          <img src={iconUrl} alt="" className="w-5 h-5 rounded" />
-          {!skill.readonly && (
-            <div className="absolute inset-0 bg-black/40 rounded opacity-0 group-hover/icon:opacity-100 transition-opacity flex items-center justify-center">
-              <Pencil className="w-2.5 h-2.5 text-white" />
-            </div>
+      <div className="flex items-center justify-end mt-3">
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button
+            onClick={() => onOpenFolder(skill.name)}
+            className="p-1 text-muted-foreground hover:text-foreground hover:bg-secondary/60 rounded transition-colors"
+            title={t('Open Folder')}
+          >
+            <FolderOpen className="w-3.5 h-3.5" />
+          </button>
+          {skill.source?.kind === 'skillsfan' && (
+            <button
+              onClick={() => onDelete(skill)}
+              className="p-1 text-destructive/60 hover:text-destructive hover:bg-destructive/10 rounded transition-colors"
+              title={t('Delete skill')}
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
           )}
-        </button>
-        <h4 className="text-base font-semibold text-foreground truncate" title={skill.displayName || skill.name}>
-          {skill.displayName || skill.name}
-        </h4>
+        </div>
       </div>
-      {skill.description ? (
-        <p className="text-[13px] text-foreground/80 mt-2 line-clamp-3" title={skill.description}>
-          {skill.description}
-        </p>
-      ) : (
-        <p className="text-[13px] text-muted-foreground/50 mt-2 italic">
-          {t('No description')}
-        </p>
-      )}
     </div>
   )
 }

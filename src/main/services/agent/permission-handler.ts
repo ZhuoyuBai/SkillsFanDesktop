@@ -34,6 +34,10 @@ export type CanUseToolFn = (
 ) => Promise<ToolPermissionResult>
 
 const BLOCKED_SERVER_SIDE_TOOLS = new Set([
+  'WebSearch',
+  'WebFetch',
+  'web_search',
+  'web_fetch',
   'code_execution',
   'bash_code_execution',
   'text_editor_code_execution',
@@ -41,6 +45,43 @@ const BLOCKED_SERVER_SIDE_TOOLS = new Set([
   'tool_search_tool_bm25',
   'memory'
 ])
+
+const WEB_RESEARCH_TASK_HINTS = [
+  'mcp__web-tools__',
+  '联网',
+  '网页',
+  '在线搜索',
+  '上网',
+  '抓取',
+  '检索',
+  '来源链接',
+  '引用',
+  'citation',
+  'citations',
+  'source',
+  'sources',
+  'url',
+  'urls',
+  'web search',
+  'web fetch',
+  'internet',
+  'online research',
+  'online search',
+  'fetch'
+]
+
+function isWebResearchTask(input: Record<string, unknown>): boolean {
+  const fields = [input.description, input.prompt]
+    .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+    .map((value) => value.toLowerCase())
+
+  if (fields.length === 0) return false
+
+  const combined = fields.join('\n')
+  if (/https?:\/\//i.test(combined)) return true
+
+  return WEB_RESEARCH_TASK_HINTS.some((hint) => combined.includes(hint))
+}
 
 function getPathCandidates(input: Record<string, unknown>): string[] {
   const candidates = [
@@ -166,12 +207,12 @@ export function createCanUseTool(
       }
     }
 
-    if (toolName === 'WebSearch' || toolName === 'web_search') {
+    if (toolName === 'mcp__web-tools__WebSearch') {
       const updatedInput = sanitizeWebSearchInput(input)
       return { behavior: 'allow' as const, updatedInput }
     }
 
-    if (toolName === 'WebFetch' || toolName === 'web_fetch') {
+    if (toolName === 'mcp__web-tools__WebFetch') {
       return {
         behavior: 'allow' as const,
         updatedInput: input
@@ -329,6 +370,13 @@ export function createCanUseTool(
 
     // Task (sub-agent) — requires user approval since it spawns child agents and costs tokens
     if (toolName === 'Task') {
+      if (isWebResearchTask(input)) {
+        return {
+          behavior: 'deny' as const,
+          message: 'Web research must run in the primary agent. Use mcp__web-tools__WebSearch/WebFetch directly instead of delegating it to a Task sub-agent.'
+        }
+      }
+
       const currentConfig = getConfig()
       const permission = currentConfig.permissions.commandExecution
 

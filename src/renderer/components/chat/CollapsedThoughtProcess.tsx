@@ -93,28 +93,31 @@ export function CollapsedThoughtProcess({
   }, [thoughts])
 
   return (
-    <div className="mb-2 rounded-xl border border-border/20 bg-card/25">
-      {/* Header - subtle summary rail */}
+    <div className="mb-1">
+      {/* Header - minimal CLI style */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-[13px]
-          text-muted-foreground/70 transition-colors hover:text-foreground/80"
+        className="flex items-center gap-2.5 py-0.5 px-3 text-[13px] w-full text-left
+          text-muted-foreground/50 hover:text-muted-foreground/70 transition-colors"
       >
+        {/* Status symbol */}
         <span className={`flex-shrink-0 ${
-          isThinking ? 'text-orange-400' : errorCount > 0 ? 'text-destructive/70' : 'text-muted-foreground/45'
+          isThinking ? 'text-orange-400' : errorCount > 0 ? 'text-destructive/70' : 'text-muted-foreground/40'
         }`}>
           {isThinking ? '⟳' : errorCount > 0 ? '✗' : '⏺'}
         </span>
 
-        <span className="font-medium text-foreground/80">{t('Thought process')}</span>
+        <span>{t('Thought process')}</span>
 
+        {/* Summary preview when collapsed */}
         {!isExpanded && thinkingSummary && (
-          <span className="truncate text-xs text-muted-foreground/45 max-w-[18rem] md:max-w-[24rem]">
+          <span className="text-muted-foreground/30 truncate max-w-[200px] text-[10px]">
             {thinkingSummary}
           </span>
         )}
 
-        <div className="ml-auto flex items-center gap-2 text-xs text-muted-foreground/45 flex-shrink-0">
+        {/* Stats */}
+        <div className="flex items-center gap-2 text-muted-foreground/40 ml-auto flex-shrink-0">
           {stats.completed > 0 && (
             <span>{stats.completed} {t('tools')}</span>
           )}
@@ -124,10 +127,11 @@ export function CollapsedThoughtProcess({
         </div>
       </button>
 
+      {/* Expanded content - border-left style */}
       {isExpanded && (
-        <div className="animate-slide-down border-t border-border/15 px-4 pb-3 pt-3">
+        <div className="ml-[22px] pl-3 border-l-2 border-muted-foreground/15 py-1 animate-slide-down">
           {hasTodos && (
-            <div className="mb-3">
+            <div className="mb-2">
               <TodoCard
                 todos={latestTodos}
                 isCollapsed={todoCollapsed}
@@ -138,7 +142,7 @@ export function CollapsedThoughtProcess({
           )}
 
           {hasActivity && (
-            <div className={`${hasTodos ? 'border-t border-border/10 pt-2' : ''}`}>
+            <div className={hasTodos ? 'pt-1' : ''}>
               <InlineActivity
                 thoughts={thoughts}
                 isThinking={isThinking}

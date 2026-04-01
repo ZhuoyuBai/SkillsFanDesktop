@@ -50,6 +50,24 @@ const DISALLOWED_SERVER_SIDE_TOOLS_BASE = [
   'memory'
 ]
 
+// WebSearch/WebFetch are Anthropic-only server-side tools.
+// Block them for all non-Anthropic backends to avoid confusing errors.
+const WEB_SEARCH_SERVER_TOOLS = [
+  'WebSearch',
+  'WebFetch',
+  'web_search',
+  'web_fetch'
+]
+
+function isNativeAnthropicApi(baseUrl: string): boolean {
+  try {
+    const host = new URL(baseUrl).hostname
+    return host === 'api.anthropic.com'
+  } catch {
+    return false
+  }
+}
+
 export interface ResolvedSdkTransport {
   anthropicBaseUrl: string
   anthropicApiKey: string
@@ -89,7 +107,7 @@ export function resolveSkillToolMode(
     return 'none'
   }
 
-  return config.skillSettings?.preferNativeClaudeSkillTool === true
+  return config.skillSettings?.preferNativeClaudeSkillTool === true && !options.routed
     ? 'native'
     : 'mcp'
 }
@@ -222,7 +240,29 @@ export async function buildSdkOptions(params: BuildSdkOptionsParams): Promise<{
     }
   }
 
-  const disallowedTools = [...DISALLOWED_SERVER_SIDE_TOOLS_BASE]
+  const builtInTools = [
+    // Core file tools
+    'Read', 'Write', 'Edit', 'Grep', 'Glob',
+    // Execution
+    'Bash',
+    // Task management — let Claude create visual task checklists
+    'TodoWrite', 'TaskOutput',
+    // Notebook — let Claude edit Jupyter notebooks
+    'NotebookEdit',
+    // Sub-agent — parallel task execution (permission via canUseTool)
+    'Task',
+    // User interaction — let Claude ask clarifying questions
+    'AskUserQuestion',
+    // Agent Teams — multi-agent coordination
+    'TeamCreate', 'TeamDelete', 'SendMessage',
+    'TaskCreate', 'TaskUpdate', 'TaskList', 'TaskGet',
+    // Planning and isolation
+    'EnterPlanMode', 'EnterWorktree',
+  ]
+
+  const disallowedTools = isNativeAnthropicApi(anthropicBaseUrl)
+    ? [...DISALLOWED_SERVER_SIDE_TOOLS_BASE]
+    : [...DISALLOWED_SERVER_SIDE_TOOLS_BASE, ...WEB_SEARCH_SERVER_TOOLS]
 
   if (effectiveIncludeSkillMcp && !disallowedTools.includes('Skill')) {
     // Prefer the app-managed MCP skill loader over Claude Code's native Skill tool.
@@ -268,15 +308,23 @@ export async function buildSdkOptions(params: BuildSdkOptionsParams): Promise<{
           : '')
     },
     maxTurns: 50,
+    allowedTools: builtInTools,
+    tools: builtInTools,
     disallowedTools,
     permissionMode: 'acceptEdits' as const,
     canUseTool: createCanUseTool(workDir, spaceId, conversationId),
     includePartialMessages: true,
     executable: electronPath,
     executableArgs: ['--no-warnings'],
+    // Only use MCP servers explicitly assembled by SkillsFan.
+    // This prevents user-level Claude settings from injecting browser automation servers
+    // such as chrome-devtools and bypassing app-level browser mode preferences.
+    strictMcpConfig: true,
     // Enable Claude Code native hooks system
     // CLI will read hooks from ~/.claude/settings.json and .claude/settings.json
     hooks: true,
+    // Load user-level and project-level Claude Code settings
+    settingSources: ['user', 'project'],
     // Enable file checkpointing for rewind support
     enableFileCheckpointing: true,
     ...(thinkingEnabled ? { thinking: { type: 'enabled' as const, budgetTokens: MAX_THINKING_TOKENS } } : {}),

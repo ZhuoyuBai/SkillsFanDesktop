@@ -364,7 +364,7 @@ describe('send-message', () => {
             content_block: {
               type: 'tool_use',
               id: 'tool-search-1',
-              name: 'WebSearch',
+              name: 'mcp__web-tools__WebSearch',
               input: {}
             }
           }
@@ -401,7 +401,7 @@ describe('send-message', () => {
         thought: expect.objectContaining({
           id: 'tool-search-1',
           type: 'tool_use',
-          toolName: 'WebSearch'
+          toolName: 'mcp__web-tools__WebSearch'
         })
       })
     )
@@ -412,7 +412,7 @@ describe('send-message', () => {
       'conv-1',
       expect.objectContaining({
         id: 'tool-search-1',
-        name: 'WebSearch',
+        name: 'mcp__web-tools__WebSearch',
         status: 'running'
       })
     )

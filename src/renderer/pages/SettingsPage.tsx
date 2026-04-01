@@ -516,9 +516,8 @@ export function SettingsPage() {
     ?? false
   )
 
-  const handlePermissionModeChange = async (mode: 'full' | 'ask') => {
+  const handlePermissionModeChange = async (enabled: boolean) => {
     const currentPermissions = config?.permissions ?? DEFAULT_CONFIG.permissions
-    const enabled = mode === 'full'
     const permissions = {
       ...currentPermissions,
       commandExecution: enabled ? 'allow' as const : 'ask' as const,
@@ -671,9 +670,19 @@ export function SettingsPage() {
     }
   }
 
+  // Handle custom instructions change
+  const handleCustomInstructionsToggle = async (enabled: boolean) => {
+    const customInstructions = { enabled, content: config?.customInstructions?.content || '' }
+    try {
+      await api.setConfig({ customInstructions })
+      setConfig({ ...config!, customInstructions } as HaloConfig)
+    } catch (error) {
+      console.error('[Settings] Failed to update custom instructions:', error)
+    }
+  }
 
   const handleCustomInstructionsSave = async (content: string) => {
-    const customInstructions = { enabled: content.trim().length > 0, content }
+    const customInstructions = { enabled: config?.customInstructions?.enabled ?? false, content }
     try {
       await api.setConfig({ customInstructions })
       setConfig({ ...config!, customInstructions } as HaloConfig)
@@ -1451,15 +1460,18 @@ export function SettingsPage() {
           {activeSection === 'advanced' && !api.isRemoteMode() && (
             <section className="space-y-4">
               <div className="space-y-4">
-                {/* Custom Prompt */}
+                {/* Custom Instructions */}
                 <div>
-                  <div>
-                    <p className="font-medium">{t('Custom Prompt')}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {t('Global instructions that AI will follow in every conversation')}
-                    </p>
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <p className="font-medium">{t('Custom Instructions')}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {t('Global instructions that AI will follow in every conversation')}
+                      </p>
+                    </div>
+                    <Switch checked={config?.customInstructions?.enabled ?? false} onChange={handleCustomInstructionsToggle} />
                   </div>
-                  <div className="mt-3">
+                  <div className={`mt-3 transition-opacity ${(config?.customInstructions?.enabled ?? false) ? '' : 'opacity-50 pointer-events-none'}`}>
                     <textarea
                       value={customInstructionsContent}
                       onChange={(e) => setCustomInstructionsContent(e.target.value)}
@@ -1477,23 +1489,30 @@ export function SettingsPage() {
                 <div>
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex-1">
-                      <p className="font-medium">{t('Permission Mode')}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium">{t('Permission Mode')}</p>
+                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                          isFullAccessEnabled
+                            ? 'bg-amber-500/10 text-amber-600 border border-amber-500/30'
+                            : 'bg-secondary text-muted-foreground border border-border'
+                        }`}>
+                          {isFullAccessEnabled ? t('Full Access') : t('Ask Every Time')}
+                        </span>
+                      </div>
                       <p className="text-sm text-muted-foreground">
                         {isFullAccessEnabled
                           ? t('Run commands, code execution, and sub-agents without asking for confirmation.')
                           : t('Ask before running commands, code execution, or sub-agents.')}
                       </p>
                     </div>
-                    <Select
-                      value={isFullAccessEnabled ? 'full' : 'ask'}
-                      onChange={(v) => handlePermissionModeChange(v as 'full' | 'ask')}
-                      variant="compact"
-                      options={[
-                        { value: 'full', label: t('Full Access') },
-                        { value: 'ask', label: t('Ask Every Time') }
-                      ]}
-                    />
+                    <Switch checked={isFullAccessEnabled} onChange={handlePermissionModeChange} />
                   </div>
+
+                  {isFullAccessEnabled && (
+                    <div className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-400">
+                      {t('Full access allows AI to execute commands directly. Only enable this on a trusted machine.')}
+                    </div>
+                  )}
                 </div>
 
                 {/* Cross-conversation Memory Toggle */}

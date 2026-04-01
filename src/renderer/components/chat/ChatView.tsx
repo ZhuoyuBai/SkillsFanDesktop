@@ -470,7 +470,7 @@ export function ChatView({ isCompact = false }: ChatViewProps) {
 
       {/* Tool approval prompt - show when execution is waiting for confirmation */}
       {pendingToolApproval && currentConversation && (
-        <div className={`shrink-0 px-4 pb-2 ${isCompact ? '' : 'max-w-4xl mx-auto w-full'}`}>
+        <div className={`shrink-0 px-4 pb-2 ${isCompact ? '' : 'max-w-3xl mx-auto w-full'}`}>
           <ToolCard
             toolCall={pendingToolApproval}
             conversationId={currentConversation.id}
@@ -480,7 +480,7 @@ export function ChatView({ isCompact = false }: ChatViewProps) {
 
       {/* UserQuestionCard - show when AI is asking a question */}
       {pendingUserQuestion && currentConversation && (
-        <div className={`shrink-0 px-4 ${isCompact ? '' : 'max-w-4xl mx-auto w-full'}`}>
+        <div className={`shrink-0 px-4 ${isCompact ? '' : 'max-w-3xl mx-auto w-full'}`}>
           <UserQuestionCard
             questions={pendingUserQuestion.questions}
             onAnswer={(answers) => answerUserQuestion(currentConversation.id, answers)}

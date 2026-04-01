@@ -10,7 +10,6 @@ import { getApiCredentials, getHeadlessElectronPath, getMainWindow, sendToRender
 import { buildSdkOptions, resolveSdkTransport, resolveSkillToolMode } from '../sdk-options'
 import { closeV2Session, getOrCreateV2Session } from '../session-manager'
 import { extractResultUsage, extractSingleUsage } from '../message-utils'
-import { sanitizeWebSearchInput } from '../tool-input-utils'
 import { atomicWriteJsonSync, safeReadJsonSync } from '../../../utils/atomic-write'
 import {
   normalizeThinkingEffortForModel,
@@ -50,6 +49,10 @@ const DISALLOWED_CHILD_BUILTIN_TOOLS = new Set([
 ])
 
 const BLOCKED_SERVER_SIDE_TOOLS = new Set([
+  'WebSearch',
+  'WebFetch',
+  'web_search',
+  'web_fetch',
   'code_execution',
   'bash_code_execution',
   'text_editor_code_execution',
@@ -549,20 +552,6 @@ function createSubagentCanUseTool(workDir: string) {
       }
     }
 
-    if (toolName === 'WebSearch' || toolName === 'web_search') {
-      return {
-        behavior: 'allow' as const,
-        updatedInput: sanitizeWebSearchInput(input)
-      }
-    }
-
-    if (toolName === 'WebFetch' || toolName === 'web_fetch') {
-      return {
-        behavior: 'allow' as const,
-        updatedInput: input
-      }
-    }
-
     const fileTools = [
       'Read',
       'Write',
@@ -713,16 +702,12 @@ async function runSubagent(runId: string): Promise<void> {
     })
 
     sdkOptions.canUseTool = createSubagentCanUseTool(sdkOptions.cwd)
-    if (Array.isArray(sdkOptions.allowedTools)) {
-      sdkOptions.allowedTools = sdkOptions.allowedTools.filter(
-        (toolName: string) => !DISALLOWED_CHILD_BUILTIN_TOOLS.has(toolName)
-      )
-    }
-    if (Array.isArray(sdkOptions.tools)) {
-      sdkOptions.tools = sdkOptions.tools.filter(
-        (toolName: string) => !DISALLOWED_CHILD_BUILTIN_TOOLS.has(toolName)
-      )
-    }
+    sdkOptions.allowedTools = (sdkOptions.allowedTools || []).filter(
+      (toolName: string) => !DISALLOWED_CHILD_BUILTIN_TOOLS.has(toolName)
+    )
+    sdkOptions.tools = (sdkOptions.tools || []).filter(
+      (toolName: string) => !DISALLOWED_CHILD_BUILTIN_TOOLS.has(toolName)
+    )
     sdkOptions.maxTurns = Math.min(30, sdkOptions.maxTurns || 30)
 
     const v2Session = await getOrCreateV2Session(
