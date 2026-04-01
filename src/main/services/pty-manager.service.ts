@@ -341,12 +341,42 @@ export async function resolveClaudeCliEnv(params: {
 }> {
   const config = getConfig()
   const source = params.source || ((config as Record<string, any>).aiSources?.current || 'custom')
+  const skipClaudeLogin = config.terminal?.skipClaudeLogin !== false
+
+  // When skipClaudeLogin is false (Claude official login mode) and no API credentials
+  // are configured, let Claude Code CLI handle its own authentication flow.
+  if (!skipClaudeLogin) {
+    try {
+      const credentials = await getApiCredentialsForSource(config, source, params.modelOverride)
+      const transport = await resolveSdkTransport(credentials)
+      return {
+        env: {
+          ANTHROPIC_API_KEY: transport.anthropicApiKey,
+          ANTHROPIC_BASE_URL: transport.anthropicBaseUrl,
+          DISABLE_TELEMETRY: '1',
+          CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1',
+          NO_PROXY: 'localhost,127.0.0.1',
+          no_proxy: 'localhost,127.0.0.1',
+        },
+        model: credentials.model,
+        skipClaudeLogin: false
+      }
+    } catch {
+      console.log('[PTY] No API credentials configured, launching Claude Code with native login flow')
+      return {
+        env: {},
+        model: params.modelOverride || '',
+        skipClaudeLogin: false
+      }
+    }
+  }
+
+  // skipClaudeLogin=true: requires pre-configured API credentials
   const credentials = await getApiCredentialsForSource(config, source, params.modelOverride)
   const transport = await resolveSdkTransport(credentials)
-  const skipClaudeLogin = config.terminal?.skipClaudeLogin !== false
-  const embeddedClaudeConfigDir = skipClaudeLogin ? getEmbeddedClaudeConfigDir() : null
+  const embeddedClaudeConfigDir = getEmbeddedClaudeConfigDir()
 
-  if (skipClaudeLogin && embeddedClaudeConfigDir) {
+  if (embeddedClaudeConfigDir) {
     try {
       ensureEmbeddedClaudeGlobalConfig({
         configDir: embeddedClaudeConfigDir,
@@ -369,7 +399,7 @@ export async function resolveClaudeCliEnv(params: {
       ...(embeddedClaudeConfigDir ? { CLAUDE_CONFIG_DIR: embeddedClaudeConfigDir } : {}),
     },
     model: credentials.model,
-    skipClaudeLogin
+    skipClaudeLogin: true
   }
 }
 

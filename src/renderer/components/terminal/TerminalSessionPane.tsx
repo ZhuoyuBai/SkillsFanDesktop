@@ -16,7 +16,9 @@ import { useTranslation } from '../../i18n'
 import { useAppStore } from '../../stores/app.store'
 import { ModelSelector } from '../layout/ModelSelector'
 import { TerminalStatusOverlay } from './TerminalStatusOverlay'
+import { TerminalSetupGuide } from './TerminalSetupGuide'
 import { describeTerminalLaunchError } from './terminal-error'
+import { hasAnyAISource } from '../../types'
 
 interface TerminalSessionPaneProps {
   terminalId: string
@@ -51,7 +53,7 @@ export function TerminalSessionPane({
   isActive
 }: TerminalSessionPaneProps) {
   const { t } = useTranslation()
-  const { openSettingsWithSection } = useAppStore()
+  const { openSettingsWithSection, config, setConfig } = useAppStore()
 
   const terminalRef = useRef<HTMLDivElement>(null)
   const xtermRef = useRef<XTerm | null>(null)
@@ -61,12 +63,19 @@ export function TerminalSessionPane({
   const [hasOutput, setHasOutput] = useState(false)
   const [model, setModel] = useState<string>('')
   const [pendingModelChange, setPendingModelChange] = useState(false)
+  const [needsSetup, setNeedsSetup] = useState(false)
   const ptyCreatedRef = useRef(false)
 
   // Initialize xterm.js and connect to PTY
   useEffect(() => {
     if (!terminalRef.current || ptyCreatedRef.current) return
     ptyCreatedRef.current = true
+
+    // If no AI source is configured AND not using Claude native login, show setup guide
+    const showSetup = !config || (!hasAnyAISource(config) && config.terminal?.skipClaudeLogin !== false)
+    if (showSetup) {
+      setNeedsSetup(true)
+    }
 
     const term = new XTerm({
       cursorBlink: true,
@@ -84,7 +93,7 @@ export function TerminalSessionPane({
     requestAnimationFrame(() => {
       try {
         fitAddon.fit()
-        term.focus()
+        if (!showSetup) term.focus()
       } catch {
         // Ignore initial fit errors until the pane is visible
       }
@@ -116,6 +125,15 @@ export function TerminalSessionPane({
         term.writeln(`\r\n\x1b[90m[Process exited with code ${exitCode}]\x1b[0m`)
       }
     })
+
+    // Skip PTY creation if setup is needed - user will trigger it via the guide
+    if (showSetup) {
+      return () => {
+        unsubData()
+        unsubExit()
+        term.dispose()
+      }
+    }
 
     // Create PTY
     api.ptyCreate({
@@ -250,10 +268,27 @@ export function TerminalSessionPane({
     openSettingsWithSection('system')
   }, [openSettingsWithSection])
 
+  const handleChooseClaudeLogin = useCallback(async () => {
+    try {
+      const result = await api.setConfig({ terminal: { skipClaudeLogin: false } })
+      if (result.success && result.data) {
+        setConfig(result.data as any)
+      }
+      setNeedsSetup(false)
+      handleRestart()
+    } catch (error) {
+      console.error('[TerminalSessionPane] Failed to set Claude login mode:', error)
+    }
+  }, [setConfig, handleRestart])
+
+  const handleChooseApiSetup = useCallback(() => {
+    openSettingsWithSection('ai-model')
+  }, [openSettingsWithSection])
+
   return (
     <div className={isActive ? 'absolute inset-0 flex min-h-0 flex-col bg-background' : 'hidden'}>
-      {/* Toolbar */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-card/50 flex-shrink-0">
+      {/* Toolbar - hidden when setup guide is shown */}
+      <div className={`flex items-center justify-between px-4 py-2 border-b border-border bg-card/50 flex-shrink-0 ${needsSetup ? 'hidden' : ''}`}>
         <div className="flex items-center gap-2 min-w-0">
           <ModelSelector
             variant="compact"
@@ -290,20 +325,29 @@ export function TerminalSessionPane({
           onClick={() => xtermRef.current?.focus()}
         />
 
-        {!hasOutput && !isExited && !startupError && (
-          <div className="pointer-events-none absolute inset-x-0 top-4 flex justify-center px-4">
-            <div className="rounded-full border border-border/70 bg-card/85 px-3 py-1 text-xs text-muted-foreground shadow-sm backdrop-blur-sm">
-              {t('Loading...')}
-            </div>
-          </div>
-        )}
+        {needsSetup ? (
+          <TerminalSetupGuide
+            onChooseClaudeLogin={handleChooseClaudeLogin}
+            onChooseApiSetup={handleChooseApiSetup}
+          />
+        ) : (
+          <>
+            {!hasOutput && !isExited && !startupError && (
+              <div className="pointer-events-none absolute inset-x-0 top-4 flex justify-center px-4">
+                <div className="rounded-full border border-border/70 bg-card/85 px-3 py-1 text-xs text-muted-foreground shadow-sm backdrop-blur-sm">
+                  {t('Loading...')}
+                </div>
+              </div>
+            )}
 
-        <TerminalStatusOverlay
-          isExited={isExited}
-          startupError={startupError}
-          onRestart={handleRestart}
-          onOpenSettings={handleSettings}
-        />
+            <TerminalStatusOverlay
+              isExited={isExited}
+              startupError={startupError}
+              onRestart={handleRestart}
+              onOpenSettings={handleSettings}
+            />
+          </>
+        )}
       </div>
 
     </div>

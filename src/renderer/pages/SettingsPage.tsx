@@ -18,7 +18,7 @@ import { SpaceManagementSection } from '../components/settings/SpaceManagementSe
 import { ResetSection } from '../components/settings/ResetSection'
 import { ApiConfigDialog } from '../components/settings/ApiConfigDialog'
 import { useTranslation, setLanguage, getCurrentLanguage, SUPPORTED_LOCALES, type LocaleCode } from '../i18n'
-import { Loader2, LogOut, Plus, Check, Globe, Key, MessageSquare, Bot, Palette, Server, Settings as SettingsIcon, Wifi, X, Package, User, Layers, SlidersHorizontal, ArrowLeft, Database, Pencil, Trash2, type LucideIcon } from 'lucide-react'
+import { Loader2, LogOut, Plus, Check, Globe, Key, MessageSquare, Bot, Palette, Server, Settings as SettingsIcon, Wifi, X, Package, User, Layers, SlidersHorizontal, ArrowLeft, Database, Pencil, Trash2, Terminal, type LucideIcon } from 'lucide-react'
 import { usePlatform } from '../components/layout/Header'
 import { isElectron } from '../api/transport'
 import { useToastStore } from '../stores/toast.store'
@@ -320,6 +320,7 @@ export function SettingsPage() {
   const [skipClaudeLogin, setSkipClaudeLogin] = useState(
     config?.terminal?.skipClaudeLogin ?? DEFAULT_CONFIG.terminal!.skipClaudeLogin
   )
+  const [showTerminalModeDialog, setShowTerminalModeDialog] = useState(false)
 
   // Advanced settings state
   const [showClearMemoryDialog, setShowClearMemoryDialog] = useState(false)
@@ -440,13 +441,15 @@ export function SettingsPage() {
     }
   }
 
-  // Handle skip Claude login change
-  const handleSkipClaudeLoginChange = async (nextValue: boolean) => {
+  // Handle terminal mode switch
+  const handleTerminalModeSwitch = async (useClaudeLogin: boolean) => {
+    const nextSkip = !useClaudeLogin
     const previousValue = skipClaudeLogin
-    setSkipClaudeLogin(nextValue)
+    setSkipClaudeLogin(nextSkip)
+    setShowTerminalModeDialog(false)
     try {
       const result = await api.setConfig({
-        terminal: { skipClaudeLogin: nextValue }
+        terminal: { skipClaudeLogin: nextSkip }
       })
       if (result.success && result.data) {
         setConfig(result.data as HaloConfig)
@@ -454,7 +457,7 @@ export function SettingsPage() {
         setSkipClaudeLogin(previousValue)
       }
     } catch (error) {
-      console.error('[Settings] Failed to set skipClaudeLogin:', error)
+      console.error('[Settings] Failed to switch terminal mode:', error)
       setSkipClaudeLogin(previousValue)
     }
   }
@@ -1069,7 +1072,7 @@ export function SettingsPage() {
                       setDialogEditingIndex(null)
                       setShowApiConfigDialog(true)
                     }}
-                    className="w-full flex items-center justify-center gap-2 py-2.5 text-sm text-muted-foreground hover:text-foreground border border-dashed border-border hover:border-primary/50 rounded-lg transition-colors"
+                    className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90 rounded-lg transition-colors"
                   >
                     <Plus className="w-4 h-4" />
                     {t('Add Configuration')}
@@ -1158,15 +1161,22 @@ export function SettingsPage() {
                   <Switch checked={minimizeToTray} onChange={handleMinimizeToTrayChange} />
                 </div>
 
-                {/* Skip Claude Login */}
+                {/* Terminal Mode */}
                 <div className="flex items-center justify-between pt-4 border-t border-border">
                   <div className="flex-1">
-                    <p className="font-medium">{t('Skip Claude login')}</p>
+                    <p className="font-medium">{t('Terminal Mode')}</p>
                     <p className="text-sm text-muted-foreground">
-                      {t('Takes effect after creating a new terminal window.')}
+                      {skipClaudeLogin
+                        ? t('Currently using custom API model')
+                        : t('Currently using Claude Code login')}
                     </p>
                   </div>
-                  <Switch checked={skipClaudeLogin} onChange={handleSkipClaudeLoginChange} />
+                  <button
+                    onClick={() => setShowTerminalModeDialog(true)}
+                    className="px-4 py-2 bg-secondary text-secondary-foreground text-sm rounded-lg hover:bg-secondary/80 transition-colors"
+                  >
+                    {t('Switch')}
+                  </button>
                 </div>
 
                 {/* Version Update */}
@@ -1222,6 +1232,82 @@ export function SettingsPage() {
                   </div>
                 </div>
               </div>
+              <ResetSection />
+
+              {/* Terminal Mode Switch Dialog */}
+              {showTerminalModeDialog && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center">
+                  <div
+                    className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                    onClick={() => setShowTerminalModeDialog(false)}
+                  />
+                  <div className="relative bg-background rounded-xl shadow-2xl border border-border max-w-lg w-full mx-4 p-6">
+                    <h3 className="text-lg font-semibold text-center mb-2">
+                      {t('Switch Terminal Mode')}
+                    </h3>
+                    <p className="text-sm text-muted-foreground text-center mb-6">
+                      {t('Choose how the terminal authenticates with AI')}
+                    </p>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <button
+                        onClick={() => handleTerminalModeSwitch(true)}
+                        className={`flex flex-col items-center gap-3 p-5 rounded-xl border-2 transition-all ${
+                          !skipClaudeLogin
+                            ? 'border-primary bg-primary/5'
+                            : 'border-border bg-card hover:border-primary/50 hover:bg-primary/5'
+                        }`}
+                      >
+                        <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
+                          <Terminal className="w-6 h-6 text-primary" />
+                        </div>
+                        <div className="text-center">
+                          <p className="text-sm font-semibold text-foreground">
+                            {t('Use Claude Code Login')}
+                          </p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {t('Sign in with your Claude account. Claude Code will handle authentication in the terminal.')}
+                          </p>
+                        </div>
+                        {!skipClaudeLogin && (
+                          <span className="text-xs text-primary font-medium">{t('Current')}</span>
+                        )}
+                      </button>
+
+                      <button
+                        onClick={() => handleTerminalModeSwitch(false)}
+                        className={`flex flex-col items-center gap-3 p-5 rounded-xl border-2 transition-all ${
+                          skipClaudeLogin
+                            ? 'border-primary bg-primary/5'
+                            : 'border-border bg-card hover:border-primary/50 hover:bg-primary/5'
+                        }`}
+                      >
+                        <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
+                          <Key className="w-6 h-6 text-primary" />
+                        </div>
+                        <div className="text-center">
+                          <p className="text-sm font-semibold text-foreground">
+                            {t('Configure Model API')}
+                          </p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {t('Set up an API key for models like Zhipu GLM, DeepSeek, Kimi, etc.')}
+                          </p>
+                        </div>
+                        {skipClaudeLogin && (
+                          <span className="text-xs text-primary font-medium">{t('Current')}</span>
+                        )}
+                      </button>
+                    </div>
+
+                    <button
+                      onClick={() => setShowTerminalModeDialog(false)}
+                      className="mt-4 w-full py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {t('Cancel')}
+                    </button>
+                  </div>
+                </div>
+              )}
             </section>
           )}
 

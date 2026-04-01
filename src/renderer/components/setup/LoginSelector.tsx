@@ -211,35 +211,6 @@ export function LoginSelector({ onSelectProvider, onBack, onSkip }: LoginSelecto
 
       {/* Main content */}
       <div className="w-full max-w-xl">
-        {/* OpenAI Subscription Login */}
-        <div className="bg-gray-50 rounded-xl p-5 border border-gray-200 mb-4">
-          <h3 className="text-sm text-gray-500 mb-4">{t('Subscription Models')}</h3>
-          <button
-            type="button"
-            disabled={!!loginState}
-            onClick={() => handleOAuthLogin('openai-codex')}
-            className="w-full flex items-center gap-3 p-4 rounded-xl border-2 border-gray-200 bg-white hover:border-primary hover:bg-primary/5 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <div className="w-10 h-10 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0">
-              <img src={openaiLogo} alt="OpenAI" className="w-full h-full object-cover rounded-lg" />
-            </div>
-            <div className="flex flex-col items-start min-w-0">
-              <span className="text-sm font-medium text-gray-700">
-                {t('OpenAI (ChatGPT)')}
-              </span>
-              <span className="text-xs text-gray-400">
-                {t('ChatGPT Plus / Pro subscription')}
-              </span>
-            </div>
-            {loginState?.provider === 'openai-codex' && (
-              <span className={`ml-auto text-xs flex items-center gap-1 ${loginState?.error ? 'text-red-500' : 'text-gray-400'}`}>
-                {!loginState?.error && <Loader2 className="w-3 h-3 animate-spin" />}
-                {loginState?.status}
-              </span>
-            )}
-          </button>
-        </div>
-
         {/* Custom API Provider Grid */}
         <div className="bg-gray-50 rounded-xl p-5 border border-gray-200">
           <h3 className="text-sm text-gray-500 mb-4">{t('Custom API Key')}</h3>

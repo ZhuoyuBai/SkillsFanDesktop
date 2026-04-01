@@ -132,7 +132,17 @@ export function SetupFlow() {
     // Mark first launch as complete
     const currentConfig = useAppStore.getState().config
     if (currentConfig) {
-      await api.setConfig({ ...currentConfig, isFirstLaunch: false })
+      const updatedConfig = {
+        ...currentConfig,
+        isFirstLaunch: false,
+        terminal: { ...currentConfig.terminal, skipClaudeLogin: true }
+      }
+      const result = await api.setConfig(updatedConfig)
+      if (result.success && result.data) {
+        setConfig(result.data as any)
+      } else {
+        setConfig(updatedConfig)
+      }
     }
     // Load spaces and go directly to chat
     await useSpaceStore.getState().loadSpaces()
