@@ -7,9 +7,9 @@
   "author": "技能范团队",
   "license": "MIT",
   "scripts": {
-    "dev": "cross-env SKILLSFAN_DATA_DIR=~/.skillsfan-dev SKILLSFAN_API_URL=http://localhost:3000 electron-vite dev",
-    "build": "electron-vite build",
-    "start": "electron-vite preview",
+    "dev": "unset ELECTRON_RUN_AS_NODE && cross-env SKILLSFAN_DATA_DIR=~/.skillsfan-dev SKILLSFAN_API_URL=http://localhost:3000 electron-vite dev",
+    "build": "unset ELECTRON_RUN_AS_NODE && electron-vite build",
+    "start": "unset ELECTRON_RUN_AS_NODE && electron-vite preview",
     "postinstall": "patch-package && electron-builder install-app-deps && node scripts/fix-node-pty-helper-permissions.mjs",
     "build:mac": "npm run build && electron-builder --mac",
     "build:win": "npm run build && electron-builder --win",

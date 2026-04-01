@@ -10,11 +10,11 @@ import { Terminal as XTerm } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import '@xterm/xterm/css/xterm.css'
-import { Plus, Settings } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { api } from '../../api'
 import { useTranslation } from '../../i18n'
+import { useAppStore } from '../../stores/app.store'
 import { TerminalStatusOverlay } from './TerminalStatusOverlay'
-import { TerminalSettingsDialog } from './TerminalSettingsDialog'
 import { describeTerminalLaunchError } from './terminal-error'
 
 interface TerminalSessionPaneProps {
@@ -50,14 +50,15 @@ export function TerminalSessionPane({
   isActive
 }: TerminalSessionPaneProps) {
   const { t } = useTranslation()
+  const { openSettingsWithSection } = useAppStore()
 
   const terminalRef = useRef<HTMLDivElement>(null)
   const xtermRef = useRef<XTerm | null>(null)
   const fitAddonRef = useRef<FitAddon | null>(null)
   const [isExited, setIsExited] = useState(false)
   const [startupError, setStartupError] = useState<string | null>(null)
+  const [hasOutput, setHasOutput] = useState(false)
   const [model, setModel] = useState<string>('')
-  const [showSettingsDialog, setShowSettingsDialog] = useState(false)
   const ptyCreatedRef = useRef(false)
 
   // Initialize xterm.js and connect to PTY
@@ -81,6 +82,7 @@ export function TerminalSessionPane({
     requestAnimationFrame(() => {
       try {
         fitAddon.fit()
+        term.focus()
       } catch {
         // Ignore initial fit errors until the pane is visible
       }
@@ -97,6 +99,9 @@ export function TerminalSessionPane({
     // Listen for PTY output
     const unsubData = api.onPtyData(({ id, data }: { id: string; data: string }) => {
       if (id === terminalId) {
+        if (data.length > 0) {
+          setHasOutput(true)
+        }
         term.write(data)
       }
     })
@@ -105,6 +110,7 @@ export function TerminalSessionPane({
     const unsubExit = api.onPtyExit(({ id, exitCode }: { id: string; exitCode: number }) => {
       if (id === terminalId) {
         setIsExited(true)
+        setHasOutput(false)
         term.writeln(`\r\n\x1b[90m[Process exited with code ${exitCode}]\x1b[0m`)
       }
     })
@@ -171,6 +177,7 @@ export function TerminalSessionPane({
       try {
         fitAddon.fit()
         api.ptyResize(terminalId, term.cols, term.rows)
+        term.focus()
       } catch {
         // Ignore fit errors if visibility changes during teardown
       }
@@ -198,6 +205,7 @@ export function TerminalSessionPane({
   const handleRestart = useCallback(async () => {
     setIsExited(false)
     setStartupError(null)
+    setHasOutput(false)
     await api.ptyDestroy(terminalId)
 
     const term = xtermRef.current
@@ -235,8 +243,8 @@ export function TerminalSessionPane({
   }, [isExited, startupError, terminalId])
 
   const handleSettings = useCallback(() => {
-    setShowSettingsDialog(true)
-  }, [])
+    openSettingsWithSection('system')
+  }, [openSettingsWithSection])
 
   return (
     <div className={isActive ? 'absolute inset-0 flex min-h-0 flex-col bg-background' : 'hidden'}>
@@ -252,25 +260,30 @@ export function TerminalSessionPane({
             title={t('Start a new Claude Code conversation')}
             aria-label={t('Start a new Claude Code conversation')}
             disabled={isExited || !!startupError}
-            className="inline-flex items-center gap-1.5 rounded px-2.5 py-1.5 text-sm text-foreground hover:bg-secondary transition-colors"
+            className="inline-flex flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded px-2.5 py-1.5 text-sm text-foreground hover:bg-secondary transition-colors"
           >
             <Plus className="w-4 h-4" />
             <span>{t('New chat')}</span>
-          </button>
-          <button
-            onClick={handleSettings}
-            title={t('Settings')}
-            aria-label={t('Settings')}
-            className="p-1.5 rounded hover:bg-secondary transition-colors"
-          >
-            <Settings className="w-4 h-4" />
           </button>
         </div>
       </div>
 
       {/* Terminal container */}
       <div className="flex-1 overflow-hidden relative">
-        <div ref={terminalRef} className="w-full h-full" />
+        <div
+          ref={terminalRef}
+          className="w-full h-full cursor-text"
+          onMouseDown={() => xtermRef.current?.focus()}
+          onClick={() => xtermRef.current?.focus()}
+        />
+
+        {!hasOutput && !isExited && !startupError && (
+          <div className="pointer-events-none absolute inset-x-0 top-4 flex justify-center px-4">
+            <div className="rounded-full border border-border/70 bg-card/85 px-3 py-1 text-xs text-muted-foreground shadow-sm backdrop-blur-sm">
+              {t('Loading...')}
+            </div>
+          </div>
+        )}
 
         <TerminalStatusOverlay
           isExited={isExited}
@@ -280,11 +293,6 @@ export function TerminalSessionPane({
         />
       </div>
 
-      <TerminalSettingsDialog
-        isOpen={showSettingsDialog}
-        onClose={() => setShowSettingsDialog(false)}
-        onReapplyCurrentTerminal={handleRestart}
-      />
     </div>
   )
 }

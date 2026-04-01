@@ -52,65 +52,12 @@ export const api = {
     disconnectWebSocket()
   },
 
-  // ===== Generic Auth (provider-agnostic) =====
-  authGetProviders: async (): Promise<ApiResponse> => {
-    if (isElectron()) {
-      return window.skillsfan.authGetProviders()
-    }
-    return httpRequest('GET', '/api/auth/providers')
-  },
-
-  authStartLogin: async (providerType: string): Promise<ApiResponse> => {
-    if (isElectron()) {
-      return window.skillsfan.authStartLogin(providerType)
-    }
-    return httpRequest('POST', '/api/auth/start-login', { providerType })
-  },
-
-  authCompleteLogin: async (providerType: string, state: string): Promise<ApiResponse> => {
-    if (isElectron()) {
-      return window.skillsfan.authCompleteLogin(providerType, state)
-    }
-    return httpRequest('POST', '/api/auth/complete-login', { providerType, state })
-  },
-
-  authRefreshToken: async (providerType: string): Promise<ApiResponse> => {
-    if (isElectron()) {
-      return window.skillsfan.authRefreshToken(providerType)
-    }
-    return httpRequest('POST', '/api/auth/refresh-token', { providerType })
-  },
-
-  authCheckToken: async (providerType: string): Promise<ApiResponse> => {
-    if (isElectron()) {
-      return window.skillsfan.authCheckToken(providerType)
-    }
-    return httpRequest('GET', `/api/auth/check-token?providerType=${providerType}`)
-  },
-
-  authLogout: async (providerType: string): Promise<ApiResponse> => {
-    if (isElectron()) {
-      return window.skillsfan.authLogout(providerType)
-    }
-    return httpRequest('POST', '/api/auth/logout', { providerType })
-  },
-
-  onAuthLoginProgress: (callback: (data: { provider: string; status: string }) => void) =>
-    onEvent('auth:login-progress', callback),
-
   // ===== Config =====
   getConfig: async (): Promise<ApiResponse> => {
     if (isElectron()) {
       return window.skillsfan.getConfig()
     }
     return httpRequest('GET', '/api/config')
-  },
-
-  getProductFeatures: async (): Promise<ApiResponse> => {
-    if (isElectron()) {
-      return window.skillsfan.getProductFeatures()
-    }
-    return httpRequest('GET', '/api/config/product-features')
   },
 
   setConfig: async (updates: Record<string, unknown>): Promise<ApiResponse> => {
@@ -136,13 +83,6 @@ export const api = {
       return window.skillsfan.refreshAISourcesConfig()
     }
     return httpRequest('POST', '/api/config/refresh-ai-sources')
-  },
-
-  getPublicModels: async (): Promise<ApiResponse> => {
-    if (isElectron()) {
-      return window.skillsfan.getPublicModels()
-    }
-    return httpRequest('GET', '/api/config/public-models')
   },
 
   resetToDefault: async (): Promise<ApiResponse> => {
@@ -1744,84 +1684,6 @@ export const api = {
       return window.skillsfan.readFile(filePath)
     }
     return httpRequest('POST', '/api/files/read', { filePath })
-  },
-
-  // ===== SkillsFan Account Auth (Electron only) =====
-  skillsfanStartLogin: async (): Promise<ApiResponse> => {
-    if (!isElectron()) {
-      return { success: false, error: 'Only available in desktop app' }
-    }
-    return window.skillsfan.skillsfanStartLogin()
-  },
-
-  skillsfanLogout: async (): Promise<ApiResponse> => {
-    if (!isElectron()) {
-      return { success: false, error: 'Only available in desktop app' }
-    }
-    return window.skillsfan.skillsfanLogout()
-  },
-
-  skillsfanGetUser: async (): Promise<ApiResponse> => {
-    if (!isElectron()) {
-      return { success: false, error: 'Only available in desktop app' }
-    }
-    return window.skillsfan.skillsfanGetUser()
-  },
-
-  skillsfanGetAuthState: async (): Promise<ApiResponse> => {
-    if (!isElectron()) {
-      return { success: false, error: 'Only available in desktop app' }
-    }
-    return window.skillsfan.skillsfanGetAuthState()
-  },
-
-  skillsfanIsLoggedIn: async (): Promise<ApiResponse> => {
-    if (!isElectron()) {
-      return { success: false, error: 'Only available in desktop app' }
-    }
-    return window.skillsfan.skillsfanIsLoggedIn()
-  },
-
-  skillsfanRefreshToken: async (): Promise<ApiResponse> => {
-    if (!isElectron()) {
-      return { success: false, error: 'Only available in desktop app' }
-    }
-    return window.skillsfan.skillsfanRefreshToken()
-  },
-
-  skillsfanGetCredits: async (): Promise<ApiResponse> => {
-    if (!isElectron()) {
-      return { success: false, error: 'Only available in desktop app' }
-    }
-    return window.skillsfan.skillsfanGetCredits()
-  },
-
-  skillsfanRefreshCredits: async (): Promise<ApiResponse> => {
-    if (!isElectron()) {
-      return { success: false, error: 'Only available in desktop app' }
-    }
-    return window.skillsfan.skillsfanRefreshCredits()
-  },
-
-  onSkillsFanLoginSuccess: (callback: (data: { user: unknown }) => void) => {
-    if (!isElectron()) {
-      return () => {}
-    }
-    return window.skillsfan.onSkillsFanLoginSuccess(callback)
-  },
-
-  onSkillsFanLoginError: (callback: (data: { error: string }) => void) => {
-    if (!isElectron()) {
-      return () => {}
-    }
-    return window.skillsfan.onSkillsFanLoginError(callback)
-  },
-
-  onSkillsFanLogout: (callback: () => void) => {
-    if (!isElectron()) {
-      return () => {}
-    }
-    return window.skillsfan.onSkillsFanLogout(callback)
   },
 }
 

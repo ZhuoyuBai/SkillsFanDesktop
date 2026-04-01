@@ -1,82 +1,57 @@
 /**
- * Native Claude Skill Bridge
+ * Native Claude skill storage helpers.
  *
- * Keeps SkillsFan-managed skills as the source of truth while exposing them
- * through ~/.claude/skills for Claude Code's native skill loader.
+ * Skills are now managed directly inside ~/.claude/skills.
+ * Legacy SkillsFan folders are only used as one-time import sources during
+ * startup, after which the old copies can be removed.
  */
 
 import {
-  Dirent,
+  cpSync,
   existsSync,
   lstatSync,
   mkdirSync,
-  readFileSync,
   readdirSync,
-  readlinkSync,
+  readFileSync,
   realpathSync,
+  renameSync,
   rmSync,
-  symlinkSync,
+  statSync,
 } from 'fs'
+import { createHash } from 'crypto'
 import { homedir } from 'os'
-import { dirname, join, resolve } from 'path'
-import { app } from 'electron'
-import { parseFrontmatter } from './frontmatter'
+import { join, resolve } from 'path'
 
-export interface NativeSkillBridgeSkip {
+export interface LegacySkillMigrationSkip {
   skillName: string
   path: string
   reason: string
 }
 
-export interface NativeSkillBridgeSyncResult {
-  created: string[]
-  updated: string[]
-  removed: string[]
-  skipped: NativeSkillBridgeSkip[]
+export interface LegacySkillMigrationResult {
+  migrated: string[]
+  materialized: string[]
+  removedLegacySkills: string[]
+  removedLegacyDirs: string[]
+  skipped: LegacySkillMigrationSkip[]
 }
 
-function getPrimarySkillsDir(): string {
-  const home = homedir()
-
-  if (process.env.SKILLSFAN_DATA_DIR) {
-    const dataDir = process.env.SKILLSFAN_DATA_DIR
-    const expandedDir = dataDir.startsWith('~')
-      ? join(home, dataDir.slice(1))
-      : dataDir
-    return join(expandedDir, 'skills')
-  }
-
-  if (!app.isPackaged) {
-    return join(home, '.skillsfan-dev', 'skills')
-  }
-
-  return join(home, '.skillsfan', 'skills')
-}
-
-function uniqueDirs(dirs: Array<string | undefined>): string[] {
-  return Array.from(new Set(dirs.filter((dir): dir is string => typeof dir === 'string' && dir.length > 0)))
-}
-
-function getAlternateSkillsDir(): string | undefined {
-  const home = homedir()
-  return uniqueDirs([
-    join(home, '.skillsfan', 'skills'),
-    join(home, '.skillsfan-dev', 'skills')
-  ]).find((dir) => dir !== getPrimarySkillsDir())
+interface LegacySkillCandidate {
+  path: string
+  fingerprint: string
+  mtimeMs: number
 }
 
 export function getClaudeSkillsDir(): string {
   return join(homedir(), '.claude', 'skills')
 }
 
-function getSkillsfanSourceDirs(): string[] {
+export function getLegacySkillsfanDirs(): string[] {
   const home = homedir()
-  return uniqueDirs([
-    getPrimarySkillsDir(),
-    getAlternateSkillsDir(),
+  return Array.from(new Set([
     join(home, '.skillsfan', 'skills'),
     join(home, '.skillsfan-dev', 'skills')
-  ])
+  ]))
 }
 
 function pathExists(path: string): boolean {
@@ -88,8 +63,87 @@ function pathExists(path: string): boolean {
   }
 }
 
+function isDirectoryLike(path: string): boolean {
+  try {
+    return statSync(path).isDirectory()
+  } catch {
+    return false
+  }
+}
+
+function listSkillDirs(baseDir: string): string[] {
+  if (!existsSync(baseDir)) return []
+
+  try {
+    return readdirSync(baseDir, { withFileTypes: true })
+      .filter((entry) => {
+        const entryPath = join(baseDir, entry.name)
+        if (!entry.isDirectory() && !entry.isSymbolicLink()) return false
+        if (!isDirectoryLike(entryPath)) return false
+        return existsSync(join(entryPath, 'SKILL.md'))
+      })
+      .map((entry) => entry.name)
+      .sort()
+  } catch {
+    return []
+  }
+}
+
+function listFilesRecursive(dir: string, prefix = ''): string[] {
+  let entries: ReturnType<typeof readdirSync<import('fs').Dirent>>
+  try {
+    entries = readdirSync(dir, { withFileTypes: true })
+  } catch {
+    return []
+  }
+
+  const files: string[] = []
+
+  for (const entry of entries) {
+    if (entry.name === '.DS_Store' || entry.name.startsWith('.')) continue
+    if (entry.name === 'node_modules') continue
+
+    const absPath = join(dir, entry.name)
+    const relPath = prefix ? `${prefix}/${entry.name}` : entry.name
+
+    if ((entry.isDirectory() || entry.isSymbolicLink()) && isDirectoryLike(absPath)) {
+      files.push(...listFilesRecursive(absPath, relPath))
+      continue
+    }
+
+    files.push(relPath)
+  }
+
+  return files.sort()
+}
+
+function fingerprintSkillDir(skillDir: string): string {
+  const hash = createHash('sha1')
+  for (const relPath of listFilesRecursive(skillDir)) {
+    hash.update(relPath)
+    hash.update(readFileSync(join(skillDir, relPath)))
+  }
+  return hash.digest('hex')
+}
+
+function getSkillMtimeMs(skillDir: string): number {
+  try {
+    return statSync(join(skillDir, 'SKILL.md')).mtimeMs
+  } catch {
+    try {
+      return statSync(skillDir).mtimeMs
+    } catch {
+      return 0
+    }
+  }
+}
+
 function normalizePath(path: string): string {
-  return resolve(path)
+  try {
+    return realpathSync(path)
+  } catch {
+    return resolve(path)
+  }
 }
 
 function isPathInsideDir(path: string, baseDir: string): boolean {
@@ -99,150 +153,186 @@ function isPathInsideDir(path: string, baseDir: string): boolean {
     || normalizedPath.startsWith(`${normalizedBaseDir}${process.platform === 'win32' ? '\\' : '/'}`)
 }
 
-function isPathInsideAnyDir(path: string, baseDirs: string[]): boolean {
-  return baseDirs.some((baseDir) => isPathInsideDir(path, baseDir))
+function isLegacyOwnedSymlink(path: string, legacyDirs: string[]): boolean {
+  try {
+    if (!lstatSync(path).isSymbolicLink()) return false
+    const target = realpathSync(path)
+    return legacyDirs.some((legacyDir) => isPathInsideDir(target, legacyDir))
+  } catch {
+    return false
+  }
 }
 
-function getDesiredSkillTargets(sourceDirs: string[]): Map<string, string> {
-  const desiredTargets = new Map<string, string>()
+function removeEmptyLegacyDirs(legacyDirs: string[], result: LegacySkillMigrationResult): void {
+  for (const legacyDir of legacyDirs) {
+    if (!existsSync(legacyDir)) continue
 
-  for (const skillsDir of sourceDirs) {
-    if (!existsSync(skillsDir)) continue
-
-    let entries: Dirent[]
+    let entries: string[]
     try {
-      entries = readdirSync(skillsDir, { withFileTypes: true })
+      entries = readdirSync(legacyDir).filter((name) => name !== '.DS_Store' && !name.startsWith('.'))
     } catch {
       continue
     }
 
-    for (const entry of entries) {
-      if (!entry.isDirectory()) continue
+    if (entries.length > 0) continue
 
-      const skillDir = join(skillsDir, entry.name)
-      const skillMdPath = join(skillDir, 'SKILL.md')
-      if (!existsSync(skillMdPath)) continue
-
-      try {
-        const parsed = parseFrontmatter(readFileSync(skillMdPath, 'utf-8'))
-        const skillName = parsed?.data.name?.trim()
-        if (!skillName || desiredTargets.has(skillName)) continue
-        desiredTargets.set(skillName, skillDir)
-      } catch (error) {
-        console.warn(`[SkillBridge] Failed to read ${skillMdPath}:`, error)
-      }
-    }
-  }
-
-  return desiredTargets
-}
-
-function resolveExistingLinkTarget(linkPath: string): string | undefined {
-  try {
-    return realpathSync(linkPath)
-  } catch {
     try {
-      const rawTarget = readlinkSync(linkPath)
-      return resolve(dirname(linkPath), rawTarget)
+      rmSync(legacyDir, { recursive: true, force: true })
+      result.removedLegacyDirs.push(legacyDir)
     } catch {
-      return undefined
+      // Ignore cleanup failures for legacy directories.
     }
   }
 }
 
-function isBridgeOwnedEntry(entryPath: string, sourceDirs: string[]): boolean {
+function removeLegacySkill(skillName: string, skillPath: string, result: LegacySkillMigrationResult): void {
   try {
-    const stat = lstatSync(entryPath)
-    if (!stat.isSymbolicLink()) return false
-  } catch {
-    return false
+    rmSync(skillPath, { recursive: true, force: true })
+    result.removedLegacySkills.push(skillName)
+  } catch (error) {
+    result.skipped.push({
+      skillName,
+      path: skillPath,
+      reason: `Failed to remove legacy copy: ${(error as Error).message}`
+    })
   }
-
-  const targetPath = resolveExistingLinkTarget(entryPath)
-  return targetPath ? isPathInsideAnyDir(targetPath, sourceDirs) : false
 }
 
-function removeEntry(entryPath: string): void {
-  rmSync(entryPath, { recursive: true, force: true })
-}
-
-function createBridgeLink(sourceDir: string, linkPath: string): void {
-  symlinkSync(sourceDir, linkPath, process.platform === 'win32' ? 'junction' : 'dir')
+function materializeLegacySymlink(skillName: string, nativePath: string, result: LegacySkillMigrationResult): void {
+  const tempPath = `${nativePath}.migrating-${Date.now()}`
+  const targetPath = realpathSync(nativePath)
+  cpSync(targetPath, tempPath, { recursive: true, dereference: true, force: true })
+  rmSync(nativePath, { recursive: true, force: true })
+  renameSync(tempPath, nativePath)
+  result.materialized.push(skillName)
 }
 
 /**
- * Sync SkillsFan-managed skills into ~/.claude/skills so Claude Code can load
- * them natively without a custom MCP skill server.
+ * Migrate legacy SkillsFan skills into ~/.claude/skills.
+ *
+ * Rules:
+ * - ~/.claude/skills is authoritative after migration.
+ * - Existing real directories in ~/.claude/skills are never overwritten.
+ * - If ~/.claude/skills contains a legacy-owned symlink, it is materialized to
+ *   a real directory first.
+ * - Identical legacy duplicates are removed after the native copy exists.
+ * - Diverging legacy copies are left in place and reported as skipped.
  */
-export function syncNativeClaudeSkillBridges(): NativeSkillBridgeSyncResult {
-  const sourceDirs = getSkillsfanSourceDirs()
-  const desiredTargets = getDesiredSkillTargets(sourceDirs)
+export function migrateLegacySkillsToClaudeDir(): LegacySkillMigrationResult {
   const claudeSkillsDir = getClaudeSkillsDir()
+  const legacyDirs = getLegacySkillsfanDirs()
 
-  const result: NativeSkillBridgeSyncResult = {
-    created: [],
-    updated: [],
-    removed: [],
+  const result: LegacySkillMigrationResult = {
+    migrated: [],
+    materialized: [],
+    removedLegacySkills: [],
+    removedLegacyDirs: [],
     skipped: []
   }
 
   mkdirSync(claudeSkillsDir, { recursive: true })
 
-  for (const [skillName, sourceDir] of desiredTargets.entries()) {
-    const linkPath = join(claudeSkillsDir, skillName)
+  for (const skillName of listSkillDirs(claudeSkillsDir)) {
+    const nativePath = join(claudeSkillsDir, skillName)
+    if (!isLegacyOwnedSymlink(nativePath, legacyDirs)) continue
 
-    if (!pathExists(linkPath)) {
-      createBridgeLink(sourceDir, linkPath)
-      result.created.push(skillName)
-      continue
-    }
-
-    if (!isBridgeOwnedEntry(linkPath, sourceDirs)) {
+    try {
+      materializeLegacySymlink(skillName, nativePath, result)
+    } catch (error) {
       result.skipped.push({
         skillName,
-        path: linkPath,
-        reason: 'Existing native Claude skill is not managed by SkillsFan'
+        path: nativePath,
+        reason: `Failed to materialize legacy symlink: ${(error as Error).message}`
       })
-      continue
+    }
+  }
+
+  const legacyCandidates = new Map<string, LegacySkillCandidate[]>()
+
+  for (const legacyDir of legacyDirs) {
+    for (const skillName of listSkillDirs(legacyDir)) {
+      const skillPath = join(legacyDir, skillName)
+
+      try {
+        const fingerprint = fingerprintSkillDir(skillPath)
+        const candidate: LegacySkillCandidate = {
+          path: skillPath,
+          fingerprint,
+          mtimeMs: getSkillMtimeMs(skillPath)
+        }
+
+        const existing = legacyCandidates.get(skillName) || []
+        existing.push(candidate)
+        legacyCandidates.set(skillName, existing)
+      } catch (error) {
+        result.skipped.push({
+          skillName,
+          path: skillPath,
+          reason: `Failed to inspect legacy skill: ${(error as Error).message}`
+        })
+      }
+    }
+  }
+
+  for (const [skillName, candidates] of Array.from(legacyCandidates.entries()).sort(([left], [right]) => left.localeCompare(right))) {
+    const nativePath = join(claudeSkillsDir, skillName)
+    let nativeFingerprint: string | undefined
+
+    if (pathExists(nativePath)) {
+      try {
+        nativeFingerprint = fingerprintSkillDir(nativePath)
+      } catch (error) {
+        result.skipped.push({
+          skillName,
+          path: nativePath,
+          reason: `Failed to inspect native skill: ${(error as Error).message}`
+        })
+        continue
+      }
+    } else {
+      const chosen = [...candidates].sort((left, right) => {
+        if (right.mtimeMs !== left.mtimeMs) return right.mtimeMs - left.mtimeMs
+        return left.path.localeCompare(right.path)
+      })[0]
+
+      try {
+        cpSync(chosen.path, nativePath, { recursive: true, dereference: true, force: true })
+        nativeFingerprint = chosen.fingerprint
+        result.migrated.push(skillName)
+      } catch (error) {
+        result.skipped.push({
+          skillName,
+          path: chosen.path,
+          reason: `Failed to migrate legacy skill: ${(error as Error).message}`
+        })
+        continue
+      }
     }
 
-    const existingTarget = resolveExistingLinkTarget(linkPath)
-    if (existingTarget && normalizePath(existingTarget) === normalizePath(sourceDir)) {
-      continue
+    for (const candidate of candidates) {
+      if (candidate.fingerprint !== nativeFingerprint) {
+        result.skipped.push({
+          skillName,
+          path: candidate.path,
+          reason: 'Legacy copy differs from the native Claude skill and was kept untouched'
+        })
+        continue
+      }
+
+      removeLegacySkill(skillName, candidate.path, result)
     }
-
-    removeEntry(linkPath)
-    createBridgeLink(sourceDir, linkPath)
-    result.updated.push(skillName)
   }
 
-  let claudeEntries: Dirent[]
-  try {
-    claudeEntries = readdirSync(claudeSkillsDir, { withFileTypes: true })
-  } catch {
-    return result
-  }
-
-  for (const entry of claudeEntries) {
-    if (!entry.isDirectory() && !entry.isSymbolicLink()) continue
-
-    const entryPath = join(claudeSkillsDir, entry.name)
-    if (desiredTargets.has(entry.name)) continue
-    if (!isBridgeOwnedEntry(entryPath, sourceDirs)) continue
-
-    removeEntry(entryPath)
-    result.removed.push(entry.name)
-  }
+  removeEmptyLegacyDirs(legacyDirs, result)
 
   if (
-    result.created.length > 0
-    || result.updated.length > 0
-    || result.removed.length > 0
+    result.migrated.length > 0
+    || result.materialized.length > 0
+    || result.removedLegacySkills.length > 0
+    || result.removedLegacyDirs.length > 0
     || result.skipped.length > 0
   ) {
-    console.log(
-      `[SkillBridge] Synced native bridges: created=${result.created.length}, updated=${result.updated.length}, removed=${result.removed.length}, skipped=${result.skipped.length}`
-    )
+    console.log('[Skill] Legacy migration result:', result)
   }
 
   return result

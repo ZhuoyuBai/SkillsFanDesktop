@@ -7,36 +7,15 @@ import { useAppStore } from '../stores/app.store'
 import { useSpaceStore } from '../stores/space.store'
 import { useUpdaterStore } from '../stores/updater.store'
 import { api } from '../api'
-import type { HaloConfig, ThemeMode, McpServersConfig, AISourceType, OAuthSourceConfig, ApiProvider, CustomSourceConfig, ApiKeyConfig } from '../types'
+import type { HaloConfig, ThemeMode, McpServersConfig, AISourceType, ApiProvider, CustomSourceConfig, ApiKeyConfig } from '../types'
 import { AVAILABLE_MODELS, DEFAULT_CONFIG, DEFAULT_MODEL, syncTopLevelFromActive } from '../types'
 import { Select } from '../components/ui/Select'
 import { Switch } from '../components/ui/Switch'
-import type { BrowserAutomationMode } from '@shared/types/browser-automation'
-import { resolveBrowserAutomationConfig } from '@shared/types/browser-automation'
-
-/**
- * Localized text - either a simple string or object with language codes
- */
-type LocalizedText = string | Record<string, string>
-
-// Auth provider config from product.json
-interface AuthProviderConfig {
-  type: string
-  displayName: LocalizedText
-  description: LocalizedText
-  icon: string
-  iconBgColor: string
-  recommended: boolean
-  enabled: boolean
-}
 import { CheckCircle2, XCircle } from '../components/icons/ToolIcons'
 import { McpServerList } from '../components/settings/McpServerList'
 import { SkillList } from '../components/settings/SkillList'
-import { SkillsFanAccountSection } from '../components/settings/SkillsFanAccountSection'
 import { SpaceManagementSection } from '../components/settings/SpaceManagementSection'
 import { ResetSection } from '../components/settings/ResetSection'
-import { ScheduledTasksSection } from '../components/settings/ScheduledTasksSection'
-import { RemoteAccessSection } from '../components/settings/RemoteAccessSection'
 import { ApiConfigDialog } from '../components/settings/ApiConfigDialog'
 import { useTranslation, setLanguage, getCurrentLanguage, SUPPORTED_LOCALES, type LocaleCode } from '../i18n'
 import { Loader2, LogOut, Plus, Check, Globe, Key, MessageSquare, Bot, Palette, Server, Settings as SettingsIcon, Wifi, X, Package, User, Layers, SlidersHorizontal, ArrowLeft, Database, Pencil, Trash2, type LucideIcon } from 'lucide-react'
@@ -44,6 +23,7 @@ import { usePlatform } from '../components/layout/Header'
 import { isElectron } from '../api/transport'
 import { useToastStore } from '../stores/toast.store'
 import { getProviderLogoById } from '../components/layout/ModelSelector'
+import { resolveBrowserAutomationConfig, type BrowserAutomationMode } from '@shared/types/browser-automation'
 
 // Import provider logos
 import zhipuLogo from '../assets/providers/zhipu.jpg'
@@ -258,31 +238,16 @@ function resolveProviderFormValues(config: HaloConfig | undefined, providerId: s
   }
 }
 
-/**
- * Get localized text based on current language
- */
-function getLocalizedText(value: LocalizedText): string {
-  if (typeof value === 'string') {
-    return value
-  }
-  const lang = getCurrentLanguage()
-  return value[lang] || value['en'] || Object.values(value)[0] || ''
-}
-
-// Icon mapping for dynamic rendering
-const ICON_MAP: Record<string, LucideIcon> = {
-  globe: Globe,
-  key: Key,
-  'message-square': MessageSquare,
-}
-
-// Get icon component by name
-function getIconComponent(iconName: string): LucideIcon {
-  return ICON_MAP[iconName] || Globe
-}
-
 // Settings section type
-type SettingsSection = 'ai-model' | 'display' | 'mcp' | 'skills' | 'system' | 'remote' | 'account' | 'spaces' | 'advanced'
+type SettingsSection = 'ai-model' | 'display' | 'skills' | 'system' | 'spaces'
+
+const TERMINAL_SHELL_SETTINGS_SECTIONS: SettingsSection[] = [
+  'ai-model',
+  'skills',
+  'spaces',
+  'system',
+  'display',
+]
 
 export function SettingsPage() {
   const { t } = useTranslation()
@@ -305,6 +270,12 @@ export function SettingsPage() {
     }
   }, [])
 
+  useEffect(() => {
+    if (!TERMINAL_SHELL_SETTINGS_SECTIONS.includes(activeSection)) {
+      setActiveSection('ai-model')
+    }
+  }, [activeSection])
+
   // AI Source state
   const [currentSource, setCurrentSource] = useState<AISourceType>(config?.aiSources?.current || 'custom')
   const [showCustomApiForm, setShowCustomApiForm] = useState(false)
@@ -324,17 +295,6 @@ export function SettingsPage() {
   // Selected provider in the grid - initialize from current source/config
   const [selectedProviderId, setSelectedProviderId] = useState<string>(() => resolveInitialSelectedProviderId(config))
   const initialProviderFormValues = resolveProviderFormValues(config, selectedProviderId)
-
-  // OAuth providers state (dynamic from product.json)
-  const [authProviders, setAuthProviders] = useState<AuthProviderConfig[]>([])
-  const [loginState, setLoginState] = useState<{
-    provider: string
-    status: string
-    userCode?: string
-    verificationUri?: string
-    error?: boolean
-  } | null>(null)
-  const [loggingOutProvider, setLoggingOutProvider] = useState<string | null>(null)
 
   // Custom API local state for editing
   const [apiKey, setApiKey] = useState(initialProviderFormValues.apiKey)
@@ -357,6 +317,9 @@ export function SettingsPage() {
   // System settings state
   const [autoLaunch, setAutoLaunch] = useState(config?.system?.autoLaunch || false)
   const [minimizeToTray, setMinimizeToTray] = useState(config?.system?.minimizeToTray || false)
+  const [skipClaudeLogin, setSkipClaudeLogin] = useState(
+    config?.terminal?.skipClaudeLogin ?? DEFAULT_CONFIG.terminal!.skipClaudeLogin
+  )
 
   // Advanced settings state
   const [showClearMemoryDialog, setShowClearMemoryDialog] = useState(false)
@@ -401,19 +364,10 @@ export function SettingsPage() {
     api.openDownloadPage()
   }
 
-  // Load auth providers and refresh AI sources config
+  // Refresh AI sources config on mount
   useEffect(() => {
-    // Load available auth providers from product.json
-    api.authGetProviders().then((result) => {
-      if (result.success && result.data) {
-        setAuthProviders(result.data as AuthProviderConfig[])
-      }
-    })
-
-    // Refresh AI sources config
     api.refreshAISourcesConfig().then((result) => {
       if (result.success) {
-        console.log('[Settings] AI sources config refreshed')
         api.getConfig().then((configResult) => {
           if (configResult.success) {
             setConfig(configResult.data)
@@ -421,26 +375,6 @@ export function SettingsPage() {
         })
       }
     })
-
-    // Listen for auth login progress
-    const unsubscribe = api.onAuthLoginProgress((data: { provider: string; status: string }) => {
-      setLoginState(data)
-      if (data.status === 'completed' || data.status === 'failed') {
-        // Reload config after login completes
-        setTimeout(() => {
-          api.getConfig().then((configResult) => {
-            if (configResult.success) {
-              setConfig(configResult.data)
-            }
-          })
-          setLoginState(null)
-        }, 500)
-      }
-    })
-
-    return () => {
-      unsubscribe()
-    }
   }, [])
 
   // Load system settings
@@ -503,6 +437,25 @@ export function SettingsPage() {
     } catch (error) {
       console.error('[Settings] Failed to set minimize to tray:', error)
       setMinimizeToTray(!enabled) // Revert on error
+    }
+  }
+
+  // Handle skip Claude login change
+  const handleSkipClaudeLoginChange = async (nextValue: boolean) => {
+    const previousValue = skipClaudeLogin
+    setSkipClaudeLogin(nextValue)
+    try {
+      const result = await api.setConfig({
+        terminal: { skipClaudeLogin: nextValue }
+      })
+      if (result.success && result.data) {
+        setConfig(result.data as HaloConfig)
+      } else {
+        setSkipClaudeLogin(previousValue)
+      }
+    } catch (error) {
+      console.error('[Settings] Failed to set skipClaudeLogin:', error)
+      setSkipClaudeLogin(previousValue)
     }
   }
 
@@ -704,97 +657,6 @@ export function SettingsPage() {
       aiSources: {
         ...config?.aiSources,
         current: source
-      }
-    }
-    await api.setConfig(newConfig)
-    setConfig({ ...config, ...newConfig } as HaloConfig)
-  }
-
-  // Handle OAuth login (generic - works for any provider)
-  const handleOAuthLogin = async (providerType: string) => {
-    try {
-      setLoginState({ provider: providerType, status: t('Starting login...') })
-      const result = await api.authStartLogin(providerType)
-      if (!result.success) {
-        console.error('[Settings] OAuth login start failed:', result.error)
-        setLoginState(null)
-        return
-      }
-
-      // Get state and device code info from start result
-      const { state, userCode, verificationUri } = result.data as {
-        loginUrl: string
-        state: string
-        userCode?: string
-        verificationUri?: string
-      }
-
-      // Update login state with device code info if available
-      setLoginState({
-        provider: providerType,
-        status: userCode ? t('Enter the code in your browser') : t('Waiting for login...'),
-        userCode,
-        verificationUri
-      })
-
-      // Complete login - this polls for the token until user completes login
-      const completeResult = await api.authCompleteLogin(providerType, state)
-      if (!completeResult.success) {
-        console.error('[Settings] OAuth login complete failed:', completeResult.error)
-        setLoginState({
-          provider: providerType,
-          status: t(completeResult.error || 'Login failed'),
-          error: true
-        })
-        return
-      }
-
-      // Success! Reload config
-      const configResult = await api.getConfig()
-      if (configResult.success && configResult.data) {
-        setConfig(configResult.data as HaloConfig)
-        setCurrentSource(providerType as AISourceType)
-      }
-      setLoginState(null)
-    } catch (err) {
-      console.error('[Settings] OAuth login error:', err)
-      setLoginState(null)
-    }
-  }
-
-  // Handle OAuth logout (generic - works for any provider)
-  const handleOAuthLogout = async (providerType: string) => {
-    try {
-      setLoggingOutProvider(providerType)
-      await api.authLogout(providerType)
-      // Reload config
-      const configResult = await api.getConfig()
-      if (configResult.success && configResult.data) {
-        setConfig(configResult.data as HaloConfig)
-        // Switch to custom if available
-        if (config?.aiSources?.custom?.apiKey) {
-          setCurrentSource('custom')
-        }
-      }
-    } catch (err) {
-      console.error('[Settings] OAuth logout error:', err)
-    } finally {
-      setLoggingOutProvider(null)
-    }
-  }
-
-  // Handle OAuth model change (generic - works for any provider)
-  const handleOAuthModelChange = async (providerType: string, modelId: string) => {
-    const providerConfig = config?.aiSources?.[providerType] as OAuthSourceConfig | undefined
-    if (!providerConfig) return
-
-    const newConfig = {
-      aiSources: {
-        ...config?.aiSources,
-        [providerType]: {
-          ...providerConfig,
-          model: modelId
-        }
       }
     }
     await api.setConfig(newConfig)
@@ -1018,16 +880,11 @@ export function SettingsPage() {
 
   // Navigation items configuration
   const navItems: { id: SettingsSection; icon: LucideIcon; label: string; desktopOnly?: boolean; hidden?: boolean }[] = [
-    { id: 'account', icon: User, label: t('Account'), desktopOnly: true },
     { id: 'ai-model', icon: Bot, label: t('AI Model') },
     { id: 'skills', icon: Package, label: t('Skills') },
     { id: 'spaces', icon: Layers, label: t('Spaces'), desktopOnly: true },
     { id: 'system', icon: SettingsIcon, label: t('System'), desktopOnly: true },
-    { id: 'advanced', icon: SlidersHorizontal, label: t('Advanced'), desktopOnly: true },
-    { id: 'mcp', icon: Server, label: t('MCP Servers'), hidden: true },
     { id: 'display', icon: Palette, label: t('Display & Language') },
-
-    { id: 'remote', icon: Wifi, label: t('Remote Access'), desktopOnly: true },
   ]
 
   return (
@@ -1101,108 +958,9 @@ export function SettingsPage() {
           <div className="flex-1 overflow-auto p-8">
             <div className="max-w-3xl">
 
-          {/* SkillsFan Account Section */}
-          {activeSection === 'account' && !api.isRemoteMode() && (
-          <>
-            <section className="space-y-6">
-              <SkillsFanAccountSection />
-            </section>
-
-            {/* Reset to Default Section */}
-            <ResetSection />
-          </>
-          )}
-
           {/* AI Model Section - Grid Layout */}
           {activeSection === 'ai-model' && (
           <section className="space-y-6">
-            {/* Account Login - OAuth Providers */}
-            {authProviders.filter(p => p.type !== 'custom' && p.enabled).length > 0 && (
-              <div>
-                <h3 className="text-sm text-muted-foreground mb-4">{t('Account Login')}</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {authProviders
-                    .filter(p => p.type !== 'custom' && p.enabled)
-                    .map(p => {
-                      const providerConfig = config?.aiSources?.[p.type] as OAuthSourceConfig | undefined
-                      const isLoggedIn = providerConfig?.loggedIn === true
-                      const isLoggingIn = loginState?.provider === p.type
-                      const isLoggingOut = loggingOutProvider === p.type
-                      const displayName = typeof p.displayName === 'string'
-                        ? p.displayName
-                        : (p.displayName as Record<string, string>)[getCurrentLanguage()] || (p.displayName as Record<string, string>)['en'] || p.type
-                      const description = typeof p.description === 'string'
-                        ? p.description
-                        : (p.description as Record<string, string>)[getCurrentLanguage()] || (p.description as Record<string, string>)['en'] || ''
-                      const logo = getProviderLogoById(p.type)
-
-                      return (
-                        <div key={p.type}
-                          className="flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-border">
-                          <div className="w-10 h-10 rounded-lg overflow-hidden">
-                            {logo ? (
-                              <img src={logo} alt={displayName}
-                                className="w-full h-full object-contain rounded-lg" />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center rounded-lg"
-                                style={{ backgroundColor: p.iconBgColor }}>
-                                <span className="text-white text-xs font-bold">
-                                  {displayName.slice(0, 2)}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                          <span className="text-sm font-medium">{displayName}</span>
-                          <span className="text-xs text-muted-foreground text-center">
-                            {isLoggedIn && providerConfig?.userEmail
-                              ? providerConfig.userEmail
-                              : description}
-                          </span>
-                          {isLoggedIn ? (
-                            <button onClick={() => handleOAuthLogout(p.type)} disabled={isLoggingOut}
-                              className="mt-1 px-4 py-1.5 text-xs text-muted-foreground hover:text-foreground border border-border rounded-lg transition-colors">
-                              {isLoggingOut ? <Loader2 className="w-3 h-3 animate-spin" /> : t('Log Out')}
-                            </button>
-                          ) : (
-                            <button onClick={() => handleOAuthLogin(p.type)} disabled={isLoggingIn}
-                              className="mt-1 px-4 py-1.5 text-xs bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors">
-                              {isLoggingIn ? <Loader2 className="w-3 h-3 animate-spin" /> : t('Log In')}
-                            </button>
-                          )}
-                        </div>
-                      )
-                    })}
-                </div>
-                {loginState && (
-                  <div className={`mt-3 rounded-lg p-3 text-sm ${
-                    loginState.error
-                      ? 'bg-destructive/10 text-destructive'
-                      : 'bg-secondary/50 text-muted-foreground'
-                  }`}>
-                    {loginState.error ? (
-                      <div className="space-y-2">
-                        <p>{loginState.status}</p>
-                        <button
-                          onClick={() => setLoginState(null)}
-                          className="text-xs text-muted-foreground hover:text-foreground underline"
-                        >{t('Dismiss')}</button>
-                      </div>
-                    ) : loginState.userCode ? (
-                      <div className="space-y-1">
-                        <p>{loginState.status}</p>
-                        <code className="text-primary font-mono text-lg">{loginState.userCode}</code>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>{loginState.status}</span>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-
             {/* Unified Model Config List (across all providers) */}
             {(() => {
               // Build a flat list of all configured models across all providers
@@ -1398,6 +1156,17 @@ export function SettingsPage() {
                     </p>
                   </div>
                   <Switch checked={minimizeToTray} onChange={handleMinimizeToTrayChange} />
+                </div>
+
+                {/* Skip Claude Login */}
+                <div className="flex items-center justify-between pt-4 border-t border-border">
+                  <div className="flex-1">
+                    <p className="font-medium">{t('Skip Claude login')}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {t('Takes effect after creating a new terminal window.')}
+                    </p>
+                  </div>
+                  <Switch checked={skipClaudeLogin} onChange={handleSkipClaudeLoginChange} />
                 </div>
 
                 {/* Version Update */}
@@ -1634,10 +1403,6 @@ export function SettingsPage() {
                   </div>
                 </div>
 
-                {/* Scheduled Tasks */}
-                <div className="pt-4 border-t border-border">
-                  <ScheduledTasksSection />
-                </div>
               </div>
             </section>
           )}
@@ -1844,14 +1609,6 @@ export function SettingsPage() {
           <section className="space-y-6">
             <h2 className="text-lg font-medium mb-4">{t('Space Management')}</h2>
             <SpaceManagementSection />
-          </section>
-          )}
-
-          {/* Remote Access Section */}
-          {activeSection === 'remote' && (
-          <section className="space-y-6">
-            <h2 className="text-lg font-medium mb-4">{t('Remote Access')}</h2>
-            <RemoteAccessSection config={config as Record<string, unknown>} />
           </section>
           )}
 

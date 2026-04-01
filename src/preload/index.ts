@@ -7,22 +7,11 @@ import type { ThinkingEffort } from '../shared/utils/openai-models'
 
 // Type definitions for exposed API
 export interface SkillsFanAPI {
-  // Generic Auth (provider-agnostic)
-  authGetProviders: () => Promise<IpcResponse>
-  authStartLogin: (providerType: string) => Promise<IpcResponse>
-  authCompleteLogin: (providerType: string, state: string) => Promise<IpcResponse>
-  authRefreshToken: (providerType: string) => Promise<IpcResponse>
-  authCheckToken: (providerType: string) => Promise<IpcResponse>
-  authLogout: (providerType: string) => Promise<IpcResponse>
-  onAuthLoginProgress: (callback: (data: { provider: string; status: string }) => void) => () => void
-
   // Config
   getConfig: () => Promise<IpcResponse>
-  getProductFeatures: () => Promise<IpcResponse>
   setConfig: (updates: Record<string, unknown>) => Promise<IpcResponse>
   validateApi: (apiKey: string, apiUrl: string, provider: string) => Promise<IpcResponse>
   refreshAISourcesConfig: () => Promise<IpcResponse>
-  getPublicModels: () => Promise<IpcResponse>
   resetToDefault: () => Promise<IpcResponse>
 
   // Memory
@@ -454,21 +443,6 @@ export interface SkillsFanAPI {
   }) => Promise<IpcResponse>
   loopTaskDeletePrd: (prdPath: string) => Promise<IpcResponse>
   readFile: (filePath: string) => Promise<IpcResponse>
-
-  // SkillsFan Account Auth
-  skillsfanStartLogin: () => Promise<IpcResponse>
-  skillsfanLogout: () => Promise<IpcResponse>
-  skillsfanGetUser: () => Promise<IpcResponse>
-  skillsfanGetAuthState: () => Promise<IpcResponse>
-  skillsfanIsLoggedIn: () => Promise<IpcResponse>
-  skillsfanRefreshToken: () => Promise<IpcResponse>
-  skillsfanEnsureValidToken: () => Promise<IpcResponse>
-  skillsfanGetAccessToken: () => Promise<IpcResponse>
-  skillsfanGetCredits: () => Promise<IpcResponse>
-  skillsfanRefreshCredits: () => Promise<IpcResponse>
-  onSkillsFanLoginSuccess: (callback: (data: { user: unknown }) => void) => () => void
-  onSkillsFanLoginError: (callback: (data: { error: string }) => void) => () => void
-  onSkillsFanLogout: (callback: () => void) => () => void
 }
 
 interface IpcResponse<T = unknown> {
@@ -505,23 +479,12 @@ function createEventListener(channel: string, callback: (data: unknown) => void)
 
 // Expose API to renderer
 const api: SkillsFanAPI = {
-  // Generic Auth (provider-agnostic)
-  authGetProviders: () => ipcRenderer.invoke('auth:get-providers'),
-  authStartLogin: (providerType) => ipcRenderer.invoke('auth:start-login', providerType),
-  authCompleteLogin: (providerType, state) => ipcRenderer.invoke('auth:complete-login', providerType, state),
-  authRefreshToken: (providerType) => ipcRenderer.invoke('auth:refresh-token', providerType),
-  authCheckToken: (providerType) => ipcRenderer.invoke('auth:check-token', providerType),
-  authLogout: (providerType) => ipcRenderer.invoke('auth:logout', providerType),
-  onAuthLoginProgress: (callback) => createEventListener('auth:login-progress', callback as (data: unknown) => void),
-
   // Config
   getConfig: () => ipcRenderer.invoke('config:get'),
-  getProductFeatures: () => ipcRenderer.invoke('config:get-product-features'),
   setConfig: (updates) => ipcRenderer.invoke('config:set', updates),
   validateApi: (apiKey, apiUrl, provider) =>
     ipcRenderer.invoke('config:validate-api', apiKey, apiUrl, provider),
   refreshAISourcesConfig: () => ipcRenderer.invoke('config:refresh-ai-sources'),
-  getPublicModels: () => ipcRenderer.invoke('config:get-public-models'),
   resetToDefault: () => ipcRenderer.invoke('config:reset-to-default'),
 
   // Memory
@@ -825,21 +788,6 @@ const api: SkillsFanAPI = {
   loopTaskExportPrd: (config) => ipcRenderer.invoke('loop-task:export-prd', config),
   loopTaskDeletePrd: (prdPath) => ipcRenderer.invoke('loop-task:delete-prd', prdPath),
   readFile: (filePath) => ipcRenderer.invoke('file:read', filePath),
-
-  // SkillsFan Account Auth
-  skillsfanStartLogin: () => ipcRenderer.invoke('skillsfan:start-login'),
-  skillsfanLogout: () => ipcRenderer.invoke('skillsfan:logout'),
-  skillsfanGetUser: () => ipcRenderer.invoke('skillsfan:get-user'),
-  skillsfanGetAuthState: () => ipcRenderer.invoke('skillsfan:get-auth-state'),
-  skillsfanIsLoggedIn: () => ipcRenderer.invoke('skillsfan:is-logged-in'),
-  skillsfanRefreshToken: () => ipcRenderer.invoke('skillsfan:refresh-token'),
-  skillsfanEnsureValidToken: () => ipcRenderer.invoke('skillsfan:ensure-valid-token'),
-  skillsfanGetAccessToken: () => ipcRenderer.invoke('skillsfan:get-access-token'),
-  skillsfanGetCredits: () => ipcRenderer.invoke('skillsfan:get-credits'),
-  skillsfanRefreshCredits: () => ipcRenderer.invoke('skillsfan:refresh-credits'),
-  onSkillsFanLoginSuccess: (callback) => createEventListener('skillsfan:login-success', callback as (data: unknown) => void),
-  onSkillsFanLoginError: (callback) => createEventListener('skillsfan:login-error', callback as (data: unknown) => void),
-  onSkillsFanLogout: (callback) => createEventListener('skillsfan:logout', callback as (data: unknown) => void),
 }
 
 contextBridge.exposeInMainWorld('skillsfan', api)

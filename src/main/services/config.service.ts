@@ -9,12 +9,6 @@ import { chmodSync, existsSync, mkdirSync } from 'fs'
 import { chmod as chmodAsync } from 'fs/promises'
 import { EventEmitter } from 'events'
 import { atomicWriteJsonSync, atomicWriteJson, safeReadJsonSync, safeReadJson, cleanupTmpFiles } from '../utils/atomic-write'
-import {
-  getFallbackVisibleAiSource,
-  isAiSourceHiddenByProductFeatures,
-  isSkillsFanHostedAiEnabled
-} from './ai-sources/hosted-ai-availability'
-
 // Import analytics config type
 import type { AnalyticsConfig } from './analytics/types'
 import type { AISourcesConfig, CustomSourceConfig } from '../../shared/types'
@@ -322,7 +316,7 @@ function normalizeAiSources(parsed: Record<string, any>): AISourcesConfig {
   }
 
   if (!aiSources.current) {
-    aiSources.current = isSkillsFanHostedAiEnabled() ? 'glm' : 'custom'
+    aiSources.current = 'custom'
   }
 
   const legacyApi = parsed?.api
@@ -387,10 +381,6 @@ function normalizeAiSources(parsed: Record<string, any>): AISourcesConfig {
     if (duplicatedNamedProvider) {
       delete aiSources.custom
     }
-  }
-
-  if (isAiSourceHiddenByProductFeatures(aiSources.current)) {
-    aiSources.current = getFallbackVisibleAiSource(aiSources)
   }
 
   // Migrate single custom API configs to configs[] array format

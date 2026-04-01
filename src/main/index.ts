@@ -38,9 +38,6 @@ app.commandLine.appendSwitch('disable-blink-features', 'AutomationControlled')
 
 // Single instance lock: Prevent multiple instances of the application
 // Must be called before app.whenReady()
-// Always request the lock, even in dev mode, to prevent protocol URLs
-// (skillsfan://auth/callback) from spawning a second Electron instance.
-// electron-vite dev sends SIGTERM on restart, releasing the OS-level lock.
 const gotTheLock = app.requestSingleInstanceLock()
 
 if (!gotTheLock) {
@@ -52,15 +49,7 @@ if (!gotTheLock) {
 
 // Handle second-instance event (when user tries to launch another instance)
 // Note: This event only fires on the primary instance
-// On Windows/Linux, deep link URLs are passed as command line arguments
-app.on('second-instance', (_event, commandLine) => {
-  // Check for skillsfan:// URL in command line (Windows/Linux deep links)
-  const url = commandLine.find((arg) => arg.startsWith('skillsfan://'))
-  if (url) {
-    console.log('[Main] Received skillsfan:// URL from second instance:', url)
-    handleSkillsFanUrl(url)
-  }
-
+app.on('second-instance', () => {
   // Focus the existing window when a second instance is launched
   if (mainWindow) {
     // Restore from tray/hidden state if needed
@@ -81,6 +70,7 @@ app.on('second-instance', (_event, commandLine) => {
   }
 })
 
+import { existsSync } from 'fs'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import {
@@ -89,7 +79,6 @@ import {
   cleanupExtendedServices
 } from './bootstrap'
 import { initializeApp, getConfig, getMinimizeToTray } from './services/config.service'
-import { disableRemoteAccess } from './services/remote.service'
 import { stopOpenAICompatRouter } from './openai-compat-router'
 import {
   createTray,
@@ -100,25 +89,26 @@ import {
 } from './services/tray.service'
 import { checkForUpdates } from './services/updater.service'
 import { initAnalytics } from './services/analytics'
-import { registerProtocols, handleSkillsFanUrl } from './services/protocol.service'
-import { loadAuthState } from './services/skillsfan/auth.service'
+import { registerProtocols } from './services/protocol.service'
 
 let mainWindow: BrowserWindow | null = null
 
-// ============================================================================
-// Deep Link Handling for OAuth
-// Must be registered before app.whenReady()
-// ============================================================================
+function resolvePreloadEntryPath(): string {
+  const candidates = [
+    join(__dirname, '../preload/index.mjs'),
+    join(__dirname, '../preload/index.cjs'),
+    join(__dirname, '../preload/index.js')
+  ]
 
-// macOS: Handle skillsfan:// URLs via open-url event
-app.on('open-url', (event, url) => {
-  event.preventDefault()
-
-  if (url.startsWith('skillsfan://')) {
-    console.log('[Main] Received skillsfan:// URL:', url)
-    handleSkillsFanUrl(url)
+  const resolved = candidates.find((candidate) => existsSync(candidate))
+  if (resolved) {
+    return resolved
   }
-})
+
+  console.warn('[Main] Preload entry not found, falling back to default candidate:', candidates[0])
+  return candidates[0]
+}
+
 
 /**
  * Create application menu with Check for Updates option
@@ -242,6 +232,8 @@ function createWindow(): void {
       : false
   const backgroundColor = isDarkMode ? '#0a0a0a' : '#ffffff'
 
+  const preloadPath = resolvePreloadEntryPath()
+
   // Create the browser window
   mainWindow = new BrowserWindow({
     width: 1050,
@@ -261,11 +253,35 @@ function createWindow(): void {
     } : undefined,
     backgroundColor,
     webPreferences: {
-      preload: join(__dirname, '../preload/index.mjs'),
+      preload: preloadPath,
       sandbox: false,
       contextIsolation: true,
       nodeIntegration: false
     }
+  })
+
+  mainWindow.webContents.on('preload-error', (_event, failingPreloadPath, error) => {
+    console.error('[Main] Preload script failed:', failingPreloadPath, error)
+  })
+
+  mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+    if (!isMainFrame) {
+      return
+    }
+    console.error(
+      `[Main] Renderer failed to load (${errorCode}): ${errorDescription} - ${validatedURL}`
+    )
+  })
+
+  mainWindow.webContents.on('render-process-gone', (_event, details) => {
+    console.error('[Main] Renderer process gone:', details)
+  })
+
+  mainWindow.webContents.on('console-message', (_event, level, message, line, sourceId) => {
+    if (level < 2) {
+      return
+    }
+    console.error(`[Renderer:${level}] ${sourceId}:${line} ${message}`)
   })
 
   mainWindow.on('ready-to-show', () => {
@@ -329,11 +345,8 @@ app.whenReady().then(async () => {
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.halo.app')
 
-  // Register custom protocols (halo-file://, skillsfan://, etc.)
+  // Register custom protocols (halo-file://)
   registerProtocols()
-
-  // Load persisted SkillsFan auth state
-  await loadAuthState()
 
   // Default open or close DevTools by F12 in development
   app.on('browser-window-created', (_, window) => {
@@ -342,17 +355,6 @@ app.whenReady().then(async () => {
 
   // Initialize app data directories
   await initializeApp()
-
-  // Windows: Check for skillsfan:// URL in command line on first launch
-  // (second-instance handles subsequent launches)
-  if (process.platform === 'win32') {
-    const url = process.argv.find((arg) => arg.startsWith('skillsfan://'))
-    if (url) {
-      console.log('[Main] Found skillsfan:// URL in startup args:', url)
-      // Delay to ensure window is ready
-      setTimeout(() => handleSkillsFanUrl(url), 500)
-    }
-  }
 
   // Create application menu
   createAppMenu()
@@ -415,12 +417,10 @@ app.on('window-all-closed', () => {
     return
   }
 
-  // Clean up remote access before quitting
-  disableRemoteAccess().catch(console.error)
-  // Clean up local OpenAI compat router (if started)
+  // Clean up OpenAI compat router (if started for non-Anthropic providers)
   stopOpenAICompatRouter().catch(console.error)
 
-  // Clean up extended services (AI Browser, Overlay, Search, etc.)
+  // Clean up extended services (PTY, skills, extensions)
   cleanupExtendedServices()
 
   // Clean up tray

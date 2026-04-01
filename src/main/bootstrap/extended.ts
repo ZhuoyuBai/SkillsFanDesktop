@@ -11,43 +11,20 @@
  *
  * CURRENT SERVICES:
  *   - Onboarding: First-time user guide (only needed once)
- *   - Remote: Remote access feature (optional)
- *   - Browser: Embedded browser for Content Canvas (V2 feature)
- *   - AIBrowser: AI browser automation tools (V2 feature)
- *   - Overlay: Floating UI elements (optional)
- *   - Search: Global search (optional)
- *   - Performance: Developer monitoring tools (dev only)
+ *   - PTY terminal runtime for Claude Code
+ *   - Skills registry/watchers for the visual skills manager
  *   - GitBash: Windows Git Bash setup (Windows optional)
  */
 
 import { BrowserWindow } from 'electron'
 import { registerOnboardingHandlers } from '../ipc/onboarding'
-import { registerRemoteHandlers } from '../ipc/remote'
-import { registerBrowserHandlers } from '../ipc/browser'
-import { registerAIBrowserHandlers, cleanupAIBrowserHandlers } from '../ipc/ai-browser'
-import { registerOverlayHandlers, cleanupOverlayHandlers } from '../ipc/overlay'
-import { initializeSearchHandlers, cleanupSearchHandlers } from '../ipc/search'
-import { registerPerfHandlers } from '../ipc/perf'
 import { registerGitBashHandlers, initializeGitBashOnStartup } from '../ipc/git-bash'
 import { registerSkillHandlers } from '../ipc/skill'
 import { initializeRegistry, startSkillWatcher } from '../services/skill'
-import { registerRalphHandlers } from '../ipc/ralph'
-import { registerLoopTaskHandlers } from '../ipc/loop-task'
-import { registerMemoryHandlers } from '../ipc/memory'
-import { shutdownMemory } from '../services/memory'
-import { registerFeishuHandlers } from '../ipc/feishu'
-import { registerWeChatHandlers } from '../ipc/wechat'
 import { registerExtensionHandlers } from '../ipc/extension'
 import { registerPtyHandlers } from '../ipc/pty'
 import { destroyAllPtys } from '../services/pty-manager.service'
 import { initializeExtensions as initExtensions, shutdownExtensions } from '../services/extension'
-import { FeishuChannel } from '../services/channel/adapters/feishu.channel'
-import { WeChatChannel } from '../services/channel/adapters/wechat.channel'
-import { getChannelManager } from '../services/channel'
-import { initializeSubagentRuntime, shutdownSubagentRuntime } from '../services/agent'
-import { shutdownScheduler } from '../services/scheduler.service'
-import { recoverInterruptedTasks } from '../services/loop-task.service'
-import { cancelAllRetries } from '../services/retry-handler'
 
 /**
  * Initialize extended services after window is visible
@@ -69,38 +46,14 @@ export function initializeExtendedServices(mainWindow: BrowserWindow): void {
   // Onboarding: First-time user guide, only needed once
   registerOnboardingHandlers()
 
-  // Remote: Remote access feature, optional functionality
-  registerRemoteHandlers(mainWindow)
-
-  // Browser: Embedded BrowserView for Content Canvas
-  // Note: BrowserView is created lazily when Canvas is opened
-  registerBrowserHandlers(mainWindow)
-
-  // AI Browser: AI automation tools (V2 feature)
-  // Uses lazy initialization - heavy modules loaded on first tool call
-  registerAIBrowserHandlers(mainWindow)
-
-  // Overlay: Floating UI elements (chat capsule, etc.)
-  // Already implements lazy initialization internally
-  registerOverlayHandlers(mainWindow)
-
-  // Search: Global search functionality
-  initializeSearchHandlers(mainWindow)
-
-  // Performance: Developer monitoring tools
-  registerPerfHandlers(mainWindow)
+  // Remote access, search, AI browser, overlay, and the app-native agent
+  // runtime are intentionally disabled in the terminal-first shell.
 
   // GitBash: Windows Git Bash detection and setup
   registerGitBashHandlers(mainWindow)
 
-  // Ralph: Loop task management (autonomous AI agent)
-  registerRalphHandlers(mainWindow)
-
-  // Loop Task: Persistent loop task storage
-  registerLoopTaskHandlers(mainWindow)
-
-  // Hosted subagent runtime: recover persisted run registry
-  initializeSubagentRuntime()
+  // The app-native orchestration stack (Ralph / loop tasks / hosted subagents)
+  // is retired in the terminal-first shell and is not registered here.
 
   // PTY: Embedded Claude Code CLI terminal in Canvas
   registerPtyHandlers(mainWindow)
@@ -108,43 +61,12 @@ export function initializeExtendedServices(mainWindow: BrowserWindow): void {
   // Skill: Settings and slash-command APIs
   registerSkillHandlers()
 
-  // Recover stale running loop tasks after crash/restart
-  try {
-    const recovery = recoverInterruptedTasks()
-    if (recovery.recoveredCount > 0) {
-      console.log(
-        `[Bootstrap] Recovered ${recovery.recoveredCount} interrupted loop task(s): ${recovery.recoveredTaskIds.join(', ')}`
-      )
-    }
-  } catch (err) {
-    console.error('[Bootstrap] Failed to recover interrupted loop tasks:', err)
-  }
-
-  // Memory: Memory management (clear memory)
-  registerMemoryHandlers()
-
   // Extensions: Lightweight plugin system
   registerExtensionHandlers()
   initExtensions()
 
-  // Feishu: Chat bot remote control (optional)
-  registerFeishuHandlers()
-  const feishuChannel = new FeishuChannel()
-  getChannelManager().registerChannel(feishuChannel)
-  feishuChannel.initialize().catch((err) => {
-    console.error('[Bootstrap] Feishu initialization failed:', err)
-  })
-
-  // WeChat: Personal account chat integration (optional)
-  registerWeChatHandlers()
-  const wechatChannel = new WeChatChannel()
-  getChannelManager().registerChannel(wechatChannel)
-  wechatChannel.initialize().catch((err) => {
-    console.error('[Bootstrap] WeChat initialization failed:', err)
-  })
-
   // Skill: Initialize skill registry and start file watcher
-  // Skills are loaded from 5 sources: project commands, SkillsFan, global commands, Claude skills, Agent skills
+  // Skills are loaded from 4 sources: project commands, managed Claude skills, global commands, Agent skills
   initializeRegistry()
     .then(() => {
       startSkillWatcher()
@@ -185,47 +107,12 @@ export function initializeExtendedServices(mainWindow: BrowserWindow): void {
  * Called during window-all-closed to properly release resources.
  */
 export function cleanupExtendedServices(): void {
-  shutdownSubagentRuntime()
-
   // PTY: Kill all terminal processes
   destroyAllPtys()
-
-  // AI Browser: Cleanup MCP server and browser context
-  cleanupAIBrowserHandlers()
-
-  // Overlay: Cleanup overlay BrowserView
-  cleanupOverlayHandlers()
-
-  // Search: Cancel any ongoing searches
-  cleanupSearchHandlers()
-
-  // Memory: Close SQLite database and embedding service
-  shutdownMemory().catch(() => {})
 
   // Extensions: Stop watcher and unload extensions
   shutdownExtensions()
 
-  // Scheduler: Stop all cron jobs and interval timers
-  shutdownScheduler()
-
-  // Retry handler: Cancel all pending retry timers
-  cancelAllRetries()
-
-  // Feishu: Disconnect bot
-  const feishuChannel = getChannelManager().getChannel<FeishuChannel>('feishu')
-  if (feishuChannel) {
-    feishuChannel.shutdown().catch((err) => {
-      console.error('[Bootstrap] Feishu shutdown error:', err)
-    })
-  }
-
-  // WeChat: Stop polling
-  const wechatChannel = getChannelManager().getChannel<WeChatChannel>('wechat')
-  if (wechatChannel) {
-    wechatChannel.shutdown().catch((err) => {
-      console.error('[Bootstrap] WeChat shutdown error:', err)
-    })
-  }
 
   console.log('[Bootstrap] Extended services cleaned up')
 }

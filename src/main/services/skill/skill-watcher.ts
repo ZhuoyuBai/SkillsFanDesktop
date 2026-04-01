@@ -1,18 +1,14 @@
 /**
- * Skill 文件监听器
+ * Skill file watcher.
  *
- * 监控所有技能目录变化，自动触发热重载
- * 监控目录包括：
- * - ~/.skillsfan/skills/         (SkillsFan 已安装)
- * - ~/.claude/commands/          (全局 Claude Code 命令)
- * - ~/.claude/skills/            (Claude 安装的技能)
- * - ~/.agents/skills/            (第三方 Agent 技能)
+ * Watches the native managed skill directory and the additional read-only
+ * command/skill sources that still appear in the GUI.
  */
 
 import { watch, existsSync, mkdirSync } from 'fs'
 import { join } from 'path'
 import { homedir } from 'os'
-import { getAllSkillsfanDirs, reloadSkills } from './skill-registry'
+import { getSkillsDir, reloadSkills } from './skill-registry'
 
 let watchers: ReturnType<typeof watch>[] = []
 let debounceTimer: NodeJS.Timeout | null = null
@@ -38,20 +34,15 @@ export function startSkillWatcher(): void {
   stopSkillWatcher()
 
   const home = homedir()
-  const skillsfanDirs = getAllSkillsfanDirs()
-  const claudeSkillsDir = join(home, '.claude', 'skills')
+  const managedSkillsDir = getSkillsDir()
 
   const dirsToWatch = [
-    ...skillsfanDirs,                           // ~/.skillsfan/skills/ and ~/.skillsfan-dev/skills/
-    join(home, '.claude', 'commands'),           // ~/.claude/commands/
-    claudeSkillsDir,                             // ~/.claude/skills/
-    join(home, '.agents', 'skills'),             // ~/.agents/skills/
+    managedSkillsDir,                  // ~/.claude/skills/
+    join(home, '.claude', 'commands'), // ~/.claude/commands/
+    join(home, '.agents', 'skills'),   // ~/.agents/skills/
   ]
 
-  const dirsToEnsure = new Set<string>([
-    ...skillsfanDirs,
-    claudeSkillsDir
-  ])
+  const dirsToEnsure = new Set<string>([managedSkillsDir])
 
   for (const dir of dirsToWatch) {
     if (!existsSync(dir)) {

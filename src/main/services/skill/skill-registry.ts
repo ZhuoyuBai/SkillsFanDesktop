@@ -1,22 +1,23 @@
 /**
- * Skill 注册表
+ * Skill registry.
  *
- * 管理所有已加载技能的内存缓存
- * 扫描 5 个来源（按优先级排序）：
- * 1. {project}/.claude/commands/   — 项目级（最高优先级）
- * 2. ~/.skillsfan/skills/          — SkillsFan 已安装
- * 3. ~/.claude/commands/           — 全局 Claude Code 命令
- * 4. ~/.claude/skills/             — Claude 安装的技能
- * 5. ~/.agents/skills/             — 第三方 Agent 技能
+ * The managed install target is now ~/.claude/skills.
+ * Legacy SkillsFan folders are migrated into the native Claude directory during
+ * initialization and are no longer scanned as active skill sources.
+ *
+ * Sources are loaded in priority order:
+ * 1. {project}/.claude/commands/   — project-level commands
+ * 2. ~/.claude/skills/             — managed Claude skills
+ * 3. ~/.claude/commands/           — global Claude commands
+ * 4. ~/.agents/skills/             — third-party agent skills
  */
 
 import { homedir } from 'os'
 import { join } from 'path'
 import { existsSync } from 'fs'
 import { createHash } from 'crypto'
-import { app } from 'electron'
 import { loadSkillsFromDir, loadClaudeCommands } from './skill-loader'
-import { syncNativeClaudeSkillBridges } from './native-bridge'
+import { getClaudeSkillsDir, migrateLegacySkillsToClaudeDir } from './native-bridge'
 import type { SkillInfo } from './types'
 
 // 技能缓存
@@ -30,65 +31,20 @@ let currentSpaceWorkDir: string | undefined
 
 /**
  * 获取技能目录路径（主目录，用于安装）
- * 跨平台支持：Mac/Linux/Windows
+ * 统一使用 Claude Code 原生目录，尽量减少 SkillsFan 自己的运行时干预。
  */
 export function getSkillsDir(): string {
-  const home = homedir()
-
-  // 1. 自定义目录（环境变量）
-  if (process.env.SKILLSFAN_DATA_DIR) {
-    const dataDir = process.env.SKILLSFAN_DATA_DIR
-    const dir = dataDir.startsWith('~') ? join(home, dataDir.slice(1)) : dataDir
-    return join(dir, 'skills')
-  }
-
-  // 2. 开发环境
-  if (!app.isPackaged) {
-    return join(home, '.skillsfan-dev', 'skills')
-  }
-
-  // 3. 生产环境
-  return join(home, '.skillsfan', 'skills')
-}
-
-function uniqueDirs(dirs: Array<string | undefined>): string[] {
-  return Array.from(new Set(dirs.filter((dir): dir is string => typeof dir === 'string' && dir.length > 0)))
-}
-
-/**
- * 获取所有 SkillsFan 技能目录。
- *
- * 为了兼容以下场景，始终同时扫描：
- * - 当前运行目录（可能来自 SKILLSFAN_DATA_DIR）
- * - ~/.skillsfan/skills
- * - ~/.skillsfan-dev/skills
- */
-export function getAllSkillsfanDirs(): string[] {
-  const home = homedir()
-  return uniqueDirs([
-    getSkillsDir(),
-    join(home, '.skillsfan', 'skills'),
-    join(home, '.skillsfan-dev', 'skills')
-  ])
-}
-
-/**
- * 获取备用技能目录（dev ↔ prod 互补）
- * 开发模式返回生产目录，生产模式返回开发目录
- * 当存在多个候选目录时，返回主安装目录以外的第一个目录
- */
-export function getAltSkillsDir(): string | undefined {
-  return getAllSkillsfanDirs().find((dir) => dir !== getSkillsDir())
+  return getClaudeSkillsDir()
 }
 
 /**
  * 初始化技能注册表 — 扫描所有来源
- * 优先级：项目级 > SkillsFan > 全局 Claude > Claude Skills > Agents Skills
+ * 优先级：项目级 > 托管技能 > 全局 Claude > Agents Skills
  */
 export async function initializeRegistry(spaceWorkDir?: string): Promise<void> {
   if (initialized) return
 
-  syncNativeClaudeSkillBridges()
+  migrateLegacySkillsToClaudeDir()
 
   const home = homedir()
   const seenNames = new Set<string>()
@@ -117,23 +73,17 @@ export async function initializeRegistry(spaceWorkDir?: string): Promise<void> {
     }))
   }
 
-  // ========== 2. SkillsFan installed skills ==========
-  for (const skillsfanDir of getAllSkillsfanDirs()) {
-    if (!existsSync(skillsfanDir)) continue
-    addSkills(loadSkillsFromDir(skillsfanDir, { kind: 'skillsfan' }))
+  // ========== 2. Managed native Claude skills ==========
+  const managedSkillsDir = getSkillsDir()
+  if (existsSync(managedSkillsDir)) {
+    addSkills(loadSkillsFromDir(managedSkillsDir, { kind: 'skillsfan' }))
   }
 
   // ========== 3. Global Claude Code commands ==========
   const globalCmdsDir = join(home, '.claude', 'commands')
   addSkills(loadClaudeCommands(globalCmdsDir, { kind: 'global-commands' }))
 
-  // ========== 4. Claude installed skills ==========
-  const claudeSkillsDir = join(home, '.claude', 'skills')
-  if (existsSync(claudeSkillsDir)) {
-    addSkills(loadSkillsFromDir(claudeSkillsDir, { kind: 'claude-skills' }))
-  }
-
-  // ========== 5. Third-party Agent skills ==========
+  // ========== 4. Third-party Agent skills ==========
   const agentsSkillsDir = join(home, '.agents', 'skills')
   if (existsSync(agentsSkillsDir)) {
     addSkills(loadSkillsFromDir(agentsSkillsDir, { kind: 'agents-skills' }))

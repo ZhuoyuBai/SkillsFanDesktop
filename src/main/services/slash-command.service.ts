@@ -1,23 +1,22 @@
 /**
  * Slash Command Service - Scan and return slash commands for the / popup
  *
- * Scans built-in commands and user skills from 5 paths (by priority):
+ * Scans built-in commands and user skills from 4 paths (by priority):
  * 1. {spaceDir}/.claude/commands/ *.md - Project-level Claude Code commands
  * 2. ~/.claude/commands/ *.md - Global Claude Code commands
- * 3. {skillsfanDataDir}/skills/{name}/SKILL.md - SkillsFan installed skills
- * 4. ~/.claude/skills/{name}/SKILL.md - Claude installed skills
- * 5. ~/.agents/skills/{name}/SKILL.md - Agents installed skills
+ * 3. ~/.claude/skills/{name}/SKILL.md - Managed Claude skills
+ * 4. ~/.agents/skills/{name}/SKILL.md - Agents installed skills
  */
 
 import * as fs from 'fs'
 import * as path from 'path'
 import * as os from 'os'
 import { getSpace } from './space.service'
-import { getHaloDir } from './config.service'
+import { getSkillsDir } from './skill/skill-registry'
 
 // ========== Types ==========
 
-export type CommandSourceKind = 'builtin' | 'project' | 'global' | 'skillsfan' | 'claude-skills' | 'agents-skills'
+export type CommandSourceKind = 'builtin' | 'project' | 'global' | 'skillsfan' | 'agents-skills'
 
 export interface CommandSource {
   kind: CommandSourceKind
@@ -219,28 +218,17 @@ export async function listSlashCommands(spaceId?: string): Promise<SlashCommand[
     }
   }
 
-  // 3. SkillsFan installed skills
-  const dataDir = getHaloDir()
-  const skillsDir = path.join(dataDir, 'skills')
-  const sfSkills = scanSkillMdDirs(skillsDir, { kind: 'skillsfan' })
-  for (const cmd of sfSkills) {
+  // 3. Managed Claude skills
+  const skillsDir = getSkillsDir()
+  const managedSkills = scanSkillMdDirs(skillsDir, { kind: 'skillsfan' })
+  for (const cmd of managedSkills) {
     if (!seenNames.has(cmd.name)) {
       seenNames.add(cmd.name)
       allCommands.push(cmd)
     }
   }
 
-  // 4. Claude installed skills
-  const claudeSkillsDir = path.join(homeDir, '.claude', 'skills')
-  const claudeSkills = scanSkillMdDirs(claudeSkillsDir, { kind: 'claude-skills' })
-  for (const cmd of claudeSkills) {
-    if (!seenNames.has(cmd.name)) {
-      seenNames.add(cmd.name)
-      allCommands.push(cmd)
-    }
-  }
-
-  // 5. Agents installed skills
+  // 4. Agents installed skills
   const agentsSkillsDir = path.join(homeDir, '.agents', 'skills')
   const agentsSkills = scanSkillMdDirs(agentsSkillsDir, { kind: 'agents-skills' })
   for (const cmd of agentsSkills) {

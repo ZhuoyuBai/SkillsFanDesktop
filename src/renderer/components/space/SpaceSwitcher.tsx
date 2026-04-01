@@ -48,7 +48,7 @@ export function SpaceSwitcher({ collapsed = false }: SpaceSwitcherProps) {
   // Collapsed view - just show current space icon
   if (collapsed) {
     return (
-      <div ref={dropdownRef} className="relative">
+      <div ref={dropdownRef} className="relative no-drag">
         <button
           onClick={() => setIsOpen(!isOpen)}
           className="p-2 hover:bg-muted rounded-md transition-colors"
@@ -63,7 +63,7 @@ export function SpaceSwitcher({ collapsed = false }: SpaceSwitcherProps) {
 
         {/* Dropdown menu for collapsed state */}
         {isOpen && (
-          <div className="absolute top-full left-0 mt-1 w-56 bg-popover border border-border rounded-xl shadow-lg py-2 z-50 animate-fade-in">
+          <div className="absolute top-full left-0 mt-1 w-56 bg-popover border border-border rounded-xl shadow-lg py-2 z-50 animate-fade-in no-drag">
             {renderDropdownContent()}
           </div>
         )}
@@ -127,7 +127,7 @@ export function SpaceSwitcher({ collapsed = false }: SpaceSwitcherProps) {
   }
 
   return (
-    <div ref={dropdownRef} className="relative flex-1 min-w-0">
+    <div ref={dropdownRef} className="relative flex-1 min-w-0 no-drag">
       {/* Trigger button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
@@ -146,7 +146,7 @@ export function SpaceSwitcher({ collapsed = false }: SpaceSwitcherProps) {
 
       {/* Dropdown menu */}
       {isOpen && (
-        <div className="absolute top-full left-0 mt-1 w-64 bg-popover border border-border rounded-xl shadow-lg py-2 z-50 animate-fade-in">
+        <div className="absolute top-full left-0 mt-1 w-64 bg-popover border border-border rounded-xl shadow-lg py-2 z-50 animate-fade-in no-drag">
           {renderDropdownContent()}
         </div>
       )}

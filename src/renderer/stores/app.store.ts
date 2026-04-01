@@ -7,13 +7,11 @@ import { api } from '../api'
 import i18n from '../i18n'
 import type { HaloConfig, AppView, McpServerStatus } from '../types'
 import { hasAnyAISource } from '../types'
-import type { ProductFeatures } from '../../shared/types'
 import { useSpaceStore } from './space.store'
-import { syncAIBrowserStoreWithConfig } from './ai-browser.store'
 import { createLogger } from '../lib/logger'
 
 // Settings section type (must match SettingsPage)
-export type SettingsSection = 'ai-model' | 'display' | 'mcp' | 'skills' | 'system' | 'remote' | 'account' | 'spaces' | 'advanced'
+export type SettingsSection = 'ai-model' | 'display' | 'skills' | 'system' | 'spaces'
 
 // Git Bash installation progress
 interface GitBashInstallProgress {
@@ -41,19 +39,8 @@ interface AppState {
   mockBashMode: boolean
   gitBashInstallProgress: GitBashInstallProgress
 
-  // Space view mode: chat (default GUI) or terminal (Claude Code CLI)
-  spaceViewMode: 'chat' | 'terminal'
-
   // Settings page initial section
   settingsSection: SettingsSection | null
-
-  // SkillsFan account login state (single source of truth for UI)
-  skillsfanLoggedIn: boolean
-  productFeatures: Required<ProductFeatures>
-
-  // Model selector (pre-loaded once during init, cached in store)
-  publicModels: Array<{ id: string; name: string; owned_by: string }>
-  authProviders: Array<{ type: string; displayName: string | Record<string, string>; enabled: boolean; recommended?: boolean }>
 
   // Actions
   setView: (view: AppView) => void
@@ -63,19 +50,11 @@ interface AppState {
   setConfig: (config: HaloConfig) => void
   updateConfig: (updates: Partial<HaloConfig>) => void
   setMcpStatus: (status: McpServerStatus[], timestamp: number) => void
-  setSkillsfanLoggedIn: (loggedIn: boolean) => void
-  setProductFeatures: (features: Required<ProductFeatures>) => void
-  setPublicModels: (models: Array<{ id: string; name: string; owned_by: string }>) => void
-  setAuthProviders: (providers: Array<{ type: string; displayName: string | Record<string, string>; enabled: boolean; recommended?: boolean }>) => void
 
   // Git Bash actions
   setMockBashMode: (mode: boolean) => void
   startGitBashInstall: () => Promise<void>
   refreshGitBashStatus: () => Promise<void>
-
-  // View mode actions
-  setSpaceViewMode: (mode: 'chat' | 'terminal') => void
-  toggleSpaceViewMode: () => void
 
   // Settings actions
   setSettingsSection: (section: SettingsSection | null) => void
@@ -98,12 +77,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   mcpStatusTimestamp: null,
   mockBashMode: false,
   gitBashInstallProgress: { phase: 'idle', progress: 0, message: '' },
-  spaceViewMode: 'chat',
   settingsSection: null,
-  skillsfanLoggedIn: false,
-  productFeatures: { skillsfanHostedAiEnabled: true },
-  publicModels: [],
-  authProviders: [],
 
   // Actions
   setView: (view) => {
@@ -124,34 +98,19 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setLoading: (isLoading) => set({ isLoading }),
   setError: (error) => set({ error }),
-  setConfig: (config) => {
-    syncAIBrowserStoreWithConfig(config)
-    set({ config })
-  },
+  setConfig: (config) => set({ config }),
 
   updateConfig: (updates) => {
     const currentConfig = get().config
     if (currentConfig) {
-      const nextConfig = { ...currentConfig, ...updates }
-      syncAIBrowserStoreWithConfig(nextConfig)
-      set({ config: nextConfig })
+      set({ config: { ...currentConfig, ...updates } })
     }
   },
 
   setMcpStatus: (status, timestamp) => {
     set({ mcpStatus: status, mcpStatusTimestamp: timestamp })
   },
-  setSkillsfanLoggedIn: (loggedIn) => set({ skillsfanLoggedIn: loggedIn }),
-  setProductFeatures: (productFeatures) => set({ productFeatures }),
-  setPublicModels: (models) => set({ publicModels: models }),
-  setAuthProviders: (providers) => set({ authProviders: providers }),
-
   // Settings actions
-  setSpaceViewMode: (mode) => set({ spaceViewMode: mode }),
-  toggleSpaceViewMode: () => {
-    const current = get().spaceViewMode
-    set({ spaceViewMode: current === 'chat' ? 'terminal' : 'chat' })
-  },
   setSettingsSection: (section) => set({ settingsSection: section }),
 
   openSettingsWithSection: (section) => {
@@ -320,32 +279,6 @@ export const useAppStore = create<AppState>((set, get) => ({
             // Non-critical, ignore errors
           })
 
-          // Pre-load SkillsFan login state, public models, and auth providers (for model selector)
-          api.skillsfanGetAuthState().then((result) => {
-            if (result.success && result.data) {
-              set({ skillsfanLoggedIn: !!(result.data as any).isLoggedIn })
-            }
-          }).catch(() => {})
-
-          api.getProductFeatures().then((result) => {
-            if (result.success && result.data) {
-              set({ productFeatures: result.data as Required<ProductFeatures> })
-            }
-          }).catch(() => {})
-
-          api.getPublicModels().then((result) => {
-            if (result.success && result.data) {
-              set({ publicModels: result.data as Array<{ id: string; name: string; owned_by: string }> })
-              appLogger.debug('[Store] Public models pre-loaded:', (result.data as any[]).length)
-            }
-          }).catch(() => {})
-
-          api.authGetProviders().then((result) => {
-            if (result.success && result.data) {
-              set({ authProviders: result.data as any[] })
-              appLogger.debug('[Store] Auth providers pre-loaded:', (result.data as any[]).length)
-            }
-          }).catch(() => {})
         }
       } else {
         appLogger.error('[Store] Failed to load config:', response.error)

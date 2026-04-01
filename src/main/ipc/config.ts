@@ -8,15 +8,10 @@ import path from 'path'
 import { getConfigAsync, saveConfigAsync, validateApiConnection } from '../services/config.service'
 import { getAISourceManager } from '../services/ai-sources'
 import { setIsQuitting } from '../services/tray.service'
-import { fetchPublicModels } from '../services/skillsfan/models.service'
 import { ipcHandle } from './utils'
 
 export function registerConfigHandlers(): void {
   ipcHandle('config:get', () => getConfigAsync())
-  ipcHandle('config:get-product-features', async () => {
-    const { getProductFeatures } = await import('../controllers/config.controller')
-    return getProductFeatures()
-  })
 
   // Save configuration
   ipcMain.handle('config:set', async (_event, updates: Record<string, unknown>) => {
@@ -67,8 +62,6 @@ export function registerConfigHandlers(): void {
     await manager.refreshAllConfigs()
     return getConfigAsync()
   })
-
-  ipcHandle('config:get-public-models', () => fetchPublicModels())
 
   // Reset to default settings
   ipcMain.handle('config:reset-to-default', async () => {

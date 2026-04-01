@@ -3,9 +3,9 @@
  */
 
 import { join } from 'path'
+import { randomUUID } from 'crypto'
 import { existsSync, mkdirSync, writeFileSync, readFileSync } from 'fs'
 import { getSpace } from './space.service'
-import { v4 as uuidv4 } from 'uuid'
 
 interface Conversation {
   id: string
@@ -84,7 +84,7 @@ export function saveOnboardingConversation(
 
     // Create conversation
     const now = new Date().toISOString()
-    const conversationId = uuidv4()
+    const conversationId = randomUUID()
 
     const conversation: Conversation = {
       id: conversationId,
@@ -92,13 +92,13 @@ export function saveOnboardingConversation(
       title: 'Welcome to Halo',
       messages: [
         {
-          id: uuidv4(),
+          id: randomUUID(),
           role: 'user',
           content: userPrompt,
           timestamp: now
         },
         {
-          id: uuidv4(),
+          id: randomUUID(),
           role: 'assistant',
           content: aiResponse,
           timestamp: now

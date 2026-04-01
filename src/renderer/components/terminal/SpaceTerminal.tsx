@@ -1,13 +1,15 @@
 /**
- * SpaceTerminal - Multi-session Claude Code terminal workspace for a space.
+ * SpaceTerminal - Terminal-first workspace with a left history rail.
  *
- * Provides a lightweight tab strip with a plus button so users can run
- * multiple Claude Code terminal sessions in parallel inside Terminal Mode.
+ * The left sidebar keeps space management and terminal session history visible,
+ * while the active Claude Code terminal stays on the right.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Plus, Terminal as TerminalIcon, X } from 'lucide-react'
+import { History, Settings, SquarePen, Terminal as TerminalIcon, X } from 'lucide-react'
 import { useTranslation } from '../../i18n'
+import { useAppStore } from '../../stores/app.store'
+import { SpaceSwitcher } from '../space/SpaceSwitcher'
 import { TerminalSessionPane } from './TerminalSessionPane'
 
 interface SpaceTerminalProps {
@@ -20,6 +22,7 @@ interface TerminalWorkspaceSession {
   sequence?: number
   defaultTitle: string
   customTitle?: string
+  createdAt: number
 }
 
 const TERMINAL_ID_PREFIX = 'space-terminal-'
@@ -30,6 +33,7 @@ function buildTerminalId(spaceId: string, sequence: number): string {
 
 export function SpaceTerminal({ spaceId }: SpaceTerminalProps) {
   const { t } = useTranslation()
+  const { setView } = useAppStore()
   const sequenceRef = useRef(0)
   const initialSessionsRef = useRef<TerminalWorkspaceSession[] | null>(null)
   const previousSpaceIdRef = useRef(spaceId)
@@ -41,7 +45,8 @@ export function SpaceTerminal({ spaceId }: SpaceTerminalProps) {
       id: buildTerminalId(spaceId, 1),
       kind: 'local',
       sequence: 1,
-      defaultTitle: t('Claude Code')
+      defaultTitle: t('Untitled task'),
+      createdAt: Date.now()
     }]
   }
 
@@ -58,12 +63,12 @@ export function SpaceTerminal({ spaceId }: SpaceTerminalProps) {
       kind: 'local',
       sequence,
       defaultTitle: sequence === 1
-        ? t('Claude Code')
-        : t('Claude Code {{number}}', { number: sequence })
+        ? t('Untitled task')
+        : t('Untitled task {{number}}', { number: sequence }),
+      createdAt: Date.now()
     }
   }, [spaceId, t])
 
-  // Initialize a fresh terminal workspace when switching spaces.
   useEffect(() => {
     if (previousSpaceIdRef.current === spaceId) {
       return
@@ -74,12 +79,24 @@ export function SpaceTerminal({ spaceId }: SpaceTerminalProps) {
     const initialSession = createSession()
     setSessions([initialSession])
     setActiveSessionId(initialSession.id)
-  }, [createSession])
+    setEditingSessionId(null)
+    setDraftTitle('')
+  }, [createSession, spaceId])
+
+  const renderSessionTitle = useCallback((session: TerminalWorkspaceSession) => {
+    if (session.customTitle?.trim()) {
+      return session.customTitle.trim()
+    }
+
+    return session.defaultTitle
+  }, [])
 
   const handleNewTerminal = useCallback(() => {
     const session = createSession()
     setSessions((prev) => [...prev, session])
     setActiveSessionId(session.id)
+    setEditingSessionId(null)
+    setDraftTitle('')
   }, [createSession])
 
   const handleCloseTerminal = useCallback((terminalId: string) => {
@@ -106,14 +123,6 @@ export function SpaceTerminal({ spaceId }: SpaceTerminalProps) {
 
       return remaining
     })
-  }, [])
-
-  const renderSessionTitle = useCallback((session: TerminalWorkspaceSession) => {
-    if (session.customTitle?.trim()) {
-      return session.customTitle.trim()
-    }
-
-    return session.defaultTitle
   }, [])
 
   const startRenaming = useCallback((session: TerminalWorkspaceSession) => {
@@ -146,92 +155,124 @@ export function SpaceTerminal({ spaceId }: SpaceTerminalProps) {
   }, [editingSessionId])
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col bg-background">
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-card/60 flex-shrink-0">
-        <div className="min-w-0 flex-1 overflow-x-auto">
-          <div className="flex items-center gap-2 min-w-max">
-            {sessions.map((session) => {
-              const isActive = session.id === activeSessionId
-              const title = renderSessionTitle(session)
-              const canRename = true
+    <div className="flex h-full min-h-0 w-full min-w-0 flex-1 bg-background">
+      <aside className="w-[280px] flex-shrink-0 border-r border-border bg-card/50">
+        <div className="flex h-full flex-col">
+          <div className="border-b border-border p-3">
+            <div className="rounded-xl border border-border bg-background px-3 py-2 shadow-sm">
+              <SpaceSwitcher />
+            </div>
 
-              return (
-                <div
-                  key={session.id}
-                  className={
-                    isActive
-                      ? 'group flex items-center gap-1 rounded-lg border border-border bg-background px-2 py-1.5 shadow-sm'
-                      : 'group flex items-center gap-1 rounded-lg border border-transparent px-2 py-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors'
-                  }
-                >
-                  <div
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => setActiveSessionId(session.id)}
-                    onDoubleClick={() => {
-                      if (canRename) {
-                        startRenaming(session)
+            <div className="mt-3">
+              <button
+                onClick={handleNewTerminal}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+              >
+                <SquarePen className="w-4 h-4" />
+                {t('New task')}
+              </button>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 px-4 py-3 text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
+            <History className="w-3.5 h-3.5" />
+            <span>{t('History')}</span>
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-2 pb-3">
+            {sessions.length > 0 ? (
+              <div className="space-y-1">
+                {sessions.map((session) => {
+                  const isActive = session.id === activeSessionId
+                  const title = renderSessionTitle(session)
+
+                  return (
+                    <div
+                      key={session.id}
+                      className={
+                        isActive
+                          ? 'group rounded-xl border border-border bg-background px-3 py-2 shadow-sm'
+                          : 'group rounded-xl border border-transparent px-3 py-2 hover:bg-secondary/60 transition-colors'
                       }
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault()
-                        setActiveSessionId(session.id)
-                      }
-                    }}
-                    className="flex min-w-0 items-center gap-2 cursor-pointer"
-                    title={title}
-                  >
-                    <TerminalIcon className="w-4 h-4 flex-shrink-0" />
-                    {canRename && editingSessionId === session.id ? (
-                      <input
-                        ref={renameInputRef}
-                        value={draftTitle}
-                        onChange={(e) => setDraftTitle(e.target.value)}
-                        onClick={(e) => e.stopPropagation()}
-                        onDoubleClick={(e) => e.stopPropagation()}
-                        onBlur={() => commitRename(session.id)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault()
-                            commitRename(session.id)
-                          } else if (e.key === 'Escape') {
-                            e.preventDefault()
-                            cancelRename()
-                          }
-                        }}
-                        className="w-[180px] rounded border border-border bg-background px-2 py-0.5 text-sm font-medium text-foreground outline-none focus:border-primary"
-                        aria-label={t('Rename terminal')}
-                      />
-                    ) : (
-                      <span className="max-w-[180px] truncate text-sm font-medium">{title}</span>
-                    )}
-                  </div>
-                  <button
-                    onClick={() => handleCloseTerminal(session.id)}
-                    className="rounded p-1 text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
-                    title={t('Close terminal')}
-                    aria-label={t('Close terminal')}
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
+                    >
+                      <div className="flex items-start gap-2">
+                        <button
+                          onClick={() => setActiveSessionId(session.id)}
+                          onDoubleClick={() => startRenaming(session)}
+                          className="flex min-w-0 flex-1 items-start gap-2 text-left"
+                          title={title}
+                        >
+                          <TerminalIcon className="mt-0.5 h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                          <div className="min-w-0 flex-1">
+                            {editingSessionId === session.id ? (
+                              <input
+                                ref={renameInputRef}
+                                value={draftTitle}
+                                onChange={(e) => setDraftTitle(e.target.value)}
+                                onClick={(e) => e.stopPropagation()}
+                                onDoubleClick={(e) => e.stopPropagation()}
+                                onBlur={() => commitRename(session.id)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault()
+                                    commitRename(session.id)
+                                  } else if (e.key === 'Escape') {
+                                    e.preventDefault()
+                                    cancelRename()
+                                  }
+                                }}
+                                className="w-full rounded border border-border bg-background px-2 py-1 text-sm font-medium text-foreground outline-none focus:border-primary"
+                                aria-label={t('Rename terminal')}
+                              />
+                            ) : (
+                              <>
+                                <div className="truncate text-sm font-medium text-foreground">{title}</div>
+                                <div className="mt-0.5 text-xs text-muted-foreground">
+                                  {new Date(session.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        </button>
+
+                        <button
+                          onClick={() => handleCloseTerminal(session.id)}
+                          className="rounded p-1 text-muted-foreground opacity-0 transition-all hover:bg-secondary hover:text-foreground group-hover:opacity-100"
+                          title={t('Close terminal')}
+                          aria-label={t('Close terminal')}
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="rounded-xl border border-dashed border-border px-4 py-6 text-center">
+                <div className="text-sm font-medium text-foreground">{t('No terminals open')}</div>
+                <div className="mt-1 text-xs text-muted-foreground">
+                  {t('Create a new Claude Code terminal to start another session.')}
                 </div>
-              )
-            })}
+              </div>
+            )}
+          </div>
+
+          <div className="border-t border-border p-3">
+            <button
+              onClick={() => setView('settings')}
+              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
+              title={t('Settings')}
+              aria-label={t('Settings')}
+            >
+              <Settings className="w-4 h-4" />
+              <span>{t('Settings')}</span>
+            </button>
           </div>
         </div>
+      </aside>
 
-        <button
-          onClick={handleNewTerminal}
-          className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-background text-foreground hover:bg-secondary transition-colors flex-shrink-0"
-          title={t('New terminal')}
-          aria-label={t('New terminal')}
-        >
-          <Plus className="w-4 h-4" />
-        </button>
-      </div>
-
-      <div className="relative flex-1 min-h-0">
+      <section className="relative flex min-w-0 flex-1 flex-col">
         {sessions.length > 0 ? (
           sessions.map((session) => (
             <TerminalSessionPane
@@ -255,13 +296,13 @@ export function SpaceTerminal({ spaceId }: SpaceTerminalProps) {
                 onClick={handleNewTerminal}
                 className="mt-4 inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
               >
-                <Plus className="w-4 h-4" />
-                {t('Open Claude Code')}
+                <SquarePen className="w-4 h-4" />
+                {t('New task')}
               </button>
             </div>
           </div>
         )}
-      </div>
+      </section>
     </div>
   )
 }

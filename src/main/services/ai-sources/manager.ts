@@ -32,18 +32,8 @@ import { getConfig, saveConfig } from '../config.service'
 import { getCustomProvider } from './providers/custom.provider'
 import { getGitHubCopilotProvider } from './providers/github-copilot.provider'
 import { getOpenAICodexProvider } from './providers/openai-codex.provider'
-import { createAllSkillsFanProviders, getOAuthToCustomFallbackMap } from './providers/skillsfan-providers'
 import { loadAuthProvidersAsync, isOAuthProvider as isOAuthProviderCheck, type LoadedProvider } from './auth-loader'
-import { isSkillsFanHostedAiEnabled } from './hosted-ai-availability'
 import { decryptString, decryptTokens } from '../secure-storage.service'
-
-/**
- * Fallback mapping: OAuth provider → custom API provider
- * Auto-generated from SkillsFan proxy provider configs.
- * When an OAuth provider is not configured (user not logged in),
- * try the corresponding custom API provider if user has configured an API key.
- */
-const OAUTH_TO_CUSTOM_FALLBACK = getOAuthToCustomFallbackMap()
 
 /**
  * Extended OAuth provider interface for token management
@@ -70,13 +60,6 @@ class AISourceManager {
     this.registerProvider(getCustomProvider())
     this.registerProvider(getGitHubCopilotProvider())
     this.registerProvider(getOpenAICodexProvider())
-    // Keep hosted proxy provider implementations in the codebase, but hide them
-    // entirely in buyout builds where SkillsFan-hosted AI is disabled.
-    if (isSkillsFanHostedAiEnabled()) {
-      for (const provider of createAllSkillsFanProviders()) {
-        this.registerProvider(provider)
-      }
-    }
 
     // Start async initialization (optional providers + dynamic loading)
     this.initPromise = this.initializeAsync()
@@ -220,18 +203,8 @@ class AISourceManager {
 
   /**
    * Try falling back to a custom API provider when an OAuth provider fails.
-   * e.g., when 'glm' OAuth is not configured, try 'zhipu' custom API key.
    */
-  private tryCustomApiFallback(aiSources: AISourcesConfig): BackendRequestConfig | null {
-    const fallbackKey = OAUTH_TO_CUSTOM_FALLBACK[aiSources.current]
-    if (!fallbackKey) return null
-
-    const fallbackConfig = (aiSources as Record<string, any>)[fallbackKey]
-    if (fallbackConfig && typeof fallbackConfig === 'object' && 'apiKey' in fallbackConfig && fallbackConfig.apiKey) {
-      console.log(`[AISourceManager] OAuth provider ${aiSources.current} unavailable, falling back to custom API: ${fallbackKey}`)
-      return this.getDynamicCustomBackendConfig(fallbackConfig)
-    }
-
+  private tryCustomApiFallback(_aiSources: AISourcesConfig): BackendRequestConfig | null {
     return null
   }
 

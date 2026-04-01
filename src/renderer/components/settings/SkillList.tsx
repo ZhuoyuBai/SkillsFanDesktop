@@ -1,7 +1,7 @@
 /**
  * Skill List Component
- * Grid layout with custom PNG icons for each skill card
- * Sources: SkillsFan, Claude commands (project/global), Claude skills, Agent skills
+ * Grid layout with custom PNG icons for each skill card.
+ * Sources: managed Claude skills, Claude commands (project/global), Agent skills
  */
 
 import { useState, useEffect } from 'react'
@@ -26,7 +26,7 @@ import { SkillIconPicker } from './SkillIconPicker'
 
 // Skill info type from backend
 interface SkillSource {
-  kind: 'skillsfan' | 'project-commands' | 'global-commands' | 'claude-skills' | 'agents-skills'
+  kind: 'skillsfan' | 'project-commands' | 'global-commands' | 'agents-skills'
   projectDir?: string
 }
 

@@ -19,7 +19,6 @@ import { tmpdir } from 'os'
 import AdmZip from 'adm-zip'
 import { getSkill, getSkillsDir, invalidateSkillsCache } from './skill-registry'
 import { parseFrontmatter } from './frontmatter'
-import { syncNativeClaudeSkillBridges } from './native-bridge'
 
 // Validation errors
 export class SkillValidationError extends Error {
@@ -160,7 +159,6 @@ function rewriteSkillNameInFrontmatter(content: string, nextSkillName: string): 
 }
 
 function refreshSkillRuntimeState(): void {
-  syncNativeClaudeSkillBridges()
   invalidateSkillsCache()
 }
 

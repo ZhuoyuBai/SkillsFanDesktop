@@ -26,8 +26,7 @@ import {
 import { dirname, join } from 'path'
 import { app, BrowserWindow, nativeTheme } from 'electron'
 import { getConfig, getHaloDir } from './config.service'
-import { getApiCredentialsForSource, getWorkingDir } from './agent/helpers'
-import { resolveSdkTransport } from './agent/sdk-options'
+import { getApiCredentialsForSource, getWorkingDir, resolveSdkTransport } from './pty-credentials'
 
 // Lazy-loaded to avoid native module issues at import time
 let pty: typeof import('node-pty') | null = null

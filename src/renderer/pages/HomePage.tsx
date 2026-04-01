@@ -158,14 +158,14 @@ export function HomePage() {
             {t('Aimless time, ideas will crystallize here')}
           </p>
 
-          {/* CTA Button - Claude Code style: subtle, not flashy */}
+          {/* CTA Button - open the terminal workspace for the selected space */}
           <button
             data-onboarding="halo-space"
             onClick={() => haloSpace && handleSpaceClick(haloSpace)}
             disabled={!haloSpace}
             className="px-8 py-3.5 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl text-sm font-semibold transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {t('Enter Halo')}
+            {t('Open Claude Code')}
           </button>
         </section>
 

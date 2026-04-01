@@ -60,7 +60,7 @@ export function TerminalStatusOverlay({
               className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm text-foreground hover:bg-secondary transition-colors"
             >
               <Settings className="w-4 h-4" />
-              {t('Terminal Settings')}
+              {t('Settings')}
             </button>
             <button
               onClick={onRestart}

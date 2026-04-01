@@ -11,7 +11,6 @@ export {
   hasSkills,
   getSkillsSignature,
   getSkillsDir,
-  getAllSkillsfanDirs,
   reloadSkills,
   updateSpaceWorkDir,
   ensureSkillsInitialized,
@@ -20,9 +19,7 @@ export {
 
 export { startSkillWatcher, stopSkillWatcher } from './skill-watcher'
 
-export { createSkillMcpServer } from './skill-mcp-server'
-
-export { getClaudeSkillsDir, syncNativeClaudeSkillBridges } from './native-bridge'
+export { getClaudeSkillsDir, migrateLegacySkillsToClaudeDir } from './native-bridge'
 
 export {
   installSkill,

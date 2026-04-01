@@ -6,10 +6,9 @@
  * 技能来源
  */
 export type SkillSource =
-  | { kind: 'skillsfan' }                              // ~/.skillsfan/skills/
+  | { kind: 'skillsfan' }                              // Managed by SkillsFan UI, stored in ~/.claude/skills/
   | { kind: 'project-commands'; projectDir: string }   // {project}/.claude/commands/
   | { kind: 'global-commands' }                        // ~/.claude/commands/
-  | { kind: 'claude-skills' }                          // ~/.claude/skills/
   | { kind: 'agents-skills' }                          // ~/.agents/skills/
 
 /**

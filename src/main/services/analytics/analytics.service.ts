@@ -9,8 +9,8 @@
  */
 
 import { app } from 'electron'
+import { randomUUID } from 'crypto'
 import { is } from '@electron-toolkit/utils'
-import { v4 as uuidv4 } from 'uuid'
 import type {
   AnalyticsEvent,
   AnalyticsEventName,
@@ -150,7 +150,7 @@ class AnalyticsService {
     // Create new config if not exists
     if (!config.analytics) {
       const newAnalyticsConfig: AnalyticsConfig = {
-        userId: uuidv4(),
+        userId: randomUUID(),
         lastVersion: currentVersion
       }
 

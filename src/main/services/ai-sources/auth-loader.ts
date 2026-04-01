@@ -15,7 +15,6 @@ import { existsSync, readFileSync } from 'fs'
 import { app } from 'electron'
 import type { AISourceProvider, OAuthAISourceProvider } from '../../../shared/interfaces'
 import type { AISourceType, ProductFeatures } from '../../../shared/types'
-import { isSkillsFanHostedProviderType } from '../../../shared/constants/providers'
 
 // ============================================================================
 // Types
@@ -82,12 +81,8 @@ export function normalizeProductFeatures(features?: ProductFeatures): Required<P
   }
 }
 
-function isProviderEnabledByProductFeatures(providerType: AISourceType, features?: ProductFeatures): boolean {
-  if (normalizeProductFeatures(features).skillsfanHostedAiEnabled) {
-    return true
-  }
-
-  return !isSkillsFanHostedProviderType(providerType)
+function isProviderEnabledByProductFeatures(_providerType: AISourceType, _features?: ProductFeatures): boolean {
+  return true
 }
 
 /**

@@ -29,7 +29,21 @@ import type {
   OAuthCompleteResult,
   AISourceUserInfo
 } from '../../../../shared/types'
-import { generateCodeVerifier, generateCodeChallenge } from '../../skillsfan/pkce'
+// ============================================================================
+// PKCE (RFC 7636) utilities for OAuth
+// ============================================================================
+
+function base64URLEncode(buffer: Buffer): string {
+  return buffer.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '')
+}
+
+function generateCodeVerifier(): string {
+  return base64URLEncode(crypto.randomBytes(32))
+}
+
+function generateCodeChallenge(verifier: string): string {
+  return base64URLEncode(crypto.createHash('sha256').update(verifier).digest())
+}
 
 // ============================================================================
 // Constants

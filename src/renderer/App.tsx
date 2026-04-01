@@ -1,36 +1,29 @@
 /**
- * Halo - Main App Component
+ * SkillsFan - Main App Component
+ *
+ * The desktop app is a terminal-first shell around Claude Code.
+ * Renderer responsibilities stay focused on app bootstrap, settings,
+ * and terminal workspace navigation.
  */
 
-import { useEffect, useRef, Suspense, lazy } from 'react'
+import { useEffect, Suspense, lazy } from 'react'
 import { useAppStore } from './stores/app.store'
-import { useChatStore } from './stores/chat.store'
 import { useOnboardingStore } from './stores/onboarding.store'
-import { initAIBrowserStoreListeners } from './stores/ai-browser.store'
-import { initPerfStoreListeners } from './stores/perf.store'
 import { useUpdaterStore, simulateUpdater } from './stores/updater.store'
-import { useSpaceStore } from './stores/space.store'
-import { useSearchStore } from './stores/search.store'
 import { SplashScreen } from './components/splash/SplashScreen'
 import { SetupFlow } from './components/setup/SetupFlow'
 import { GitBashSetup } from './components/setup/GitBashSetup'
-import { SearchPanel } from './components/search/SearchPanel'
-import { SearchHighlightBar } from './components/search/SearchHighlightBar'
 import { OnboardingOverlay } from './components/onboarding'
 import { UpdateNotification } from './components/updater/UpdateNotification'
 import { Toaster } from './components/ui/Toaster'
 import { api } from './api'
 import { logger } from './lib/logger'
-import type { AgentEventBase, Thought, ToolCall, HaloConfig } from './types'
+import type { HaloConfig } from './types'
 import { hasAnyAISource } from './types'
 
-// Lazy load heavy page components for better initial load performance
-// These pages contain complex components (chat, markdown, code highlighting, etc.)
 const SpacePage = lazy(() => import('./pages/SpacePage').then(m => ({ default: m.SpacePage })))
 const SettingsPage = lazy(() => import('./pages/SettingsPage').then(m => ({ default: m.SettingsPage })))
 
-
-// Page loading fallback - minimal spinner that matches app style
 function PageLoader() {
   return (
     <div className="h-screen w-screen flex items-center justify-center bg-background">
@@ -42,20 +35,19 @@ function PageLoader() {
   )
 }
 
-// Theme colors for titleBarOverlay
 const THEME_COLORS = {
   light: { color: '#ffffff', symbolColor: '#1a1a1a' },
   dark: { color: '#0a0a0a', symbolColor: '#ffffff' }
 }
 
-// Apply theme to document and sync to localStorage (for anti-flash on reload)
 function applyTheme(theme: 'light' | 'dark' | 'system') {
   const root = document.documentElement
 
-  // Save to localStorage for anti-flash script
   try {
     localStorage.setItem('skillsfan-theme', theme)
-  } catch (e) { /* ignore */ }
+  } catch {
+    // Ignore storage failures in restricted environments.
+  }
 
   let isDark: boolean
   if (theme === 'system') {
@@ -66,42 +58,16 @@ function applyTheme(theme: 'light' | 'dark' | 'system') {
     root.classList.toggle('light', theme === 'light')
   }
 
-  // Update titleBarOverlay colors (Windows/Linux only)
   const colors = isDark ? THEME_COLORS.dark : THEME_COLORS.light
   api.setTitleBarOverlay(colors).catch(() => {
-    // Ignore errors - may not be supported on current platform
+    // Ignore unsupported platforms.
   })
 }
 
 export default function App() {
-  const { view, config, initialize, setMcpStatus, setView, setConfig } = useAppStore()
-  const {
-    handleAgentStart,
-    handleAgentMessage,
-    handleAgentToolCall,
-    handleAgentToolResult,
-    handleAgentToolApprovalResolved,
-    handleAgentError,
-    handleAgentComplete,
-    handleAgentThought,
-    handleAgentCompact,
-    handleAgentStatus,
-    handleAgentUserQuestion,
-    handleAgentUserQuestionAnswered,
-    handleAgentTaskUpdate,
-    handleAgentSubagentUpdate,
-    currentSpaceId,
-    setCurrentSpace: setChatCurrentSpace,
-    loadConversations,
-    selectConversation
-  } = useChatStore()
+  const { view, config, initialize, setView, setConfig } = useAppStore()
   const { initialize: initializeOnboarding } = useOnboardingStore()
-  const { isSearchOpen, closeSearch, isHighlightBarVisible, hideHighlightBar, goToPreviousResult, goToNextResult, openSearch } = useSearchStore()
 
-  // For search result navigation
-  const { spaces, haloSpace, setCurrentSpace: setSpaceStoreCurrentSpace } = useSpaceStore()
-
-  // Initialize app on mount - wait for backend extended services to be ready
   useEffect(() => {
     let initialized = false
     const startTime = Date.now()
@@ -115,22 +81,18 @@ export default function App() {
       logger.debug(`[App] Starting initialization (trigger: ${trigger}, waited: ${waitTime}ms)`)
 
       await initialize()
-      // Initialize onboarding after app config is loaded
       await initializeOnboarding()
     }
 
-    // Listen for extended services ready event from main process
     const unsubscribe = api.onBootstrapExtendedReady((data) => {
       logger.debug('[App] Received bootstrap:extended-ready', data)
-      doInit('event')
+      void doInit('event')
     })
 
-    // Fallback timeout - if event not received in 5 seconds, initialize anyway
-    // This prevents the app from being stuck if something goes wrong
     const fallbackTimeout = setTimeout(() => {
       if (!initialized) {
         logger.warn('[App] Bootstrap timeout after 10000ms, force initializing...')
-        doInit('timeout')
+        void doInit('timeout')
       }
     }, 10000)
 
@@ -140,13 +102,10 @@ export default function App() {
     }
   }, [initialize, initializeOnboarding])
 
-  // Theme switching
   useEffect(() => {
-    // Default to 'light' before config loads, then use config value
     const theme = config?.appearance?.theme || 'light'
     applyTheme(theme)
 
-    // Listen for system theme changes when using 'system' mode
     if (theme === 'system') {
       const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
       const handleChange = () => applyTheme('system')
@@ -155,7 +114,6 @@ export default function App() {
     }
   }, [config?.appearance?.theme])
 
-  // Connect WebSocket for remote mode
   useEffect(() => {
     if (api.isRemoteMode()) {
       logger.debug('[App] Remote mode detected, connecting WebSocket...')
@@ -163,431 +121,39 @@ export default function App() {
     }
   }, [])
 
-  // Initialize AI Browser IPC listeners for active view sync
-  useEffect(() => {
-    logger.debug('[App] Initializing AI Browser store listeners')
-    initPerfStoreListeners()
-    const cleanup = initAIBrowserStoreListeners()
-    return cleanup
-  }, [])
-
-  // Initialize updater store listeners
   useEffect(() => {
     const cleanup = useUpdaterStore.getState().init()
 
-    // Expose simulate function in dev mode for testing
     if (import.meta.env.DEV) {
-      ;(window as any).__updaterSimulate = simulateUpdater
+      ;(window as typeof window & { __updaterSimulate?: typeof simulateUpdater }).__updaterSimulate = simulateUpdater
     }
 
     return cleanup
   }, [])
 
-  // Register agent event listeners (global - handles events for all conversations)
-  useEffect(() => {
-    logger.debug('[App] Registering agent event listeners')
 
-    // Agent start - message actually begins executing (after queue wait)
-    const unsubStart = api.onAgentStart((data) => {
-      handleAgentStart(data as AgentEventBase)
-    })
-
-    // Primary thought listener - handles all agent reasoning events
-    const unsubThought = api.onAgentThought((data) => {
-      logger.debug('[App] Received agent:thought event:', data)
-      handleAgentThought(data as AgentEventBase & { thought: Thought })
-    })
-
-    // Message events (with session IDs)
-    const unsubMessage = api.onAgentMessage((data) => {
-      logger.debug('[App] Received agent:message event:', data)
-      handleAgentMessage(data as AgentEventBase & { content: string; isComplete: boolean })
-    })
-
-    const unsubToolCall = api.onAgentToolCall((data) => {
-      logger.debug('[App] Received agent:tool-call event:', data)
-      handleAgentToolCall(data as AgentEventBase & ToolCall)
-    })
-
-    const unsubToolResult = api.onAgentToolResult((data) => {
-      logger.debug('[App] Received agent:tool-result event:', data)
-      handleAgentToolResult(data as AgentEventBase & { toolId: string; result: string; isError: boolean })
-    })
-
-    const unsubToolApprovalResolved = api.onAgentToolApprovalResolved((data) => {
-      logger.debug('[App] Received agent:tool-approval-resolved event:', data)
-      handleAgentToolApprovalResolved(data as AgentEventBase & {
-        toolId?: string
-        toolName?: string
-        approved: boolean
-      })
-    })
-
-    const unsubError = api.onAgentError((data) => {
-      logger.debug('[App] Received agent:error event:', data)
-      handleAgentError(data as AgentEventBase & { error: string; errorCode?: number })
-    })
-
-    const unsubComplete = api.onAgentComplete((data) => {
-      logger.debug('[App] Received agent:complete event:', data)
-      handleAgentComplete(data as AgentEventBase)
-    })
-
-    const unsubCompact = api.onAgentCompact((data) => {
-      logger.debug('[App] Received agent:compact event:', data)
-      handleAgentCompact(data as AgentEventBase & { trigger: 'manual' | 'auto'; preTokens: number })
-    })
-
-    const unsubStatus = api.onAgentStatus((data) => {
-      handleAgentStatus(data as AgentEventBase & { message: string })
-    })
-
-    const unsubUserQuestion = api.onAgentUserQuestion((data) => {
-      logger.debug('[App] Received agent:user-question event:', data)
-      handleAgentUserQuestion(data as AgentEventBase & { toolId: string; questions: Array<{ question: string; header: string; options: Array<{ label: string; description: string }>; multiSelect: boolean }> })
-    })
-
-    const unsubUserQuestionAnswered = api.onAgentUserQuestionAnswered((data) => {
-      logger.debug('[App] Received agent:user-question-answered event:', data)
-      handleAgentUserQuestionAnswered(data as AgentEventBase)
-    })
-
-    // Sub-agent task updates (task_started, task_progress, task_notification)
-    const unsubTaskUpdate = api.onAgentTaskUpdate((data) => {
-      handleAgentTaskUpdate(data as AgentEventBase & {
-        type: 'task_started' | 'task_progress' | 'task_notification'
-        taskId: string
-        toolUseId?: string
-        description?: string
-        summary?: string
-        lastToolName?: string
-        status?: string
-        usage?: { total_tokens: number; tool_uses: number; duration_ms: number }
-      })
-    })
-
-    const unsubSubagentUpdate = api.onAgentSubagentUpdate((data) => {
-      handleAgentSubagentUpdate(data as AgentEventBase & {
-        runId: string
-        parentConversationId: string
-        parentSpaceId: string
-        childConversationId: string
-        status: 'queued' | 'running' | 'waiting_announce' | 'completed' | 'failed' | 'killed' | 'timeout'
-        task: string
-        label?: string
-        spawnedAt: string
-        startedAt?: string
-        endedAt?: string
-        latestSummary?: string
-        resultSummary?: string
-        error?: string
-        announcedAt?: string
-        durationMs?: number
-      })
-    })
-
-    // MCP status updates (global - not per-conversation)
-    const unsubMcpStatus = api.onAgentMcpStatus((data) => {
-      logger.debug('[App] Received agent:mcp-status event:', data)
-      const event = data as { servers: Array<{ name: string; status: string }>; timestamp: number }
-      if (event.servers) {
-        setMcpStatus(event.servers as any, event.timestamp)
-      }
-    })
-
-    // SkillsFan login success - complete model setup then go to chat
-    // Only handles login from non-setup contexts (Settings, Onboarding).
-    // SetupFlow handles its own login completion to avoid race conditions.
-    const unsubSkillsFanLogin = api.onSkillsFanLoginSuccess(async () => {
-      // Update global login state immediately
-      useAppStore.getState().setSkillsfanLoggedIn(true)
-      const hostedAiEnabled = useAppStore.getState().productFeatures.skillsfanHostedAiEnabled
-
-      const currentView = useAppStore.getState().view
-      if (currentView === 'setup') {
-        logger.debug('[App] SkillsFan login success, but SetupFlow is handling it')
-        return
-      }
-
-      if (!hostedAiEnabled) {
-        logger.debug('[App] SkillsFan login success, hosted proxy AI disabled, skipping model hydration')
-        return
-      }
-
-      logger.debug('[App] SkillsFan login success, completing model setup...')
-
-      // Complete login via AISourceManager - fetches models, saves tokens + models to config
-      const completeResult = await api.authCompleteLogin('skillsfan-credits', 'skillsfan-credits-login')
-      if (completeResult.success) {
-        logger.debug('[App] SkillsFan model setup complete')
-      } else {
-        logger.warn('[App] Failed to complete model setup:', completeResult.error)
-      }
-
-      // Reload config into store (now includes skillsfan-credits with models)
-      const configResult = await api.getConfig()
-      if (configResult.success && configResult.data) {
-        setConfig(configResult.data as HaloConfig)
-      }
-
-      // Load spaces and navigate to chat
-      await useSpaceStore.getState().loadSpaces()
-      const { haloSpace } = useSpaceStore.getState()
-      if (haloSpace) {
-        useSpaceStore.getState().setCurrentSpace(haloSpace)
-      }
-      setView('space')
-    })
-
-    const unsubSkillsFanLogout = api.onSkillsFanLogout(() => {
-      useAppStore.getState().setSkillsfanLoggedIn(false)
-    })
-
-    return () => {
-      unsubThought()
-      unsubMessage()
-      unsubStart()
-      unsubToolCall()
-      unsubToolResult()
-      unsubToolApprovalResolved()
-      unsubError()
-      unsubComplete()
-      unsubCompact()
-      unsubStatus()
-      unsubUserQuestion()
-      unsubUserQuestionAnswered()
-      unsubTaskUpdate()
-      unsubSubagentUpdate()
-      unsubMcpStatus()
-      unsubSkillsFanLogin()
-      unsubSkillsFanLogout()
-    }
-  }, [
-    handleAgentStart,
-    handleAgentMessage,
-    handleAgentToolCall,
-    handleAgentToolResult,
-    handleAgentError,
-    handleAgentComplete,
-    handleAgentThought,
-    handleAgentCompact,
-    handleAgentStatus,
-    handleAgentUserQuestion,
-    handleAgentUserQuestionAnswered,
-    handleAgentTaskUpdate,
-    handleAgentSubagentUpdate,
-    setMcpStatus
-  ])
-
-  // Handle search keyboard shortcuts with debouncing for navigation
-  // Use ref to maintain debounce timer across renders
-  const navigationDebounceTimerRef = useRef<NodeJS.Timeout | null>(null)
-  const pendingNavigationRef = useRef<(() => void) | null>(null)
-
-  const debouncedNavigate = (callback: () => void) => {
-    // Clear previous timeout
-    if (navigationDebounceTimerRef.current) {
-      clearTimeout(navigationDebounceTimerRef.current)
-    }
-
-    // Store the pending navigation
-    pendingNavigationRef.current = callback
-
-    // Set new timeout - debounce for 300ms
-    navigationDebounceTimerRef.current = setTimeout(() => {
-      logger.debug('[App] Executing debounced keyboard navigation')
-      pendingNavigationRef.current?.()
-      pendingNavigationRef.current = null
-      navigationDebounceTimerRef.current = null
-    }, 300)
-  }
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Only handle when highlight bar is visible
-      if (!isHighlightBarVisible) return
-
-      const isMac = typeof navigator !== 'undefined' &&
-        navigator.platform.toUpperCase().indexOf('MAC') >= 0
-
-      // Esc - Close highlight bar (no debounce needed)
-      if (e.key === 'Escape') {
-        e.preventDefault()
-        hideHighlightBar()
-        return
-      }
-
-      // Arrow up - Navigate to earlier result (with debounce)
-      // Note: In time-sorted results (newest first), earlier = higher index
-      if (e.key === 'ArrowUp') {
-        e.preventDefault()
-        debouncedNavigate(() => {
-          logger.debug('[App] Keyboard: navigating to earlier result')
-          goToNextResult() // goToNextResult increases index = earlier in time
-        })
-        return
-      }
-
-      // Arrow down - Navigate to more recent result (with debounce)
-      // Note: In time-sorted results (newest first), more recent = lower index
-      if (e.key === 'ArrowDown') {
-        e.preventDefault()
-        debouncedNavigate(() => {
-          logger.debug('[App] Keyboard: navigating to more recent result')
-          goToPreviousResult() // goToPreviousResult decreases index = more recent in time
-        })
-        return
-      }
-
-      // Ctrl+K / Cmd+K - Open search to edit (no debounce needed)
-      const metaKey = isMac ? e.metaKey : e.ctrlKey
-      if (metaKey && e.key === 'k' && !e.shiftKey) {
-        e.preventDefault()
-        openSearch()
-        return
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isHighlightBarVisible, hideHighlightBar, goToPreviousResult, goToNextResult, openSearch])
-
-  // Handle search result navigation from highlight bar
-  // This handles the complete navigation flow when user clicks [↑][↓] or uses arrow keys
-  useEffect(() => {
-    const handleNavigateToResult = async (event: Event) => {
-      const customEvent = event as CustomEvent<{
-        messageId: string
-        spaceId: string
-        conversationId: string
-        query: string
-        resultIndex: number
-      }>
-
-      const { messageId, spaceId, conversationId, query } = customEvent.detail
-
-      logger.debug(`[App] search:navigate-to-result event - space=${spaceId}, conv=${conversationId}, msg=${messageId}`)
-
-      try {
-        // Step 1: If switching spaces, update both stores
-        if (spaceId !== currentSpaceId) {
-          logger.debug(`[App] Switching to space: ${spaceId}`)
-
-          // Find the space object
-          let targetSpace = null
-          if (spaceId === 'skillsfan-temp' && haloSpace) {
-            targetSpace = haloSpace
-          } else {
-            targetSpace = spaces.find(s => s.id === spaceId)
-          }
-
-          if (!targetSpace) {
-            logger.error(`[App] Space not found: ${spaceId}`)
-            return
-          }
-
-          // Update spaceStore
-          logger.debug(`[App] Updating space to: ${targetSpace.name}`)
-          setSpaceStoreCurrentSpace(targetSpace)
-
-          // Update chatStore
-          setChatCurrentSpace(spaceId)
-
-          // Give state time to update
-          await new Promise(resolve => setTimeout(resolve, 50))
-        }
-
-        // Step 2: Load conversations if needed
-        logger.debug(`[App] Loading conversations for space: ${spaceId}`)
-        await loadConversations(spaceId)
-
-        // Step 3: Select conversation
-        logger.debug(`[App] Selecting conversation: ${conversationId}`)
-        await selectConversation(conversationId)
-
-        // Step 4: Wait for message element to render and navigate
-        logger.debug(`[App] Waiting for message element: ${messageId}`)
-
-        const waitForMessageElement = (targetMessageId: string, timeoutMs: number): Promise<Element | null> => {
-          return new Promise((resolve) => {
-            const selector = `[data-message-id="${targetMessageId}"]`
-            const existingElement = document.querySelector(selector)
-            if (existingElement) {
-              resolve(existingElement)
-              return
-            }
-
-            let timeoutId: number | null = null
-            const observer = new MutationObserver(() => {
-              const target = document.querySelector(selector)
-              if (target) {
-                observer.disconnect()
-                if (timeoutId !== null) {
-                  window.clearTimeout(timeoutId)
-                }
-                resolve(target)
-              }
-            })
-
-            observer.observe(document.body, { childList: true, subtree: true })
-
-            timeoutId = window.setTimeout(() => {
-              observer.disconnect()
-              resolve(null)
-            }, timeoutMs)
-          })
-        }
-
-        const messageElement = await waitForMessageElement(messageId, 5000)
-        if (!messageElement) {
-          logger.warn(`[App] Message element not found before timeout`)
-          return
-        }
-
-        logger.debug(`[App] Message element found, dispatching navigate event`)
-        const navEvent = new CustomEvent('search:navigate-to-message', {
-          detail: {
-            messageId,
-            query
-          }
-        })
-        window.dispatchEvent(navEvent)
-      } catch (error) {
-        logger.error(`[App] Error navigating to result:`, error)
-      }
-    }
-
-    window.addEventListener('search:navigate-to-result', handleNavigateToResult)
-    return () => window.removeEventListener('search:navigate-to-result', handleNavigateToResult)
-  }, [currentSpaceId, spaces, haloSpace, setSpaceStoreCurrentSpace, setChatCurrentSpace, loadConversations, selectConversation])
-
-  // Handle Git Bash setup completion
   const handleGitBashSetupComplete = async (installed: boolean) => {
     logger.debug('[App] Git Bash setup completed, installed:', installed)
 
-    // Save skip preference if not installed
     if (!installed) {
       await api.setConfig({ gitBash: { skipped: true, installed: false, path: null } })
     }
 
-    // Continue with normal initialization - sync config to store
     const response = await api.getConfig()
     if (response.success && response.data) {
       const loadedConfig = response.data as HaloConfig
-      setConfig(loadedConfig)  // Sync config to store (was missing, causing empty apiKey in settings)
-      // Show setup if first launch or no AI source configured
+      setConfig(loadedConfig)
       if (loadedConfig.isFirstLaunch || !hasAnyAISource(loadedConfig)) {
         setView('setup')
       } else {
         setView('space')
       }
-    } else {
-      setView('setup')
+      return
     }
+
+    setView('setup')
   }
 
-  // Render based on current view
-  // Heavy pages (HomePage, SpacePage, SettingsPage) are lazy-loaded for better initial performance
   const renderView = () => {
     switch (view) {
       case 'splash':
@@ -595,8 +161,6 @@ export default function App() {
       case 'gitBashSetup':
         return <GitBashSetup onComplete={handleGitBashSetupComplete} />
       case 'onboarding':
-        // Onboarding is skipped - redirect to setup
-        return <SetupFlow />
       case 'setup':
         return <SetupFlow />
       case 'space':
@@ -619,15 +183,8 @@ export default function App() {
   return (
     <div className="h-screen w-screen overflow-hidden bg-background">
       {renderView()}
-      {/* Search panel - full screen edit mode */}
-      <SearchPanel isOpen={isSearchOpen} onClose={closeSearch} />
-      {/* Search highlight bar - floating navigation mode */}
-      <SearchHighlightBar />
-      {/* Onboarding overlay - renders on top of everything */}
       <OnboardingOverlay />
-      {/* Update notification - shows when update is downloaded */}
       <UpdateNotification />
-      {/* Global toast notifications */}
       <Toaster />
     </div>
   )

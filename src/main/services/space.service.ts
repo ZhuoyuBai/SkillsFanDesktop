@@ -3,12 +3,12 @@
  */
 
 import { shell } from 'electron'
+import { randomUUID } from 'crypto'
 import { join, basename, extname } from 'path'
 import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, statSync, rmSync } from 'fs'
 import { atomicWriteJsonSync } from '../utils/atomic-write'
 import * as fs from 'fs/promises'
 import { getHaloDir, getTempSpacePath, getSpacesDir } from './config.service'
-import { v4 as uuidv4 } from 'uuid'
 
 interface Space {
   id: string
@@ -306,7 +306,7 @@ export function listSpaces(): Space[] {
 
 // Create a new space
 export function createSpace(input: { name: string; icon: string; iconColor?: string; customPath?: string }): Space {
-  const id = uuidv4()
+  const id = randomUUID()
   const now = new Date().toISOString()
   const isCustomPath = !!input.customPath
 
@@ -577,8 +577,7 @@ export function saveOnboardingConversation(
   }
 
   try {
-    const { v4: uuidv4 } = require('uuid')
-    const conversationId = uuidv4()
+    const conversationId = randomUUID()
     const now = new Date().toISOString()
 
     // Determine conversations directory
@@ -597,13 +596,13 @@ export function saveOnboardingConversation(
       updatedAt: now,
       messages: [
         {
-          id: uuidv4(),
+          id: randomUUID(),
           role: 'user',
           content: userMessage,
           timestamp: now
         },
         {
-          id: uuidv4(),
+          id: randomUUID(),
           role: 'assistant',
           content: aiResponse,
           timestamp: now
