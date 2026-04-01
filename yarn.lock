@@ -7,7 +7,7 @@
   resolved "https://registry.npmmirror.com/@alloc/quick-lru/-/quick-lru-5.2.0.tgz"
   integrity sha512-UrcABB+4bUrFABwbluTIBErXwvbsU/V7TZWfmbgJfbkwiBuziS9gxdODUyuiecfdGQ85jglMW6juS3+z5TsKLw==
 
-"@anthropic-ai/claude-agent-sdk@^0.2.72":
+"@anthropic-ai/claude-agent-sdk@0.2.89":
   version "0.2.89"
   resolved "https://registry.npmjs.org/@anthropic-ai/claude-agent-sdk/-/claude-agent-sdk-0.2.89.tgz"
   integrity sha512-/9W0lyBGuGHw1uu7pQafsp6BLpxfqCv1QYE0Z/eZTX6lGHht4j4Q+O3UImzjsiyEE9cGkOAwZBGAEHDEqt+QUA==
@@ -25,10 +25,10 @@
     "@img/sharp-win32-arm64" "^0.34.2"
     "@img/sharp-win32-x64" "^0.34.2"
 
-"@anthropic-ai/claude-code@^2.1.72":
-  version "2.1.72"
-  resolved "https://registry.npmjs.org/@anthropic-ai/claude-code/-/claude-code-2.1.72.tgz"
-  integrity sha512-GhoUURM5xUPL+DSn0jMPXDEkWvocl5lqCs/wnyYDUliY0fBlXm7LxWnjLCBPZ0LoeUnr2e6MFRBxyUFrgrRp0A==
+"@anthropic-ai/claude-code@2.1.89":
+  version "2.1.89"
+  resolved "https://registry.npmjs.org/@anthropic-ai/claude-code/-/claude-code-2.1.89.tgz"
+  integrity sha512-etjihHqVxj1RjS5Zu/o+rv3ojn1N7AWzfgIOCSSSncfyb4qJn9J677scj0LHIxtwzjgU7j1qAedXlXKxgkFG2w==
   optionalDependencies:
     "@img/sharp-darwin-arm64" "^0.34.2"
     "@img/sharp-darwin-x64" "^0.34.2"
@@ -2466,7 +2466,7 @@ electron-vite@^2.0.0:
     magic-string "^0.30.10"
     picocolors "^1.0.1"
 
-electron@^31.7.7, electron@>=13.0.0:
+electron@^31.2.1, electron@>=13.0.0:
   version "31.7.7"
   resolved "https://registry.npmjs.org/electron/-/electron-31.7.7.tgz"
   integrity sha512-HZtZg8EHsDGnswFt0QeV8If8B+et63uD6RJ7I4/xhcXqmTIbI08GoubX/wm+HdY0DwcuPe1/xsgqpmYvjdjRoA==

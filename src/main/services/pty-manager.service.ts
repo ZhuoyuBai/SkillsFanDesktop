@@ -21,8 +21,10 @@ import {
   readFileSync,
   realpathSync,
   statSync,
+  symlinkSync,
   writeFileSync
 } from 'fs'
+import { homedir } from 'os'
 import { dirname, join } from 'path'
 import { app, BrowserWindow, nativeTheme } from 'electron'
 import { getConfig, getHaloDir } from './config.service'
@@ -376,6 +378,23 @@ function getEmbeddedClaudeConfigDir(): string {
 
   if (!existsSync(configDir)) {
     mkdirSync(configDir, { recursive: true })
+  }
+
+  // Symlink user's ~/.claude/ subdirectories into embedded config so the CLI
+  // can discover user-installed skills, agents, plugins, commands and settings.
+  // Auth-related files (.config.json, projects/, sessions/) are NOT linked
+  // to keep the embedded CLI's auth isolated from the user's standalone CLI.
+  const claudeDir = join(homedir(), '.claude')
+  for (const entry of ['skills', 'commands', 'agents', 'plugins', 'settings.json']) {
+    const source = join(claudeDir, entry)
+    const target = join(configDir, entry)
+    if (existsSync(source) && !existsSync(target)) {
+      try {
+        symlinkSync(source, target)
+      } catch {
+        // Ignore if symlink creation fails
+      }
+    }
   }
 
   return configDir

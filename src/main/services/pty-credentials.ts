@@ -7,8 +7,7 @@
  * - SDK transport resolution (Anthropic direct vs OpenAI compat router)
  */
 
-import { existsSync, mkdirSync } from 'fs'
-import { join } from 'path'
+import { homedir } from 'os'
 import { getConfig, getTempSpacePath } from './config.service'
 import { getSpace } from './space.service'
 import { getAISourceManager } from './ai-sources'
@@ -47,11 +46,7 @@ const ROUTED_MODEL = 'claude-sonnet-4-20250514'
 
 export function getWorkingDir(spaceId: string): string {
   if (spaceId === 'skillsfan-temp') {
-    const artifactsDir = join(getTempSpacePath(), 'artifacts')
-    if (!existsSync(artifactsDir)) {
-      mkdirSync(artifactsDir, { recursive: true })
-    }
-    return artifactsDir
+    return homedir()
   }
 
   const space = getSpace(spaceId)

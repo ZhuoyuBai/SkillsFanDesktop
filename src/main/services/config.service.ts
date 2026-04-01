@@ -607,7 +607,8 @@ export async function initializeApp(): Promise<void> {
   const tempConversationsDir = join(tempDir, 'conversations')
 
   // Create directories if they don't exist
-  const dirs = [haloDir, tempDir, spacesDir, tempArtifactsDir, tempConversationsDir]
+  const claudeCommandsDir = join(homedir(), '.claude', 'commands')
+  const dirs = [haloDir, tempDir, spacesDir, tempArtifactsDir, tempConversationsDir, claudeCommandsDir]
   for (const dir of dirs) {
     if (!existsSync(dir)) {
       mkdirSync(dir, { recursive: true })

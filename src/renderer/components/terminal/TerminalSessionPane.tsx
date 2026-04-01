@@ -14,6 +14,7 @@ import { Plus } from 'lucide-react'
 import { api } from '../../api'
 import { useTranslation } from '../../i18n'
 import { useAppStore } from '../../stores/app.store'
+import { ModelSelector } from '../layout/ModelSelector'
 import { TerminalStatusOverlay } from './TerminalStatusOverlay'
 import { describeTerminalLaunchError } from './terminal-error'
 
@@ -59,6 +60,7 @@ export function TerminalSessionPane({
   const [startupError, setStartupError] = useState<string | null>(null)
   const [hasOutput, setHasOutput] = useState(false)
   const [model, setModel] = useState<string>('')
+  const [pendingModelChange, setPendingModelChange] = useState(false)
   const ptyCreatedRef = useRef(false)
 
   // Initialize xterm.js and connect to PTY
@@ -233,10 +235,12 @@ export function TerminalSessionPane({
     }
   }, [terminalId, spaceId, t])
 
+  const handleModelChange = useCallback(() => {
+    setPendingModelChange(true)
+  }, [])
+
   const handleNewConversation = useCallback(() => {
-    if (isExited || startupError) {
-      return
-    }
+    if (isExited || startupError) return
 
     xtermRef.current?.focus()
     void api.ptyWrite(terminalId, '/new\r')
@@ -250,8 +254,17 @@ export function TerminalSessionPane({
     <div className={isActive ? 'absolute inset-0 flex min-h-0 flex-col bg-background' : 'hidden'}>
       {/* Toolbar */}
       <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-card/50 flex-shrink-0">
-        <div className="flex items-center gap-2 text-xs text-muted-foreground min-w-0">
-          {model ? <span className="truncate">{model}</span> : <span>{t('Claude Code')}</span>}
+        <div className="flex items-center gap-2 min-w-0">
+          <ModelSelector
+            variant="compact"
+            disabled={!hasOutput && !isExited && !startupError}
+            onModelChange={handleModelChange}
+          />
+          {pendingModelChange && (
+            <span className="text-[11px] text-muted-foreground/60 whitespace-nowrap">
+              {t('Effective after new chat')}
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-1">

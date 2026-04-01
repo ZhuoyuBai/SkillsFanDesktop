@@ -178,9 +178,10 @@ interface ModelSelectorProps {
   disabled?: boolean  // Disable interaction during generation
   onDisabledClick?: () => void  // Callback when clicked while disabled
   popoverUp?: boolean  // true = dropdown opens upward
+  onModelChange?: () => void  // Called after model selection is saved
 }
 
-export function ModelSelector({ variant = 'header', iconOnly = false, disabled = false, onDisabledClick, popoverUp = false }: ModelSelectorProps = {}) {
+export function ModelSelector({ variant = 'header', iconOnly = false, disabled = false, onDisabledClick, popoverUp = false, onModelChange }: ModelSelectorProps = {}) {
   const { t } = useTranslation()
   const {
     config,
@@ -192,8 +193,8 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
     skillsfanLoggedIn,
     productFeatures
   } = useAppStore()
-  const authProviders = storeAuthProviders as AuthProviderConfig[]
-  const hostedAiEnabled = productFeatures.skillsfanHostedAiEnabled
+  const authProviders = (storeAuthProviders || []) as AuthProviderConfig[]
+  const hostedAiEnabled = productFeatures?.skillsfanHostedAiEnabled
   const [isOpen, setIsOpen] = useState(false)
   const [isDropdownScrolling, setIsDropdownScrolling] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -215,21 +216,25 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
     if (now - lastRefreshRef.current < 60_000) return
     lastRefreshRef.current = now
 
-    api.refreshAISourcesConfig().then((result) => {
-      if (result.success) {
-        api.getConfig().then((configResult) => {
-          if (configResult.success && configResult.data) {
-            setConfig(configResult.data as HaloConfig)
-          }
-        })
-      }
-    })
+    if (typeof api.refreshAISourcesConfig === 'function') {
+      api.refreshAISourcesConfig().then((result) => {
+        if (result.success) {
+          api.getConfig().then((configResult) => {
+            if (configResult.success && configResult.data) {
+              setConfig(configResult.data as HaloConfig)
+            }
+          })
+        }
+      })
+    }
     // Refresh public models → update store
-    api.getPublicModels().then((result) => {
-      if (result.success && result.data) {
-        setPublicModels(result.data as Array<{ id: string; name: string; owned_by: string }>)
-      }
-    })
+    if (typeof (api as any).getPublicModels === 'function') {
+      (api as any).getPublicModels().then((result: any) => {
+        if (result.success && result.data) {
+          setPublicModels(result.data as Array<{ id: string; name: string; owned_by: string }>)
+        }
+      })
+    }
   }, [isOpen])
 
   useEffect(() => {
@@ -422,6 +427,7 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
     await api.setConfig(newConfig)
     setConfig(newConfig as HaloConfig)
     setIsOpen(false)
+    onModelChange?.()
   }
 
   // Handle provider selection for configured custom API providers
@@ -445,6 +451,7 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
     await api.setConfig(newConfig)
     setConfig(newConfig as HaloConfig)
     setIsOpen(false)
+    onModelChange?.()
   }
 
   // Handle selecting a specific config within a provider (multi-config support)
@@ -485,6 +492,7 @@ export function ModelSelector({ variant = 'header', iconOnly = false, disabled =
     await api.setConfig(newConfig)
     setConfig(newConfig as HaloConfig)
     setIsOpen(false)
+    onModelChange?.()
   }
 
   // Handle add source - navigate to settings
