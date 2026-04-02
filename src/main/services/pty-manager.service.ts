@@ -503,6 +503,7 @@ export async function createPty(options: CreatePtyOptions): Promise<{ model: str
     helperPath = validatePtyLaunchPrerequisites({ electronPath, cliPath, workDir }).helperPath
 
     const nodePty = getPty()
+    const ptyConfig = getConfig()
     const { env: claudeEnv, model, skipClaudeLogin } = await resolveClaudeCliEnv({
       workDir,
       source,
@@ -534,6 +535,7 @@ export async function createPty(options: CreatePtyOptions): Promise<{ model: str
         ELECTRON_RUN_AS_NODE: '1',
         // Don't set ELECTRON_NO_ATTACH_CONSOLE - we need TTY interaction
         ...claudeEnv,
+        ...(ptyConfig.terminal?.noFlicker ? { CLAUDE_CODE_NO_FLICKER: '1' } : {}),
       } as Record<string, string>
     })
 

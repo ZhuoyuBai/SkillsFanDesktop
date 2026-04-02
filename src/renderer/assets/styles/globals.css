@@ -63,45 +63,45 @@
    ============================================ */
 
 :root {
-  /* Dark theme (default) — neutral Codex-inspired */
-  --background: 0 0% 7%;
-  --foreground: 0 0% 98%;
-  --card: 0 0% 10%;
-  --card-foreground: 0 0% 98%;
-  --popover: 0 0% 9%;
-  --popover-foreground: 0 0% 98%;
+  /* Dark theme (default) — Anthropic brand warm neutrals */
+  --background: 60 3% 8%;
+  --foreground: 48 33% 97%;
+  --card: 50 5% 12%;
+  --card-foreground: 48 33% 97%;
+  --popover: 50 4% 10%;
+  --popover-foreground: 48 33% 97%;
   --primary: 0 0% 90%;
-  --primary-foreground: 0 0% 7%;
-  --secondary: 0 0% 15%;
-  --secondary-foreground: 0 0% 98%;
-  --muted: 0 0% 13%;
-  --muted-foreground: 0 0% 60%;
-  --accent: 0 0% 15%;
-  --accent-foreground: 0 0% 98%;
+  --primary-foreground: 60 3% 8%;
+  --secondary: 50 5% 17%;
+  --secondary-foreground: 48 33% 97%;
+  --muted: 50 4% 15%;
+  --muted-foreground: 49 7% 67%;
+  --accent: 50 5% 17%;
+  --accent-foreground: 48 33% 97%;
   --destructive: 0 62% 50%;
-  --destructive-foreground: 0 0% 98%;
-  --border: 0 0% 12%;
-  --input: 0 0% 11%;
-  --ring: 0 0% 40%;
+  --destructive-foreground: 48 33% 97%;
+  --border: 50 5% 14%;
+  --input: 50 4% 13%;
+  --ring: 15 40% 55%;
   --radius: 0.75rem;
-  --link: 220 90% 65%;
+  --link: 210 49% 61%;
 
-  /* SkillsFan brand colors - Monochrome */
-  --skillsfan-glow: 0 0% 100%;
-  --skillsfan-success: 0 0% 80%;
-  --skillsfan-warning: 0 0% 60%;
-  --skillsfan-error: 0 0% 40%;
+  /* SkillsFan brand colors - Anthropic warm tones */
+  --skillsfan-glow: 48 33% 97%;
+  --skillsfan-success: 86 15% 70%;
+  --skillsfan-warning: 15 30% 60%;
+  --skillsfan-error: 0 30% 45%;
   /* Legacy aliases */
   --halo-glow: var(--skillsfan-glow);
   --halo-success: var(--skillsfan-success);
   --halo-warning: var(--skillsfan-warning);
   --halo-error: var(--skillsfan-error);
 
-  /* Semantic status colors */
-  --success: 142 71% 45%;
-  --success-foreground: 0 0% 100%;
-  --warning: 38 92% 50%;
-  --warning-foreground: 0 0% 10%;
+  /* Semantic status colors — Anthropic accent palette */
+  --success: 86 20% 46%;
+  --success-foreground: 48 33% 97%;
+  --warning: 15 63% 60%;
+  --warning-foreground: 60 3% 8%;
 
   /* VIP membership gold */
   --vip-gold: 43 75% 70%;
@@ -109,45 +109,45 @@
   --vip-gold-border: 43 75% 70% / 0.25;
 }
 
-/* Light theme — neutral Codex-inspired black/white */
+/* Light theme — Anthropic brand warm cream */
 .light {
-  --background: 0 0% 99%;
-  --foreground: 0 0% 15%;
-  --card: 0 0% 100%;
-  --card-foreground: 0 0% 15%;
-  --popover: 0 0% 100%;
-  --popover-foreground: 0 0% 15%;
-  --primary: 0 0% 12%;
-  --primary-foreground: 0 0% 100%;
-  --secondary: 0 0% 96%;
-  --secondary-foreground: 0 0% 20%;
-  --muted: 0 0% 96%;
-  --muted-foreground: 0 0% 40%;
-  --accent: 0 0% 96%;
-  --accent-foreground: 0 0% 20%;
+  --background: 48 33% 97%;
+  --foreground: 60 3% 8%;
+  --card: 48 30% 96%;
+  --card-foreground: 60 3% 8%;
+  --popover: 48 30% 96%;
+  --popover-foreground: 60 3% 8%;
+  --primary: 15 63% 60%;
+  --primary-foreground: 48 33% 97%;
+  --secondary: 50 21% 89%;
+  --secondary-foreground: 60 3% 15%;
+  --muted: 50 18% 93%;
+  --muted-foreground: 49 7% 47%;
+  --accent: 50 21% 89%;
+  --accent-foreground: 60 3% 15%;
   --destructive: 0 84% 60%;
-  --destructive-foreground: 0 0% 98%;
-  --border: 0 0% 92%;
-  --input: 0 0% 96%;
-  --ring: 0 0% 12%;
-  --link: 220 90% 50%;
+  --destructive-foreground: 48 33% 97%;
+  --border: 50 15% 82%;
+  --input: 50 18% 91%;
+  --ring: 15 40% 50%;
+  --link: 210 49% 48%;
 
-  /* SkillsFan brand colors (adjusted for light) */
-  --skillsfan-glow: 0 0% 90%;
-  --skillsfan-success: 0 0% 60%;
-  --skillsfan-warning: 0 0% 70%;
-  --skillsfan-error: 0 0% 80%;
+  /* SkillsFan brand colors (Anthropic warm tones for light) */
+  --skillsfan-glow: 50 21% 89%;
+  --skillsfan-success: 86 15% 55%;
+  --skillsfan-warning: 15 30% 50%;
+  --skillsfan-error: 0 30% 55%;
   /* Legacy aliases */
   --halo-glow: var(--skillsfan-glow);
   --halo-success: var(--skillsfan-success);
   --halo-warning: var(--skillsfan-warning);
   --halo-error: var(--skillsfan-error);
 
-  /* Semantic status colors */
-  --success: 142 76% 36%;
-  --success-foreground: 0 0% 100%;
-  --warning: 38 92% 50%;
-  --warning-foreground: 0 0% 10%;
+  /* Semantic status colors — Anthropic accent palette */
+  --success: 86 25% 38%;
+  --success-foreground: 48 33% 97%;
+  --warning: 15 63% 52%;
+  --warning-foreground: 60 3% 8%;
 
   /* VIP membership gold */
   --vip-gold: 43 80% 45%;

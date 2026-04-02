@@ -320,6 +320,9 @@ export function SettingsPage() {
   const [skipClaudeLogin, setSkipClaudeLogin] = useState(
     config?.terminal?.skipClaudeLogin ?? DEFAULT_CONFIG.terminal!.skipClaudeLogin
   )
+  const [noFlicker, setNoFlicker] = useState(
+    config?.terminal?.noFlicker ?? DEFAULT_CONFIG.terminal!.noFlicker
+  )
   const [showTerminalModeDialog, setShowTerminalModeDialog] = useState(false)
 
   // Advanced settings state
@@ -459,6 +462,25 @@ export function SettingsPage() {
     } catch (error) {
       console.error('[Settings] Failed to switch terminal mode:', error)
       setSkipClaudeLogin(previousValue)
+    }
+  }
+
+  // Handle NO_FLICKER toggle
+  const handleNoFlickerChange = async (enabled: boolean) => {
+    const previousValue = noFlicker
+    setNoFlicker(enabled)
+    try {
+      const result = await api.setConfig({
+        terminal: { noFlicker: enabled }
+      })
+      if (result.success && result.data) {
+        setConfig(result.data as HaloConfig)
+      } else {
+        setNoFlicker(previousValue)
+      }
+    } catch (error) {
+      console.error('[Settings] Failed to toggle noFlicker:', error)
+      setNoFlicker(previousValue)
     }
   }
 
@@ -886,8 +908,8 @@ export function SettingsPage() {
     { id: 'ai-model', icon: Bot, label: t('AI Model') },
     { id: 'skills', icon: Package, label: t('Skills') },
     { id: 'spaces', icon: Layers, label: t('Spaces'), desktopOnly: true },
+    { id: 'display', icon: Palette, label: t('Display') },
     { id: 'system', icon: SettingsIcon, label: t('System'), desktopOnly: true },
-    { id: 'display', icon: Palette, label: t('Display & Language') },
   ]
 
   return (
@@ -1094,7 +1116,7 @@ export function SettingsPage() {
           </section>
           )}
 
-          {/* Display & Language Section */}
+          {/* Display Section */}
           {activeSection === 'display' && (
           <section className="space-y-6">
             <div className="space-y-6">
@@ -1128,6 +1150,17 @@ export function SettingsPage() {
                     label: name
                   }))}
                 />
+              </div>
+
+              {/* Smooth Mode */}
+              <div className="flex items-center justify-between pt-4 border-t border-border">
+                <div className="flex-1">
+                  <p className="font-medium">{t('Smooth Mode')}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {t('Supports mouse clicks, smoother scrolling. Takes effect on new sessions')}
+                  </p>
+                </div>
+                <Switch checked={noFlicker} onChange={handleNoFlickerChange} />
               </div>
             </div>
           </section>

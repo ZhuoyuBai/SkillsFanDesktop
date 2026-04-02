@@ -1,6 +1,6 @@
 {
   "name": "skillsfan",
-  "version": "0.3.3",
+  "version": "0.4.0",
   "description": "技能范 - AI 技能助手",
   "type": "module",
   "main": "./out/main/index.mjs",
@@ -45,12 +45,10 @@
     "i18n": "npm run i18n:extract && npm run i18n:translate"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "0.2.89",
     "@anthropic-ai/claude-code": "2.1.89",
     "@anthropic-ai/sdk": "0.71.0",
     "@electron-toolkit/preload": "^3.0.0",
     "@electron-toolkit/utils": "^3.0.0",
-    "@huggingface/transformers": "^3.8.1",
     "@larksuiteoapi/node-sdk": "^1.59.0",
     "@streamdown/cjk": "^1.0.2",
     "@streamdown/code": "^1.0.2",
@@ -82,7 +80,6 @@
     "rehype-highlight": "^7.0.2",
     "rehype-raw": "^7.0.0",
     "remark-gfm": "^4.0.1",
-    "sqlite-vec": "^0.1.7-alpha.2",
     "streamdown": "^2.2.0",
     "tailwind-merge": "^2.2.0",
     "uuid": "^13.0.0",

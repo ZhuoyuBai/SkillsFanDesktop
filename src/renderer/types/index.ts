@@ -224,6 +224,7 @@ export interface BrowserAutomationConfig {
 
 export interface TerminalConfig {
   skipClaudeLogin: boolean;
+  noFlicker: boolean;
 }
 
 export interface SkillSettingsConfig {
@@ -651,7 +652,8 @@ export const DEFAULT_CONFIG: HaloConfig = {
     mode: 'ai-browser'
   },
   terminal: {
-    skipClaudeLogin: true
+    skipClaudeLogin: true,
+    noFlicker: false
   },
   skillSettings: {
     preferNativeClaudeSkillTool: true

@@ -119,7 +119,6 @@ interface HaloConfig {
   memory?: {
     enabled: boolean        // Master toggle, default true
     retentionDays: number   // 0 = forever, 7/30/180
-    semanticSearch?: boolean // Enable vector-based semantic search, default true
   }
   browserAutomation?: {
     enabled: boolean
@@ -127,6 +126,7 @@ interface HaloConfig {
   }
   terminal?: {
     skipClaudeLogin: boolean
+    noFlicker: boolean
   }
   skillSettings?: {
     preferNativeClaudeSkillTool: boolean
@@ -237,7 +237,7 @@ const DEFAULT_CONFIG: HaloConfig = {
     trustMode: false
   },
   appearance: {
-    theme: 'light'
+    theme: 'system'
   },
   system: {
     autoLaunch: false,
@@ -252,7 +252,8 @@ const DEFAULT_CONFIG: HaloConfig = {
     mode: 'ai-browser'
   },
   terminal: {
-    skipClaudeLogin: true
+    skipClaudeLogin: true,
+    noFlicker: false
   },
   skillSettings: {
     preferNativeClaudeSkillTool: true
@@ -423,13 +424,17 @@ function normalizeBrowserAutomation(parsed: Record<string, any>): {
 
 function normalizeTerminalConfig(parsed: Record<string, any>): {
   skipClaudeLogin: boolean
+  noFlicker: boolean
 } {
   const raw = parsed?.terminal
 
   return {
     skipClaudeLogin: typeof raw?.skipClaudeLogin === 'boolean'
       ? raw.skipClaudeLogin
-      : DEFAULT_CONFIG.terminal.skipClaudeLogin
+      : DEFAULT_CONFIG.terminal.skipClaudeLogin,
+    noFlicker: typeof raw?.noFlicker === 'boolean'
+      ? raw.noFlicker
+      : DEFAULT_CONFIG.terminal.noFlicker
   }
 }
 

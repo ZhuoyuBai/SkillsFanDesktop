@@ -38,12 +38,12 @@ function getXtermTheme(): Record<string, string> {
   }
 
   return {
-    background: hsl('--background') || '#1e1e1e',
-    foreground: hsl('--foreground') || '#d4d4d4',
-    cursor: hsl('--foreground') || '#d4d4d4',
-    cursorAccent: hsl('--background') || '#1e1e1e',
-    selectionBackground: hsl('--primary') || '#264f78',
-    selectionForeground: hsl('--primary-foreground') || '#ffffff',
+    background: hsl('--background') || '#141413',
+    foreground: hsl('--foreground') || '#faf9f5',
+    cursor: hsl('--foreground') || '#faf9f5',
+    cursorAccent: hsl('--background') || '#141413',
+    selectionBackground: hsl('--primary') || '#e6e6e6',
+    selectionForeground: hsl('--primary-foreground') || '#141413',
   }
 }
 
