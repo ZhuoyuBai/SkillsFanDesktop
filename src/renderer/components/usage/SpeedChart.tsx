@@ -1,7 +1,7 @@
-import { useMemo } from 'react'
+import { useId, useMemo } from 'react'
 import { AreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts'
 import { useTranslation } from 'react-i18next'
-import { getChartColors, formatTokenCount } from '../../utils/chart-colors'
+import { useChartColors, formatTokenCount } from '../../utils/chart-colors'
 import { ChartContainer } from './ChartContainer'
 
 interface SpeedSample {
@@ -16,7 +16,8 @@ interface SpeedChartProps {
 
 export function SpeedChart({ samples }: SpeedChartProps) {
   const { t } = useTranslation()
-  const colors = useMemo(() => getChartColors(), [])
+  const gradientId = useId()
+  const colors = useChartColors()
 
   const data = useMemo(() => {
     if (samples.length === 0) {
@@ -38,7 +39,7 @@ export function SpeedChart({ samples }: SpeedChartProps) {
       {({ width, height }) => (
         <AreaChart width={width} height={height} data={data} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
           <defs>
-            <linearGradient id="speedGradient" x1="0" y1="0" x2="0" y2="1">
+            <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor={colors.primary} stopOpacity={0.3} />
               <stop offset="95%" stopColor={colors.primary} stopOpacity={0} />
             </linearGradient>
@@ -72,7 +73,7 @@ export function SpeedChart({ samples }: SpeedChartProps) {
             type="monotone"
             dataKey="tokensPerMin"
             stroke={colors.primary}
-            fill="url(#speedGradient)"
+            fill={`url(#${gradientId})`}
             strokeWidth={2}
             connectNulls
           />

@@ -2,6 +2,8 @@
  * Chart color utilities - reads CSS theme variables for recharts
  */
 
+import { useState, useEffect, useMemo } from 'react'
+
 function getCSSVar(name: string): string {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
 }
@@ -28,6 +30,25 @@ export function getChartColors() {
       `hsl(${getCSSVar('--muted-foreground')})`,
     ]
   }
+}
+
+/**
+ * React hook that re-reads chart colors when the theme changes
+ * (watches class/data-theme attribute on <html>).
+ */
+export function useChartColors() {
+  const [revision, setRevision] = useState(0)
+
+  useEffect(() => {
+    const observer = new MutationObserver(() => setRevision((n) => n + 1))
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class', 'data-theme']
+    })
+    return () => observer.disconnect()
+  }, [])
+
+  return useMemo(() => getChartColors(), [revision])
 }
 
 /**

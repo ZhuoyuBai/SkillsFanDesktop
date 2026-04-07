@@ -54,6 +54,160 @@ const fileCache = new Map<string, FileCacheEntry>()
 const SAMPLE_INTERVAL_MS = 30_000
 const MAX_SAMPLES = 10
 
+// ---------------------------------------------------------------------------
+// Model pricing table (USD per 1M tokens)
+// Chinese vendors are calibrated from official CNY pricing tables and converted
+// to USD because the usage pipeline currently reports/render costs as `costUsd`.
+// ---------------------------------------------------------------------------
+interface ModelPricingRates {
+  input: number
+  output: number
+  cacheRead?: number
+  cacheCreation?: number
+}
+
+interface ModelPricingTier extends ModelPricingRates {
+  minInputTokens?: number
+  maxInputTokens?: number
+  minOutputTokens?: number
+  maxOutputTokens?: number
+}
+
+interface ModelPricing extends Partial<ModelPricingRates> {
+  tiers?: ModelPricingTier[]
+}
+
+const CNY_PER_USD = 7.2
+const cny = (amount: number): number => amount / CNY_PER_USD
+
+const MODEL_PRICING: Record<string, ModelPricing> = {
+  // Anthropic Claude (https://docs.anthropic.com/en/docs/about-claude/pricing)
+  'claude-opus-4-6':             { input: 5,     output: 25,  cacheRead: 0.50,  cacheCreation: 6.25 },
+  'claude-opus-4-5':             { input: 5,     output: 25,  cacheRead: 0.50,  cacheCreation: 6.25 },
+  'claude-opus-4-1':             { input: 15,    output: 75,  cacheRead: 1.50,  cacheCreation: 18.75 },
+  'claude-opus-4':               { input: 15,    output: 75,  cacheRead: 1.50,  cacheCreation: 18.75 },
+  'claude-sonnet-4-6':           { input: 3,     output: 15,  cacheRead: 0.30,  cacheCreation: 3.75 },
+  'claude-sonnet-4-5':           { input: 3,     output: 15,  cacheRead: 0.30,  cacheCreation: 3.75 },
+  'claude-sonnet-4':             { input: 3,     output: 15,  cacheRead: 0.30,  cacheCreation: 3.75 },
+  'claude-haiku-4-5':            { input: 1,     output: 5,   cacheRead: 0.10,  cacheCreation: 1.25 },
+  'claude-haiku-3-5':            { input: 0.80,  output: 4,   cacheRead: 0.08,  cacheCreation: 1.00 },
+
+  // DeepSeek V3.2 (https://api-docs.deepseek.com/zh-cn/quick_start/pricing)
+  'deepseek-chat':               { input: cny(2),   output: cny(3),  cacheRead: cny(0.2) },
+  'deepseek-reasoner':           { input: cny(2),   output: cny(3),  cacheRead: cny(0.2) },
+
+  // Kimi / Moonshot (https://platform.moonshot.cn/docs/pricing/chat)
+  'kimi-k2.5':                   { input: cny(4),   output: cny(21), cacheRead: cny(0.7) },
+  'kimi-k2-0905-preview':        { input: cny(4),   output: cny(16), cacheRead: cny(1) },
+  'kimi-k2-0711-preview':        { input: cny(4),   output: cny(16), cacheRead: cny(1) },
+  'kimi-k2-turbo-preview':       { input: cny(8),   output: cny(58), cacheRead: cny(1) },
+  'kimi-k2-thinking':            { input: cny(4),   output: cny(16), cacheRead: cny(1) },
+  'kimi-k2-thinking-turbo':      { input: cny(8),   output: cny(58), cacheRead: cny(1) },
+  'moonshot-v1-8k':              { input: cny(2),   output: cny(10) },
+  'moonshot-v1-32k':             { input: cny(5),   output: cny(20) },
+  'moonshot-v1-128k':            { input: cny(10),  output: cny(30) },
+  'moonshot-v1-8k-vision-preview':   { input: cny(2),  output: cny(10) },
+  'moonshot-v1-32k-vision-preview':  { input: cny(5),  output: cny(20) },
+  'moonshot-v1-128k-vision-preview': { input: cny(10), output: cny(30) },
+
+  // ZhiPu GLM (https://open.bigmodel.cn/pricing)
+  // Context thresholds are in tokens; e.g. [0, 32) on the pricing page means < 32k tokens.
+  'glm-5-turbo': {
+    tiers: [
+      { maxInputTokens: 32_000, input: cny(5), output: cny(22), cacheRead: cny(1.2), cacheCreation: 0 },
+      { minInputTokens: 32_000, input: cny(7), output: cny(26), cacheRead: cny(1.8), cacheCreation: 0 }
+    ]
+  },
+  'glm-5': {
+    tiers: [
+      { maxInputTokens: 32_000, input: cny(4), output: cny(18), cacheRead: cny(1), cacheCreation: 0 },
+      { minInputTokens: 32_000, input: cny(6), output: cny(22), cacheRead: cny(1.5), cacheCreation: 0 }
+    ]
+  },
+  'glm-4.7-flashx':              { input: cny(0.5), output: cny(3), cacheRead: cny(0.1), cacheCreation: 0 },
+  'glm-4.7-flash':               { input: 0,        output: 0,      cacheRead: 0,        cacheCreation: 0 },
+  'glm-4.7': {
+    tiers: [
+      { maxInputTokens: 32_000, maxOutputTokens: 200, input: cny(2), output: cny(8),  cacheRead: cny(0.4), cacheCreation: 0 },
+      { maxInputTokens: 32_000, minOutputTokens: 200, input: cny(3), output: cny(14), cacheRead: cny(0.6), cacheCreation: 0 },
+      { minInputTokens: 32_000, maxInputTokens: 200_000, input: cny(4), output: cny(16), cacheRead: cny(0.8), cacheCreation: 0 }
+    ]
+  },
+  'glm-4.5-air': {
+    tiers: [
+      { maxInputTokens: 32_000, maxOutputTokens: 200, input: cny(0.8), output: cny(2), cacheRead: cny(0.16), cacheCreation: 0 },
+      { maxInputTokens: 32_000, minOutputTokens: 200, input: cny(0.8), output: cny(6), cacheRead: cny(0.16), cacheCreation: 0 },
+      { minInputTokens: 32_000, maxInputTokens: 128_000, input: cny(1.2), output: cny(8), cacheRead: cny(0.24), cacheCreation: 0 }
+    ]
+  },
+
+  // MiniMax (https://platform.minimaxi.com/docs/guides/pricing-paygo)
+  'minimax-m2.7':                { input: cny(2.1), output: cny(8.4),  cacheRead: cny(0.42), cacheCreation: cny(2.625) },
+  'minimax-m2.7-highspeed':      { input: cny(4.2), output: cny(16.8), cacheRead: cny(0.42), cacheCreation: cny(2.625) },
+  'minimax-m2.5':                { input: cny(2.1), output: cny(8.4),  cacheRead: cny(0.21), cacheCreation: cny(2.625) },
+  'minimax-m2.5-highspeed':      { input: cny(4.2), output: cny(16.8), cacheRead: cny(0.21), cacheCreation: cny(2.625) },
+  'm2-her':                      { input: cny(2.1), output: cny(8.4),  cacheRead: 0,         cacheCreation: 0 }
+}
+
+function getModelPricing(model: string): ModelPricing | undefined {
+  const normalizedModel = model.toLowerCase()
+  const exactMatch = MODEL_PRICING[normalizedModel]
+  if (exactMatch) return exactMatch
+
+  const prefixMatch = Object.entries(MODEL_PRICING)
+    .sort(([a], [b]) => b.length - a.length)
+    .find(([key]) => normalizedModel.startsWith(key))
+
+  return prefixMatch?.[1]
+}
+
+function resolveModelPricing(
+  pricing: ModelPricing,
+  inputTokens: number,
+  outputTokens: number
+): ModelPricingRates | undefined {
+  if (pricing.tiers) {
+    const tier = pricing.tiers.find((candidate) => {
+      if (candidate.minInputTokens != null && inputTokens < candidate.minInputTokens) return false
+      if (candidate.maxInputTokens != null && inputTokens >= candidate.maxInputTokens) return false
+      if (candidate.minOutputTokens != null && outputTokens < candidate.minOutputTokens) return false
+      if (candidate.maxOutputTokens != null && outputTokens >= candidate.maxOutputTokens) return false
+      return true
+    })
+    if (tier) return tier
+  }
+
+  if (pricing.input == null || pricing.output == null) return undefined
+
+  return {
+    input: pricing.input,
+    output: pricing.output,
+    cacheRead: pricing.cacheRead,
+    cacheCreation: pricing.cacheCreation
+  }
+}
+
+function estimateCost(
+  model: string,
+  inputTokens: number,
+  outputTokens: number,
+  cacheReadTokens: number,
+  cacheCreationTokens: number
+): number {
+  const pricing = getModelPricing(model)
+  if (!pricing) return 0
+
+  const resolvedPricing = resolveModelPricing(pricing, inputTokens, outputTokens)
+  if (!resolvedPricing) return 0
+
+  return (
+    inputTokens * resolvedPricing.input +
+    outputTokens * resolvedPricing.output +
+    cacheReadTokens * (resolvedPricing.cacheRead ?? resolvedPricing.input) +
+    cacheCreationTokens * (resolvedPricing.cacheCreation ?? resolvedPricing.input)
+  ) / 1_000_000
+}
+
 function getConversationsDir(spacePath: string): string {
   const tempPath = getTempSpacePath()
   if (spacePath === tempPath) {
@@ -101,15 +255,21 @@ function extractRecordsFromConversationFile(filePath: string): ExtractedRecord[]
 
       if (!usage) continue
 
+      const inTok = usage.inputTokens || 0
+      const outTok = usage.outputTokens || 0
+      const cacheRead = usage.cacheReadTokens || 0
+      const cacheCreate = usage.cacheCreationTokens || 0
+      const modelName = extractModel(message)
+
       records.push({
         timestamp: (message.timestamp as string) || '',
         conversationId,
-        model: extractModel(message),
-        inputTokens: usage.inputTokens || 0,
-        outputTokens: usage.outputTokens || 0,
-        cacheReadTokens: usage.cacheReadTokens || 0,
-        cacheCreationTokens: usage.cacheCreationTokens || 0,
-        costUsd: usage.totalCostUsd || 0
+        model: modelName,
+        inputTokens: inTok,
+        outputTokens: outTok,
+        cacheReadTokens: cacheRead,
+        cacheCreationTokens: cacheCreate,
+        costUsd: usage.totalCostUsd || estimateCost(modelName, inTok, outTok, cacheRead, cacheCreate)
       })
     }
 
@@ -147,19 +307,36 @@ function extractRecordsFromTranscriptFile(filePath: string): ExtractedRecord[] {
         continue
       }
 
+      const inTok = usage.input_tokens || 0
+      const outTok = usage.output_tokens || 0
+      const cacheRead = usage.cache_read_input_tokens || 0
+      const cacheCreate = usage.cache_creation_input_tokens || 0
+      const modelName = entry.message?.model || 'unknown'
+
       records.push({
         timestamp: entry.timestamp,
         conversationId: entry.sessionId || fallbackConversationId,
-        model: entry.message?.model || 'unknown',
-        inputTokens: usage.input_tokens || 0,
-        outputTokens: usage.output_tokens || 0,
-        cacheReadTokens: usage.cache_read_input_tokens || 0,
-        cacheCreationTokens: usage.cache_creation_input_tokens || 0,
-        costUsd: entry.costUSD || 0
+        model: modelName,
+        inputTokens: inTok,
+        outputTokens: outTok,
+        cacheReadTokens: cacheRead,
+        cacheCreationTokens: cacheCreate,
+        costUsd: entry.costUSD || estimateCost(modelName, inTok, outTok, cacheRead, cacheCreate)
       })
     }
 
-    return records
+    // Deduplicate: the SDK emits two entries per assistant turn —
+    // an initial one (output_tokens=0) and a final one (output_tokens>0).
+    // Keep only the most complete record per (sessionId, timestamp) pair.
+    const deduped = new Map<string, ExtractedRecord>()
+    for (const record of records) {
+      const key = `${record.conversationId}|${record.timestamp}`
+      const existing = deduped.get(key)
+      if (!existing || record.outputTokens > existing.outputTokens) {
+        deduped.set(key, record)
+      }
+    }
+    return Array.from(deduped.values())
   } catch {
     return []
   }

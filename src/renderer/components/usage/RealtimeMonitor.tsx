@@ -16,9 +16,13 @@ export function RealtimeMonitor({ isActive }: RealtimeMonitorProps) {
   const [data, setData] = useState<UsageRealtimeData | null>(null)
 
   const fetchData = useCallback(async () => {
-    const res = await api.getUsageRealtime()
-    if (res.success && res.data) {
-      setData(res.data as UsageRealtimeData)
+    try {
+      const res = await api.getUsageRealtime()
+      if (res.success && res.data) {
+        setData(res.data as UsageRealtimeData)
+      }
+    } catch {
+      // Silently ignore fetch errors — will retry on next interval
     }
   }, [])
 

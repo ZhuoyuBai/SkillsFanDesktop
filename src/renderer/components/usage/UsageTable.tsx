@@ -74,11 +74,16 @@ export function UsageTable({ periods }: UsageTableProps) {
                   </td>
                   <td className="px-3 py-2">
                     <div className="space-y-0.5">
-                      {p.modelsUsed.map(m => (
+                      {p.modelsUsed.slice(0, 3).map(m => (
                         <div key={m} className="text-xs text-muted-foreground">
                           • {m}
                         </div>
                       ))}
+                      {p.modelsUsed.length > 3 && (
+                        <div className="text-xs text-muted-foreground/60">
+                          +{p.modelsUsed.length - 3} more
+                        </div>
+                      )}
                     </div>
                   </td>
                   <td className="text-right px-3 py-2 tabular-nums">{tokenCell(p.inputTokens)}</td>

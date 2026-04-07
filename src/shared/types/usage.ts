@@ -4,7 +4,7 @@
 
 // Per-period aggregation (daily/weekly/monthly)
 export interface UsagePeriod {
-  period: string // "2026-04-07" (day) / "2026-W15" (week) / "2026-04" (month)
+  period: string // "2026-04-07" (day) / "2026-03-30" (week, Monday date) / "2026-04" (month)
   inputTokens: number
   outputTokens: number
   cacheReadTokens: number
