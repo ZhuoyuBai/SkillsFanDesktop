@@ -1,159 +1,201 @@
-# Claude Code 内置版本升级说明与操作手册
+# SkillsFan 内置 Claude Code 升级手册
 
-更新时间：2026-04-01
+更新时间：2026-04-07
 
-这份文档既记录本次升级结果，也作为后续重复升级 SkillsFan 内置 Claude Code 的标准操作手册。
+适用范围：当前这个 SkillsFan 仓库里的“内置 Claude Code CLI”升级工作。
+
+这份文档有两个用途：
+
+- 记录 2026-04-07 这次从 `2.1.89` 升级到 `2.1.92` 的结果
+- 作为以后任何模型重复执行升级时的标准 SOP
 
 ## 1. 本次升级结论
 
-2026-04-01 我已核对 npm registry，并完成本仓库内置 Claude Code 版本升级。
+2026-04-07 已确认 `@anthropic-ai/claude-code@2.1.92` 已发布，并已在本仓库完成升级。
 
 版本快照：
 
-- `@anthropic-ai/claude-code`
-  - 升级前：`2.1.72`
-  - npm `stable`：`2.1.81`
-  - npm `latest`：`2.1.89`
-  - 本次升级目标：`2.1.89`
-- `@anthropic-ai/claude-agent-sdk`
-  - 声明版本升级前：`^0.2.72`
-  - lockfile 实际已解析到：`0.2.89`
-  - npm `latest`：`0.2.89`
-  - 本次对齐后：`0.2.89`
+- 升级前：`@anthropic-ai/claude-code@2.1.89`
+- 升级后：`@anthropic-ai/claude-code@2.1.92`
+- 2026-04-07 查询到的 npm dist-tags：
+  - `latest`: `2.1.92`
+  - `next`: `2.1.92`
+  - `stable`: `2.1.85`
 
-本次实际改动：
+下载来源：
 
-- 将 [package.json](../package.json) 中的 `@anthropic-ai/claude-code` 固定为 `2.1.89`
-- 将 [package.json](../package.json) 中的 `@anthropic-ai/claude-agent-sdk` 固定为 `0.2.89`
-- 更新 [package-lock.json](../package-lock.json)
-- 不改动 PTY 启动逻辑，不改动 renderer，不改动打包脚本
+- npm registry 元数据：`https://registry.npmjs.org/@anthropic-ai/claude-code`
+- 2.1.92 tarball：`https://registry.npmjs.org/@anthropic-ai/claude-code/-/claude-code-2.1.92.tgz`
 
-为什么改成精确版本而不是 `^`：
+本次实际改动文件：
 
-- 内置 CLI 属于打包产物的一部分，版本漂移会直接影响终端行为
-- 精确版本更适合桌面应用发布和问题回溯
-- 以后每次升级都应该是“明确确认目标版本 + 明确验证结果”
+- [package.json](../package.json)
+- [package-lock.json](../package-lock.json)
+- [yarn.lock](../yarn.lock)
+- [docs/claude-code-upgrade-checklist.zh-CN.md](./claude-code-upgrade-checklist.zh-CN.md)
 
-## 2. 当前项目里的真实集成方式
+本次没有改动的内容：
 
-当前仓库中，内置 Claude Code 不是运行时单独下载，而是作为 npm 依赖随应用一起打包。
+- 不改 PTY 启动逻辑
+- 不改 renderer 逻辑
+- 不改打包脚本
+- 不改 `@anthropic-ai/sdk@0.71.0`
 
-关键位置：
+关键判断：
+
+- 当前仓库里真正的“Claude Code 内核”是 `@anthropic-ai/claude-code`
+- 当前仓库并没有直接依赖 `@anthropic-ai/claude-agent-sdk`
+- 以后不要再照旧文档去同步升级 `claude-agent-sdk`，除非仓库重新引入它
+
+## 2. 这个项目里“Claude Code 内核”到底在哪里
+
+当前仓库不是在运行时去单独下载 Claude Code，而是把它作为 npm 依赖随应用一起打包。
+
+源码里的关键位置：
 
 - 版本声明：[package.json](../package.json)
-- 锁定版本：[package-lock.json](../package-lock.json)
+- 锁定结果：[package-lock.json](../package-lock.json)、[yarn.lock](../yarn.lock)
 - PTY 启动入口：[src/main/services/pty-manager.service.ts](../src/main/services/pty-manager.service.ts)
-- macOS `node-pty` 权限修复：[scripts/fix-node-pty-helper-permissions.mjs](../scripts/fix-node-pty-helper-permissions.mjs)
-- macOS 打包后补权限与签名：[scripts/afterPack.cjs](../scripts/afterPack.cjs)
+- PTY 认证与环境变量：[src/main/services/pty-credentials.ts](../src/main/services/pty-credentials.ts)
+- macOS `node-pty` helper 权限修复：[scripts/fix-node-pty-helper-permissions.mjs](../scripts/fix-node-pty-helper-permissions.mjs)
+- macOS 打包后补权限：[scripts/afterPack.cjs](../scripts/afterPack.cjs)
 
-当前 PTY 逻辑直接依赖：
+[src/main/services/pty-manager.service.ts](../src/main/services/pty-manager.service.ts) 里当前是这样找 CLI 的：
 
-- `@anthropic-ai/claude-code/cli.js`
+- 先找 `app.getAppPath()/node_modules/@anthropic-ai/claude-code/cli.js`
+- 再找 `require.resolve('@anthropic-ai/claude-code/cli.js')`
+- 再找相对 `__dirname` 的候选路径
 
-当前项目现状补充：
+所以这里的升级本质上是：
 
-- 仓库里目前没有 `patches/` 目录
-- 本次升级不涉及 patch-package 自定义补丁调整
+1. 把 `@anthropic-ai/claude-code` 升到目标版本
+2. 更新 lockfile
+3. 验证 `cli.js` 入口还存在
+4. 验证构建产物和 PTY 启动链路没有被打断
 
 结论：
 
-- “升级内置 Claude Code” 本质上是升级 npm 依赖并重新打包应用
-- 最终用户不能只升级 App 里的终端 CLI；必须升级整个 SkillsFan 应用
+- 这不是“替换一个外部二进制”
+- 这不是“终端里单独安装 claude 命令”
+- 这是“升级桌面应用内置的 npm 依赖并重新验证”
 
-## 3. 本次升级后的最小验证结果
+## 3. 本次实际执行过的命令
 
-已完成并通过：
+先确认上游版本和下载地址：
 
 ```bash
+npm view @anthropic-ai/claude-code version dist-tags versions --json
+npm view @anthropic-ai/claude-code engines bin --json
+npm view @anthropic-ai/claude-code@2.1.92 dist.tarball dist.integrity --json
+```
+
+实际升级命令：
+
+```bash
+npm install @anthropic-ai/claude-code@2.1.92 --save-exact
+```
+
+实际验证命令：
+
+```bash
+npm ls @anthropic-ai/claude-code
 node -p "require.resolve('@anthropic-ai/claude-code/cli.js')"
+node -e "const p=require('./node_modules/@anthropic-ai/claude-code/package.json'); console.log(JSON.stringify({version:p.version, bin:p.bin, engines:p.engines}, null, 2))"
 ./node_modules/.bin/tsc --noEmit --pretty false -p tsconfig.json
 node tests/check/binaries.mjs --platform mac
+git diff --check
+npm run build
 ```
 
-结果：
+## 4. 本次验证结果
 
-- `cli.js` 入口在 `2.1.89` 中仍然存在
-- TypeScript 类型检查通过
-- macOS 二进制检查通过
+已经确认通过：
 
-已发现的仓库基线问题：
+- `npm ls @anthropic-ai/claude-code` 显示当前安装版本为 `2.1.92`
+- `require.resolve('@anthropic-ai/claude-code/cli.js')` 仍然成功
+- 包内 `bin` 仍然是 `claude -> cli.js`
+- 包内 `engines.node` 仍然是 `>=18.0.0`
+- TypeScript 静态检查通过
+- `tests/check/binaries.mjs --platform mac` 通过
+- `git diff --check` 通过
+- `npm run build` 通过
+
+这次构建级验证说明：
+
+- 不是只有依赖树更新成功
+- Electron + preload + renderer 的构建链路仍然正常
+- 内置 Claude Code CLI 的路径没有在构建阶段被明显破坏
+
+## 5. 以后重复升级时的标准流程
+
+下面这套流程就是以后让我重复执行升级时应遵循的标准流程。
+
+### 5.1 先确认“目标版本是否真实存在”
+
+不要凭记忆升级，也不要只看聊天记录。
+
+先跑：
 
 ```bash
-./node_modules/.bin/vitest run tests/unit/services/agent/session-manager.test.ts tests/unit/services/agent/sdk-options.test.ts --config tests/vitest.config.ts
+npm view @anthropic-ai/claude-code version dist-tags versions engines bin --json
 ```
 
-结果：
-
-- 上述两组测试失败
-- 失败原因不是本次升级引入，而是测试引用了不存在的路径：
-  - `src/main/services/agent/session-manager`
-  - `src/main/services/agent/sdk-options`
-- 当前仓库中并不存在 `src/main/services/agent/` 目录
-
-因此，本次升级的验证结论应写成：
-
-- 升级本身已完成
-- 最小静态检查通过
-- 相关单测存在既有基线问题，不能作为本次升级失败依据
-
-## 4. 以后升级前，先用这些命令确认上游版本
-
-先查最新版本，不要凭记忆升级。
+如果用户指定了具体版本，再跑：
 
 ```bash
-npm view @anthropic-ai/claude-code version dist-tags --json
-npm view @anthropic-ai/claude-agent-sdk version dist-tags --json
-npm view @anthropic-ai/claude-code engines --json
-npm view @anthropic-ai/claude-agent-sdk peerDependencies engines --json
+npm view @anthropic-ai/claude-code@<target_version> version dist.tarball dist.integrity engines bin --json
 ```
 
 判断规则：
 
-- 如果你要“最新版本”，优先取 `dist-tags.latest`
-- 如果你要“相对稳妥版本”，优先取 `dist-tags.stable`
-- 如果 `claude-code` 和 `claude-agent-sdk` 都发布了相同尾号版本，优先一并对齐
-- 如果上游要求的 Node 版本高于当前 Electron 内置 Node 版本，不要直接升级
+- 如果用户明确指定版本，例如 `2.1.92`，先确认该版本确实已发布
+- 如果用户说“升级到最新”，优先看 `dist-tags.latest`
+- 如果用户说“稳一点”，优先看 `dist-tags.stable`
+- 回答用户时要写绝对日期，例如“截至 2026-04-07，latest 是 2.1.92”
 
-## 5. 标准升级步骤
+### 5.2 确认当前仓库是不是还沿用同一条集成链路
 
-下面这套流程就是以后让我重复执行时应遵循的标准流程。
+每次升级前先确认下面这些点没有根本变化：
 
-### 5.1 确认目标版本
+- [package.json](../package.json) 里是否仍然直接依赖 `@anthropic-ai/claude-code`
+- [src/main/services/pty-manager.service.ts](../src/main/services/pty-manager.service.ts) 是否仍然通过 `cli.js` 启动
+- [scripts/afterPack.cjs](../scripts/afterPack.cjs) 和 [scripts/fix-node-pty-helper-permissions.mjs](../scripts/fix-node-pty-helper-permissions.mjs) 是否仍然存在
 
-示例：
+如果这些前提变了，不要机械照抄本文档，先重新审视集成方式。
 
-- `@anthropic-ai/claude-code` 目标版本：`2.1.89`
-- `@anthropic-ai/claude-agent-sdk` 目标版本：`0.2.89`
+### 5.3 执行升级
 
-### 5.2 升级依赖并固定精确版本
+标准命令：
 
 ```bash
-npm install @anthropic-ai/claude-code@<claude_code_version> @anthropic-ai/claude-agent-sdk@<sdk_version> --save-exact
+npm install @anthropic-ai/claude-code@<target_version> --save-exact
 ```
 
-如果只升级 CLI，不升级 SDK，使用：
+要求：
+
+- 必须使用精确版本，不要改成 `^`
+- 升级后必须检查 [package.json](../package.json)
+- 升级后必须检查 [package-lock.json](../package-lock.json)
+- 如果 [yarn.lock](../yarn.lock) 也跟着变了，一并提交，不要忽略
+
+### 5.4 先验证 CLI 包本身是否还是原来的结构
+
+至少运行：
 
 ```bash
-npm install @anthropic-ai/claude-code@<claude_code_version> --save-exact
-```
-
-升级后必须确认：
-
-- [package.json](../package.json) 中不再出现 `^`
-- [package-lock.json](../package-lock.json) 已更新到目标版本
-
-### 5.3 检查内置 CLI 入口是否还存在
-
-```bash
+npm ls @anthropic-ai/claude-code
 node -p "require.resolve('@anthropic-ai/claude-code/cli.js')"
+node -e "const p=require('./node_modules/@anthropic-ai/claude-code/package.json'); console.log(JSON.stringify({version:p.version, bin:p.bin, engines:p.engines}, null, 2))"
 ```
 
 如果失败，优先检查：
 
 - 新版本是否仍然导出 `cli.js`
-- [src/main/services/pty-manager.service.ts](../src/main/services/pty-manager.service.ts) 中的候选路径是否需要调整
+- `bin.claude` 是否仍然指向 `cli.js`
+- `engines.node` 是否高于当前项目可接受的 Node 版本
+- [src/main/services/pty-manager.service.ts](../src/main/services/pty-manager.service.ts) 的候选路径是否需要调整
 
-### 5.4 运行最小验证
+### 5.5 运行最小静态验证
 
 ```bash
 ./node_modules/.bin/tsc --noEmit --pretty false -p tsconfig.json
@@ -165,133 +207,130 @@ git diff --check
 
 ```bash
 npm run build
+```
+
+如果你准备出正式 mac 包，再补：
+
+```bash
 npm run build:mac:cn
 ```
 
-如果你准备验证 Windows 包，再补：
+如果你准备检查 Windows 包，再补：
 
 ```bash
-npm run prepare:win-x64
 npm run test:check:win
 ```
 
-### 5.5 手工验收终端关键路径
+### 5.6 做一次最小手工验收
 
-至少做这些：
+至少验证这些路径：
 
 1. 启动应用
 2. 打开内置 Claude Code 终端
 3. 新建一个终端 tab
 4. 再新建第二个终端 tab
 5. 切换 tab 并关闭其中一个
-6. 验证“新对话”按钮是否还能触发新会话
-7. 验证本地模型模式或现有登录模式是否仍然正常
+6. 验证“新对话”按钮是否还能创建新会话
+7. 验证你当前常用的登录模式或本地模型模式是否仍然可用
 
 验收重点：
 
 - 不报 `Claude Code CLI not found`
 - 不报 `posix_spawnp failed`
-- 不重复卡在 welcome / onboarding
+- 不反复卡在 welcome / onboarding
 - 多 tab 会话不串
 - 关闭一个 tab 不影响其他 tab
 
-## 6. 重点风险面
+## 6. 最容易出错的点
 
-每次升级都优先检查下面这几类兼容风险。
+### 6.1 把错误的包当成“Claude Code 内核”
 
-### 6.1 CLI 入口路径变化
+当前仓库里容易混淆的包有两个：
 
-关联代码：
+- `@anthropic-ai/claude-code`
+- `@anthropic-ai/sdk`
 
-- [src/main/services/pty-manager.service.ts](../src/main/services/pty-manager.service.ts)
+这里真正的内置 CLI 是前者。后者是通用 API SDK，不等于桌面应用里的 Claude Code CLI。
 
-重点检查：
+### 6.2 继续沿用旧文档里那套 `claude-agent-sdk` 逻辑
 
-- `require.resolve('@anthropic-ai/claude-code/cli.js')` 是否仍然有效
-- 打包后 `app.asar` / `app.asar.unpacked` 路径是否仍然正确
+这是当前最容易踩的坑之一。
 
-### 6.2 认证与环境变量行为变化
+旧文档里写了 `@anthropic-ai/claude-agent-sdk`，但当前仓库并没有直接依赖它。以后升级时，不要默认去同步升级一个仓库里根本没有的依赖。
 
-关联代码：
+### 6.3 只改 `package.json`，不看 lockfile
 
-- [src/main/services/pty-manager.service.ts](../src/main/services/pty-manager.service.ts)
-- [src/main/services/pty-credentials.ts](../src/main/services/pty-credentials.ts)
+升级后至少要确认：
 
-重点检查：
+- [package.json](../package.json) 已变成目标版本
+- [package-lock.json](../package-lock.json) 已解析到目标版本
+- [yarn.lock](../yarn.lock) 如果变了，也要一起保留
 
-- `ANTHROPIC_API_KEY`
-- `ANTHROPIC_BASE_URL`
-- `CLAUDE_CONFIG_DIR`
-- 是否还需要清理继承态里的 auth token
+### 6.4 只看版本号，不看 CLI 入口
 
-### 6.3 onboarding 或 trust 状态字段变化
+版本升上去不代表 PTY 一定还能跑。
 
-关联代码：
+真正关键的是：
 
-- [src/main/services/pty-manager.service.ts](../src/main/services/pty-manager.service.ts)
+```bash
+node -p "require.resolve('@anthropic-ai/claude-code/cli.js')"
+```
 
-重点检查：
+如果这条不通，应用里的嵌入式终端大概率就会挂。
 
-- 全局配置文件名是否变化
-- `hasCompletedOnboarding` 是否变化
-- `projects[workDir].hasTrustDialogAccepted` 是否变化
-- `customApiKeyResponses.approved` 是否变化
+### 6.5 忽略 Node 要求
 
-### 6.4 macOS PTY 启动链路变化
+截至 2026-04-07，`@anthropic-ai/claude-code@2.1.92` 要求：
 
-关联代码：
+```json
+{
+  "node": ">=18.0.0"
+}
+```
 
-- [src/main/services/pty-manager.service.ts](../src/main/services/pty-manager.service.ts)
+如果后续某个版本把要求抬高，先确认当前 Electron 和构建环境是否还能满足，再决定升不升。
+
+### 6.6 构建能过，但 PTY 还是可能因为 helper 权限翻车
+
+这个项目的 PTY 链路不只依赖 Claude Code，还依赖 `node-pty`。
+
+重点看：
+
 - [scripts/fix-node-pty-helper-permissions.mjs](../scripts/fix-node-pty-helper-permissions.mjs)
 - [scripts/afterPack.cjs](../scripts/afterPack.cjs)
 
-重点检查：
+如果升级后出现 macOS 终端启动失败，不要只盯着 Claude Code 版本，也要检查 `node-pty` helper 权限。
 
-- `node-pty` helper 是否仍有执行权限
-- 打包后 helper 是否仍在 `asarUnpack` 链路中
-- 升级后 Electron + PTY + Claude Code 的启动方式是否变化
+### 6.7 忽略仓库原本已有的脏改动
 
-## 7. 回滚方式
-
-如果新版本有问题，按下面方式回滚：
+升级前先看：
 
 ```bash
-npm install @anthropic-ai/claude-code@<old_version> @anthropic-ai/claude-agent-sdk@<old_version> --save-exact
-./node_modules/.bin/tsc --noEmit --pretty false -p tsconfig.json
-node tests/check/binaries.mjs --platform mac
+git status --short
 ```
 
-本次升级前的可回滚基线：
+如果仓库里已经有用户自己的未提交改动，不要回滚，也不要覆盖。升级工作应该只动与升级直接相关的文件。
 
-- `@anthropic-ai/claude-code`：`2.1.72`
-- `@anthropic-ai/claude-agent-sdk`：`0.2.89` 或声明值 `^0.2.72`
+## 7. 以后再让我升级时，可以直接用这段话
 
-如果只回滚 CLI：
-
-```bash
-npm install @anthropic-ai/claude-code@2.1.72 --save-exact
-```
-
-## 8. 下次让我执行时，可以直接给我的指令模板
-
-以后你只要把下面这句话发给我，我就可以按这份文档直接执行：
+把下面这段话直接发给任何模型即可：
 
 ```text
-请按照 docs/claude-code-upgrade-checklist.zh-CN.md 的流程，把 SkillsFan 内置 Claude Code 升级到 npm latest，并完成最小验证；如果 latest 不适合发版，就改用 stable，并把差异和风险写出来。
+请按照 docs/claude-code-upgrade-checklist.zh-CN.md 的流程，
+把 SkillsFan 内置 Claude Code 升级到 @anthropic-ai/claude-code=<目标版本>。
+先核对 npm 是否存在该版本，再执行升级、最小验证和必要的构建验证。
+不要擅自升级与当前仓库无关的包，不要回滚我现有的未提交改动。
+完成后把结果、风险和验证情况写回文档，并同步一份到桌面。
 ```
 
-如果你要指定版本，用这句：
+## 8. 本次 2.1.92 升级的最终记录
 
-```text
-请按照 docs/claude-code-upgrade-checklist.zh-CN.md 的流程，把 SkillsFan 内置 Claude Code 升级到 @anthropic-ai/claude-code=<目标版本>，并尽量把 @anthropic-ai/claude-agent-sdk 对齐到兼容版本，完成最小验证后汇报结果。
-```
+截至 2026-04-07，本仓库内置 Claude Code 已完成：
 
-## 9. 本次升级摘要
+- 从 `2.1.89` 升级到 `2.1.92`
+- `package.json`、`package-lock.json`、`yarn.lock` 已同步
+- `cli.js` 入口验证通过
+- 最小静态验证通过
+- `npm run build` 通过
 
-这次升级的最终状态如下：
-
-- 内置 `Claude Code` 已从 `2.1.72` 升级到 `2.1.89`
-- `Claude Agent SDK` 已在声明层面对齐到 `0.2.89`
-- 版本声明从浮动版本改为精确版本
-- 最小静态检查通过
-- 已知的 agent 单测路径失效问题需要后续单独修复
+如果下次用户要求继续升级，不要从旧记忆开始，直接先看本文档第 5 节，然后重新用 `npm view` 核对上游状态。

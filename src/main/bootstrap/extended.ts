@@ -22,6 +22,7 @@ import { registerGitBashHandlers, initializeGitBashOnStartup } from '../ipc/git-
 import { registerSkillHandlers } from '../ipc/skill'
 import { initializeRegistry, startSkillWatcher } from '../services/skill'
 import { registerExtensionHandlers } from '../ipc/extension'
+import { registerUsageHandlers } from '../ipc/usage'
 import { registerPtyHandlers } from '../ipc/pty'
 import { destroyAllPtys } from '../services/pty-manager.service'
 import { initializeExtensions as initExtensions, shutdownExtensions } from '../services/extension'
@@ -57,6 +58,9 @@ export function initializeExtendedServices(mainWindow: BrowserWindow): void {
 
   // PTY: Embedded Claude Code CLI terminal in Canvas
   registerPtyHandlers(mainWindow)
+
+  // Usage Statistics: Token usage and cost tracking
+  registerUsageHandlers()
 
   // Skill: Settings and slash-command APIs
   registerSkillHandlers()

@@ -138,30 +138,19 @@ class AISourceManager {
     // Use decrypted config for providers to read tokens
     const aiSources = this.getDecryptedAiSources()
 
-    // Debug logging
-    console.log('[AISourceManager] getBackendConfig called')
-    console.log('[AISourceManager] current source:', aiSources.current)
-    console.log('[AISourceManager] aiSources keys:', Object.keys(aiSources))
-
     const provider = this.providers.get(aiSources.current)
 
     if (!provider) {
-      console.log(`[AISourceManager] No registered provider for source: ${aiSources.current}`)
-      console.log('[AISourceManager] Available providers:', Array.from(this.providers.keys()))
-
       // Check if current source is a dynamic custom API provider (e.g., 'zhipu', 'kimi', 'deepseek')
       // These have 'apiKey' field but are not registered as providers
       const currentConfig = (aiSources as Record<string, any>)[aiSources.current]
       if (currentConfig && typeof currentConfig === 'object' && 'apiKey' in currentConfig && currentConfig.apiKey) {
-        console.log('[AISourceManager] Found dynamic custom API config for:', aiSources.current)
         return this.getDynamicCustomBackendConfig(currentConfig)
       }
 
       console.warn(`[AISourceManager] No config found for source: ${aiSources.current}`)
       return null
     }
-
-    console.log('[AISourceManager] Found provider:', provider.type)
 
     if (!provider.isConfigured(aiSources)) {
       console.warn(`[AISourceManager] Provider ${aiSources.current} is not configured`)
@@ -170,9 +159,7 @@ class AISourceManager {
       return this.tryCustomApiFallback(aiSources)
     }
 
-    console.log('[AISourceManager] Provider is configured, calling getBackendConfig')
     const result = provider.getBackendConfig(aiSources)
-    console.log('[AISourceManager] getBackendConfig result:', result ? { url: result.url, model: result.model, hasKey: !!result.key } : null)
 
     if (!result) {
       // Provider is configured but returned null (e.g., expired token)

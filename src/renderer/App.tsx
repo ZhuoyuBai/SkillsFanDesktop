@@ -26,7 +26,7 @@ const SettingsPage = lazy(() => import('./pages/SettingsPage').then(m => ({ defa
 
 function PageLoader() {
   return (
-    <div className="h-screen w-screen flex items-center justify-center bg-background">
+    <div className="h-full w-full flex items-center justify-center bg-background">
       <div className="flex flex-col items-center gap-4">
         <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
         <span className="text-sm text-muted-foreground">Loading...</span>
@@ -164,16 +164,20 @@ export default function App() {
       case 'setup':
         return <SetupFlow />
       case 'space':
-        return (
-          <Suspense fallback={<PageLoader />}>
-            <SpacePage />
-          </Suspense>
-        )
       case 'settings':
         return (
-          <Suspense fallback={<PageLoader />}>
-            <SettingsPage />
-          </Suspense>
+          <div className="relative h-full w-full">
+            <Suspense fallback={<PageLoader />}>
+              <SpacePage />
+            </Suspense>
+            {view === 'settings' && (
+              <div className="absolute inset-0 z-20">
+                <Suspense fallback={<PageLoader />}>
+                  <SettingsPage />
+                </Suspense>
+              </div>
+            )}
+          </div>
         )
       default:
         return <SplashScreen />

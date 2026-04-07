@@ -226,7 +226,7 @@ export function OnboardingFlow({ onComplete, onLogin, onStartNow }: OnboardingFl
   const dots = <ProgressDots />
 
   return (
-    <div className="h-full w-full bg-white relative overflow-hidden">
+    <div className="h-full w-full bg-background relative overflow-hidden">
       {/* Page 1: Welcome */}
       <OnboardingPage
         image={ONBOARDING_IMAGES.welcome}

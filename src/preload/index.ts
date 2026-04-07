@@ -226,6 +226,14 @@ export interface SkillsFanAPI {
   wechatSetDefaultSpace: (spaceId: string | null) => Promise<IpcResponse>
   wechatSetAutoApproveTools: (enabled: boolean) => Promise<IpcResponse>
 
+  // Usage Statistics
+  getUsageHistory: (query: {
+    dateRange?: { from: string; to: string }
+    granularity: 'day' | 'week' | 'month'
+    forceRefresh?: boolean
+  }) => Promise<IpcResponse>
+  getUsageRealtime: () => Promise<IpcResponse>
+
   // System Settings
   getAutoLaunch: () => Promise<IpcResponse>
   setAutoLaunch: (enabled: boolean) => Promise<IpcResponse>
@@ -633,6 +641,10 @@ const api: SkillsFanAPI = {
   wechatRemoveSession: (fromUserId) => ipcRenderer.invoke('wechat:remove-session', fromUserId),
   wechatSetDefaultSpace: (spaceId) => ipcRenderer.invoke('wechat:set-default-space', spaceId),
   wechatSetAutoApproveTools: (enabled) => ipcRenderer.invoke('wechat:set-auto-approve-tools', enabled),
+
+  // Usage Statistics
+  getUsageHistory: (query) => ipcRenderer.invoke('usage:get-history', query),
+  getUsageRealtime: () => ipcRenderer.invoke('usage:get-realtime'),
 
   // System Settings
   getAutoLaunch: () => ipcRenderer.invoke('system:get-auto-launch'),

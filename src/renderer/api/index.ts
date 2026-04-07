@@ -837,6 +837,29 @@ export const api = {
     if (!isElectron()) return { success: false, error: 'Only available in desktop app' }
     return window.skillsfan.wechatSetAutoApproveTools(enabled)
   },
+  // ===== Usage Statistics =====
+  getUsageHistory: async (query: {
+    dateRange?: { from: string; to: string }
+    granularity: 'day' | 'week' | 'month'
+    forceRefresh?: boolean
+  }): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.skillsfan.getUsageHistory(query)
+    }
+    return httpRequest('GET', `/api/usage/history?${new URLSearchParams({
+      granularity: query.granularity,
+      ...(query.dateRange ? { from: query.dateRange.from, to: query.dateRange.to } : {}),
+      ...(query.forceRefresh ? { forceRefresh: '1' } : {})
+    })}`)
+  },
+
+  getUsageRealtime: async (): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.skillsfan.getUsageRealtime()
+    }
+    return httpRequest('GET', '/api/usage/realtime')
+  },
+
   // ===== System Settings (Electron only) =====
   getAutoLaunch: async (): Promise<ApiResponse> => {
     if (!isElectron()) {

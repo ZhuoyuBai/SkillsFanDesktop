@@ -11,7 +11,7 @@ import { useSpaceStore } from './space.store'
 import { createLogger } from '../lib/logger'
 
 // Settings section type (must match SettingsPage)
-export type SettingsSection = 'ai-model' | 'display' | 'skills' | 'system' | 'spaces'
+export type SettingsSection = 'ai-model' | 'display' | 'skills' | 'system' | 'spaces' | 'usage'
 
 // Git Bash installation progress
 interface GitBashInstallProgress {

@@ -151,7 +151,7 @@ export function LoginSelector({ onSelectProvider, onBack, onSkip }: LoginSelecto
   }
 
   return (
-    <div className="h-full w-full flex flex-col items-center bg-white pt-[12vh] px-8 relative overflow-y-auto">
+    <div className="h-full w-full flex flex-col items-center bg-background pt-[12vh] px-8 relative overflow-y-auto">
       {/* Back Button - Top Left (when coming from onboarding) */}
       {onBack && (
         <div className="absolute top-12 left-6">

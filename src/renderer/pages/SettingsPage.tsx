@@ -18,12 +18,14 @@ import { SpaceManagementSection } from '../components/settings/SpaceManagementSe
 import { ResetSection } from '../components/settings/ResetSection'
 import { ApiConfigDialog } from '../components/settings/ApiConfigDialog'
 import { useTranslation, setLanguage, getCurrentLanguage, SUPPORTED_LOCALES, type LocaleCode } from '../i18n'
-import { Loader2, LogOut, Plus, Check, Globe, Key, MessageSquare, Bot, Palette, Server, Settings as SettingsIcon, Wifi, X, Package, User, Layers, SlidersHorizontal, ArrowLeft, Database, Pencil, Trash2, Terminal, type LucideIcon } from 'lucide-react'
+import { Loader2, LogOut, Plus, Check, Globe, Key, MessageSquare, Bot, Palette, Server, Settings as SettingsIcon, Wifi, X, Package, User, Layers, SlidersHorizontal, ArrowLeft, Database, Pencil, Trash2, Terminal, BarChart3, type LucideIcon } from 'lucide-react'
 import { usePlatform } from '../components/layout/Header'
 import { isElectron } from '../api/transport'
 import { useToastStore } from '../stores/toast.store'
 import { getProviderLogoById } from '../components/layout/ModelSelector'
 import { resolveBrowserAutomationConfig, type BrowserAutomationMode } from '@shared/types/browser-automation'
+import { RealtimeMonitor } from '../components/usage/RealtimeMonitor'
+import { HistoryStats } from '../components/usage/HistoryStats'
 
 // Import provider logos
 import zhipuLogo from '../assets/providers/zhipu.jpg'
@@ -239,11 +241,12 @@ function resolveProviderFormValues(config: HaloConfig | undefined, providerId: s
 }
 
 // Settings section type
-type SettingsSection = 'ai-model' | 'display' | 'skills' | 'system' | 'spaces'
+type SettingsSection = 'ai-model' | 'display' | 'skills' | 'system' | 'spaces' | 'usage'
 
 const TERMINAL_SHELL_SETTINGS_SECTIONS: SettingsSection[] = [
   'ai-model',
   'skills',
+  'usage',
   'spaces',
   'system',
   'display',
@@ -907,6 +910,7 @@ export function SettingsPage() {
   const navItems: { id: SettingsSection; icon: LucideIcon; label: string; desktopOnly?: boolean; hidden?: boolean }[] = [
     { id: 'ai-model', icon: Bot, label: t('AI Model') },
     { id: 'skills', icon: Package, label: t('Skills') },
+    { id: 'usage', icon: BarChart3, label: t('Usage'), desktopOnly: true },
     { id: 'spaces', icon: Layers, label: t('Spaces'), desktopOnly: true },
     { id: 'display', icon: Palette, label: t('Display') },
     { id: 'system', icon: SettingsIcon, label: t('System'), desktopOnly: true },
@@ -981,7 +985,7 @@ export function SettingsPage() {
 
           {/* Scrollable content */}
           <div className="flex-1 overflow-auto p-8">
-            <div className="max-w-3xl">
+            <div className={activeSection === 'usage' ? '' : 'max-w-3xl'}>
 
           {/* AI Model Section - Grid Layout */}
           {activeSection === 'ai-model' && (
@@ -1720,7 +1724,7 @@ export function SettingsPage() {
           </section>
           )}
 
-          <div className="max-w-2xl">{/* reopen max-w-2xl */}
+          <div className={activeSection === 'usage' ? '' : 'max-w-2xl'}>{/* reopen max-w-2xl */}
 
 
           {/* Spaces Management Section */}
@@ -1728,6 +1732,14 @@ export function SettingsPage() {
           <section className="space-y-6">
             <h2 className="text-lg font-medium mb-4">{t('Space Management')}</h2>
             <SpaceManagementSection />
+          </section>
+          )}
+
+          {activeSection === 'usage' && !api.isRemoteMode() && (
+          <section className="w-full min-w-0 space-y-8">
+            <RealtimeMonitor isActive={activeSection === 'usage'} />
+            <div className="border-t border-border/50" />
+            <HistoryStats isActive={activeSection === 'usage'} />
           </section>
           )}
 
