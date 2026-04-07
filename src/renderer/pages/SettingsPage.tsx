@@ -326,6 +326,9 @@ export function SettingsPage() {
   const [noFlicker, setNoFlicker] = useState(
     config?.terminal?.noFlicker ?? DEFAULT_CONFIG.terminal!.noFlicker
   )
+  const [desktopPetEnabled, setDesktopPetEnabled] = useState(
+    config?.desktopPet?.enabled ?? false
+  )
   const [showTerminalModeDialog, setShowTerminalModeDialog] = useState(false)
 
   // Advanced settings state
@@ -484,6 +487,23 @@ export function SettingsPage() {
     } catch (error) {
       console.error('[Settings] Failed to toggle noFlicker:', error)
       setNoFlicker(previousValue)
+    }
+  }
+
+  // Handle Desktop Pet toggle
+  const handleDesktopPetToggle = async (enabled: boolean) => {
+    const previousValue = desktopPetEnabled
+    setDesktopPetEnabled(enabled)
+    try {
+      const result = await api.setConfig({ desktopPet: { enabled } })
+      if (result.success && result.data) {
+        setConfig(result.data as HaloConfig)
+      } else {
+        setDesktopPetEnabled(previousValue)
+      }
+    } catch (error) {
+      console.error('[Settings] Failed to toggle desktopPet:', error)
+      setDesktopPetEnabled(previousValue)
     }
   }
 
@@ -1737,6 +1757,16 @@ export function SettingsPage() {
 
           {activeSection === 'usage' && !api.isRemoteMode() && (
           <section className="w-full min-w-0 space-y-8">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <p className="font-medium">{t('Desktop Pet')}</p>
+                <p className="text-sm text-muted-foreground">
+                  {t('Show a pet in the terminal that reacts to your usage activity')}
+                </p>
+              </div>
+              <Switch checked={desktopPetEnabled} onChange={handleDesktopPetToggle} />
+            </div>
+            <div className="border-t border-border/50" />
             <RealtimeMonitor isActive={activeSection === 'usage'} />
             <div className="border-t border-border/50" />
             <HistoryStats isActive={activeSection === 'usage'} />

@@ -19,6 +19,7 @@ import { TerminalStatusOverlay } from './TerminalStatusOverlay'
 import { TerminalSetupGuide } from './TerminalSetupGuide'
 import { describeTerminalLaunchError } from './terminal-error'
 import { hasAnyAISource } from '../../types'
+import { DesktopPet } from '../pet/DesktopPet'
 
 interface TerminalSessionPaneProps {
   terminalId: string
@@ -347,6 +348,10 @@ export function TerminalSessionPane({
               onOpenSettings={handleSettings}
             />
           </>
+        )}
+
+        {!needsSetup && config?.desktopPet?.enabled && (
+          <DesktopPet isActive={isActive} />
         )}
       </div>
 

@@ -51,8 +51,9 @@ interface TranscriptLine {
 }
 
 const fileCache = new Map<string, FileCacheEntry>()
-const SAMPLE_INTERVAL_MS = 30_000
-const MAX_SAMPLES = 10
+const SAMPLE_INTERVAL_MS = 60_000
+const MAX_SAMPLES = 5
+const APP_SESSION_STARTED_AT = Date.now()
 
 // ---------------------------------------------------------------------------
 // Model pricing table (USD per 1M tokens)
@@ -495,11 +496,12 @@ function buildSpeedSamples(records: ExtractedRecord[]): UsageRealtimeData['speed
   if (records.length === 0) return []
 
   const now = Date.now()
+  const currentMinuteStart = Math.floor(now / SAMPLE_INTERVAL_MS) * SAMPLE_INTERVAL_MS
   const samples: UsageRealtimeData['speedSamples'] = []
 
-  for (let index = MAX_SAMPLES - 1; index >= 0; index--) {
-    const bucketEnd = now - index * SAMPLE_INTERVAL_MS
-    const bucketStart = bucketEnd - SAMPLE_INTERVAL_MS
+  for (let index = MAX_SAMPLES; index >= 1; index--) {
+    const bucketStart = currentMinuteStart - index * SAMPLE_INTERVAL_MS
+    const bucketEnd = bucketStart + SAMPLE_INTERVAL_MS
 
     let bucketTokens = 0
     let bucketCost = 0
@@ -513,7 +515,7 @@ function buildSpeedSamples(records: ExtractedRecord[]): UsageRealtimeData['speed
     }
 
     samples.push({
-      timestamp: bucketEnd,
+      timestamp: bucketStart,
       tokensPerMinute: Math.round((bucketTokens / SAMPLE_INTERVAL_MS) * 60_000),
       costPerMinute: Math.round(((bucketCost / SAMPLE_INTERVAL_MS) * 60_000) * 10000) / 10000
     })
@@ -652,6 +654,10 @@ export function getUsageRealtime(): UsageRealtimeData {
   const { records } = scanAllUsageRecords(false)
   const todayStr = new Date().toISOString().slice(0, 10)
   const todayRecords = records.filter((record) => record.timestamp && record.timestamp.startsWith(todayStr))
+  const appSessionRecords = records.filter((record) => {
+    const timestamp = new Date(record.timestamp).getTime()
+    return !Number.isNaN(timestamp) && timestamp >= APP_SESSION_STARTED_AT
+  })
 
   let todayTokens = 0
   let todayCost = 0
@@ -660,13 +666,13 @@ export function getUsageRealtime(): UsageRealtimeData {
     todayCost += record.costUsd
   }
 
-  const latestRecord = records.reduce<ExtractedRecord | null>((latest, record) => {
+  const latestRecord = appSessionRecords.reduce<ExtractedRecord | null>((latest, record) => {
     if (!latest) return record
     return new Date(record.timestamp).getTime() > new Date(latest.timestamp).getTime() ? record : latest
   }, null)
 
   const currentSessionRecords = latestRecord
-    ? records.filter((record) => record.conversationId === latestRecord.conversationId)
+    ? appSessionRecords.filter((record) => record.conversationId === latestRecord.conversationId)
     : []
 
   let currentSessionTokens = 0

@@ -249,6 +249,9 @@ export interface HaloConfig {
     enabled: boolean;
     content: string;
   };
+  desktopPet?: {  // Desktop pet floating widget
+    enabled: boolean;
+  };
   isFirstLaunch: boolean;
 }
 
@@ -676,6 +679,9 @@ export const DEFAULT_CONFIG: HaloConfig = {
         userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_7_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
       }
     }
+  },
+  desktopPet: {
+    enabled: false,
   },
   mcpServers: {},  // Empty by default
   isFirstLaunch: true

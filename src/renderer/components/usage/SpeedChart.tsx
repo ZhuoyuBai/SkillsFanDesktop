@@ -21,10 +21,10 @@ export function SpeedChart({ samples }: SpeedChartProps) {
 
   const data = useMemo(() => {
     if (samples.length === 0) {
-      // Generate a flat zero line spanning 5 minutes
-      const now = Date.now()
-      return Array.from({ length: 10 }, (_, i) => ({
-        time: new Date(now - (9 - i) * 30_000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      // Generate a flat zero line spanning the last 5 completed minutes
+      const currentMinuteStart = Math.floor(Date.now() / 60_000) * 60_000
+      return Array.from({ length: 5 }, (_, i) => ({
+        time: new Date(currentMinuteStart - (5 - i) * 60_000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         tokensPerMin: 0,
       }))
     }
