@@ -379,8 +379,10 @@ export function SettingsPage() {
     api.openDownloadPage()
   }
 
-  // Refresh AI sources config on mount
+  // Refresh AI sources only when the AI Model section is visible.
   useEffect(() => {
+    if (activeSection !== 'ai-model') return
+
     api.refreshAISourcesConfig().then((result) => {
       if (result.success) {
         api.getConfig().then((configResult) => {
@@ -390,7 +392,7 @@ export function SettingsPage() {
         })
       }
     })
-  }, [])
+  }, [activeSection, setConfig])
 
   // Load system settings
   useEffect(() => {
@@ -413,6 +415,23 @@ export function SettingsPage() {
       console.error('[Settings] Failed to load system settings:', error)
     }
   }
+
+  const applyTerminalConfigOptimistically = useCallback((terminalConfig: NonNullable<HaloConfig['terminal']>) => {
+    if (!config) return
+    setConfig({
+      ...config,
+      terminal: terminalConfig,
+    } as HaloConfig)
+  }, [config, setConfig])
+
+  const restoreTerminalConfig = useCallback((terminalConfig: NonNullable<HaloConfig['terminal']>) => {
+    const latestConfig = useAppStore.getState().config
+    if (!latestConfig) return
+    setConfig({
+      ...latestConfig,
+      terminal: terminalConfig,
+    } as HaloConfig)
+  }, [setConfig])
 
   // Auto-save helper for appearance settings
   const autoSave = useCallback(async (partialConfig: Partial<HaloConfig>) => {
@@ -459,10 +478,12 @@ export function SettingsPage() {
   const handleTerminalModeSwitch = async (useClaudeLogin: boolean) => {
     const nextSkip = !useClaudeLogin
     const previousValue = skipClaudeLogin
+    const previousTerminalConfig = mergeTerminalConfig(config?.terminal, {})
     setSkipClaudeLogin(nextSkip)
     setShowTerminalModeDialog(false)
     try {
-      const terminalConfig = mergeTerminalConfig(config?.terminal, { skipClaudeLogin: nextSkip })
+      const terminalConfig = mergeTerminalConfig(previousTerminalConfig, { skipClaudeLogin: nextSkip })
+      applyTerminalConfigOptimistically(terminalConfig)
       const result = await api.setConfig({
         terminal: terminalConfig
       })
@@ -470,19 +491,23 @@ export function SettingsPage() {
         setConfig(result.data as HaloConfig)
       } else {
         setSkipClaudeLogin(previousValue)
+        restoreTerminalConfig(previousTerminalConfig)
       }
     } catch (error) {
       console.error('[Settings] Failed to switch terminal mode:', error)
       setSkipClaudeLogin(previousValue)
+      restoreTerminalConfig(previousTerminalConfig)
     }
   }
 
   // Handle NO_FLICKER toggle
   const handleNoFlickerChange = async (enabled: boolean) => {
     const previousValue = noFlicker
+    const previousTerminalConfig = mergeTerminalConfig(config?.terminal, {})
     setNoFlicker(enabled)
     try {
-      const terminalConfig = mergeTerminalConfig(config?.terminal, { noFlicker: enabled })
+      const terminalConfig = mergeTerminalConfig(previousTerminalConfig, { noFlicker: enabled })
+      applyTerminalConfigOptimistically(terminalConfig)
       const result = await api.setConfig({
         terminal: terminalConfig
       })
@@ -490,19 +515,23 @@ export function SettingsPage() {
         setConfig(result.data as HaloConfig)
       } else {
         setNoFlicker(previousValue)
+        restoreTerminalConfig(previousTerminalConfig)
       }
     } catch (error) {
       console.error('[Settings] Failed to toggle noFlicker:', error)
       setNoFlicker(previousValue)
+      restoreTerminalConfig(previousTerminalConfig)
     }
   }
 
   // Handle skip permissions toggle
   const handleSkipPermissionsChange = async (enabled: boolean) => {
     const previousValue = skipPermissions
+    const previousTerminalConfig = mergeTerminalConfig(config?.terminal, {})
     setSkipPermissions(enabled)
     try {
-      const terminalConfig = mergeTerminalConfig(config?.terminal, { skipPermissions: enabled })
+      const terminalConfig = mergeTerminalConfig(previousTerminalConfig, { skipPermissions: enabled })
+      applyTerminalConfigOptimistically(terminalConfig)
       const result = await api.setConfig({
         terminal: terminalConfig
       })
@@ -511,19 +540,23 @@ export function SettingsPage() {
         addToast(t('Saved'), 'success')
       } else {
         setSkipPermissions(previousValue)
+        restoreTerminalConfig(previousTerminalConfig)
       }
     } catch (error) {
       console.error('[Settings] Failed to toggle skipPermissions:', error)
       setSkipPermissions(previousValue)
+      restoreTerminalConfig(previousTerminalConfig)
     }
   }
 
   // Handle Shift+Enter newline toggle
   const handleShiftEnterNewlineChange = async (enabled: boolean) => {
     const previousValue = shiftEnterNewline
+    const previousTerminalConfig = mergeTerminalConfig(config?.terminal, {})
     setShiftEnterNewline(enabled)
     try {
-      const terminalConfig = mergeTerminalConfig(config?.terminal, { shiftEnterNewline: enabled })
+      const terminalConfig = mergeTerminalConfig(previousTerminalConfig, { shiftEnterNewline: enabled })
+      applyTerminalConfigOptimistically(terminalConfig)
       const result = await api.setConfig({
         terminal: terminalConfig
       })
@@ -532,10 +565,12 @@ export function SettingsPage() {
         addToast(t('Saved'), 'success')
       } else {
         setShiftEnterNewline(previousValue)
+        restoreTerminalConfig(previousTerminalConfig)
       }
     } catch (error) {
       console.error('[Settings] Failed to toggle shiftEnterNewline:', error)
       setShiftEnterNewline(previousValue)
+      restoreTerminalConfig(previousTerminalConfig)
     }
   }
 
