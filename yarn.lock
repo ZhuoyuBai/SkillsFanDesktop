@@ -7,10 +7,10 @@
   resolved "https://registry.npmmirror.com/@alloc/quick-lru/-/quick-lru-5.2.0.tgz"
   integrity sha512-UrcABB+4bUrFABwbluTIBErXwvbsU/V7TZWfmbgJfbkwiBuziS9gxdODUyuiecfdGQ85jglMW6juS3+z5TsKLw==
 
-"@anthropic-ai/claude-code@2.1.92":
-  version "2.1.92"
-  resolved "https://registry.npmjs.org/@anthropic-ai/claude-code/-/claude-code-2.1.92.tgz"
-  integrity sha512-mNGw/IK3+1yHsQBeKaNtdTPCrQDkUEuNTJtm3OBTXs4bBkUVdIgRme/34ZnbZkl2VMMYPoNaTvqX2qJZ9EdSxQ==
+"@anthropic-ai/claude-code@2.1.96":
+  version "2.1.96"
+  resolved "https://registry.npmjs.org/@anthropic-ai/claude-code/-/claude-code-2.1.96.tgz"
+  integrity sha512-ETrc0+1qWHaqtKi+ixbsAecZyM+H52VIJj+zWIvw3jBU/JZ9v5vnE2kHShM1lcpr+Gji7GXk23l0CMGLA7hC0g==
   optionalDependencies:
     "@img/sharp-darwin-arm64" "^0.34.2"
     "@img/sharp-darwin-x64" "^0.34.2"

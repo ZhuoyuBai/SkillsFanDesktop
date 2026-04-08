@@ -1,31 +1,31 @@
 # SkillsFan 内置 Claude Code 升级手册
 
-更新时间：2026-04-07
+更新时间：2026-04-08
 
 适用范围：当前这个 SkillsFan 仓库里的“内置 Claude Code CLI”升级工作。
 
 这份文档有两个用途：
 
-- 记录 2026-04-07 这次从 `2.1.89` 升级到 `2.1.92` 的结果
+- 记录 2026-04-08 这次从 `2.1.92` 升级到 `2.1.96` 的结果
 - 作为以后任何模型重复执行升级时的标准 SOP
 
 ## 1. 本次升级结论
 
-2026-04-07 已确认 `@anthropic-ai/claude-code@2.1.92` 已发布，并已在本仓库完成升级。
+2026-04-08 已确认 `@anthropic-ai/claude-code@2.1.96` 已发布，并已在本仓库完成升级。
 
 版本快照：
 
-- 升级前：`@anthropic-ai/claude-code@2.1.89`
-- 升级后：`@anthropic-ai/claude-code@2.1.92`
-- 2026-04-07 查询到的 npm dist-tags：
-  - `latest`: `2.1.92`
-  - `next`: `2.1.92`
-  - `stable`: `2.1.85`
+- 升级前：`@anthropic-ai/claude-code@2.1.92`
+- 升级后：`@anthropic-ai/claude-code@2.1.96`
+- 2026-04-08 查询到的 npm dist-tags：
+  - `latest`: `2.1.96`
+  - `next`: `2.1.96`
+  - `stable`: `2.1.87`
 
 下载来源：
 
 - npm registry 元数据：`https://registry.npmjs.org/@anthropic-ai/claude-code`
-- 2.1.92 tarball：`https://registry.npmjs.org/@anthropic-ai/claude-code/-/claude-code-2.1.92.tgz`
+- 2.1.96 tarball：`https://registry.npmjs.org/@anthropic-ai/claude-code/-/claude-code-2.1.96.tgz`
 
 本次实际改动文件：
 
@@ -86,13 +86,13 @@
 ```bash
 npm view @anthropic-ai/claude-code version dist-tags versions --json
 npm view @anthropic-ai/claude-code engines bin --json
-npm view @anthropic-ai/claude-code@2.1.92 dist.tarball dist.integrity --json
+npm view @anthropic-ai/claude-code@2.1.96 dist.tarball dist.integrity --json
 ```
 
 实际升级命令：
 
 ```bash
-npm install @anthropic-ai/claude-code@2.1.92 --save-exact
+npm install @anthropic-ai/claude-code@2.1.96 --save-exact
 ```
 
 实际验证命令：
@@ -111,7 +111,7 @@ npm run build
 
 已经确认通过：
 
-- `npm ls @anthropic-ai/claude-code` 显示当前安装版本为 `2.1.92`
+- `npm ls @anthropic-ai/claude-code` 显示当前安装版本为 `2.1.96`
 - `require.resolve('@anthropic-ai/claude-code/cli.js')` 仍然成功
 - 包内 `bin` 仍然是 `claude -> cli.js`
 - 包内 `engines.node` 仍然是 `>=18.0.0`
@@ -148,10 +148,10 @@ npm view @anthropic-ai/claude-code@<target_version> version dist.tarball dist.in
 
 判断规则：
 
-- 如果用户明确指定版本，例如 `2.1.92`，先确认该版本确实已发布
+- 如果用户明确指定版本，例如 `2.1.96`，先确认该版本确实已发布
 - 如果用户说“升级到最新”，优先看 `dist-tags.latest`
 - 如果用户说“稳一点”，优先看 `dist-tags.stable`
-- 回答用户时要写绝对日期，例如“截至 2026-04-07，latest 是 2.1.92”
+- 回答用户时要写绝对日期，例如“截至 2026-04-08，latest 是 2.1.96”
 
 ### 5.2 确认当前仓库是不是还沿用同一条集成链路
 
@@ -280,7 +280,7 @@ node -p "require.resolve('@anthropic-ai/claude-code/cli.js')"
 
 ### 6.5 忽略 Node 要求
 
-截至 2026-04-07，`@anthropic-ai/claude-code@2.1.92` 要求：
+截至 2026-04-08，`@anthropic-ai/claude-code@2.1.96` 要求：
 
 ```json
 {
@@ -323,11 +323,11 @@ git status --short
 完成后把结果、风险和验证情况写回文档，并同步一份到桌面。
 ```
 
-## 8. 本次 2.1.92 升级的最终记录
+## 8. 本次 2.1.96 升级的最终记录
 
-截至 2026-04-07，本仓库内置 Claude Code 已完成：
+截至 2026-04-08，本仓库内置 Claude Code 已完成：
 
-- 从 `2.1.89` 升级到 `2.1.92`
+- 从 `2.1.92` 升级到 `2.1.96`
 - `package.json`、`package-lock.json`、`yarn.lock` 已同步
 - `cli.js` 入口验证通过
 - 最小静态验证通过
