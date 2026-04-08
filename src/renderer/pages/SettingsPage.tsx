@@ -4,7 +4,6 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useAppStore } from '../stores/app.store'
-import { useSpaceStore } from '../stores/space.store'
 import { useUpdaterStore } from '../stores/updater.store'
 import { api } from '../api'
 import type { HaloConfig, ThemeMode, McpServersConfig, AISourceType, ApiProvider, CustomSourceConfig, ApiKeyConfig } from '../types'
@@ -18,14 +17,14 @@ import { SpaceManagementSection } from '../components/settings/SpaceManagementSe
 import { ResetSection } from '../components/settings/ResetSection'
 import { ApiConfigDialog } from '../components/settings/ApiConfigDialog'
 import { useTranslation, setLanguage, getCurrentLanguage, SUPPORTED_LOCALES, type LocaleCode } from '../i18n'
-import { Loader2, LogOut, Plus, Check, Globe, Key, MessageSquare, Bot, Palette, Server, Settings as SettingsIcon, Wifi, X, Package, User, Layers, SlidersHorizontal, ArrowLeft, Database, Pencil, Trash2, Terminal, BarChart3, type LucideIcon } from 'lucide-react'
+import { LogOut, Plus, Check, Globe, Key, Bot, Palette, Server, Settings as SettingsIcon, Wifi, X, Package, User, Layers, SlidersHorizontal, ArrowLeft, Pencil, Trash2, Terminal, BarChart3, Wrench, type LucideIcon } from 'lucide-react'
 import { usePlatform } from '../components/layout/Header'
 import { isElectron } from '../api/transport'
 import { useToastStore } from '../stores/toast.store'
 import { getProviderLogoById } from '../components/layout/ModelSelector'
-import { resolveBrowserAutomationConfig, type BrowserAutomationMode } from '@shared/types/browser-automation'
 import { RealtimeMonitor } from '../components/usage/RealtimeMonitor'
 import { HistoryStats } from '../components/usage/HistoryStats'
+import { mergeTerminalConfig } from './settings-terminal-config'
 
 // Import provider logos
 import zhipuLogo from '../assets/providers/zhipu.jpg'
@@ -241,7 +240,7 @@ function resolveProviderFormValues(config: HaloConfig | undefined, providerId: s
 }
 
 // Settings section type
-type SettingsSection = 'ai-model' | 'display' | 'skills' | 'system' | 'spaces' | 'usage'
+type SettingsSection = 'ai-model' | 'display' | 'skills' | 'system' | 'spaces' | 'usage' | 'advanced'
 
 const TERMINAL_SHELL_SETTINGS_SECTIONS: SettingsSection[] = [
   'ai-model',
@@ -250,12 +249,12 @@ const TERMINAL_SHELL_SETTINGS_SECTIONS: SettingsSection[] = [
   'spaces',
   'system',
   'display',
+  'advanced',
 ]
 
 export function SettingsPage() {
   const { t } = useTranslation()
   const { config, setConfig, goBack, settingsSection, setSettingsSection } = useAppStore()
-  const { currentSpace } = useSpaceStore()
   const { addToast } = useToastStore()
   const platform = usePlatform()
   const isInElectron = isElectron()
@@ -326,23 +325,16 @@ export function SettingsPage() {
   const [noFlicker, setNoFlicker] = useState(
     config?.terminal?.noFlicker ?? DEFAULT_CONFIG.terminal!.noFlicker
   )
+  const [skipPermissions, setSkipPermissions] = useState(
+    config?.terminal?.skipPermissions ?? DEFAULT_CONFIG.terminal!.skipPermissions
+  )
+  const [shiftEnterNewline, setShiftEnterNewline] = useState(
+    config?.terminal?.shiftEnterNewline ?? DEFAULT_CONFIG.terminal!.shiftEnterNewline
+  )
   const [desktopPetEnabled, setDesktopPetEnabled] = useState(
     config?.desktopPet?.enabled ?? false
   )
   const [showTerminalModeDialog, setShowTerminalModeDialog] = useState(false)
-
-  // Advanced settings state
-  const [showClearMemoryDialog, setShowClearMemoryDialog] = useState(false)
-  const [clearMemoryScope, setClearMemoryScope] = useState<'space' | 'all'>('space')
-  const [isClearingMemory, setIsClearingMemory] = useState(false)
-  const [showMemoryManager, setShowMemoryManager] = useState(false)
-  const [memoryMdContent, setMemoryMdContent] = useState('')
-  const [memoryMdOriginal, setMemoryMdOriginal] = useState('')
-  const [memoryMdExists, setMemoryMdExists] = useState(false)
-  const [memoryStats, setMemoryStats] = useState<{ fragmentCount: number; conversationCount: number } | null>(null)
-  const [isSavingMemory, setIsSavingMemory] = useState(false)
-  const [isLoadingMemory, setIsLoadingMemory] = useState(false)
-  const [customInstructionsContent, setCustomInstructionsContent] = useState(config?.customInstructions?.content || '')
 
   // API Key visibility state
   const [showApiKey, setShowApiKey] = useState(false)
@@ -357,6 +349,19 @@ export function SettingsPage() {
       setIsCheckingUpdate(false)
     }
   }, [updateStatus])
+
+  useEffect(() => {
+    const nextTerminalConfig = mergeTerminalConfig(config?.terminal, {})
+    setSkipClaudeLogin(nextTerminalConfig.skipClaudeLogin)
+    setNoFlicker(nextTerminalConfig.noFlicker)
+    setSkipPermissions(nextTerminalConfig.skipPermissions)
+    setShiftEnterNewline(nextTerminalConfig.shiftEnterNewline)
+  }, [
+    config?.terminal?.skipClaudeLogin,
+    config?.terminal?.noFlicker,
+    config?.terminal?.skipPermissions,
+    config?.terminal?.shiftEnterNewline,
+  ])
 
   // Handler for check updates button
   const handleCheckForUpdates = async () => {
@@ -457,8 +462,9 @@ export function SettingsPage() {
     setSkipClaudeLogin(nextSkip)
     setShowTerminalModeDialog(false)
     try {
+      const terminalConfig = mergeTerminalConfig(config?.terminal, { skipClaudeLogin: nextSkip })
       const result = await api.setConfig({
-        terminal: { skipClaudeLogin: nextSkip }
+        terminal: terminalConfig
       })
       if (result.success && result.data) {
         setConfig(result.data as HaloConfig)
@@ -476,8 +482,9 @@ export function SettingsPage() {
     const previousValue = noFlicker
     setNoFlicker(enabled)
     try {
+      const terminalConfig = mergeTerminalConfig(config?.terminal, { noFlicker: enabled })
       const result = await api.setConfig({
-        terminal: { noFlicker: enabled }
+        terminal: terminalConfig
       })
       if (result.success && result.data) {
         setConfig(result.data as HaloConfig)
@@ -487,6 +494,48 @@ export function SettingsPage() {
     } catch (error) {
       console.error('[Settings] Failed to toggle noFlicker:', error)
       setNoFlicker(previousValue)
+    }
+  }
+
+  // Handle skip permissions toggle
+  const handleSkipPermissionsChange = async (enabled: boolean) => {
+    const previousValue = skipPermissions
+    setSkipPermissions(enabled)
+    try {
+      const terminalConfig = mergeTerminalConfig(config?.terminal, { skipPermissions: enabled })
+      const result = await api.setConfig({
+        terminal: terminalConfig
+      })
+      if (result.success && result.data) {
+        setConfig(result.data as HaloConfig)
+        addToast(t('Saved'), 'success')
+      } else {
+        setSkipPermissions(previousValue)
+      }
+    } catch (error) {
+      console.error('[Settings] Failed to toggle skipPermissions:', error)
+      setSkipPermissions(previousValue)
+    }
+  }
+
+  // Handle Shift+Enter newline toggle
+  const handleShiftEnterNewlineChange = async (enabled: boolean) => {
+    const previousValue = shiftEnterNewline
+    setShiftEnterNewline(enabled)
+    try {
+      const terminalConfig = mergeTerminalConfig(config?.terminal, { shiftEnterNewline: enabled })
+      const result = await api.setConfig({
+        terminal: terminalConfig
+      })
+      if (result.success && result.data) {
+        setConfig(result.data as HaloConfig)
+        addToast(t('Saved'), 'success')
+      } else {
+        setShiftEnterNewline(previousValue)
+      }
+    } catch (error) {
+      console.error('[Settings] Failed to toggle shiftEnterNewline:', error)
+      setShiftEnterNewline(previousValue)
     }
   }
 
@@ -504,191 +553,6 @@ export function SettingsPage() {
     } catch (error) {
       console.error('[Settings] Failed to toggle desktopPet:', error)
       setDesktopPetEnabled(previousValue)
-    }
-  }
-
-  const isFullAccessEnabled = (config?.permissions?.commandExecution === 'allow')
-    || (config?.permissions?.trustMode ?? false)
-  const browserAutomation = resolveBrowserAutomationConfig(config ?? DEFAULT_CONFIG)
-  const isBrowserAutomationEnabled = browserAutomation.enabled
-  const prefersNativeClaudeSkillTool = (
-    config?.skillSettings?.preferNativeClaudeSkillTool
-    ?? DEFAULT_CONFIG.skillSettings?.preferNativeClaudeSkillTool
-    ?? false
-  )
-
-  const handlePermissionModeChange = async (enabled: boolean) => {
-    const currentPermissions = config?.permissions ?? DEFAULT_CONFIG.permissions
-    const permissions = {
-      ...currentPermissions,
-      commandExecution: enabled ? 'allow' as const : 'ask' as const,
-      trustMode: enabled
-    }
-
-    try {
-      await api.setConfig({ permissions })
-      setConfig({ ...(config ?? DEFAULT_CONFIG), permissions } as HaloConfig)
-      addToast(t('Saved'), 'success')
-    } catch (error) {
-      console.error('[Settings] Failed to update permission mode:', error)
-      addToast(t('Save failed'), 'error')
-    }
-  }
-
-  // Handle memory enabled change
-  const handleMemoryEnabledChange = async (enabled: boolean) => {
-    const memoryConfig = { enabled, retentionDays: config?.memory?.retentionDays ?? 0 }
-    try {
-      await api.setConfig({ memory: memoryConfig })
-      setConfig({ ...config!, memory: memoryConfig } as HaloConfig)
-    } catch (error) {
-      console.error('[Settings] Failed to update memory config:', error)
-    }
-  }
-
-  // Handle memory retention change
-  const handleRetentionChange = async (days: number) => {
-    const memoryConfig = { enabled: config?.memory?.enabled ?? true, retentionDays: days }
-    try {
-      await api.setConfig({ memory: memoryConfig })
-      setConfig({ ...config!, memory: memoryConfig } as HaloConfig)
-    } catch (error) {
-      console.error('[Settings] Failed to update memory retention:', error)
-    }
-  }
-
-  const handleBrowserAutomationToggle = async (enabled: boolean) => {
-    const browserAutomation = {
-      enabled,
-      mode: resolveBrowserAutomationConfig(config ?? DEFAULT_CONFIG).mode
-    }
-
-    try {
-      await api.setConfig({ browserAutomation })
-      setConfig({ ...(config ?? DEFAULT_CONFIG), browserAutomation } as HaloConfig)
-      addToast(t('Saved'), 'success')
-    } catch (error) {
-      console.error('[Settings] Failed to update browser automation toggle:', error)
-      addToast(t('Save failed'), 'error')
-    }
-  }
-
-  const handleBrowserAutomationModeChange = async (mode: BrowserAutomationMode) => {
-    const browserAutomation = {
-      enabled: true,
-      mode
-    }
-
-    try {
-      await api.setConfig({ browserAutomation })
-      setConfig({ ...(config ?? DEFAULT_CONFIG), browserAutomation } as HaloConfig)
-      addToast(t('Saved'), 'success')
-    } catch (error) {
-      console.error('[Settings] Failed to update browser automation mode:', error)
-      addToast(t('Save failed'), 'error')
-    }
-  }
-
-  const handleNativeClaudeSkillToolChange = async (enabled: boolean) => {
-    const skillSettings = {
-      preferNativeClaudeSkillTool: enabled
-    }
-
-    try {
-      await api.setConfig({ skillSettings })
-      setConfig({ ...(config ?? DEFAULT_CONFIG), skillSettings } as HaloConfig)
-      addToast(t('Saved'), 'success')
-    } catch (error) {
-      console.error('[Settings] Failed to update skill settings:', error)
-      addToast(t('Save failed'), 'error')
-    }
-  }
-
-  // Handle clear memory
-  const handleClearMemory = async () => {
-    setIsClearingMemory(true)
-    try {
-      const spaceId = clearMemoryScope === 'space' ? currentSpace?.id : undefined
-      const result = await api.clearMemory(clearMemoryScope, spaceId)
-      if (result.success) {
-        addToast(t('Memory cleared successfully'), 'success')
-      } else {
-        addToast(result.error || t('Failed to clear memory'), 'error')
-      }
-    } catch {
-      addToast(t('Failed to clear memory'), 'error')
-    } finally {
-      setIsClearingMemory(false)
-      setShowClearMemoryDialog(false)
-    }
-  }
-
-  // Memory management
-  const loadMemoryData = useCallback(async () => {
-    if (!currentSpace?.id) return
-    setIsLoadingMemory(true)
-    try {
-      const [mdResult, statsResult] = await Promise.all([
-        api.readMemoryMd(currentSpace.id),
-        api.getMemoryStats(currentSpace.id)
-      ])
-      if (mdResult.success) {
-        setMemoryMdContent(mdResult.data.content)
-        setMemoryMdOriginal(mdResult.data.content)
-        setMemoryMdExists(mdResult.data.exists)
-      }
-      if (statsResult.success) {
-        setMemoryStats(statsResult.data)
-      }
-    } catch (error) {
-      console.error('[Settings] Failed to load memory data:', error)
-    } finally {
-      setIsLoadingMemory(false)
-    }
-  }, [currentSpace?.id])
-
-  useEffect(() => {
-    if (showMemoryManager) {
-      loadMemoryData()
-    }
-  }, [showMemoryManager, loadMemoryData])
-
-  const handleSaveMemoryMd = async () => {
-    if (!currentSpace?.id) return
-    setIsSavingMemory(true)
-    try {
-      const result = await api.saveMemoryMd(currentSpace.id, memoryMdContent)
-      if (result.success) {
-        setMemoryMdOriginal(memoryMdContent)
-        addToast(t('Memory saved successfully'), 'success')
-      } else {
-        addToast(result.error || t('Failed to save memory'), 'error')
-      }
-    } catch {
-      addToast(t('Failed to save memory'), 'error')
-    } finally {
-      setIsSavingMemory(false)
-    }
-  }
-
-  // Handle custom instructions change
-  const handleCustomInstructionsToggle = async (enabled: boolean) => {
-    const customInstructions = { enabled, content: config?.customInstructions?.content || '' }
-    try {
-      await api.setConfig({ customInstructions })
-      setConfig({ ...config!, customInstructions } as HaloConfig)
-    } catch (error) {
-      console.error('[Settings] Failed to update custom instructions:', error)
-    }
-  }
-
-  const handleCustomInstructionsSave = async (content: string) => {
-    const customInstructions = { enabled: config?.customInstructions?.enabled ?? false, content }
-    try {
-      await api.setConfig({ customInstructions })
-      setConfig({ ...config!, customInstructions } as HaloConfig)
-    } catch (error) {
-      console.error('[Settings] Failed to update custom instructions:', error)
     }
   }
 
@@ -938,6 +802,7 @@ export function SettingsPage() {
     { id: 'usage', icon: BarChart3, label: t('Usage'), desktopOnly: true },
     { id: 'spaces', icon: Layers, label: t('Spaces'), desktopOnly: true },
     { id: 'display', icon: Palette, label: t('Display') },
+    { id: 'advanced', icon: Wrench, label: t('Advanced'), desktopOnly: true },
     { id: 'system', icon: SettingsIcon, label: t('System'), desktopOnly: true },
   ]
 
@@ -1207,18 +1072,48 @@ export function SettingsPage() {
                 />
               </div>
 
-              {/* Smooth Mode */}
-              <div className="flex items-center justify-between pt-4 border-t border-border">
-                <div className="flex-1">
-                  <p className="font-medium">{t('Smooth Mode')}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {t('Supports mouse clicks, smoother scrolling. Takes effect on new sessions')}
-                  </p>
-                </div>
-                <Switch checked={noFlicker} onChange={handleNoFlickerChange} />
-              </div>
             </div>
           </section>
+          )}
+
+          {/* Advanced Section */}
+          {activeSection === 'advanced' && !api.isRemoteMode() && (
+            <section className="space-y-4">
+              <div className="space-y-4">
+                {/* Skip Permissions */}
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <p className="font-medium">{t('Skip Permission Prompts')}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {t('Skip all permission confirmations in Claude Code. Takes effect on new sessions')}
+                    </p>
+                  </div>
+                  <Switch checked={skipPermissions} onChange={handleSkipPermissionsChange} />
+                </div>
+
+                {/* Smooth Mode */}
+                <div className="flex items-center justify-between pt-4 border-t border-border">
+                  <div className="flex-1">
+                    <p className="font-medium">{t('Smooth Mode')}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {t('Supports mouse clicks, smoother scrolling. Takes effect on new sessions')}
+                    </p>
+                  </div>
+                  <Switch checked={noFlicker} onChange={handleNoFlickerChange} />
+                </div>
+
+                {/* Shift+Enter Newline */}
+                <div className="flex items-center justify-between pt-4 border-t border-border">
+                  <div className="flex-1">
+                    <p className="font-medium">{t('Shift+Enter Newline')}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {t('Use Shift+Enter to insert a new line instead of submitting. Takes effect on new sessions')}
+                    </p>
+                  </div>
+                  <Switch checked={shiftEnterNewline} onChange={handleShiftEnterNewlineChange} />
+                </div>
+              </div>
+            </section>
           )}
 
           {/* System Section */}
@@ -1397,345 +1292,6 @@ export function SettingsPage() {
                 </div>
               )}
             </section>
-          )}
-
-          {/* Advanced Section */}
-          {activeSection === 'advanced' && !api.isRemoteMode() && (
-            <section className="space-y-4">
-              <div className="space-y-4">
-                {/* Custom Instructions */}
-                <div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <p className="font-medium">{t('Custom Instructions')}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {t('Global instructions that AI will follow in every conversation')}
-                      </p>
-                    </div>
-                    <Switch checked={config?.customInstructions?.enabled ?? false} onChange={handleCustomInstructionsToggle} />
-                  </div>
-                  <div className={`mt-3 transition-opacity ${(config?.customInstructions?.enabled ?? false) ? '' : 'opacity-50 pointer-events-none'}`}>
-                    <textarea
-                      value={customInstructionsContent}
-                      onChange={(e) => setCustomInstructionsContent(e.target.value)}
-                      onBlur={() => handleCustomInstructionsSave(customInstructionsContent)}
-                      placeholder={t('e.g., Always respond in Chinese, Use concise language...')}
-                      className="w-full h-32 px-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground resize-y focus:outline-none focus:ring-2 focus:ring-primary/50"
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {t('Changes take effect in the next new conversation')}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Permission Mode */}
-                <div>
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium">{t('Permission Mode')}</p>
-                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                          isFullAccessEnabled
-                            ? 'bg-amber-500/10 text-amber-600 border border-amber-500/30'
-                            : 'bg-secondary text-muted-foreground border border-border'
-                        }`}>
-                          {isFullAccessEnabled ? t('Full Access') : t('Ask Every Time')}
-                        </span>
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        {isFullAccessEnabled
-                          ? t('Run commands, code execution, and sub-agents without asking for confirmation.')
-                          : t('Ask before running commands, code execution, or sub-agents.')}
-                      </p>
-                    </div>
-                    <Switch checked={isFullAccessEnabled} onChange={handlePermissionModeChange} />
-                  </div>
-
-                  {isFullAccessEnabled && (
-                    <div className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-400">
-                      {t('Full access allows AI to execute commands directly. Only enable this on a trusted machine.')}
-                    </div>
-                  )}
-                </div>
-
-                {/* Cross-conversation Memory Toggle */}
-                <div className="flex items-center justify-between pt-4 border-t border-border">
-                  <div className="flex-1">
-                    <p className="font-medium">{t('Cross-conversation Memory')}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {t('AI can remember content from previous conversations')}
-                    </p>
-                  </div>
-                  <Switch checked={config?.memory?.enabled ?? true} onChange={handleMemoryEnabledChange} />
-                </div>
-
-                <div className="flex items-center justify-between pt-4 border-t border-border">
-                  <div className="flex-1">
-                    <p className="font-medium">{t('Use Browser')}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {t('Allow AI to use browser tools when a task needs web pages.')}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {t('Changes take effect on the next message')}
-                    </p>
-                  </div>
-                  <Switch checked={isBrowserAutomationEnabled} onChange={handleBrowserAutomationToggle} />
-                </div>
-
-                {isBrowserAutomationEnabled && (
-                  <div className="flex items-center justify-between pt-4 border-t border-border">
-                    <div className="flex-1">
-                      <p className="font-medium">{t('Browser mode')}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {t('Choose whether browser tasks open in your system browser or the built-in browser.')}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {t('Changes take effect on the next message')}
-                      </p>
-                    </div>
-                    <Select<BrowserAutomationMode>
-                      variant="compact"
-                      value={browserAutomation.mode}
-                      onChange={handleBrowserAutomationModeChange}
-                      options={[
-                        { value: 'system-browser', label: t('System Browser') },
-                        { value: 'ai-browser', label: t('Built-in Browser') }
-                      ]}
-                    />
-                  </div>
-                )}
-
-                <div className="flex items-center justify-between pt-4 border-t border-border">
-                  <div className="flex-1">
-                    <p className="font-medium">{t('Prefer Native Claude Skill Tool')}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {t("When supported by the current provider, use Claude Code's built-in Skill tool instead of SkillsFan's MCP Skill tool.")}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {t('Changes take effect on the next message')}
-                    </p>
-                  </div>
-                  <Switch checked={prefersNativeClaudeSkillTool} onChange={handleNativeClaudeSkillToolChange} />
-                </div>
-
-                {/* Memory Retention Period */}
-                <div className={`pt-4 border-t border-border transition-opacity ${(config?.memory?.enabled ?? true) ? '' : 'opacity-50 pointer-events-none'}`}>
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <p className="font-medium">{t('Memory Retention Period')}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {t('How far back AI can recall conversations')}
-                      </p>
-                    </div>
-                    <Select<number>
-                      variant="compact"
-                      value={config?.memory?.retentionDays ?? 0}
-                      onChange={handleRetentionChange}
-                      options={[
-                        { value: 7, label: t('7 days') },
-                        { value: 30, label: t('30 days') },
-                        { value: 180, label: t('180 days') },
-                        { value: 0, label: t('Forever') }
-                      ]}
-                    />
-                  </div>
-                </div>
-
-                {/* Memory Management */}
-                <div className="pt-4 border-t border-border">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <p className="font-medium">{t('Memory Management')}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {t('View and edit the memory file for current space')}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => setShowMemoryManager(true)}
-                      className="px-4 py-2 bg-primary/10 text-primary rounded-lg hover:bg-primary/20 transition-colors border border-primary/30"
-                    >
-                      {t('Manage')}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Clear Memory Button */}
-                <div className="pt-4 border-t border-border">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <p className="font-medium">{t('Clear Memory')}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {t('Delete all conversation memory accumulated by AI')}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => setShowClearMemoryDialog(true)}
-                      className="px-4 py-2 bg-red-500/10 text-red-500 rounded-lg hover:bg-red-500/20 transition-colors border border-red-500/30"
-                    >
-                      {t('Clear Memory')}
-                    </button>
-                  </div>
-                </div>
-
-              </div>
-            </section>
-          )}
-
-          {/* Memory Manager Modal */}
-          {showMemoryManager && (
-            <div
-              className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4"
-              onClick={(e) => {
-                if (e.target === e.currentTarget) setShowMemoryManager(false)
-              }}
-            >
-              <div className="bg-background border border-border rounded-lg w-full max-w-2xl shadow-lg max-h-[80vh] flex flex-col">
-                {/* Header */}
-                <div className="flex items-center justify-between p-4 border-b border-border">
-                  <h3 className="font-medium text-foreground">{t('Memory Management')}</h3>
-                  <button
-                    onClick={() => setShowMemoryManager(false)}
-                    className="text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-
-                {/* Stats Bar */}
-                <div className="px-4 py-3 bg-secondary/30 border-b border-border flex items-center gap-4 text-sm text-muted-foreground">
-                  <div className="flex items-center gap-1.5">
-                    <Database className="w-4 h-4" />
-                    <span>{t('Fragments')}: {memoryStats?.fragmentCount ?? 0}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <MessageSquare className="w-4 h-4" />
-                    <span>{t('Conversations')}: {memoryStats?.conversationCount ?? 0}</span>
-                  </div>
-                  {!memoryMdExists && !isLoadingMemory && (
-                    <span className="text-amber-500 text-xs ml-auto">{t('No MEMORY.md file found')}</span>
-                  )}
-                </div>
-
-                {/* Content */}
-                <div className="flex-1 p-4 overflow-hidden">
-                  {isLoadingMemory ? (
-                    <div className="flex items-center justify-center h-64 text-muted-foreground">
-                      <Loader2 className="w-5 h-5 animate-spin mr-2" />
-                      {t('Loading...')}
-                    </div>
-                  ) : (
-                    <textarea
-                      value={memoryMdContent}
-                      onChange={(e) => setMemoryMdContent(e.target.value)}
-                      placeholder={t('MEMORY.md content will appear here...')}
-                      className="w-full h-80 px-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground resize-y focus:outline-none focus:ring-2 focus:ring-primary/50 font-mono"
-                    />
-                  )}
-                </div>
-
-                {/* Footer */}
-                <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-border">
-                  <button
-                    onClick={() => setShowMemoryManager(false)}
-                    className="px-4 py-2 text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    {t('Cancel')}
-                  </button>
-                  <button
-                    onClick={handleSaveMemoryMd}
-                    disabled={isSavingMemory || memoryMdContent === memoryMdOriginal}
-                    className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50"
-                  >
-                    {isSavingMemory ? t('Saving...') : t('Save')}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Clear Memory Dialog */}
-          {showClearMemoryDialog && (
-            <div
-              className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4"
-              onClick={(e) => {
-                if (e.target === e.currentTarget) setShowClearMemoryDialog(false)
-              }}
-            >
-              <div className="bg-background border border-border rounded-lg w-full max-w-sm shadow-lg">
-                <div className="p-4 space-y-4">
-                  <h3 className="font-medium text-foreground">{t('Clear Memory')}</h3>
-                  <p className="text-sm text-muted-foreground">
-                    {t('This will delete all conversation memory accumulated by AI. This action cannot be undone.')}
-                  </p>
-
-                  {/* Scope selection */}
-                  <div className="space-y-2">
-                    <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer hover:bg-secondary/50 transition-colors ${
-                      clearMemoryScope === 'space' ? 'border-primary' : 'border-border'
-                    }`}>
-                      <span className={`inline-flex items-center justify-center w-4 h-4 rounded-full border-2 transition-colors ${
-                        clearMemoryScope === 'space' ? 'border-primary' : 'border-muted-foreground/40'
-                      }`}>
-                        {clearMemoryScope === 'space' && <span className="w-2 h-2 rounded-full bg-primary" />}
-                      </span>
-                      <input
-                        type="radio"
-                        name="clearScope"
-                        value="space"
-                        checked={clearMemoryScope === 'space'}
-                        onChange={() => setClearMemoryScope('space')}
-                        className="sr-only"
-                      />
-                      <div>
-                        <p className="text-sm font-medium">{t('Current Space')}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {currentSpace?.name || t('Default Space')}
-                        </p>
-                      </div>
-                    </label>
-                    <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer hover:bg-secondary/50 transition-colors ${
-                      clearMemoryScope === 'all' ? 'border-primary' : 'border-border'
-                    }`}>
-                      <span className={`inline-flex items-center justify-center w-4 h-4 rounded-full border-2 transition-colors ${
-                        clearMemoryScope === 'all' ? 'border-primary' : 'border-muted-foreground/40'
-                      }`}>
-                        {clearMemoryScope === 'all' && <span className="w-2 h-2 rounded-full bg-primary" />}
-                      </span>
-                      <input
-                        type="radio"
-                        name="clearScope"
-                        value="all"
-                        checked={clearMemoryScope === 'all'}
-                        onChange={() => setClearMemoryScope('all')}
-                        className="sr-only"
-                      />
-                      <div>
-                        <p className="text-sm font-medium">{t('All Spaces')}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {t('Clear memory across all spaces')}
-                        </p>
-                      </div>
-                    </label>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-border">
-                  <button
-                    onClick={() => setShowClearMemoryDialog(false)}
-                    className="px-4 py-2 text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    {t('Cancel')}
-                  </button>
-                  <button
-                    onClick={handleClearMemory}
-                    disabled={isClearingMemory}
-                    className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50"
-                  >
-                    {isClearingMemory ? t('Clearing...') : t('Confirm Clear')}
-                  </button>
-                </div>
-              </div>
-            </div>
           )}
 
           {/* MCP Servers Section */}

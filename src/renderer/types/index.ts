@@ -225,6 +225,8 @@ export interface BrowserAutomationConfig {
 export interface TerminalConfig {
   skipClaudeLogin: boolean;
   noFlicker: boolean;
+  skipPermissions: boolean;
+  shiftEnterNewline: boolean;
 }
 
 export interface SkillSettingsConfig {
@@ -656,7 +658,9 @@ export const DEFAULT_CONFIG: HaloConfig = {
   },
   terminal: {
     skipClaudeLogin: true,
-    noFlicker: false
+    noFlicker: false,
+    skipPermissions: false,
+    shiftEnterNewline: false
   },
   skillSettings: {
     preferNativeClaudeSkillTool: true

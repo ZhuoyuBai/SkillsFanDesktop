@@ -127,6 +127,8 @@ interface HaloConfig {
   terminal?: {
     skipClaudeLogin: boolean
     noFlicker: boolean
+    skipPermissions: boolean
+    shiftEnterNewline: boolean
   }
   skillSettings?: {
     preferNativeClaudeSkillTool: boolean
@@ -216,6 +218,10 @@ export function getSpacesDir(): string {
   return join(getHaloDir(), 'spaces')
 }
 
+export function getDefaultSpaceRootDir(): string {
+  return homedir()
+}
+
 // Default model (GLM-5-Turbo)
 const DEFAULT_MODEL = 'GLM-5-Turbo'
 
@@ -253,7 +259,9 @@ const DEFAULT_CONFIG: HaloConfig = {
   },
   terminal: {
     skipClaudeLogin: true,
-    noFlicker: false
+    noFlicker: false,
+    skipPermissions: false,
+    shiftEnterNewline: false
   },
   skillSettings: {
     preferNativeClaudeSkillTool: true
@@ -425,6 +433,8 @@ function normalizeBrowserAutomation(parsed: Record<string, any>): {
 function normalizeTerminalConfig(parsed: Record<string, any>): {
   skipClaudeLogin: boolean
   noFlicker: boolean
+  skipPermissions: boolean
+  shiftEnterNewline: boolean
 } {
   const raw = parsed?.terminal
 
@@ -434,7 +444,13 @@ function normalizeTerminalConfig(parsed: Record<string, any>): {
       : DEFAULT_CONFIG.terminal.skipClaudeLogin,
     noFlicker: typeof raw?.noFlicker === 'boolean'
       ? raw.noFlicker
-      : DEFAULT_CONFIG.terminal.noFlicker
+      : DEFAULT_CONFIG.terminal.noFlicker,
+    skipPermissions: typeof raw?.skipPermissions === 'boolean'
+      ? raw.skipPermissions
+      : DEFAULT_CONFIG.terminal.skipPermissions,
+    shiftEnterNewline: typeof raw?.shiftEnterNewline === 'boolean'
+      ? raw.shiftEnterNewline
+      : DEFAULT_CONFIG.terminal.shiftEnterNewline
   }
 }
 

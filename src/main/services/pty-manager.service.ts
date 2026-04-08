@@ -17,15 +17,19 @@ import {
   chmodSync,
   constants,
   existsSync,
+  lstatSync,
   mkdirSync,
+  readdirSync,
   readFileSync,
   realpathSync,
+  renameSync,
+  rmSync,
   statSync,
   symlinkSync,
   writeFileSync
 } from 'fs'
 import { homedir } from 'os'
-import { dirname, join } from 'path'
+import { basename, dirname, join } from 'path'
 import { app, BrowserWindow, nativeTheme } from 'electron'
 import { getConfig, getHaloDir } from './config.service'
 import { getPtyRuntimePath } from './headless-electron.service'
@@ -51,12 +55,118 @@ interface PtyInstance {
 
 const ptyInstances = new Map<string, PtyInstance>()
 const EMBEDDED_CLAUDE_CONFIG_FILE_NAMES = ['.config.json', '.claude.json']
+const EMBEDDED_CLAUDE_SHARED_ENTRIES = [
+  'skills',
+  'commands',
+  'agents',
+  'plugins',
+  'settings.json',
+  'CLAUDE.md',
+  'rules'
+] as const
+const EMBEDDED_CLAUDE_BACKUP_DIR = '.skillsfan-shadow-backups'
 
 // Reference to main window for sending events
 let mainWindowRef: BrowserWindow | null = null
 
 export function setPtyMainWindow(window: BrowserWindow | null): void {
   mainWindowRef = window
+}
+
+function pathEntryExists(targetPath: string): boolean {
+  try {
+    lstatSync(targetPath)
+    return true
+  } catch {
+    return false
+  }
+}
+
+function targetSymlinksToSource(targetPath: string, sourcePath: string): boolean {
+  try {
+    if (!lstatSync(targetPath).isSymbolicLink()) {
+      return false
+    }
+    return realpathSync(targetPath) === realpathSync(sourcePath)
+  } catch {
+    return false
+  }
+}
+
+function hasMeaningfulEmbeddedContents(targetPath: string): boolean {
+  try {
+    const stats = statSync(targetPath)
+    if (stats.isDirectory()) {
+      return readdirSync(targetPath)
+        .some((entry) => entry !== '.DS_Store' && entry !== EMBEDDED_CLAUDE_BACKUP_DIR)
+    }
+    return stats.size > 0
+  } catch {
+    return false
+  }
+}
+
+function getSymlinkType(sourcePath: string): 'dir' | 'file' | 'junction' | undefined {
+  try {
+    const stats = statSync(sourcePath)
+    if (!stats.isDirectory()) {
+      return process.platform === 'win32' ? 'file' : undefined
+    }
+    return process.platform === 'win32' ? 'junction' : 'dir'
+  } catch {
+    return undefined
+  }
+}
+
+function backupEmbeddedShadowCopy(configDir: string, targetPath: string): void {
+  if (!hasMeaningfulEmbeddedContents(targetPath)) {
+    rmSync(targetPath, { recursive: true, force: true })
+    return
+  }
+
+  const backupDir = join(configDir, EMBEDDED_CLAUDE_BACKUP_DIR)
+  mkdirSync(backupDir, { recursive: true })
+
+  const backupName = `${basename(targetPath)}-${Date.now()}`
+  const backupPath = join(backupDir, backupName)
+  renameSync(targetPath, backupPath)
+
+  console.warn(`[PTY] Backed up embedded Claude shadow copy: ${targetPath} -> ${backupPath}`)
+}
+
+function syncEmbeddedClaudeSharedEntries(configDir: string): void {
+  const nativeClaudeDir = join(homedir(), '.claude')
+
+  for (const entry of EMBEDDED_CLAUDE_SHARED_ENTRIES) {
+    const sourcePath = join(nativeClaudeDir, entry)
+    if (!existsSync(sourcePath)) {
+      continue
+    }
+
+    const targetPath = join(configDir, entry)
+    if (targetSymlinksToSource(targetPath, sourcePath)) {
+      continue
+    }
+
+    if (pathEntryExists(targetPath)) {
+      try {
+        if (lstatSync(targetPath).isSymbolicLink()) {
+          rmSync(targetPath, { recursive: true, force: true })
+        } else {
+          backupEmbeddedShadowCopy(configDir, targetPath)
+        }
+      } catch (error) {
+        console.warn(`[PTY] Failed to prepare embedded Claude entry ${entry} for sync`, error)
+        continue
+      }
+    }
+
+    try {
+      symlinkSync(sourcePath, targetPath, getSymlinkType(sourcePath))
+    } catch (error) {
+      console.warn(`[PTY] Failed to link embedded Claude entry ${entry} -> ${sourcePath}`, error)
+    }
+  }
 }
 
 function unwrapAsarPath(filePath: string): string {
@@ -400,22 +510,11 @@ function getEmbeddedClaudeConfigDir(): string {
     mkdirSync(configDir, { recursive: true })
   }
 
-  // Symlink user's ~/.claude/ subdirectories into embedded config so the CLI
-  // can discover user-installed skills, agents, plugins, commands and settings.
-  // Auth-related files (.config.json, projects/, sessions/) are NOT linked
-  // to keep the embedded CLI's auth isolated from the user's standalone CLI.
-  const claudeDir = join(homedir(), '.claude')
-  for (const entry of ['skills', 'commands', 'agents', 'plugins', 'settings.json']) {
-    const source = join(claudeDir, entry)
-    const target = join(configDir, entry)
-    if (existsSync(source) && !existsSync(target)) {
-      try {
-        symlinkSync(source, target)
-      } catch {
-        // Ignore if symlink creation fails
-      }
-    }
-  }
+  // Re-sync the shared user-level Claude entries on every launch so stale
+  // shadow copies inside the embedded config cannot mask the official ~/.claude
+  // skills, commands, user memory, rules, plugins, or settings.
+  // Auth/session state (.config.json, .claude.json, projects/) remains isolated.
+  syncEmbeddedClaudeSharedEntries(configDir)
 
   return configDir
 }
@@ -501,6 +600,10 @@ export async function createPty(options: CreatePtyOptions): Promise<{ model: str
     })
 
     const args = model ? [cliPath, '--model', model] : [cliPath]
+
+    if (ptyConfig.terminal?.skipPermissions) {
+      args.push('--dangerously-skip-permissions')
+    }
 
     const spawnEnv = {
       ...process.env,

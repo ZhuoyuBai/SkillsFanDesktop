@@ -17,7 +17,7 @@ import {
   deleteSpace,
   getAllSpacePaths
 } from '../../../src/main/services/space.service'
-import { initializeApp, getSpacesDir, getTempSpacePath } from '../../../src/main/services/config.service'
+import { initializeApp, getSpacesDir, getTempSpacePath, getDefaultSpaceRootDir } from '../../../src/main/services/config.service'
 
 describe('Space Service', () => {
   beforeEach(async () => {
@@ -84,6 +84,7 @@ describe('Space Service', () => {
       expect(space.icon).toBe('code')
       expect(space.isTemp).toBe(false)
       expect(fs.existsSync(space.path)).toBe(true)
+      expect(space.path).toBe(path.join(getDefaultSpaceRootDir(), 'My Project'))
     })
 
     it('should create .skillsfan directory inside space', async () => {
@@ -94,6 +95,15 @@ describe('Space Service', () => {
 
       const dataDir = path.join(space.path, '.skillsfan')
       expect(fs.existsSync(dataDir)).toBe(true)
+    })
+
+    it('should not create default spaces under the app data managed spaces directory', async () => {
+      const space = await createSpace({
+        name: 'Home Root Space',
+        icon: 'folder'
+      })
+
+      expect(space.path.startsWith(getSpacesDir())).toBe(false)
     })
 
     it('should create meta.json with space info', async () => {
@@ -123,6 +133,19 @@ describe('Space Service', () => {
 
       expect(space.path).toBe(customPath)
       expect(fs.existsSync(path.join(customPath, '.skillsfan', 'meta.json'))).toBe(true)
+    })
+
+    it('should avoid taking over an existing home directory folder name by creating a unique path', async () => {
+      const occupiedPath = path.join(getDefaultSpaceRootDir(), 'Existing Project')
+      fs.mkdirSync(occupiedPath, { recursive: true })
+
+      const space = await createSpace({
+        name: 'Existing Project',
+        icon: 'folder'
+      })
+
+      expect(space.path).toBe(path.join(getDefaultSpaceRootDir(), 'Existing Project 1'))
+      expect(fs.existsSync(path.join(space.path, '.skillsfan', 'meta.json'))).toBe(true)
     })
   })
 

@@ -1,9 +1,14 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { DollarSign, Hash, RefreshCw } from 'lucide-react'
 import { api } from '../../api'
 import { StatCard } from './StatCard'
 import { UsageTable } from './UsageTable'
+import {
+  getHistorySummaryColumnCount,
+  USAGE_STAT_CARD_WIDTH,
+  useUsageCardColumns,
+} from './usage-card-layout'
 import { formatTokenCount, formatCost } from '../../utils/chart-colors'
 import type { UsageHistoryResponse, UsageHistoryQuery } from '../../../shared/types/usage'
 
@@ -36,6 +41,8 @@ export function HistoryStats({ isActive }: HistoryStatsProps) {
   const [isTableLoading, setIsTableLoading] = useState(false)
   const [datePreset, setDatePreset] = useState<DateRangePreset>('7d')
   const [granularity, setGranularity] = useState<Granularity>('day')
+  const summaryContainerRef = useRef<HTMLDivElement | null>(null)
+  const summaryColumnCount = useUsageCardColumns(summaryContainerRef, getHistorySummaryColumnCount, 2)
 
   const fetchTodayData = useCallback(async (forceRefresh = false) => {
     setIsTodayLoading(true)
@@ -112,7 +119,11 @@ export function HistoryStats({ isActive }: HistoryStatsProps) {
         <h3 className="text-sm font-medium text-foreground">{t("Today's Summary")}</h3>
       </div>
 
-      <div className="flex flex-wrap gap-3">
+      <div
+        ref={summaryContainerRef}
+        className="grid justify-start gap-3"
+        style={{ gridTemplateColumns: `repeat(${summaryColumnCount}, ${USAGE_STAT_CARD_WIDTH}px)` }}
+      >
         <StatCard
           icon={DollarSign}
           label={t("Today's Total Cost")}

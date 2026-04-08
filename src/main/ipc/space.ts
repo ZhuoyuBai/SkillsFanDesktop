@@ -16,7 +16,7 @@ import {
   listWorkspaceFiles,
   isExistingDirectory
 } from '../services/space.service'
-import { getSpacesDir, setActiveSpaceId } from '../services/config.service'
+import { getDefaultSpaceRootDir, setActiveSpaceId } from '../services/config.service'
 import { ipcHandle } from './utils'
 
 // Import types for preferences
@@ -54,7 +54,7 @@ export function registerSpaceHandlers(): void {
       updateSpace(spaceId, updates)
   )
 
-  ipcHandle('space:get-default-path', () => getSpacesDir())
+  ipcHandle('space:get-default-path', () => getDefaultSpaceRootDir())
 
   // Select folder dialog (for custom space location)
   ipcHandle('dialog:select-folder', async () => {

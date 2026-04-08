@@ -18,6 +18,10 @@ import { ModelSelector } from '../layout/ModelSelector'
 import { TerminalStatusOverlay } from './TerminalStatusOverlay'
 import { TerminalSetupGuide } from './TerminalSetupGuide'
 import { describeTerminalLaunchError } from './terminal-error'
+import {
+  SHIFT_ENTER_NEWLINE_PASTE_TEXT,
+  shouldHandleShiftEnterNewline,
+} from './input-shortcuts'
 import { canLaunchTerminal } from '../../types'
 import { DesktopPet } from '../pet/DesktopPet'
 
@@ -224,6 +228,24 @@ export function TerminalSessionPane({
 
     return () => observer.disconnect()
   }, [])
+
+  useEffect(() => {
+    const term = xtermRef.current
+    if (!term) return
+
+    term.attachCustomKeyEventHandler((event: KeyboardEvent) => {
+      if (!config?.terminal?.shiftEnterNewline) {
+        return true
+      }
+
+      if (shouldHandleShiftEnterNewline(event)) {
+        term.paste(SHIFT_ENTER_NEWLINE_PASTE_TEXT)
+        return false
+      }
+
+      return true
+    })
+  }, [config?.terminal?.shiftEnterNewline, terminalId])
 
   const handleRestart = useCallback(async () => {
     setIsExited(false)

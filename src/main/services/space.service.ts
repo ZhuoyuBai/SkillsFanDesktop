@@ -5,6 +5,7 @@
 import { shell } from 'electron'
 import { randomUUID } from 'crypto'
 import { join, basename, extname } from 'path'
+import { homedir } from 'os'
 import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, statSync, rmSync } from 'fs'
 import { atomicWriteJsonSync } from '../utils/atomic-write'
 import * as fs from 'fs/promises'
@@ -49,7 +50,7 @@ interface SpaceMeta {
 
 // Space index for tracking custom path spaces
 interface SpaceIndex {
-  customPaths: string[]  // Array of paths to spaces outside ~/.skillsfan/spaces/
+  customPaths: string[]  // Tracked spaces outside the legacy managed spaces directory
 }
 
 // New Space uses this directory name
@@ -82,6 +83,24 @@ export function isExistingDirectory(targetPath: string): boolean {
   } catch {
     return false
   }
+}
+
+function getDefaultSpacePath(name: string): string {
+  const rootDir = homedir()
+  const candidate = join(rootDir, name)
+
+  if (!existsSync(candidate)) {
+    return candidate
+  }
+
+  let counter = 1
+  let uniquePath = `${candidate} ${counter}`
+  while (existsSync(uniquePath)) {
+    counter += 1
+    uniquePath = `${candidate} ${counter}`
+  }
+
+  return uniquePath
 }
 
 function getSpaceIndexPath(): string {
@@ -308,15 +327,16 @@ export function listSpaces(): Space[] {
 export function createSpace(input: { name: string; icon: string; iconColor?: string; customPath?: string }): Space {
   const id = randomUUID()
   const now = new Date().toISOString()
-  const isCustomPath = !!input.customPath
 
   // Determine space path
   let spacePath: string
   if (input.customPath) {
     spacePath = input.customPath
   } else {
-    spacePath = join(getSpacesDir(), input.name)
+    spacePath = getDefaultSpacePath(input.name)
   }
+
+  const shouldTrackInIndex = !spacePath.startsWith(getSpacesDir())
 
   // Create directories
   mkdirSync(spacePath, { recursive: true })
@@ -335,8 +355,8 @@ export function createSpace(input: { name: string; icon: string; iconColor?: str
 
   atomicWriteJsonSync(join(spacePath, SPACE_DATA_DIR, 'meta.json'), meta, { backup: true })
 
-  // Register custom path in index
-  if (isCustomPath) {
+  // Track spaces outside the legacy managed directory so they still appear in the UI.
+  if (shouldTrackInIndex) {
     addToSpaceIndex(spacePath)
   }
 

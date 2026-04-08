@@ -1,9 +1,14 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Activity, DollarSign, Hash, Clock } from 'lucide-react'
 import { api } from '../../api'
 import { StatCard } from './StatCard'
 import { SpeedChart } from './SpeedChart'
+import {
+  getRealtimeMonitorColumnCount,
+  USAGE_STAT_CARD_WIDTH,
+  useUsageCardColumns,
+} from './usage-card-layout'
 import { formatTokenCount, formatCost } from '../../utils/chart-colors'
 import type { UsageRealtimeData } from '../../../shared/types/usage'
 
@@ -26,6 +31,8 @@ export function projectFiveHourCost(costPerMinute?: number | null): number | nul
 export function RealtimeMonitor({ isActive }: RealtimeMonitorProps) {
   const { t } = useTranslation()
   const [data, setData] = useState<UsageRealtimeData | null>(null)
+  const containerRef = useRef<HTMLDivElement | null>(null)
+  const columnCount = useUsageCardColumns(containerRef, getRealtimeMonitorColumnCount, 4)
 
   const fetchData = useCallback(async () => {
     try {
@@ -58,21 +65,25 @@ export function RealtimeMonitor({ isActive }: RealtimeMonitorProps) {
     <div className="w-full min-w-0 space-y-4">
       <h3 className="text-sm font-medium text-foreground">{t('Realtime Usage')}</h3>
 
-      <div className="flex flex-wrap gap-3">
+      <div
+        ref={containerRef}
+        className="grid justify-start gap-3"
+        style={{ gridTemplateColumns: `repeat(${columnCount}, ${USAGE_STAT_CARD_WIDTH}px)` }}
+      >
         <StatCard
-          className="w-full flex-none sm:w-[240px] lg:w-[260px]"
+          className="min-w-0"
           icon={Activity}
           label={t('Current Speed')}
           value={currentSpeed ? `${formatTokenCount(currentSpeed.tokensPerMinute)} tok/min` : '0 tok/min'}
         />
         <StatCard
-          className="w-full flex-none sm:w-[240px] lg:w-[260px]"
+          className="min-w-0"
           icon={DollarSign}
           label={t('Current Cost')}
           value={currentSpeed ? `${formatCost(currentSpeed.costPerMinute)}/min` : `${formatCost(0)}/min`}
         />
         <StatCard
-          className="w-full flex-none sm:w-[240px] lg:w-[260px]"
+          className="min-w-0"
           icon={Hash}
           label={t('Projected 5h Usage')}
           value={projectedFiveHourTokens != null
@@ -81,7 +92,7 @@ export function RealtimeMonitor({ isActive }: RealtimeMonitorProps) {
           }
         />
         <StatCard
-          className="w-full flex-none sm:w-[240px] lg:w-[260px]"
+          className="min-w-0"
           icon={Clock}
           label={t('Projected 5h Cost')}
           value={projectedFiveHourCost != null ? formatCost(projectedFiveHourCost) : formatCost(0)}

@@ -93,35 +93,6 @@ export const api = {
     return { success: false, error: 'Reset to default is only available in desktop mode' }
   },
 
-  // ===== Memory =====
-  clearMemory: async (scope: 'space' | 'all', spaceId?: string): Promise<ApiResponse> => {
-    if (isElectron()) {
-      return window.skillsfan.clearMemory(scope, spaceId)
-    }
-    return httpRequest('POST', '/api/memory/clear', { scope, spaceId })
-  },
-
-  readMemoryMd: async (spaceId: string): Promise<ApiResponse> => {
-    if (isElectron()) {
-      return window.skillsfan.readMemoryMd(spaceId)
-    }
-    return httpRequest('GET', `/api/memory/read-md?spaceId=${spaceId}`)
-  },
-
-  saveMemoryMd: async (spaceId: string, content: string): Promise<ApiResponse> => {
-    if (isElectron()) {
-      return window.skillsfan.saveMemoryMd(spaceId, content)
-    }
-    return httpRequest('POST', '/api/memory/save-md', { spaceId, content })
-  },
-
-  getMemoryStats: async (spaceId: string): Promise<ApiResponse> => {
-    if (isElectron()) {
-      return window.skillsfan.getMemoryStats(spaceId)
-    }
-    return httpRequest('GET', `/api/memory/stats?spaceId=${spaceId}`)
-  },
-
   // ===== Space =====
   setActiveSpace: async (spaceId: string): Promise<ApiResponse> => {
     if (isElectron()) {

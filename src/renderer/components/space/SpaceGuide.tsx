@@ -116,7 +116,7 @@ export function SpaceGuide() {
                     <p>{t('Use Halo space')}</p>
                     <p>{t('Suitable for default space')}</p>
                     <p className="text-muted-foreground/70 font-mono text-[11px]">
-                      {platform.isMac ? '~/.skillsfan/spaces/{项目名}' : '%USERPROFILE%\\.skillsfan\\spaces\\{项目名}'}
+                      {platform.isMac ? '~/{项目名}' : '%USERPROFILE%\\{项目名}'}
                     </p>
                   </div>
                   {/* Custom space */}

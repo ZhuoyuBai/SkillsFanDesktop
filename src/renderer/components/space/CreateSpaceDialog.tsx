@@ -33,7 +33,7 @@ export function CreateSpaceDialog({ isOpen, onClose, onCreated }: CreateSpaceDia
   const [newSpaceIconColor, setNewSpaceIconColor] = useState<SpaceIconColorId>(DEFAULT_SPACE_ICON_COLOR)
   const [useCustomPath, setUseCustomPath] = useState(false)
   const [customPath, setCustomPath] = useState<string | null>(null)
-  const [defaultPath, setDefaultPath] = useState<string>('~/.skillsfan/spaces')
+  const [defaultPath, setDefaultPath] = useState<string>('~')
   const [showAdvanced, setShowAdvanced] = useState(false)
 
   // Ref for space name input
