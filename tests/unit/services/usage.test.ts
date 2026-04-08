@@ -2,34 +2,52 @@ import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest'
 import fs from 'fs'
 import path from 'path'
 
-import { getHaloDir, initializeApp } from '../../../src/main/services/config.service'
+import { getHaloDir, initializeApp, saveConfig } from '../../../src/main/services/config.service'
 
-function writeTranscript(records: Array<{
+function writeTranscriptToDir(projectsDir: string, records: Array<{
   timestamp: string
   sessionId: string
+  model?: string
   inputTokens: number
   outputTokens: number
+  cacheReadTokens?: number
+  cacheCreationTokens?: number
   costUSD?: number
 }>): void {
-  const projectsDir = path.join(getHaloDir(), 'claude-code', 'embedded', 'projects', 'test-project')
   fs.mkdirSync(projectsDir, { recursive: true })
 
   const lines = records.map((record) => JSON.stringify({
     type: 'assistant',
     timestamp: record.timestamp,
     sessionId: record.sessionId,
-    costUSD: record.costUSD ?? 0.01,
+    ...(record.costUSD != null ? { costUSD: record.costUSD } : {}),
     message: {
       role: 'assistant',
-      model: 'claude-sonnet-4',
+      model: record.model ?? 'claude-sonnet-4',
       usage: {
         input_tokens: record.inputTokens,
         output_tokens: record.outputTokens,
+        cache_read_input_tokens: record.cacheReadTokens,
+        cache_creation_input_tokens: record.cacheCreationTokens,
       },
     },
   }))
 
   fs.writeFileSync(path.join(projectsDir, 'session.jsonl'), `${lines.join('\n')}\n`)
+}
+
+function writeTranscript(records: Parameters<typeof writeTranscriptToDir>[1]): void {
+  writeTranscriptToDir(
+    path.join(getHaloDir(), 'claude-code', 'embedded', 'projects', 'test-project'),
+    records
+  )
+}
+
+function writeNativeTranscript(records: Parameters<typeof writeTranscriptToDir>[1]): void {
+  writeTranscriptToDir(
+    path.join(path.dirname(getHaloDir()), '.claude', 'projects', 'test-project'),
+    records
+  )
 }
 
 async function loadUsageService() {
@@ -76,7 +94,7 @@ describe('Usage Service', () => {
     expect(realtime.speedSamples.some((sample) => sample.tokensPerMinute > 0)).toBe(true)
   })
 
-  it('only calculates speed from completed one-minute buckets', async () => {
+  it('includes the current in-progress minute in realtime speed samples', async () => {
     vi.setSystemTime(new Date('2026-04-07T10:00:00.000Z'))
     const { getUsageRealtime } = await loadUsageService()
 
@@ -104,10 +122,140 @@ describe('Usage Service', () => {
     const completedMinute = realtime.speedSamples.find(
       (sample) => sample.timestamp === Date.parse('2026-04-07T10:01:00.000Z')
     )
-    const latestClosedMinute = realtime.speedSamples[realtime.speedSamples.length - 1]
+    const currentMinute = realtime.speedSamples[realtime.speedSamples.length - 1]
 
     expect(completedMinute?.tokensPerMinute).toBe(120)
-    expect(latestClosedMinute.timestamp).toBe(Date.parse('2026-04-07T10:02:00.000Z'))
-    expect(latestClosedMinute.tokensPerMinute).toBe(0)
+    expect(currentMinute.timestamp).toBe(Date.parse('2026-04-07T10:03:00.000Z'))
+    expect(currentMinute.tokensPerMinute).toBe(360)
+  })
+
+  it('tracks non-cache speed separately for realtime pet tiers', async () => {
+    vi.setSystemTime(new Date('2026-04-07T10:00:00.000Z'))
+    const { getUsageRealtime } = await loadUsageService()
+
+    writeTranscript([
+      {
+        timestamp: '2026-04-07T10:03:10.000Z',
+        sessionId: 'session-after-restart',
+        inputTokens: 100,
+        outputTokens: 20,
+        cacheReadTokens: 300,
+        cacheCreationTokens: 180,
+      },
+    ])
+
+    vi.setSystemTime(new Date('2026-04-07T10:03:20.000Z'))
+    const realtime = getUsageRealtime()
+    const currentMinute = realtime.speedSamples[realtime.speedSamples.length - 1]
+
+    expect(currentMinute?.tokensPerMinute).toBe(600)
+    expect(currentMinute?.nonCacheTokensPerMinute).toBe(120)
+  })
+
+  it('does not price cache tokens at the input rate when cache pricing is unavailable', async () => {
+    vi.setSystemTime(new Date('2026-04-07T10:00:00.000Z'))
+    const { getUsageRealtime } = await loadUsageService()
+
+    writeTranscript([
+      {
+        timestamp: '2026-04-07T10:03:10.000Z',
+        sessionId: 'session-after-restart',
+        model: 'moonshot-v1-8k',
+        inputTokens: 1000,
+        outputTokens: 500,
+        cacheReadTokens: 2000,
+        cacheCreationTokens: 3000,
+      },
+    ])
+
+    vi.setSystemTime(new Date('2026-04-07T10:03:20.000Z'))
+    const realtime = getUsageRealtime()
+
+    expect(realtime.currentSession.totalTokens).toBe(6500)
+    expect(realtime.currentSession.costUsd).toBeCloseTo(0.000972, 6)
+  })
+
+  it('uses official Claude Code transcripts for realtime in native login mode', async () => {
+    vi.setSystemTime(new Date('2026-04-07T10:00:00.000Z'))
+    const { getUsageRealtime, getUsageHistory } = await loadUsageService()
+    saveConfig({ terminal: { skipClaudeLogin: false } })
+
+    writeTranscript([
+      {
+        timestamp: '2026-04-07T10:03:10.000Z',
+        sessionId: 'embedded-session',
+        model: 'claude-sonnet-4',
+        inputTokens: 80,
+        outputTokens: 20,
+      },
+    ])
+
+    writeNativeTranscript([
+      {
+        timestamp: '2026-04-07T10:04:10.000Z',
+        sessionId: 'native-session',
+        model: 'claude-sonnet-4-5',
+        inputTokens: 120,
+        outputTokens: 30,
+      },
+    ])
+
+    vi.setSystemTime(new Date('2026-04-07T10:04:20.000Z'))
+
+    const realtime = getUsageRealtime()
+    const history = getUsageHistory({
+      granularity: 'day',
+      dateRange: { from: '2026-04-07', to: '2026-04-07' }
+    })
+
+    expect(realtime.currentSession.totalTokens).toBe(150)
+    expect(realtime.currentSession.startedAt).toBe('2026-04-07T10:04:10.000Z')
+    expect(realtime.today.totalTokens).toBe(150)
+    expect(realtime.today.messageCount).toBe(1)
+    expect(history.summary.totalMessages).toBe(2)
+    expect(history.summary.totalInputTokens).toBe(200)
+    expect(history.summary.totalOutputTokens).toBe(50)
+  })
+
+  it('keeps realtime scoped to embedded transcripts in custom API mode while history still merges both sources', async () => {
+    vi.setSystemTime(new Date('2026-04-07T10:00:00.000Z'))
+    const { getUsageRealtime, getUsageHistory } = await loadUsageService()
+    saveConfig({ terminal: { skipClaudeLogin: true } })
+
+    writeTranscript([
+      {
+        timestamp: '2026-04-07T10:04:10.000Z',
+        sessionId: 'embedded-session',
+        model: 'claude-sonnet-4',
+        inputTokens: 90,
+        outputTokens: 10,
+      },
+    ])
+
+    writeNativeTranscript([
+      {
+        timestamp: '2026-04-07T10:05:10.000Z',
+        sessionId: 'native-session',
+        model: 'claude-sonnet-4-5',
+        inputTokens: 120,
+        outputTokens: 30,
+      },
+    ])
+
+    vi.setSystemTime(new Date('2026-04-07T10:05:20.000Z'))
+
+    const realtime = getUsageRealtime()
+    const history = getUsageHistory({
+      granularity: 'day',
+      dateRange: { from: '2026-04-07', to: '2026-04-07' }
+    })
+
+    expect(realtime.currentSession.totalTokens).toBe(100)
+    expect(realtime.currentSession.startedAt).toBe('2026-04-07T10:04:10.000Z')
+    expect(realtime.today.totalTokens).toBe(100)
+    expect(realtime.today.messageCount).toBe(1)
+    expect(history.summary.totalMessages).toBe(2)
+    expect(history.summary.totalInputTokens).toBe(210)
+    expect(history.summary.totalOutputTokens).toBe(40)
   })
 })

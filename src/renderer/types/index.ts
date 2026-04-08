@@ -715,6 +715,10 @@ export function hasAnyAISource(config: HaloConfig): boolean {
   return hasProvider || hasLegacyCustom;
 }
 
+export function canLaunchTerminal(config: HaloConfig): boolean {
+  return config.terminal?.skipClaudeLogin === false || hasAnyAISource(config);
+}
+
 // Check if a specific AI source is configured (logged in or has API key)
 export function isSourceConfigured(aiSources: AISourcesConfig, source: AISourceType): boolean {
   if (source === 'custom') {

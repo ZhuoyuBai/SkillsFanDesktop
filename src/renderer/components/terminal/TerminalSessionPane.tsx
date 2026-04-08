@@ -18,7 +18,7 @@ import { ModelSelector } from '../layout/ModelSelector'
 import { TerminalStatusOverlay } from './TerminalStatusOverlay'
 import { TerminalSetupGuide } from './TerminalSetupGuide'
 import { describeTerminalLaunchError } from './terminal-error'
-import { hasAnyAISource } from '../../types'
+import { canLaunchTerminal } from '../../types'
 import { DesktopPet } from '../pet/DesktopPet'
 
 interface TerminalSessionPaneProps {
@@ -66,6 +66,7 @@ export function TerminalSessionPane({
   const [pendingModelChange, setPendingModelChange] = useState(false)
   const [needsSetup, setNeedsSetup] = useState(false)
   const ptyCreatedRef = useRef(false)
+  const showModelControls = config?.terminal?.skipClaudeLogin !== false
 
   // Initialize xterm.js and connect to PTY
   useEffect(() => {
@@ -73,7 +74,7 @@ export function TerminalSessionPane({
     ptyCreatedRef.current = true
 
     // If no AI source is configured AND not using Claude native login, show setup guide
-    const showSetup = !config || (!hasAnyAISource(config) && config.terminal?.skipClaudeLogin !== false)
+    const showSetup = !config || !canLaunchTerminal(config)
     if (showSetup) {
       setNeedsSetup(true)
     }
@@ -81,6 +82,7 @@ export function TerminalSessionPane({
     const term = new XTerm({
       cursorBlink: true,
       fontSize: 14,
+      lineHeight: 1.12,
       fontFamily: 'Menlo, Monaco, "Courier New", monospace',
       theme: getXtermTheme(),
       allowProposedApi: true,
@@ -291,12 +293,14 @@ export function TerminalSessionPane({
       {/* Toolbar - hidden when setup guide is shown */}
       <div className={`flex items-center justify-between px-4 py-2 border-b border-border bg-card/50 flex-shrink-0 ${needsSetup ? 'hidden' : ''}`}>
         <div className="flex items-center gap-2 min-w-0">
-          <ModelSelector
-            variant="compact"
-            disabled={!hasOutput && !isExited && !startupError}
-            onModelChange={handleModelChange}
-          />
-          {pendingModelChange && (
+          {showModelControls && (
+            <ModelSelector
+              variant="compact"
+              disabled={!hasOutput && !isExited && !startupError}
+              onModelChange={handleModelChange}
+            />
+          )}
+          {showModelControls && pendingModelChange && (
             <span className="text-[11px] text-muted-foreground/60 whitespace-nowrap">
               {t('Effective after new chat')}
             </span>
@@ -350,7 +354,7 @@ export function TerminalSessionPane({
           </>
         )}
 
-        {!needsSetup && config?.desktopPet?.enabled && (
+        {!needsSetup && isActive && config?.desktopPet?.enabled && (
           <DesktopPet isActive={isActive} />
         )}
       </div>

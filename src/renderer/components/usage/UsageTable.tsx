@@ -48,7 +48,6 @@ export function UsageTable({ periods }: UsageTableProps) {
 
   return (
     <div className="w-full">
-      <h4 className="text-sm font-medium text-foreground mb-3">{t('Usage Details')}</h4>
       <div className="overflow-x-auto rounded-lg border border-border/50">
         <table className="w-full text-sm">
           <thead>

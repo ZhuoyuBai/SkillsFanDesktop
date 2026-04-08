@@ -59,6 +59,7 @@ export interface UsageRealtimeData {
   speedSamples: Array<{
     timestamp: number // Unix ms
     tokensPerMinute: number
+    nonCacheTokensPerMinute: number
     costPerMinute: number
   }>
 }

@@ -5,6 +5,7 @@ import {
   type PetActivityState,
   PET_THRESHOLDS,
   HYSTERESIS_COUNT,
+  LIVE_OUTPUT_HOLD_MS,
   POLL_INTERVAL_MS,
 } from './petConstants'
 
@@ -13,8 +14,17 @@ type UsageRealtimeApiResponse = {
   data?: UsageRealtimeData
 }
 
+type PetSpeedSample = {
+  tokensPerMinute: number
+  nonCacheTokensPerMinute?: number
+}
+
+function getIndicatorTokensPerMinute(sample: PetSpeedSample): number {
+  return sample.nonCacheTokensPerMinute ?? sample.tokensPerMinute
+}
+
 export function determineRawState(
-  speedSamples: Array<{ tokensPerMinute: number }>
+  speedSamples: PetSpeedSample[]
 ): PetActivityState {
   if (!speedSamples.length) return 'sleeping'
 
@@ -23,11 +33,11 @@ export function determineRawState(
   const totalWeight = weights.reduce((a, b) => a + b, 0)
 
   const weightedAvg = recent.reduce(
-    (sum, s, i) => sum + s.tokensPerMinute * (weights[i] / totalWeight),
+    (sum, sample, i) => sum + getIndicatorTokensPerMinute(sample) * (weights[i] / totalWeight),
     0
   )
 
-  if (weightedAvg < PET_THRESHOLDS.normal) return 'sleeping'
+  if (weightedAvg < PET_THRESHOLDS.sleeping) return 'sleeping'
   if (weightedAvg <= PET_THRESHOLDS.busy) return 'normal'
   if (weightedAvg <= PET_THRESHOLDS.overwhelmed) return 'busy'
   return 'overwhelmed'
@@ -45,13 +55,46 @@ export function unwrapUsageRealtimeData(
   return response
 }
 
-export function usePetState(): PetActivityState {
+export function mergeLiveOutputState(
+  rawState: PetActivityState,
+  hasLiveOutput: boolean
+): PetActivityState {
+  if (!hasLiveOutput || rawState !== 'sleeping') {
+    return rawState
+  }
+
+  return 'normal'
+}
+
+export interface PetUsageStats {
+  tokensPerMinute: number
+  costPerMinute: number
+}
+
+export interface PetStateResult {
+  activityState: PetActivityState
+  usageStats: PetUsageStats | null
+}
+
+export function usePetState(): PetStateResult {
   const [activityState, setActivityState] = useState<PetActivityState>('sleeping')
+  const [usageStats, setUsageStats] = useState<PetUsageStats | null>(null)
+  const [hasLiveOutput, setHasLiveOutput] = useState(false)
   const pendingState = useRef<PetActivityState>('sleeping')
   const pendingCount = useRef(0)
+  const lastSessionStartedAt = useRef<string | null>(null)
+  const lastTotalTokens = useRef<number | null>(null)
+  const liveOutputTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     let mounted = true
+
+    const clearLiveOutputTimeout = () => {
+      if (liveOutputTimeoutRef.current !== null) {
+        clearTimeout(liveOutputTimeoutRef.current)
+        liveOutputTimeoutRef.current = null
+      }
+    }
 
     const poll = async () => {
       try {
@@ -61,7 +104,37 @@ export function usePetState(): PetActivityState {
         const data = unwrapUsageRealtimeData(response)
         if (!data) return
 
+        const lastSample = data.speedSamples.length
+          ? data.speedSamples[data.speedSamples.length - 1]
+          : null
+        setUsageStats(
+          lastSample
+            ? { tokensPerMinute: lastSample.tokensPerMinute, costPerMinute: lastSample.costPerMinute }
+            : null
+        )
+
         const rawState = determineRawState(data.speedSamples)
+        const sessionStartedAt = data.currentSession.startedAt
+        const totalTokens = data.currentSession.totalTokens
+
+        if (lastSessionStartedAt.current !== sessionStartedAt) {
+          lastSessionStartedAt.current = sessionStartedAt
+          lastTotalTokens.current = totalTokens
+          setHasLiveOutput(false)
+          clearLiveOutputTimeout()
+        } else if (
+          lastTotalTokens.current !== null &&
+          totalTokens > lastTotalTokens.current
+        ) {
+          setHasLiveOutput(true)
+          clearLiveOutputTimeout()
+          liveOutputTimeoutRef.current = setTimeout(() => {
+            setHasLiveOutput(false)
+            liveOutputTimeoutRef.current = null
+          }, LIVE_OUTPUT_HOLD_MS)
+        }
+
+        lastTotalTokens.current = totalTokens
 
         if (rawState === pendingState.current) {
           pendingCount.current++
@@ -82,9 +155,13 @@ export function usePetState(): PetActivityState {
     const timer = setInterval(poll, POLL_INTERVAL_MS)
     return () => {
       mounted = false
+      clearLiveOutputTimeout()
       clearInterval(timer)
     }
   }, [])
 
-  return activityState
+  return {
+    activityState: mergeLiveOutputState(activityState, hasLiveOutput),
+    usageStats,
+  }
 }

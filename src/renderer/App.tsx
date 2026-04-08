@@ -19,7 +19,7 @@ import { Toaster } from './components/ui/Toaster'
 import { api } from './api'
 import { logger } from './lib/logger'
 import type { HaloConfig } from './types'
-import { hasAnyAISource } from './types'
+import { canLaunchTerminal } from './types'
 
 const SpacePage = lazy(() => import('./pages/SpacePage').then(m => ({ default: m.SpacePage })))
 const SettingsPage = lazy(() => import('./pages/SettingsPage').then(m => ({ default: m.SettingsPage })))
@@ -143,7 +143,7 @@ export default function App() {
     if (response.success && response.data) {
       const loadedConfig = response.data as HaloConfig
       setConfig(loadedConfig)
-      if (loadedConfig.isFirstLaunch || !hasAnyAISource(loadedConfig)) {
+      if (loadedConfig.isFirstLaunch || !canLaunchTerminal(loadedConfig)) {
         setView('setup')
       } else {
         setView('space')

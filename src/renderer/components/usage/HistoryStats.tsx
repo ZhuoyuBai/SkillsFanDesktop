@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { DollarSign, Hash, MessageSquare, RefreshCw } from 'lucide-react'
+import { DollarSign, Hash, RefreshCw } from 'lucide-react'
 import { api } from '../../api'
 import { StatCard } from './StatCard'
 import { UsageTable } from './UsageTable'
@@ -23,15 +23,39 @@ function getDateRange(preset: DateRangePreset): { from: string; to: string } | u
   return { from, to }
 }
 
+function getTodayDateRange(): { from: string; to: string } {
+  const today = new Date().toISOString().slice(0, 10)
+  return { from: today, to: today }
+}
+
 export function HistoryStats({ isActive }: HistoryStatsProps) {
   const { t } = useTranslation()
-  const [data, setData] = useState<UsageHistoryResponse | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
+  const [todayData, setTodayData] = useState<UsageHistoryResponse | null>(null)
+  const [tableData, setTableData] = useState<UsageHistoryResponse | null>(null)
+  const [isTodayLoading, setIsTodayLoading] = useState(false)
+  const [isTableLoading, setIsTableLoading] = useState(false)
   const [datePreset, setDatePreset] = useState<DateRangePreset>('7d')
   const [granularity, setGranularity] = useState<Granularity>('day')
 
-  const fetchData = useCallback(async (forceRefresh = false) => {
-    setIsLoading(true)
+  const fetchTodayData = useCallback(async (forceRefresh = false) => {
+    setIsTodayLoading(true)
+    try {
+      const query: UsageHistoryQuery = {
+        granularity: 'day',
+        dateRange: getTodayDateRange(),
+        forceRefresh
+      }
+      const res = await api.getUsageHistory(query)
+      if (res.success && res.data) {
+        setTodayData(res.data as UsageHistoryResponse)
+      }
+    } finally {
+      setIsTodayLoading(false)
+    }
+  }, [])
+
+  const fetchTableData = useCallback(async (forceRefresh = false) => {
+    setIsTableLoading(true)
     try {
       const query: UsageHistoryQuery = {
         granularity,
@@ -40,18 +64,24 @@ export function HistoryStats({ isActive }: HistoryStatsProps) {
       }
       const res = await api.getUsageHistory(query)
       if (res.success && res.data) {
-        setData(res.data as UsageHistoryResponse)
+        setTableData(res.data as UsageHistoryResponse)
       }
     } finally {
-      setIsLoading(false)
+      setIsTableLoading(false)
     }
   }, [granularity, datePreset])
 
   useEffect(() => {
     if (isActive) {
-      fetchData()
+      void fetchTodayData()
     }
-  }, [isActive, fetchData])
+  }, [isActive, fetchTodayData])
+
+  useEffect(() => {
+    if (isActive) {
+      void fetchTableData()
+    }
+  }, [isActive, fetchTableData])
 
   const presetOptions: { value: DateRangePreset; label: string }[] = useMemo(() => [
     { value: '7d', label: t('Last 7 days') },
@@ -66,13 +96,52 @@ export function HistoryStats({ isActive }: HistoryStatsProps) {
     { value: 'month', label: t('Month') },
   ], [t])
 
-  const hasData = data && data.summary.totalMessages > 0
+  const hasTableData = (tableData?.periods.length ?? 0) > 0
+  const todaySummary = todayData?.summary
+
+  const handleRefresh = useCallback(async () => {
+    await Promise.all([
+      fetchTodayData(true),
+      fetchTableData(true),
+    ])
+  }, [fetchTableData, fetchTodayData])
 
   return (
     <div className="w-full min-w-0 space-y-6">
-      {/* Header with filters */}
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <h3 className="text-sm font-medium text-foreground">{t('History')}</h3>
+        <h3 className="text-sm font-medium text-foreground">{t("Today's Summary")}</h3>
+      </div>
+
+      <div className="flex flex-wrap gap-3">
+        <StatCard
+          icon={DollarSign}
+          label={t("Today's Total Cost")}
+          value={todaySummary
+            ? formatCost(todaySummary.totalCostUsd)
+            : isTodayLoading
+              ? '-'
+              : formatCost(0)
+          }
+        />
+        <StatCard
+          icon={Hash}
+          label={t("Today's Total Tokens")}
+          value={todaySummary
+            ? formatTokenCount(
+                todaySummary.totalInputTokens +
+                todaySummary.totalOutputTokens +
+                todaySummary.totalCacheReadTokens +
+                todaySummary.totalCacheCreationTokens
+              )
+            : isTodayLoading
+              ? '-'
+              : formatTokenCount(0)
+          }
+        />
+      </div>
+
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <h4 className="text-sm font-medium text-foreground">{t('History')}</h4>
         <div className="flex items-center gap-2">
           <select
             value={datePreset}
@@ -93,55 +162,28 @@ export function HistoryStats({ isActive }: HistoryStatsProps) {
             ))}
           </select>
           <button
-            onClick={() => fetchData(true)}
-            disabled={isLoading}
+            onClick={() => void handleRefresh()}
+            disabled={isTodayLoading || isTableLoading}
             className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
             title={t('Refresh')}
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-3.5 h-3.5 ${(isTodayLoading || isTableLoading) ? 'animate-spin' : ''}`} />
           </button>
         </div>
       </div>
 
-      {isLoading && !data ? (
+      {isTableLoading && !tableData ? (
         <div className="flex items-center justify-center py-12 text-sm text-muted-foreground">
           {t('Loading usage data...')}
         </div>
-      ) : !hasData ? (
+      ) : !hasTableData ? (
         <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
           <Hash className="w-8 h-8 mb-3 opacity-40" />
           <p className="text-sm">{t('No usage data found')}</p>
           <p className="text-xs mt-1">{t('Start a conversation to see usage stats')}</p>
         </div>
       ) : (
-        <>
-          {/* KPI Cards */}
-          <div className="flex flex-wrap gap-3">
-            <StatCard
-              icon={DollarSign}
-              label={t('Total Cost')}
-              value={formatCost(data!.summary.totalCostUsd)}
-            />
-            <StatCard
-              icon={Hash}
-              label={t('Total Tokens')}
-              value={formatTokenCount(
-                data!.summary.totalInputTokens +
-                data!.summary.totalOutputTokens +
-                data!.summary.totalCacheReadTokens +
-                data!.summary.totalCacheCreationTokens
-              )}
-            />
-            <StatCard
-              icon={MessageSquare}
-              label={t('Messages')}
-              value={data!.summary.totalMessages.toLocaleString()}
-            />
-          </div>
-
-          {/* Detailed Table */}
-          <UsageTable periods={data!.periods} />
-        </>
+        <UsageTable periods={tableData!.periods} />
       )}
     </div>
   )

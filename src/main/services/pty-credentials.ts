@@ -8,7 +8,7 @@
  */
 
 import { homedir } from 'os'
-import { getConfig, getTempSpacePath } from './config.service'
+import { getConfig } from './config.service'
 import { getSpace } from './space.service'
 import { getAISourceManager } from './ai-sources'
 import { resolveAccessibleAiSource } from './ai-sources/hosted-ai-availability'
@@ -54,7 +54,7 @@ export function getWorkingDir(spaceId: string): string {
     return space.path
   }
 
-  return getTempSpacePath()
+  return homedir()
 }
 
 // ============================================

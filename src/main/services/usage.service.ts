@@ -7,7 +7,8 @@
 
 import { basename, join } from 'path'
 import { existsSync, readdirSync, readFileSync, statSync } from 'fs'
-import { getHaloDir, getTempSpacePath } from './config.service'
+import { homedir } from 'os'
+import { getConfig, getHaloDir, getTempSpacePath } from './config.service'
 import { getSpaceMetaDir, listSpaces } from './space.service'
 import type {
   UsageHistoryResponse,
@@ -201,11 +202,14 @@ function estimateCost(
   const resolvedPricing = resolveModelPricing(pricing, inputTokens, outputTokens)
   if (!resolvedPricing) return 0
 
+  const cacheReadRate = resolvedPricing.cacheRead ?? 0
+  const cacheCreationRate = resolvedPricing.cacheCreation ?? 0
+
   return (
     inputTokens * resolvedPricing.input +
     outputTokens * resolvedPricing.output +
-    cacheReadTokens * (resolvedPricing.cacheRead ?? resolvedPricing.input) +
-    cacheCreationTokens * (resolvedPricing.cacheCreation ?? resolvedPricing.input)
+    cacheReadTokens * cacheReadRate +
+    cacheCreationTokens * cacheCreationRate
   ) / 1_000_000
 }
 
@@ -433,16 +437,42 @@ function scanEmbeddedClaudeProjects(): ExtractedRecord[] {
   return scanConversationDir(projectsDir, (name) => name.endsWith('.jsonl'), extractRecordsFromTranscriptFile)
 }
 
-function scanAllUsageRecords(forceRefresh: boolean): { records: ExtractedRecord[]; scannedFiles: number; cacheHit: boolean } {
+function scanNativeClaudeProjects(): ExtractedRecord[] {
+  const projectsDir = join(homedir(), '.claude', 'projects')
+  return scanConversationDir(projectsDir, (name) => name.endsWith('.jsonl'), extractRecordsFromTranscriptFile)
+}
+
+interface UsageScanOptions {
+  forceRefresh: boolean
+  includeLegacy?: boolean
+  includeEmbedded?: boolean
+  includeNative?: boolean
+}
+
+function scanUsageRecords({
+  forceRefresh,
+  includeLegacy = true,
+  includeEmbedded = true,
+  includeNative = true
+}: UsageScanOptions): { records: ExtractedRecord[]; scannedFiles: number; cacheHit: boolean } {
   if (forceRefresh) {
     fileCache.clear()
   }
 
   const initialCacheSize = fileCache.size
-  const records = [
-    ...scanLegacyConversationFiles(),
-    ...scanEmbeddedClaudeProjects()
-  ]
+  const records: ExtractedRecord[] = []
+
+  if (includeLegacy) {
+    records.push(...scanLegacyConversationFiles())
+  }
+
+  if (includeEmbedded) {
+    records.push(...scanEmbeddedClaudeProjects())
+  }
+
+  if (includeNative) {
+    records.push(...scanNativeClaudeProjects())
+  }
 
   return {
     records,
@@ -451,8 +481,32 @@ function scanAllUsageRecords(forceRefresh: boolean): { records: ExtractedRecord[
   }
 }
 
+function scanAllUsageRecords(forceRefresh: boolean): { records: ExtractedRecord[]; scannedFiles: number; cacheHit: boolean } {
+  return scanUsageRecords({
+    forceRefresh,
+    includeLegacy: true,
+    includeEmbedded: true,
+    includeNative: true
+  })
+}
+
+function scanRealtimeUsageRecords(): ExtractedRecord[] {
+  const useNativeClaudeProjects = getConfig().terminal?.skipClaudeLogin === false
+
+  return scanUsageRecords({
+    forceRefresh: false,
+    includeLegacy: true,
+    includeEmbedded: !useNativeClaudeProjects,
+    includeNative: useNativeClaudeProjects
+  }).records
+}
+
 function getRecordTotalTokens(record: ExtractedRecord): number {
   return record.inputTokens + record.outputTokens + record.cacheReadTokens + record.cacheCreationTokens
+}
+
+function getRecordNonCacheTokens(record: ExtractedRecord): number {
+  return record.inputTokens + record.outputTokens
 }
 
 function getDateKey(timestamp: string, granularity: 'day' | 'week' | 'month'): string {
@@ -499,17 +553,19 @@ function buildSpeedSamples(records: ExtractedRecord[]): UsageRealtimeData['speed
   const currentMinuteStart = Math.floor(now / SAMPLE_INTERVAL_MS) * SAMPLE_INTERVAL_MS
   const samples: UsageRealtimeData['speedSamples'] = []
 
-  for (let index = MAX_SAMPLES; index >= 1; index--) {
+  for (let index = MAX_SAMPLES - 1; index >= 0; index--) {
     const bucketStart = currentMinuteStart - index * SAMPLE_INTERVAL_MS
     const bucketEnd = bucketStart + SAMPLE_INTERVAL_MS
 
     let bucketTokens = 0
+    let bucketNonCacheTokens = 0
     let bucketCost = 0
 
     for (const record of records) {
       const timestamp = new Date(record.timestamp).getTime()
       if (timestamp > bucketStart && timestamp <= bucketEnd) {
         bucketTokens += getRecordTotalTokens(record)
+        bucketNonCacheTokens += getRecordNonCacheTokens(record)
         bucketCost += record.costUsd
       }
     }
@@ -517,6 +573,7 @@ function buildSpeedSamples(records: ExtractedRecord[]): UsageRealtimeData['speed
     samples.push({
       timestamp: bucketStart,
       tokensPerMinute: Math.round((bucketTokens / SAMPLE_INTERVAL_MS) * 60_000),
+      nonCacheTokensPerMinute: Math.round((bucketNonCacheTokens / SAMPLE_INTERVAL_MS) * 60_000),
       costPerMinute: Math.round(((bucketCost / SAMPLE_INTERVAL_MS) * 60_000) * 10000) / 10000
     })
   }
@@ -651,7 +708,7 @@ export function getUsageHistory(query: UsageHistoryQuery): UsageHistoryResponse 
 }
 
 export function getUsageRealtime(): UsageRealtimeData {
-  const { records } = scanAllUsageRecords(false)
+  const records = scanRealtimeUsageRecords()
   const todayStr = new Date().toISOString().slice(0, 10)
   const todayRecords = records.filter((record) => record.timestamp && record.timestamp.startsWith(todayStr))
   const appSessionRecords = records.filter((record) => {

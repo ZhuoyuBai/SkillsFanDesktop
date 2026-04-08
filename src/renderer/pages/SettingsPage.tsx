@@ -926,6 +926,11 @@ export function SettingsPage() {
     goBack()
   }
 
+  const handleOpenTerminalModeSettings = () => {
+    setActiveSection('system')
+    setShowTerminalModeDialog(true)
+  }
+
   // Navigation items configuration
   const navItems: { id: SettingsSection; icon: LucideIcon; label: string; desktopOnly?: boolean; hidden?: boolean }[] = [
     { id: 'ai-model', icon: Bot, label: t('AI Model') },
@@ -1010,6 +1015,30 @@ export function SettingsPage() {
           {/* AI Model Section - Grid Layout */}
           {activeSection === 'ai-model' && (
           <section className="space-y-6">
+            {!skipClaudeLogin ? (
+              <div className="rounded-2xl border border-border bg-card/70 p-6">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
+                  <Terminal className="h-6 w-6 text-primary" />
+                </div>
+                <h3 className="mt-4 text-base font-semibold text-foreground">
+                  {t('Currently using Claude Code login')}
+                </h3>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  {t('Sign in with your Claude account. Claude Code will handle authentication in the terminal.')}
+                </p>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  {t('Choose how the terminal authenticates with AI')}
+                </p>
+                <button
+                  onClick={handleOpenTerminalModeSettings}
+                  className="mt-5 inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+                >
+                  <Key className="h-4 w-4" />
+                  {t('Configure Model API')}
+                </button>
+              </div>
+            ) : (
+              <>
             {/* Unified Model Config List (across all providers) */}
             {(() => {
               // Build a flat list of all configured models across all providers
@@ -1137,6 +1166,8 @@ export function SettingsPage() {
               editingProviderId={dialogEditingProviderId}
               editingIndex={dialogEditingIndex}
             />
+              </>
+            )}
           </section>
           )}
 
@@ -1293,75 +1324,75 @@ export function SettingsPage() {
 
               {/* Terminal Mode Switch Dialog */}
               {showTerminalModeDialog && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center">
+                <div className="fixed -inset-2 z-[100] flex items-center justify-center">
                   <div
-                    className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                    className="absolute -inset-2 bg-black/60 backdrop-blur-sm"
                     onClick={() => setShowTerminalModeDialog(false)}
                   />
-                  <div className="relative bg-background rounded-xl shadow-2xl border border-border max-w-lg w-full mx-4 p-6">
-                    <h3 className="text-lg font-semibold text-center mb-2">
+                  <div className="relative bg-background rounded-xl shadow-2xl border border-border max-w-2xl w-full mx-4 p-8">
+                    <button
+                      onClick={() => setShowTerminalModeDialog(false)}
+                      className="absolute top-4 right-4 p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                    <h3 className="text-xl font-semibold text-center mb-2">
                       {t('Switch Terminal Mode')}
                     </h3>
                     <p className="text-sm text-muted-foreground text-center mb-6">
                       {t('Choose how the terminal authenticates with AI')}
                     </p>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-2 gap-6">
                       <button
                         onClick={() => handleTerminalModeSwitch(true)}
-                        className={`flex flex-col items-center gap-3 p-5 rounded-xl border-2 transition-all ${
+                        className={`flex flex-col items-center gap-4 p-8 rounded-xl border-2 transition-all ${
                           !skipClaudeLogin
                             ? 'border-primary bg-primary/5'
                             : 'border-border bg-card hover:border-primary/50 hover:bg-primary/5'
                         }`}
                       >
-                        <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                          <Terminal className="w-6 h-6 text-primary" />
+                        <div className="w-14 h-14 rounded-lg bg-primary/10 flex items-center justify-center">
+                          <Terminal className="w-7 h-7 text-primary" />
                         </div>
                         <div className="text-center">
-                          <p className="text-sm font-semibold text-foreground">
+                          <p className="text-base font-semibold text-foreground">
                             {t('Use Claude Code Login')}
                           </p>
-                          <p className="mt-1 text-xs text-muted-foreground">
+                          <p className="mt-1.5 text-sm text-muted-foreground">
                             {t('Sign in with your Claude account. Claude Code will handle authentication in the terminal.')}
                           </p>
                         </div>
                         {!skipClaudeLogin && (
-                          <span className="text-xs text-primary font-medium">{t('Current')}</span>
+                          <span className="text-sm text-primary font-medium">{t('Current')}</span>
                         )}
                       </button>
 
                       <button
                         onClick={() => handleTerminalModeSwitch(false)}
-                        className={`flex flex-col items-center gap-3 p-5 rounded-xl border-2 transition-all ${
+                        className={`flex flex-col items-center gap-4 p-8 rounded-xl border-2 transition-all ${
                           skipClaudeLogin
                             ? 'border-primary bg-primary/5'
                             : 'border-border bg-card hover:border-primary/50 hover:bg-primary/5'
                         }`}
                       >
-                        <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                          <Key className="w-6 h-6 text-primary" />
+                        <div className="w-14 h-14 rounded-lg bg-primary/10 flex items-center justify-center">
+                          <Key className="w-7 h-7 text-primary" />
                         </div>
                         <div className="text-center">
-                          <p className="text-sm font-semibold text-foreground">
+                          <p className="text-base font-semibold text-foreground">
                             {t('Configure Model API')}
                           </p>
-                          <p className="mt-1 text-xs text-muted-foreground">
+                          <p className="mt-1.5 text-sm text-muted-foreground">
                             {t('Set up an API key for models like Zhipu GLM, DeepSeek, Kimi, etc.')}
                           </p>
                         </div>
                         {skipClaudeLogin && (
-                          <span className="text-xs text-primary font-medium">{t('Current')}</span>
+                          <span className="text-sm text-primary font-medium">{t('Current')}</span>
                         )}
                       </button>
                     </div>
 
-                    <button
-                      onClick={() => setShowTerminalModeDialog(false)}
-                      className="mt-4 w-full py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      {t('Cancel')}
-                    </button>
                   </div>
                 </div>
               )}

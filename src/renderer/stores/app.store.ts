@@ -6,7 +6,7 @@ import { create } from 'zustand'
 import { api } from '../api'
 import i18n from '../i18n'
 import type { HaloConfig, AppView, McpServerStatus } from '../types'
-import { hasAnyAISource } from '../types'
+import { canLaunchTerminal } from '../types'
 import { useSpaceStore } from './space.store'
 import { createLogger } from '../lib/logger'
 
@@ -231,7 +231,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         // Determine initial view based on config
         // Skip onboarding - go directly to setup or space
         // No AI source configured: show setup directly
-        if (!hasAnyAISource(config)) {
+        if (!canLaunchTerminal(config)) {
           appLogger.debug('[Store] No AI source configured, showing setup')
           set({ view: 'setup' })
         } else {

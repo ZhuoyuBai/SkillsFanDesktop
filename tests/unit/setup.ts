@@ -56,6 +56,9 @@ vi.mock('electron', () => {
       getVersion: vi.fn(() => '1.0.0-test'),
       getLocale: vi.fn(() => 'en-US')
     },
+    nativeTheme: {
+      shouldUseDarkColors: false
+    },
     BrowserWindow: vi.fn(() => ({
       webContents: {
         send: vi.fn()

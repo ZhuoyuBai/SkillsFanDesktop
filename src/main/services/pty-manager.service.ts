@@ -342,32 +342,22 @@ export async function resolveClaudeCliEnv(params: {
   const config = getConfig()
   const source = params.source || ((config as Record<string, any>).aiSources?.current || 'custom')
   const skipClaudeLogin = config.terminal?.skipClaudeLogin !== false
+  const sharedClaudeEnv = {
+    // Prevent in-app sessions from attempting self-updates or other
+    // non-essential network calls that users cannot complete from the
+    // bundled runtime.
+    CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1'
+  }
 
-  // When skipClaudeLogin is false (Claude official login mode) and no API credentials
-  // are configured, let Claude Code CLI handle its own authentication flow.
+  // When skipClaudeLogin is false, let Claude Code CLI manage authentication
+  // and model selection itself. Do not inject app-managed API credentials or a
+  // persisted custom model, otherwise new terminals can silently keep using the
+  // previous Custom API provider after the user switches back to Claude login.
   if (!skipClaudeLogin) {
-    try {
-      const credentials = await getApiCredentialsForSource(config, source, params.modelOverride)
-      const transport = await resolveSdkTransport(credentials)
-      return {
-        env: {
-          ANTHROPIC_API_KEY: transport.anthropicApiKey,
-          ANTHROPIC_BASE_URL: transport.anthropicBaseUrl,
-          DISABLE_TELEMETRY: '1',
-          CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1',
-          NO_PROXY: 'localhost,127.0.0.1',
-          no_proxy: 'localhost,127.0.0.1',
-        },
-        model: credentials.model,
-        skipClaudeLogin: false
-      }
-    } catch {
-      console.log('[PTY] No API credentials configured, launching Claude Code with native login flow')
-      return {
-        env: {},
-        model: params.modelOverride || '',
-        skipClaudeLogin: false
-      }
+    return {
+      env: sharedClaudeEnv,
+      model: '',
+      skipClaudeLogin: false
     }
   }
 
@@ -390,10 +380,10 @@ export async function resolveClaudeCliEnv(params: {
 
   return {
     env: {
+      ...sharedClaudeEnv,
       ANTHROPIC_API_KEY: transport.anthropicApiKey,
       ANTHROPIC_BASE_URL: transport.anthropicBaseUrl,
       DISABLE_TELEMETRY: '1',
-      CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1',
       NO_PROXY: 'localhost,127.0.0.1',
       no_proxy: 'localhost,127.0.0.1',
       ...(embeddedClaudeConfigDir ? { CLAUDE_CONFIG_DIR: embeddedClaudeConfigDir } : {}),
@@ -510,15 +500,18 @@ export async function createPty(options: CreatePtyOptions): Promise<{ model: str
       modelOverride
     })
 
-    const args = [cliPath, '--model', model]
+    const args = model ? [cliPath, '--model', model] : [cliPath]
 
     const spawnEnv = {
       ...process.env,
     } as Record<string, string>
 
+    delete spawnEnv.ANTHROPIC_API_KEY
+    delete spawnEnv.ANTHROPIC_BASE_URL
+    delete spawnEnv.CLAUDE_CONFIG_DIR
+
     if (skipClaudeLogin) {
       delete spawnEnv.ANTHROPIC_AUTH_TOKEN
-      delete spawnEnv.CLAUDE_CONFIG_DIR
     }
 
     console.log(
