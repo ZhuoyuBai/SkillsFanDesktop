@@ -632,6 +632,7 @@ export async function createPty(options: CreatePtyOptions): Promise<{ model: str
         // Don't set ELECTRON_NO_ATTACH_CONSOLE - we need TTY interaction
         ...claudeEnv,
         ...(ptyConfig.terminal?.noFlicker ? { CLAUDE_CODE_NO_FLICKER: '1' } : {}),
+        ...(ptyConfig.terminal?.agentTeams ? { CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: '1' } : {}),
       } as Record<string, string>
     })
 

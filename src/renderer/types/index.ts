@@ -227,6 +227,7 @@ export interface TerminalConfig {
   noFlicker: boolean;
   skipPermissions: boolean;
   shiftEnterNewline: boolean;
+  agentTeams: boolean;
 }
 
 export interface SkillSettingsConfig {
@@ -660,7 +661,8 @@ export const DEFAULT_CONFIG: HaloConfig = {
     skipClaudeLogin: true,
     noFlicker: false,
     skipPermissions: false,
-    shiftEnterNewline: false
+    shiftEnterNewline: false,
+    agentTeams: false
   },
   skillSettings: {
     preferNativeClaudeSkillTool: true

@@ -331,6 +331,9 @@ export function SettingsPage() {
   const [shiftEnterNewline, setShiftEnterNewline] = useState(
     config?.terminal?.shiftEnterNewline ?? DEFAULT_CONFIG.terminal!.shiftEnterNewline
   )
+  const [agentTeams, setAgentTeams] = useState(
+    config?.terminal?.agentTeams ?? DEFAULT_CONFIG.terminal!.agentTeams
+  )
   const [desktopPetEnabled, setDesktopPetEnabled] = useState(
     config?.desktopPet?.enabled ?? false
   )
@@ -570,6 +573,31 @@ export function SettingsPage() {
     } catch (error) {
       console.error('[Settings] Failed to toggle shiftEnterNewline:', error)
       setShiftEnterNewline(previousValue)
+      restoreTerminalConfig(previousTerminalConfig)
+    }
+  }
+
+  // Handle Agent Teams toggle
+  const handleAgentTeamsChange = async (enabled: boolean) => {
+    const previousValue = agentTeams
+    const previousTerminalConfig = mergeTerminalConfig(config?.terminal, {})
+    setAgentTeams(enabled)
+    try {
+      const terminalConfig = mergeTerminalConfig(previousTerminalConfig, { agentTeams: enabled })
+      applyTerminalConfigOptimistically(terminalConfig)
+      const result = await api.setConfig({
+        terminal: terminalConfig
+      })
+      if (result.success && result.data) {
+        setConfig(result.data as HaloConfig)
+        addToast(t('Saved'), 'success')
+      } else {
+        setAgentTeams(previousValue)
+        restoreTerminalConfig(previousTerminalConfig)
+      }
+    } catch (error) {
+      console.error('[Settings] Failed to toggle agentTeams:', error)
+      setAgentTeams(previousValue)
       restoreTerminalConfig(previousTerminalConfig)
     }
   }
@@ -1146,6 +1174,17 @@ export function SettingsPage() {
                     </p>
                   </div>
                   <Switch checked={shiftEnterNewline} onChange={handleShiftEnterNewlineChange} />
+                </div>
+
+                {/* Agent Teams */}
+                <div className="flex items-center justify-between pt-4 border-t border-border">
+                  <div className="flex-1">
+                    <p className="font-medium">{t('Agent Teams')}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {t('Enable experimental Agent Teams feature in Claude Code. Takes effect on new sessions')}
+                    </p>
+                  </div>
+                  <Switch checked={agentTeams} onChange={handleAgentTeamsChange} />
                 </div>
               </div>
             </section>

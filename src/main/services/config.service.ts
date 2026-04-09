@@ -261,7 +261,8 @@ const DEFAULT_CONFIG: HaloConfig = {
     skipClaudeLogin: true,
     noFlicker: false,
     skipPermissions: false,
-    shiftEnterNewline: false
+    shiftEnterNewline: false,
+    agentTeams: false
   },
   skillSettings: {
     preferNativeClaudeSkillTool: true
