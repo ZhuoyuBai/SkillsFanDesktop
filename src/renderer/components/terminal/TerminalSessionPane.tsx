@@ -137,7 +137,12 @@ export function TerminalSessionPane({
   const pendingOutputMaskBufferRef = useRef('')
   const pendingOutputMaskFlushTimerRef = useRef<number | null>(null)
   const sessionImagesRef = useRef<TerminalDraftImage[]>([])
+  const tRef = useRef(t)
   const showModelControls = config?.terminal?.skipClaudeLogin !== false
+
+  useEffect(() => {
+    tRef.current = t
+  }, [t])
 
   const clearPendingImages = useCallback(() => {
     pendingImagesRef.current = []
@@ -340,13 +345,43 @@ export function TerminalSessionPane({
     }, TERMINAL_OUTPUT_MASK_FLUSH_MS)
   }, [flushPendingOutputMaskBuffer])
 
+  const startPty = useCallback(async (termOverride?: XTerm | null) => {
+    const term = termOverride ?? xtermRef.current
+    if (!term) {
+      return false
+    }
+
+    const result = await api.ptyCreate({
+      id: terminalId,
+      spaceId,
+      cols: term.cols,
+      rows: term.rows,
+    })
+
+    if (result.success && result.data) {
+      setStartupError(null)
+      setIsPtyReady(true)
+      setNeedsSetup(false)
+      setModel((result.data as any).model || '')
+      return true
+    }
+
+    const issue = describeTerminalLaunchError(result.error, tRef.current)
+    term.writeln(`\x1b[31m${issue.title}\x1b[0m`)
+    term.writeln(`\x1b[90m${issue.message}\x1b[0m`)
+    setStartupError(result.error || tRef.current('Unknown error'))
+    setIsPtyReady(false)
+    setIsExited(true)
+    return false
+  }, [spaceId, terminalId])
+
   // Initialize xterm.js and connect to PTY
   useEffect(() => {
     if (!terminalRef.current || ptyCreatedRef.current) return
     ptyCreatedRef.current = true
 
     // If no AI source is configured AND not using Claude native login, show setup guide
-    const showSetup = !config || !canLaunchTerminal(config)
+    const showSetup = !canLaunchTerminal(useAppStore.getState().config)
     if (showSetup) {
       setNeedsSetup(true)
     }
@@ -466,6 +501,7 @@ export function TerminalSessionPane({
     // Skip PTY creation if setup is needed - user will trigger it via the guide
     if (showSetup) {
       return () => {
+        ptyCreatedRef.current = false
         unsubData()
         unsubExit()
         clearPendingOutputMaskBuffer()
@@ -476,28 +512,10 @@ export function TerminalSessionPane({
       }
     }
 
-    // Create PTY
-    api.ptyCreate({
-      id: terminalId,
-      spaceId,
-      cols: term.cols,
-      rows: term.rows,
-    }).then((result) => {
-      if (result.success && result.data) {
-        setStartupError(null)
-        setIsPtyReady(true)
-        setModel((result.data as any).model || '')
-      } else if (!result.success) {
-        const issue = describeTerminalLaunchError(result.error, t)
-        term.writeln(`\x1b[31m${issue.title}\x1b[0m`)
-        term.writeln(`\x1b[90m${issue.message}\x1b[0m`)
-        setStartupError(result.error || t('Unknown error'))
-        setIsPtyReady(false)
-        setIsExited(true)
-      }
-    })
+    void startPty(term)
 
     return () => {
+      ptyCreatedRef.current = false
       unsubData()
       unsubExit()
       clearPendingOutputMaskBuffer()
@@ -510,14 +528,13 @@ export function TerminalSessionPane({
   }, [
     clearPendingImages,
     clearPendingOutputMaskBuffer,
-    config,
     flushPendingOutputMaskBuffer,
     handleClipboardShortcutPaste,
     savePastedFiles,
     schedulePendingOutputMaskFlush,
+    startPty,
     terminalId,
     spaceId,
-    t,
   ])
 
   // Handle container resize
@@ -617,6 +634,7 @@ export function TerminalSessionPane({
     setStartupError(null)
     setHasOutput(false)
     setIsPtyReady(false)
+    setNeedsSetup(false)
     clearPendingImages()
     clearPendingOutputMaskBuffer()
     pendingSubmitMaskRef.current = null
@@ -629,26 +647,8 @@ export function TerminalSessionPane({
       term.reset()
     }
 
-    const result = await api.ptyCreate({
-      id: terminalId,
-      spaceId,
-      cols: term?.cols || 80,
-      rows: term?.rows || 24,
-    })
-
-    if (result.success && result.data) {
-      setStartupError(null)
-      setIsPtyReady(true)
-      setModel((result.data as any).model || '')
-    } else if (!result.success) {
-      const issue = describeTerminalLaunchError(result.error, t)
-      term?.writeln(`\x1b[31m${issue.title}\x1b[0m`)
-      term?.writeln(`\x1b[90m${issue.message}\x1b[0m`)
-      setStartupError(result.error || t('Unknown error'))
-      setIsPtyReady(false)
-      setIsExited(true)
-    }
-  }, [clearPendingImages, clearPendingOutputMaskBuffer, terminalId, spaceId, t])
+    await startPty(term ?? null)
+  }, [clearPendingImages, clearPendingOutputMaskBuffer, startPty, terminalId])
 
   const handleModelChange = useCallback(() => {
     setPendingModelChange(true)
@@ -685,6 +685,14 @@ export function TerminalSessionPane({
   const handleChooseApiSetup = useCallback(() => {
     openSettingsWithSection('ai-model')
   }, [openSettingsWithSection])
+
+  useEffect(() => {
+    if (!needsSetup || !config || !canLaunchTerminal(config)) {
+      return
+    }
+
+    void handleRestart()
+  }, [config, handleRestart, needsSetup])
 
   return (
     <div className={isActive ? 'absolute inset-0 flex min-h-0 flex-col bg-background' : 'hidden'}>
