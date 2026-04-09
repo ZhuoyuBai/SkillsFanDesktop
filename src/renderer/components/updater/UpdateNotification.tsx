@@ -1,6 +1,6 @@
 /**
  * Update Notification Component
- * Shows a toast card in the top-right corner for available updates
+ * Shows a toast card in the top-right corner for available updates.
  */
 
 import { X } from 'lucide-react'
@@ -10,11 +10,7 @@ import { useUpdaterStore } from '../../stores/updater.store'
 
 export function UpdateNotification() {
   const { t } = useTranslation()
-  const { status, errorMessage, dismissed, dismiss } = useUpdaterStore()
-
-  const handleRetry = async () => {
-    await api.checkForUpdates()
-  }
+  const { status, dismissed, dismiss } = useUpdaterStore()
 
   const handleOpenDownloadPage = () => {
     api.openDownloadPage()
@@ -22,8 +18,7 @@ export function UpdateNotification() {
 
   if (dismissed) return null
 
-  const showStatuses = ['available', 'error']
-  if (!showStatuses.includes(status)) return null
+  if (status !== 'available') return null
 
   return (
     <div className="fixed top-4 right-4 z-50 w-72 animate-in slide-in-from-right duration-300 no-drag">
@@ -32,12 +27,10 @@ export function UpdateNotification() {
         <div className="flex items-start justify-between p-4 pb-2">
           <div>
             <h4 className="text-sm font-semibold text-foreground">
-              {status === 'available' && t('Version update available')}
-              {status === 'error' && t('Update check failed')}
+              {t('Version update available')}
             </h4>
             <p className="text-xs text-muted-foreground mt-1">
-              {status === 'available' && t('Update now to experience new features')}
-              {status === 'error' && (errorMessage || t('Please check your network and try again'))}
+              {t('Update now to experience new features')}
             </p>
           </div>
           <button
@@ -50,31 +43,12 @@ export function UpdateNotification() {
 
         {/* Action buttons */}
         <div className="px-4 pb-4 pt-2">
-          {status === 'available' && (
-            <button
-              onClick={handleOpenDownloadPage}
-              className="w-full py-2 bg-foreground hover:bg-foreground/90 text-background text-xs font-medium rounded-lg transition-colors"
-            >
-              {t('Download from website')}
-            </button>
-          )}
-
-          {status === 'error' && (
-            <div className="flex gap-2">
-              <button
-                onClick={handleOpenDownloadPage}
-                className="flex-1 py-2 bg-secondary hover:bg-secondary/80 text-secondary-foreground text-xs font-medium rounded-lg transition-colors"
-              >
-                {t('Download from website')}
-              </button>
-              <button
-                onClick={handleRetry}
-                className="flex-1 py-2 bg-foreground hover:bg-foreground/90 text-background text-xs font-medium rounded-lg transition-colors"
-              >
-                {t('Retry')}
-              </button>
-            </div>
-          )}
+          <button
+            onClick={handleOpenDownloadPage}
+            className="w-full py-2 bg-foreground hover:bg-foreground/90 text-background text-xs font-medium rounded-lg transition-colors"
+          >
+            {t('Download from website')}
+          </button>
         </div>
       </div>
     </div>

@@ -327,6 +327,7 @@
   "Reinstall dependencies or rebuild the app to restore the terminal runtime.": "Reinstall dependencies or rebuild the app to restore the terminal runtime.",
   "Reinstall or rebuild the app so the bundled Claude Code CLI is available.": "Reinstall or rebuild the app so the bundled Claude Code CLI is available.",
   "Rename terminal": "Rename terminal",
+  "Remove terminal image": "Remove terminal image",
   "Replace Existing": "Replace Existing",
   "Reports, proposals, emails—tell Halo what you need and it will draft it.": "Reports, proposals, emails—tell Halo what you need and it will draft it.",
   "Research with the web": "Research with the web",

@@ -25,6 +25,18 @@ interface ApiResponse<T = unknown> {
   error?: string
 }
 
+interface TerminalClipboardImage {
+  filePath: string
+  name: string
+  size: number
+  mediaType: string
+}
+
+type TerminalClipboardPaste =
+  | { kind: 'image'; image: TerminalClipboardImage }
+  | { kind: 'text'; text: string }
+  | { kind: 'empty' }
+
 /**
  * API object - drop-in replacement for window.skillsfan
  * Works in both Electron and remote web mode
@@ -911,6 +923,25 @@ export const api = {
       return () => { } // No-op in remote mode
     }
     return window.skillsfan.onWindowMaximizeChange(callback)
+  },
+
+  readTerminalClipboard: async (terminalId: string): Promise<ApiResponse<TerminalClipboardPaste>> => {
+    if (!isElectron()) {
+      return { success: false, error: 'Clipboard images only available in desktop app' }
+    }
+    return window.skillsfan.readTerminalClipboard(terminalId) as Promise<ApiResponse<TerminalClipboardPaste>>
+  },
+
+  saveTerminalImage: async (request: {
+    terminalId: string
+    base64Data: string
+    mediaType?: string
+    name?: string
+  }): Promise<ApiResponse<TerminalClipboardImage>> => {
+    if (!isElectron()) {
+      return { success: false, error: 'Clipboard images only available in desktop app' }
+    }
+    return window.skillsfan.saveTerminalImage(request) as Promise<ApiResponse<TerminalClipboardImage>>
   },
 
   // ===== Event Listeners =====

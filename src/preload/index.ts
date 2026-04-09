@@ -243,6 +243,33 @@ export interface SkillsFanAPI {
   toggleMaximizeWindow: () => Promise<IpcResponse<boolean>>
   onWindowMaximizeChange: (callback: (isMaximized: boolean) => void) => () => void
 
+  // Terminal images
+  readTerminalClipboard: (terminalId: string) => Promise<IpcResponse<{
+    kind: 'image'
+    image: {
+      filePath: string
+      name: string
+      size: number
+      mediaType: string
+    }
+  } | {
+    kind: 'text'
+    text: string
+  } | {
+    kind: 'empty'
+  }>>
+  saveTerminalImage: (request: {
+    terminalId: string
+    base64Data: string
+    mediaType?: string
+    name?: string
+  }) => Promise<IpcResponse<{
+    filePath: string
+    name: string
+    size: number
+    mediaType: string
+  }>>
+
   // Search
   search: (
     query: string,
@@ -644,6 +671,10 @@ const api: SkillsFanAPI = {
   isWindowMaximized: () => ipcRenderer.invoke('window:is-maximized'),
   toggleMaximizeWindow: () => ipcRenderer.invoke('window:toggle-maximize'),
   onWindowMaximizeChange: (callback) => createEventListener('window:maximize-change', callback as (data: unknown) => void),
+
+  // Terminal images
+  readTerminalClipboard: (terminalId) => ipcRenderer.invoke('terminal-image:read-clipboard', terminalId),
+  saveTerminalImage: (request) => ipcRenderer.invoke('terminal-image:save', request),
 
   // Search
   search: (query, scope, conversationId, spaceId) =>

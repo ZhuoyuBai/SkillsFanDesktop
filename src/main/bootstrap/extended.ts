@@ -24,6 +24,7 @@ import { initializeRegistry, startSkillWatcher } from '../services/skill'
 import { registerExtensionHandlers } from '../ipc/extension'
 import { registerUsageHandlers } from '../ipc/usage'
 import { registerPtyHandlers } from '../ipc/pty'
+import { registerTerminalImageHandlers } from '../ipc/terminal-image'
 import { destroyAllPtys } from '../services/pty-manager.service'
 import { initializeExtensions as initExtensions, shutdownExtensions } from '../services/extension'
 
@@ -58,6 +59,7 @@ export function initializeExtendedServices(mainWindow: BrowserWindow): void {
 
   // PTY: Embedded Claude Code CLI terminal in Canvas
   registerPtyHandlers(mainWindow)
+  registerTerminalImageHandlers()
 
   // Usage Statistics: Token usage and cost tracking
   registerUsageHandlers()

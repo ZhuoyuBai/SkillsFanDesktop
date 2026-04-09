@@ -327,6 +327,7 @@
   "Reinstall dependencies or rebuild the app to restore the terminal runtime.": "请重新安装依赖，或重新构建应用，以恢复终端运行时。",
   "Reinstall or rebuild the app so the bundled Claude Code CLI is available.": "请重新安装或重新构建应用，以恢复内置的 Claude Code CLI。",
   "Rename terminal": "重命名终端",
+  "Remove terminal image": "移除终端图片",
   "Replace Existing": "替换现有",
   "Reports, proposals, emails—tell Halo what you need and it will draft it.": "报告、邮件、方案——说一句话，初稿就来了",
   "Research with the web": "使用网络研究",
