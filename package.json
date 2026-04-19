@@ -1,6 +1,6 @@
 {
   "name": "skillsfan",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "技能范 - AI 技能助手",
   "type": "module",
   "main": "./out/main/index.mjs",
@@ -45,7 +45,7 @@
     "i18n": "npm run i18n:extract && npm run i18n:translate"
   },
   "dependencies": {
-    "@anthropic-ai/claude-code": "2.1.96",
+    "@anthropic-ai/claude-code": "2.1.105",
     "@anthropic-ai/sdk": "0.71.0",
     "@electron-toolkit/preload": "^3.0.0",
     "@electron-toolkit/utils": "^3.0.0",
